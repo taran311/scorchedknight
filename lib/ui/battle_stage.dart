@@ -806,8 +806,8 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     final nEffects = [r.damage.poison, r.damage.burn, r.damage.frost, r.damage.smite].where((n) => n > 0).length;
     final dragonFire = (r.dragon != null && r.dragon!.name != 'Egg') || r.pet != null;
     // The foe's turn comes once your blow, its effects and any dragon fire have landed.
-    final counterAt = math.max(hitAt + 160 * nEffects + 260, dragonFire ? hitAt + 760.0 : 0.0);
-    final end = [950.0, hitAt + 160 * nEffects + 60, if (dragonFire) hitAt + 580, if (r.counter != null) counterAt + 700, if (r.knockedOut || r.cheatedDeath) counterAt + 170 + _reapMs].reduce(math.max);
+    final counterAt = math.max(hitAt + 160 * nEffects + 360, dragonFire ? hitAt + 760.0 : 0.0);
+    final end = [950.0, hitAt + 160 * nEffects + 60, if (dragonFire) hitAt + 580, if (r.counter != null) counterAt + 760, if (r.knockedOut || r.cheatedDeath) counterAt + strikeMs + _reapMs].reduce(math.max);
     // Mounted: the day's first strike opens with a charge, played before the blow.
     if (r.chargeHit > 0 && r.mount != null) _playCharge(r);
     final d0 = _slot(end);
@@ -884,7 +884,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
           _knightClipStart = now;
           // A step in behind the blow (a full charge for a bash), then back to your mark.
           _tween('dash', bash ? 1 : .92, swingHitMs * .75, ease: easeOut);
-          _tween('dash', 0, 240, delay: swingHitMs + 40, ease: easeInOut);
+          _tween('dash', 0, 320, delay: swingHitMs + 80, ease: easeInOut);
         });
         if (bash) {
           // The ground cracks where it lands: dust thrown out both ways, and the screen jolts.
@@ -895,7 +895,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
             _impact(.8);
           });
         }
-        _at(d0 + swingHitMs - 70, () {
+        _at(d0 + swingHitMs - 110, () {
           _trail = (now, bash ? const Color(0xFFFFF2C0) : _bladeColour, bash, r.damage.crit);
           Audio.play(Sfx.swing, power: bash ? 1.3 : 1);
         });
@@ -1120,34 +1120,36 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       _at(at, () {
         if (_foe.aloft && (_foe.strike == Strike.melee || _foe.strike == Strike.fire)) {
           // Things with wings dive at you, then climb back up.
-          _tween('swoop', 1, 230, ease: easeIn);
-          _tween('swoop', 0, 520, delay: 260, ease: easeOut);
+          _tween('swoop', 1, strikeMs, ease: easeIn);
+          _tween('swoop', 0, 520, delay: strikeMs + 40, ease: easeOut);
         }
         switch (_foe.strike) {
           case Strike.melee:
             if (!_foe.aloft) {
-              _tween('lunge', 1, 160, ease: easeOut);
-              _tween('lunge', 0, 340, delay: 220);
+              // A wind-up and a lunge that lands at [strikeMs], the same pace as your own swing.
+              _tween('lunge', -.12, 100, ease: easeOut);
+              _tween('lunge', 1, strikeMs - 100, delay: 100, ease: easeIn);
+              _tween('lunge', 0, 360, delay: strikeMs + 80);
             }
           case Strike.arrow:
             // An archer looses an arrow at you.
             _tween('lunge', .25, 100, ease: easeOut);
-            _tween('lunge', 0, 200, delay: 120);
-            _shots.add(_Projectile('arrow', _foeChest + const Offset(-30, -10), to, now, 170, const Color(0x00000000)));
+            _tween('lunge', 0, 260, delay: 140);
+            _at(strikeMs - 170, () => _shots.add(_Projectile('arrow', _foeChest + const Offset(-30, -10), to, now, 170, const Color(0x00000000))));
           case Strike.magic:
             // A caster hurls a bolt of dark magic.
-            _shots.add(_Projectile('bolt', _foeChest + const Offset(-30, -30), to, now, 170, const Color(0xFFB07AFF)));
             _spark('curse', _foeChest + const Offset(-30, -30), 8, speed: 2, life: 400, radius: 3, gravity: 0);
+            _at(strikeMs - 170, () => _shots.add(_Projectile('bolt', _foeChest + const Offset(-30, -30), to, now, 170, const Color(0xFFB07AFF))));
           case Strike.fire:
             // Fire pours across the field at you.
             for (var j = 0; j < 5; j++) {
-              _at(j * 30.0, () => _spark('fire', _foeChest + const Offset(-50, -20), 4, dir: math.atan2(to.dy - _foeChest.dy, to.dx - _foeChest.dx), spread: .3, speed: 10, life: 420, radius: 10, lift: 0, gravity: 0));
+              _at(strikeMs - 200 + j * 30.0, () => _spark('fire', _foeChest + const Offset(-50, -20), 4, dir: math.atan2(to.dy - _foeChest.dy, to.dx - _foeChest.dx), spread: .3, speed: 10, life: 420, radius: 10, lift: 0, gravity: 0));
             }
         }
       });
     }
     if (counter != null) {
-      _at(at + 170, () {
+      _at(at + strikeMs, () {
         const at = Offset(_knightX + 10, _groundY - 250), clash = Offset(_knightX + 120, _groundY - 150);
         switch (r.guard) {
           case Guard.dodge:
