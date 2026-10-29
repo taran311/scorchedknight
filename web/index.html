@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!-- Replaced by `flutter build web --base-href /` when it's served from its own domain. -->
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <!-- Fills the whole phone screen (under the notch too; the game pads for it) and doesn't zoom on a double-tap. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="description" content="Scorched Knight: survive the ashfall, slay the flame. A cartoony turn-based fantasy RPG.">
+  <meta name="theme-color" content="#14110D">
+
+  <!-- How the link looks when it's shared (messages, Discord, socials). -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://scorchedknight.com/">
+  <meta property="og:title" content="Scorched Knight">
+  <meta property="og:description" content="Survive the ashfall. Slay the flame. A cartoony turn-based fantasy RPG you can play right in your browser.">
+  <meta property="og:image" content="https://scorchedknight.com/icons/Icon-512.png">
+  <meta name="twitter:card" content="summary">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Scorched Knight">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>Scorched Knight</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    /* Dark stone while the game loads (no white flash). */
+    html, body { margin: 0; height: 100%; background: #14110D; overscroll-behavior: none; touch-action: manipulation; }
+    #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+      color: #E3A548; font: 600 18px Georgia, serif; letter-spacing: .08em; }
+  </style>
+</head>
+<body>
+  <div id="loading">Brushing off the soot…</div>
+  <script>
+    // Flutter's first frame replaces the loading text.
+    window.addEventListener('flutter-first-frame', function () {
+      var l = document.getElementById('loading');
+      if (l) l.remove();
+    });
+  </script>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>

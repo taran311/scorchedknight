@@ -1,0 +1,725 @@
+// The shops on the square. Mags' stall: potions and a mystery ring, the crossbow, the first armour
+// upgrade, dyes and steeds. Dunstan's forge: golems' ore smelted into bars, the better armour
+// forged from them, set pieces from blueprints, and relics. Old Wick's tower: runes, gems ground
+// into special bolts, and the wards against each land's hazard. Everything else (weapons, shields, helms, gloves, boots, rings,
+// trinkets) comes from the spoils of victory.
+
+import 'package:flutter/material.dart';
+
+import '../art/beasts.dart';
+import '../art/griffin.dart';
+import '../audio/audio.dart';
+import '../art/creatures.dart' show drawFoeDragon, foeDragons;
+import '../game/ammo.dart';
+import '../game/catalog.dart';
+import '../game/rules.dart' show crossbowShare;
+import '../game/mounts.dart';
+import '../game/brews.dart';
+import '../game/classes.dart';
+import '../game/crafting.dart';
+import '../game/loot.dart';
+import '../game/controller.dart';
+import '../game/rules.dart' show potionHeal;
+import 'item_icons.dart';
+import 'loot_window.dart' show resolvePendingLoot;
+import 'material_icons.dart';
+import 'journal_panel.dart' show fmt;
+import 'hero_view.dart' show GearIcon;
+import 'theme.dart';
+
+const _tierTint = <String, int>{
+  'dragonhide': 0xFF2F6A46,
+  'bonemail': 0xFFCFC3A6,
+  'riveted': 0xFFA8AEB6,
+  'scalemail': 0xFFB89A62,
+  'blackplate': 0xFF4E525C,
+  'fluted': 0xFFE2E8EE,
+  'crusader': 0xFFF0F2F4,
+  'mithril': 0xFFCFE4F2,
+  'obsidian': 0xFF2E2A36,
+  'bonerobe': 0xFFCFC3A6,
+  'bonescale': 0xFFBFB396,
+  'padded': 0xFF7A5233,
+  'apprentice': 0xFF6E6252,
+  'arcane': 0xFF2F4F86,
+  'archmage': 0xFF5A2E7A,
+  'astral': 0xFF1C2448,
+  'woodsman': 0xFF7A5233,
+  'studded': 0xFF5E4026,
+  'brigandine': 0xFF3E5232,
+  'shadowweave': 0xFF2C2834,
+  'emberglass': 0xFF3A2430,
+  'emberweave': 0xFF4A1A22,
+  'emberhide': 0xFF3A2228,
+};
+
+Widget armourIcon(ArmourTier t) => switch (t.id) {
+  'chainmail' => const ItemIcon(Item.chainmail),
+  'plate' => const ItemIcon(Item.plate),
+  'gilded' => const ItemIcon(Item.gilded),
+  _ => ItemIcon(Item.armour, tint: Color(_tierTint[t.id] ?? 0xFF7A5233)),
+};
+
+/// What the three shops share: a row for a ware, a heading, a "have/need" count and a buy button.
+class _Shop {
+  _Shop(this.context, this.c);
+  final BuildContext context;
+  final GameController c;
+
+  static const ok = Color(0xFF9BE27A), short = Color(0xFFE88A70);
+
+  /// A material and how many: "[bar] 4/6", green when there's enough.
+  Widget have(Widget icon, int n, [int? need]) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      icon,
+      Text(need == null ? ' $n' : ' $n/$need', style: Txt.label(size: 13, color: need == null ? Palette.cream : (n >= need ? ok : short))),
+    ],
+  );
+
+  Widget buy(String id) {
+    final e = c.engine, k = c.state.knight;
+    if (e.owns(id) && !id.startsWith('dye:')) return Text('Owned', style: Txt.label(size: 13, color: ok));
+    final price = e.priceOf(id);
+    return CostButton(
+      label: '$price gold',
+      onTap: k.coins >= price
+          ? () {
+              c.purchase(id);
+              Audio.play(Sfx.coins);
+            }
+          : null,
+    );
+  }
+
+  Widget ware(Widget icon, String name, String desc, Widget action, {Widget? extra}) => Container(
+    margin: const EdgeInsets.only(bottom: 5),
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
+    decoration: BoxDecoration(
+      color: Colors.black.withValues(alpha: .22),
+      border: Border.all(color: Colors.black.withValues(alpha: .55)),
+      borderRadius: BorderRadius.circular(2),
+    ),
+    // On a narrow screen the button drops under the words, so neither gets squeezed; either way it
+    // shrinks to fit rather than overflow.
+    child: LayoutBuilder(
+      builder: (context, box) {
+        final narrow = box.maxWidth < 360;
+        final words = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(name, style: Txt.onStone(size: 15, color: Palette.cream).copyWith(fontWeight: FontWeight.w700)),
+            Text(desc, style: Txt.onStone(size: 12.5)),
+            if (extra != null) Padding(padding: const EdgeInsets.only(top: 3), child: extra),
+          ],
+        );
+        final button = ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: narrow ? box.maxWidth - 38 : box.maxWidth * .42),
+          child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerRight, child: action),
+        );
+        final top = Row(
+          children: [
+            SizedBox(width: 30, child: icon),
+            const SizedBox(width: 8),
+            Expanded(child: words),
+            if (!narrow) ...[const SizedBox(width: 8), button],
+          ],
+        );
+        if (!narrow) return top;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [top, const SizedBox(height: 4), Align(alignment: Alignment.centerRight, child: button)],
+        );
+      },
+    ),
+  );
+
+  Widget heading(String s) => Padding(
+    padding: const EdgeInsets.only(top: 8, bottom: 4),
+    child: Text(s, style: Txt.label(size: 13, color: Palette.parch2)),
+  );
+
+  Widget gold() => Text('${fmt(c.state.knight.coins)} gold to spend', style: Txt.label(size: 16, color: Palette.amber));
+
+  /// Your crafting stock as a row of icons and counts (only what you have).
+  Widget stock({bool metals = true, bool gems = true, bool trophies = false}) {
+    final s = c.state;
+    return Wrap(
+      spacing: 12,
+      runSpacing: 4,
+      children: [
+        if (metals)
+          for (final m in Metal.values)
+            if (s.mat(oreKey(m)) > 0) Tooltip(message: m.ore, child: have(MatIcon.ore(m, size: 20), s.mat(oreKey(m)))),
+        if (metals)
+          for (final m in Metal.values)
+            if (s.mat(barKey(m)) > 0) Tooltip(message: '${m.bar}s', child: have(MatIcon.bar(m, size: 20), s.mat(barKey(m)))),
+        if (gems)
+          for (final g in Gem.values)
+            if (s.mat(gemKey(g)) > 0) Tooltip(message: '${g.label}s', child: have(MatIcon.gem(g, size: 20), s.mat(gemKey(g)))),
+        if (trophies)
+          for (final t in Trophy.values)
+            if (s.mat(trophyKey(t)) > 0) Tooltip(message: t.label, child: have(MatIcon.trophy(t, size: 20), s.mat(trophyKey(t)))),
+      ],
+    );
+  }
+}
+
+/// Mags' stall: supplies, the crossbow, the first armour upgrade, dyes and the stable.
+class MerchantWares extends StatelessWidget {
+  const MerchantWares({super.key, required this.controller});
+  final GameController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = controller, k = c.state.knight, e = c.engine, x = _Shop(context, c);
+    final upgrades = [for (final t in tiersFor(k.heroClass).skip(1)) if (!t.dropOnly && t.reduction > armourTierById(k.armour).reduction) t];
+    final bought = upgrades.where((t) => !isCrafted(t.id)).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        x.gold(),
+        x.heading('Supplies'),
+        x.ware(const ItemIcon(Item.potion), 'Health potion', 'Heals ${potionHeal(k)} HP · you carry ${k.potions}', x.buy('potion')),
+        x.ware(const Icon(Icons.diamond_outlined, color: Color(0xFF9ADFFF), size: 26), 'Jeweller\'s box', 'A mystery ring: uncommon to epic, now and then legendary', x.buy('ringbox')),
+        x.heading('Mags\' brews · from the reagents your foes drop'),
+        for (final b in Brew.values)
+          if (b.land <= c.state.unlocked || c.state.reagents[b.land] > 0)
+            x.ware(
+              MatIcon.brew(Color(b.argb), size: 28),
+              b.label,
+              b.desc,
+              CostButton(
+                label: b == Brew.healing ? 'Brew' : (brewOn(k, b) ? (b == Brew.reaperbane ? 'In you' : 'Top up') : 'Brew & drink'),
+                onTap: c.whyNotBrew(b) == null
+                    ? () {
+                        c.brew(b);
+                        Audio.play(Sfx.potion);
+                      }
+                    : null,
+              ),
+              extra: Wrap(
+                spacing: 10,
+                children: [
+                  Tooltip(message: b.ingredient, child: x.have(const Icon(Icons.eco, size: 15, color: Color(0xFF9BE27A)), c.state.reagents[b.land], b.reagents)),
+                  Text(b.ingredient, style: Txt.onStone(size: 12)),
+                  x.have(const ItemIcon(Item.coins, size: 14), k.coins, b.fee(k.level)),
+                  if (brewOn(k, b) && b != Brew.reaperbane) Text('${k.brews[b.name]} fights left', style: Txt.label(size: 12.5, color: _Shop.ok)),
+                ],
+              ),
+            ),
+        x.heading('Crossbow'),
+        x.ware(
+          const Icon(Icons.gps_fixed, color: Color(0xFFC8A070), size: 26),
+          k.crossbow + 1 < crossbows.length ? crossbows[k.crossbow + 1].$1 : crossbows.last.$1,
+          k.crossbow + 1 < crossbows.length
+              ? 'A bolt deals ${(crossbows[k.crossbow + 1].$2 * 100).round()}% of an attack (yours: ${(crossbowShare(k) * 100).round()}%), and ×$aloftShot against foes aloft'
+              : 'The best crossbow there is. You have it.',
+          x.buy('crossbow'),
+        ),
+        if (upgrades.isNotEmpty) ...[
+          x.heading('${k.heroClass.label} armour'),
+          for (final t in bought) x.ware(armourIcon(t), t.name, 'Damage taken −${(t.reduction * 100).round()}% (yours: −${(armourTierById(k.armour).reduction * 100).round()}%)', x.buy(t.id)),
+          if (bought.length < upgrades.length) Text('Anything better than this is forged at $smithName\'s, from golems\' ore.', style: Txt.onStone(size: 12.5)),
+        ],
+        x.heading('Dyes · ${switch (k.heroClass) {
+          HeroClass.knight => 'cape, tabard, plume and shield',
+          HeroClass.mage => 'sash and hat',
+          HeroClass.ranger => 'cloak and feather',
+        }} · ${prices['dye']} gold'),
+        // One row of swatches: tap one you own to wear it, or buy it.
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final d in dyes.where((d) => !seasonalDyes.containsKey(d.id) || k.ownedDyes.contains(d.id) || c.season.name == seasonalDyes[d.id]))
+              _DyeSwatch(
+                colour: Color(d.argb),
+                name: seasonalDyes.containsKey(d.id) ? '${d.name} (this season only)' : d.name,
+                owned: k.ownedDyes.contains(d.id),
+                wearing: k.dye == d.id,
+                price: e.priceOf('dye:${d.id}'),
+                onTap: k.ownedDyes.contains(d.id)
+                    ? () => c.wearDye(d.id)
+                    : (k.coins >= e.priceOf('dye:${d.id}')
+                          ? () {
+                              c.purchase('dye:${d.id}');
+                              Audio.play(Sfx.coins);
+                            }
+                          : null),
+              ),
+          ],
+        ),
+        x.heading('Stable'),
+        for (final m in mounts.where((m) => !m.dropOnly)) x.ware(MountIcon(m.id), m.name, m.desc, x.buy('mount:${m.id}')),
+        const SizedBox(height: 4),
+        Text('Weapons, armour pieces, rings and trinkets come from the spoils of victory. Companions come from each land\'s boss.', style: Txt.onStone(size: 12.5)),
+      ],
+    );
+  }
+}
+
+/// The smith's forge: smelting golems' ore into bars, forging armour from them, and relics.
+class ForgeWares extends StatelessWidget {
+  const ForgeWares({super.key, required this.controller});
+  final GameController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = controller, s = c.state, k = s.knight, x = _Shop(context, c);
+    final forged = [for (final t in tiersFor(k.heroClass)) if (isCrafted(t.id) && t.reduction > armourTierById(k.armour).reduction) t];
+    final anyOre = Metal.values.any((m) => s.mat(oreKey(m)) > 0 || s.mat(barKey(m)) > 0);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        x.gold(),
+        x.heading('Your ore and bars'),
+        if (anyOre || Trophy.values.any((t) => s.mat(trophyKey(t)) > 0)) x.stock(gems: false, trophies: true) else Text('Nothing yet. Golems carry ore: iron in the Gloomfen and beyond, gold in the Badlands and the Sunken Sands, obsidian in the Cinderreach. Maces and hammers break them best.', style: Txt.onStone(size: 12.5)),
+        const SizedBox(height: 4),
+        for (final m in Metal.values)
+          if (s.mat(oreKey(m)) > 0)
+            x.ware(
+              MatIcon.ore(m, size: 28),
+              'Smelt ${m.ore.toLowerCase()}',
+              '$orePerBar lumps make ${withArticle(m.bar.toLowerCase())} · ${smeltFee(k.level)} gold a bar',
+              CostButton(
+                label: c.engine.barsFrom(m) > 0 ? 'Smelt ${c.engine.barsFrom(m)} · ${c.engine.smeltCost(m)} gold' : 'Need $orePerBar',
+                onTap: c.whyNotSmelt(m) == null
+                    ? () {
+                        c.smelt(m);
+                        Audio.play(Sfx.clang);
+                      }
+                    : null,
+              ),
+            ),
+        x.heading('${k.heroClass.label} armour'),
+        if (forged.isEmpty) Text('You wear the best $smithName can make. Only bosses and blueprints do better now.', style: Txt.onStone(size: 12.5)),
+        for (final t in forged)
+          x.ware(
+            armourIcon(t),
+            t.name,
+            'Damage taken −${(t.reduction * 100).round()}% (yours: −${(armourTierById(k.armour).reduction * 100).round()}%)',
+            CostButton(
+              label: 'Forge',
+              onTap: c.whyNotCraft(t.id) == null
+                  ? () {
+                      c.craftArmour(t.id);
+                      Audio.play(Sfx.levelUp);
+                    }
+                  : null,
+            ),
+            extra: Wrap(
+              spacing: 10,
+              children: [
+                for (final e in armourRecipes[t.id]!.bars.entries) x.have(MatIcon.bar(e.key, size: 16), s.mat(barKey(e.key)), e.value),
+                x.have(const ItemIcon(Item.coins, size: 14), k.coins, armourRecipes[t.id]!.gold),
+              ],
+            ),
+          ),
+        // Tempering: a favourite weapon reworked up to your level, so a farmed prize stays useful.
+        x.heading('Tempering'),
+        if (c.temperable case final w?)
+          x.ware(
+            GearIcon(item: w, size: 30, heroClass: k.heroClass, dye: k.dye),
+            'Temper ${w.name}',
+            'Rework it from level ${w.level} up to ${k.level}: every stat grows to match (runes and specials stay)',
+            CostButton(
+              label: 'Temper',
+              onTap: c.whyNotTemper() == null
+                  ? () {
+                      if (c.temper() != null) Audio.play(Sfx.clang);
+                    }
+                  : null,
+            ),
+            extra: Wrap(
+              spacing: 10,
+              children: [
+                x.have(MatIcon.bar(c.temperCost(w).$1, size: 16), s.mat(barKey(c.temperCost(w).$1)), c.temperCost(w).$2),
+                x.have(const ItemIcon(Item.coins, size: 14), k.coins, c.temperCost(w).$3),
+              ],
+            ),
+          )
+        else
+          Text('Wield an epic or legendary weapon that\'s fallen $temperMinGap or more levels behind you, and $smithName will rework it up to your level: iron bars for epics, gold bars for legendaries.', style: Txt.onStone(size: 12.5)),
+        // Set pieces, from the blueprints the Ashen Order, the vampires and the werewolves carry.
+        for (final f in forgedSets)
+          if (s.mat(trophyKey(f.trophy)) > 0 || setPieceSlots.any((slot) => s.mat(blueprintKey(f.id, slot)) > 0)) ...[
+            x.heading('${gearSetById(f.id)!.name} set · blueprints from ${f.from}'),
+            Text('2 pieces: ${gearSetById(f.id)!.twoText}. All 3: ${gearSetById(f.id)!.threeText}.', style: Txt.onStone(size: 12.5)),
+            const SizedBox(height: 4),
+            for (final slot in setPieceSlots)
+              if (s.mat(blueprintKey(f.id, slot)) > 0)
+                x.ware(
+                  MatIcon.blueprint(size: 28),
+                  '${gearSetById(f.id)!.name} ${pieceNoun(slot)}',
+                  'Epic, forged at your level (forge it again later for a stronger one)',
+                  CostButton(
+                    label: 'Forge',
+                    onTap: c.whyNotForgePiece(f.id, slot) == null
+                        ? () {
+                            if (c.forgePiece(f.id, slot) != null) {
+                              Audio.play(Sfx.clang);
+                              resolvePendingLoot(context, c);
+                            }
+                          }
+                        : null,
+                  ),
+                  extra: Wrap(
+                    spacing: 10,
+                    children: [
+                      x.have(MatIcon.trophy(f.trophy, size: 16), s.mat(trophyKey(f.trophy)), pieceTrophies),
+                      x.have(MatIcon.bar(f.metal, size: 16), s.mat(barKey(f.metal)), pieceBars),
+                      x.have(const ItemIcon(Item.coins, size: 14), k.coins, pieceFee(k.level)),
+                    ],
+                  ),
+                )
+              else
+                x.ware(
+                  Opacity(opacity: .35, child: MatIcon.blueprint(size: 28)),
+                  '${gearSetById(f.id)!.name} ${pieceNoun(slot)}',
+                  'No blueprint yet',
+                  const SizedBox(),
+                ),
+          ],
+        // Relics: a blueprint and its parts, forged into a legend.
+        if (relics.keys.any((l) => c.heroicOpen(l) && !s.forged.contains(l))) x.heading('Relics'),
+        for (final e in relics.entries)
+          if (c.heroicOpen(e.key) && !s.forged.contains(e.key)) ...[
+            x.ware(
+              const Icon(Icons.hardware, color: Color(0xFFFFB04A), size: 26),
+              'Forge ${e.key == 2 && k.heroClass == HeroClass.ranger ? 'Briarsong' : e.value.name}',
+              '${[for (var i = 0; i < e.value.parts.length; i++) '${i < (s.relicParts[e.key] ?? 0) ? '✓' : '·'} ${e.value.parts[i]}'].join('  ')} · from ${continents[e.key].name}\'s Heroic trail',
+              CostButton(
+                label: '${e.value.gold} gold',
+                onTap: c.whyNotForge(e.key) == null
+                    ? () {
+                        if (c.forgeRelic(e.key) != null) {
+                          Audio.play(Sfx.levelUp);
+                          resolvePendingLoot(context, c);
+                        }
+                      }
+                    : null,
+              ),
+            ),
+          ],
+      ],
+    );
+  }
+}
+
+/// The hedge-mage's tower: runes on your weapon and armour, gems ground into special bolts, and the
+/// wards against each land's hazard.
+class EnchanterWares extends StatelessWidget {
+  const EnchanterWares({super.key, required this.controller});
+  final GameController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = controller, s = c.state, k = s.knight, x = _Shop(context, c);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        x.gold(),
+        x.heading('Runes · ${enchantCost(k.level)} gold a rune'),
+        for (final slot in EnchantSlot.values)
+          Builder(
+            builder: (context) {
+              final kit = k.loadout;
+              final current = slot == EnchantSlot.weapon ? kit.weapon?.enchant : kit.armourEnchant;
+              final what = slot == EnchantSlot.weapon ? (kit.weapon?.name ?? 'No weapon') : armourTierById(kit.armour).name;
+              return x.ware(
+                Icon(slot == EnchantSlot.weapon ? Icons.auto_fix_high : Icons.shield_moon, color: const Color(0xFFB89AE0), size: 26),
+                'Enchant: $what',
+                current == null ? 'No rune yet · a random ${slot.name} rune, tier I to III' : '${current.title}: ${current.describe}',
+                k.scrolls > 0
+                    ? CostButton(label: 'Read a scroll (${k.scrolls})', onTap: () => enchantFlow(context, c, slot, scroll: true))
+                    : CostButton(
+                        label: current == null ? 'Enchant' : 'Reroll',
+                        onTap: k.coins >= enchantCost(k.level) ? () => enchantFlow(context, c, slot) : null,
+                      ),
+              );
+            },
+          ),
+        if (Elemental.values.any((el) => s.mat(coreKey(el)) > 0)) ...[
+          x.heading('Elemental cores · $coresPerRune bind a rune of their element on your weapon'),
+          for (final el in Elemental.values)
+            if (s.mat(coreKey(el)) > 0)
+              x.ware(
+                MatIcon.core(Color(el.argb), size: 28),
+                'Bind ${el.core.toLowerCase()}s',
+                '${enchantmentById(el.rune)!.name} on your weapon: tier II, sometimes III · ${enchantCost(k.level)} gold',
+                CostButton(
+                  label: 'Bind',
+                  onTap: c.whyNotBind(el) == null ? () => enchantFlow(context, c, EnchantSlot.weapon, core: el) : null,
+                ),
+                extra: x.have(MatIcon.core(Color(el.argb), size: 16), s.mat(coreKey(el)), coresPerRune),
+              ),
+        ],
+        x.heading('Special bolts · a gem makes $ammoBundle, one per shot'),
+        for (final a in AmmoType.values)
+          x.ware(
+            Container(
+              width: 26,
+              height: 26,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: Color(a.argb).withValues(alpha: .25), border: Border.all(color: Color(a.argb), width: 2)),
+              child: Icon(Icons.north_east, size: 16, color: Color(a.argb)),
+            ),
+            a.label(Missile.bolt),
+            '${a.desc} (+${ammoBonus(k.level)})${(k.ammo[a.name] ?? 0) > 0 ? ' · you have ${k.ammo[a.name]}' : ''}',
+            extra: x.have(MatIcon.gem(gemFor(a), size: 16), s.mat(gemKey(gemFor(a))), 1),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if ((k.ammo[a.name] ?? 0) > 0) ...[
+                  k.ammoLoaded == a.name ? Text('Loaded', style: Txt.label(size: 13, color: _Shop.ok)) : CostButton(label: 'Load', onTap: () => c.loadAmmo(a.name)),
+                  const SizedBox(width: 6),
+                ],
+                CostButton(
+                  label: 'Fit ${gemFor(a).label.toLowerCase()} · ${fletchFee(k.level)} gold',
+                  onTap: c.whyNotFletch(gemFor(a)) == null
+                      ? () {
+                          c.fletch(gemFor(a));
+                          Audio.play(Sfx.coins);
+                        }
+                      : null,
+                ),
+              ],
+            ),
+          ),
+        if (s.unlocked > 0 || s.reagents.any((n) => n > 0)) ...[
+          x.heading('Wards · against each land\'s hazard'),
+          for (var i = 1; i < continents.length; i++)
+            if (continents[i].ward != null && i <= s.unlocked + 1)
+              x.ware(
+                Icon(Icons.shield_moon, color: s.warded.contains(i) ? _Shop.ok : const Color(0xFF9ADFFF), size: 26),
+                continents[i].ward!,
+                'Stops ${continents[i].hazard!.toLowerCase()} in ${continents[i].name}. Made from $reagentsForWard ${continents[i - 1].reagent} (you have ${s.reagents[i - 1]}) and ${fmt(wardPrice(i))} gold',
+                s.warded.contains(i) ? Text('Warded', style: Txt.label(size: 13, color: _Shop.ok)) : CostButton(label: 'Craft', onTap: c.whyNotWard(i) == null ? () => c.craftWard(i) : null),
+              ),
+        ],
+      ],
+    );
+  }
+}
+
+/// A small picture of a mount, from the same art as the battle.
+class MountIcon extends StatelessWidget {
+  const MountIcon(this.id, {super.key, this.size = 30});
+  final String id;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(width: size, height: size, child: CustomPaint(painter: _MountPainter(id)));
+}
+
+class _MountPainter extends CustomPainter {
+  _MountPainter(this.id);
+  final String id;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = size.width / 190;
+    if (id == 'griffin') {
+      canvas.save();
+      canvas.translate(size.width * .5, size.height * .95);
+      canvas.scale(-1, 1);
+      drawGriffin(canvas, griffins['griffin']!, Offset.zero, s * .75, 0, still: true);
+      canvas.restore();
+    } else if (id == 'wyvern') {
+      drawFoeDragon(canvas, foeDragons['wyvern']!, Offset(size.width * .35, size.height * .95), s * .9, 0, still: true);
+    } else {
+      drawHorse(canvas, horseFor(id), Offset(size.width * .42, size.height * .98), s * 1.6, 0, still: true);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_MountPainter old) => old.id != id;
+}
+
+/// Pays for a random rune (or, with [core], binds three of an elemental's cores into its rune for
+/// your weapon) and asks whether to keep it or what you had.
+Future<void> enchantFlow(BuildContext context, GameController c, EnchantSlot slot, {bool scroll = false, Elemental? core}) async {
+  final kit = c.state.knight.loadout;
+  final current = slot == EnchantSlot.weapon ? kit.weapon?.enchant : kit.armourEnchant;
+  final roll = core != null ? c.bindCores(core) : c.enchantOffer(slot, scroll: scroll);
+  if (roll == null || !context.mounted) return;
+  final tierCol = [const Color(0xFF9BC2E8), const Color(0xFFB07AFF), const Color(0xFFF09A2E)][roll.tier - 1];
+  final keep = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => Dialog(
+      backgroundColor: Colors.transparent,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 400),
+        child: Stone(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('The rune takes shape…', style: Txt.label(size: 12, color: Palette.parch2)),
+              Text(roll.title, style: Txt.label(size: 22, color: tierCol, weight: FontWeight.w900)),
+              if (roll.tier == 3) Text('A perfect rune!', style: Txt.label(size: 13, color: tierCol)),
+              const SizedBox(height: 4),
+              Text(roll.describe, style: Txt.onStone(size: 15, color: Palette.cream)),
+              const SizedBox(height: 10),
+              Text(current == null ? 'Nothing to replace.' : 'Currently: ${current.title}: ${current.describe}', style: Txt.onStone(size: 13.5)),
+              const SizedBox(height: 12),
+              StoneButton(title: current == null ? 'Bind the rune' : 'Take the new rune', tone: ButtonTone.blood, onPressed: () => Navigator.of(context).pop(true)),
+              const SizedBox(height: 6),
+              if (current != null) StoneButton(title: 'Keep ${current.title}', compact: true, onPressed: () => Navigator.of(context).pop(false)),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+  if (keep == true) c.applyEnchant(slot, roll);
+}
+
+class CostButton extends StatelessWidget {
+  const CostButton({super.key, required this.label, this.onTap});
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => Opacity(
+    opacity: onTap == null ? .45 : 1,
+    child: Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.black),
+            borderRadius: BorderRadius.circular(2),
+            gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFFEFC675), Color(0xFFB98634)]),
+          ),
+          child: Text(label, style: Txt.inkLabel(size: 13, color: const Color(0xFF2A1C0C))),
+        ),
+      ),
+    ),
+  );
+}
+
+/// A shop window: a name, a line from whoever keeps it, and their wares.
+Future<void> _showShop(BuildContext context, GameController c, {required String title, required String line, required IconData icon, required Color colour, required Widget Function() wares}) => showDialog<void>(
+  context: context,
+  builder: (context) => Dialog(
+    backgroundColor: Colors.transparent,
+    insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 480),
+      child: Stone(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: colour, size: 22),
+                const SizedBox(width: 8),
+                Expanded(child: Text(title, style: Txt.label(size: 18, color: colour, weight: FontWeight.w800))),
+                IconButton(
+                  tooltip: 'Close',
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close, size: 20, color: Palette.parch),
+                ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Text(line, style: Txt.onStone(size: 13.5, color: Palette.parch2).copyWith(fontStyle: FontStyle.italic)),
+            ),
+            Flexible(
+              child: SingleChildScrollView(
+                child: ListenableBuilder(listenable: c, builder: (context, _) => wares()),
+              ),
+            ),
+            const SizedBox(height: 10),
+            StoneButton(title: 'Done', tone: ButtonTone.blood, compact: true, onPressed: () => Navigator.of(context).pop()),
+          ],
+        ),
+      ),
+    ),
+  ),
+);
+
+/// Mags' stall, from the square.
+Future<void> showMerchantWindow(BuildContext context, GameController c) => _showShop(
+  context,
+  c,
+  title: 'Mags\' Stall',
+  line: '"Bring me what your foes drop, dear, and I\'ll brew you something. Potions, rings, a crossbow if you\'ve the arms for it."',
+  icon: Icons.storefront,
+  colour: Palette.amber,
+  wares: () => MerchantWares(controller: c),
+);
+
+/// The forge, from the square.
+Future<void> showForgeWindow(BuildContext context, GameController c) => _showShop(
+  context,
+  c,
+  title: '$smithName\'s Forge',
+  line: '"Bring me ore and I\'ll make you something worth wearing. Bring me gold and I\'ll make it quicker."',
+  icon: Icons.hardware,
+  colour: const Color(0xFFFFB04A),
+  wares: () => ForgeWares(controller: c),
+);
+
+/// The hedge-mage's tower, from the square.
+Future<void> showEnchanterWindow(BuildContext context, GameController c) => _showShop(
+  context,
+  c,
+  title: '$mageName\'s Tower',
+  line: '"Runes, wards, little stones that burn. Mind the cat. It bites, and it isn\'t always a cat."',
+  icon: Icons.auto_fix_high,
+  colour: const Color(0xFFC8A8FF),
+  wares: () => EnchanterWares(controller: c),
+);
+
+/// A dye as a round swatch: a tick on the one you're wearing, a coin price on ones you don't own.
+class _DyeSwatch extends StatelessWidget {
+  const _DyeSwatch({required this.colour, required this.name, required this.owned, required this.wearing, required this.price, this.onTap});
+  final Color colour;
+  final String name;
+  final bool owned, wearing;
+  final int price;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: owned ? (wearing ? '$name · wearing' : '$name · tap to wear') : '$name · $price gold',
+    child: GestureDetector(
+      onTap: onTap,
+      child: MouseRegion(
+        cursor: onTap == null ? MouseCursor.defer : SystemMouseCursors.click,
+        child: Opacity(
+          opacity: owned || onTap != null ? 1 : .45,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: colour,
+                  border: Border.all(color: wearing ? Palette.amber : Colors.black, width: wearing ? 3 : 1.5),
+                  boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 3, offset: Offset(0, 1))],
+                ),
+                child: wearing ? const Icon(Icons.check, size: 18, color: Colors.white) : null,
+              ),
+              const SizedBox(height: 2),
+              owned
+                  ? Text(wearing ? 'On' : 'Owned', style: Txt.label(size: 10.5, color: wearing ? Palette.amber : Palette.parch2))
+                  : Row(mainAxisSize: MainAxisSize.min, children: [const ItemIcon(Item.coins, size: 11), Text(' $price', style: Txt.label(size: 10.5, color: Palette.amber))]),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}

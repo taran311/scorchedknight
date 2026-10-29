@@ -1,0 +1,22 @@
+rules_version = '2';
+
+// Scorched Knight's cloud saves: one document per player, at players/{their sign-in id}.
+// Each player can read and write only their own save, and only in the shape the game writes.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /players/{uid} {
+      allow read, delete: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['save', 'savedAt', 'summary', 'updated'])
+        && request.resource.data.save is string
+        && request.resource.data.save.size() < 900000
+        && request.resource.data.savedAt is int
+        && request.resource.data.summary is string
+        && request.resource.data.summary.size() < 200;
+    }
+    // Nothing else is readable or writable.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
