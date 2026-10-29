@@ -46,6 +46,23 @@
       if (l) l.remove();
     });
   </script>
+  <script>
+    // Older builds installed a service worker that kept serving the old game after a deploy.
+    // Throw it and its caches away; if one was in charge of this page, reload once without it.
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function (regs) {
+        var had = regs.length > 0;
+        Promise.all(regs.map(function (r) { return r.unregister(); }))
+          .then(function () { return window.caches ? caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); }) : null; })
+          .then(function () {
+            if (had && navigator.serviceWorker.controller && !sessionStorage.getItem('sk-sw-gone')) {
+              sessionStorage.setItem('sk-sw-gone', '1');
+              location.reload();
+            }
+          });
+      });
+    }
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
