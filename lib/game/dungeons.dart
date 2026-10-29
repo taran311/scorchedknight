@@ -187,7 +187,7 @@ const lockedChance = .3;
 /// Levels foes gain over a hero of [level] in room [room]: a third of your level more by the
 /// last room, an elite one more, and the boss more again.
 int dungeonLevels(int room, RoomKind kind, int level) =>
-    (level * .3 * room / dungeonRooms).round() + (kind == RoomKind.elite ? 1 : 0) + (kind == RoomKind.boss ? 2 + level ~/ 10 : 0);
+    (level * .3 * room / dungeonRooms).round() + (kind == RoomKind.elite ? 1 : 0) + (kind == RoomKind.boss ? 1 + level ~/ 10 : 0);
 
 /// The chance you spot a trap in time, and the share of your health one takes if you don't.
 const trapSpot = .35, trapHurtMin = .12, trapHurtMax = .22;

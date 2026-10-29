@@ -268,23 +268,70 @@ const heroicStops = 5;
 /// Heroic foes fight this many levels above you.
 const heroicLevels = 3;
 
-/// A legendary weapon forged from a blueprint (the land's boss carries it) and three parts found
-/// on that land's Heroic trail: one now and then from its elites, one for reaching its end, one
-/// from the risen boss.
+/// Where a relic part waits: carried by a land's risen boss (its Heroic trail's end), guarded at
+/// a place on the map (it appears once you hold the blueprint), or in a dungeon boss's hoard.
+enum PartSource { risen, place, dungeon }
+
+/// One part of a relic: its land, how it's won, and (for a place or a dungeon) which one, by id,
+/// with [where] saying it in words. Each is a quest, done once: no farming for it.
+class RelicPart {
+  const RelicPart(this.name, this.land, this.where, {this.source = PartSource.risen, this.at});
+  final String name, where;
+  final int land;
+  final PartSource source;
+  final String? at;
+  bool get risen => source == PartSource.risen;
+}
+
+/// A relic weapon, the finest thing in the game: forged from a blueprint (the land's boss carries
+/// it) and three parts, each a quest in a different part of the world (a risen boss, a guardian at
+/// a hidden place, a dungeon's hoard), so it comes mid-to-late, after a long road. Dunstan won't
+/// hand one to a hero below [minLevel].
 class Relic {
-  const Relic(this.name, this.parts, this.gold, this.blueprint);
+  const Relic(this.name, this.parts, this.gold, this.blueprint, {required this.minLevel});
   final String name, blueprint;
-  final List<String> parts;
-  final int gold;
+  final List<RelicPart> parts;
+  final int gold, minLevel;
 }
 
 const relics = <int, Relic>{
-  0: Relic('Kingsfall', ['Crown Shard', 'Ember Core', 'Old King\'s Hilt'], 600, 'Among Gorbo\'s hoard: a scorched blueprint for a greatsword called Kingsfall, forged from the shards of the old king\'s crown. Dunstan the smith could forge it, given the parts. The parts are out on Cindervale\'s Heroic trail.'),
-  2: Relic('Bramblelash', ['Living Briar', 'Heartwood Grip', 'First Bloom'], 520, 'Tucked in Grandmother Bramblecrown\'s roots: a pressed-leaf blueprint for the Bramblelash, a whip of living briar (or, for an archer, Briarsong, a bow strung with one). Dunstan could bind it, given the parts. The parts are out on the Thornwild\'s Heroic trail.'),
+  0: Relic(
+    'Kingsfall',
+    [
+      RelicPart('Crown Shard', 0, 'Gorbo the One-Eyed, risen, at the end of Cindervale\'s Heroic trail'),
+      RelicPart('Ember Core', 3, 'Skarr the Ember-Keeper, in the Ember Pit in the Grimtusk Badlands', source: PartSource.place, at: 'emberpit'),
+      RelicPart('Old King\'s Hilt', 4, 'the hoard at the bottom of the Tomb of Kings, under the Sunken Sands', source: PartSource.dungeon, at: 'kingstomb'),
+    ],
+    2400,
+    'Among Gorbo\'s hoard: a scorched blueprint for a greatsword called Kingsfall, forged from the shards of the old king\'s crown. Gorbo kept the crown shard (beat him again, risen, on Cindervale\'s Heroic trail); an ork fire-priest stole its ember core and keeps it in a pit in the Grimtusk Badlands; and the old king\'s hilt was buried with him in the Tomb of Kings.',
+    minLevel: 28,
+  ),
+  2: Relic(
+    'Bramblelash',
+    [
+      RelicPart('Living Briar', 2, 'the Briar Heart, deep in the Thornwild', source: PartSource.place, at: 'briarheart'),
+      RelicPart('Heartwood Grip', 9, 'Warden Aelindor, at the Elder Heartwood in the Silverwood', source: PartSource.place, at: 'elderheart'),
+      RelicPart('First Bloom', 2, 'Grandmother Bramblecrown, risen, at the end of the Thornwild\'s Heroic trail'),
+    ],
+    4200,
+    'Tucked in Grandmother Bramblecrown\'s roots: a pressed-leaf blueprint for the Bramblelash, a whip of living briar. The briar grows from a heart of thorns somewhere deep in the Thornwild, the grip is heartwood the elves of the Silverwood guard, and the first bloom is Grandmother Bramblecrown\'s own, when she rises again.',
+    minLevel: 32,
+  ),
 };
 
-/// The chance an elite on a Heroic trail drops the first missing relic part.
-const relicPartChance = .35;
+/// Whether you hold part [i] of relic [relic] (parts are kept as a bit mask).
+bool hasRelicPart(Map<int, int> parts, int relic, int i) => ((parts[relic] ?? 0) >> i) & 1 == 1;
+
+/// How many parts of relic [relic] you hold.
+int relicPartsFound(Map<int, int> parts, int relic) => [for (var i = 0; i < relics[relic]!.parts.length; i++) if (hasRelicPart(parts, relic, i)) i].length;
+
+/// The relic parts that turn up on land [land]'s Heroic trail: (relic, part index).
+List<(int, int)> relicPartsOn(int land) => [
+  for (final e in relics.entries)
+    for (var i = 0; i < e.value.parts.length; i++)
+      if (e.value.parts[i].land == land) (e.key, i),
+];
+
 
 /// The chance a foe carries timber or iron for your building, once Hob's job is done.
 const buildFindChance = .3;
@@ -292,14 +339,14 @@ const buildFindChance = .3;
 /// Lands whose foes carry timber, and iron.
 const timberLands = {0, 2}, ironLands = {0, 3};
 
-const jobPotions = 2, innRepairPotions = 2, potionDropChance = .12;
+const jobPotions = 2, innRepairPotions = 2, potionDropChance = .08;
 const hobsJob = 'Hob the innkeeper looks at the smouldering roof, then at you. "Goblins took the good timber and every nail I had. '
     'Bring me $timberNeeded lengths of timber and $ironNeeded sacks of iron, and you\'ll have a bed by the fire for life."';
 
 const winsForBoss = 8;
 
 /// The share of your HP you get back catching your breath after every win (on top of regeneration).
-const breathShare = .08;
+const breathShare = .06;
 
 /// The lands along the road, Cindervale to the Ember Throne. The side lands come after them.
 const mainLands = 7;
@@ -1349,7 +1396,16 @@ class Place {
     this.trophies = 0,
     this.legendary = false,
     this.hidden = false,
+    this.relic,
+    this.above = 0,
   });
+
+  /// A relic part's guardian: this place only shows once you hold that relic's blueprint (and still
+  /// need the part), and winning it gives the part: (relic, part index).
+  final (int, int)? relic;
+
+  /// Levels its guardian fights above you.
+  final int above;
   final String id, name, blurb;
 
   /// What you find (or what happens) once it's explored.
@@ -1400,6 +1456,10 @@ const places = <Place>[
   Place('mirrorhall', 'The Hall of Mirrors', 14, 868, 600, PlaceKind.shrine, 'A ruined hall full of mirrors, and in every one, a different you: older, younger, a goblin, a dragon. One of them winks.', 'You stare until your reflection settles back into your own shape, and feel stronger for it. (Might for three fights.) The mirrors shed their silver skins at your feet.', brew: 'might', trophies: 3),
   Place('castleoflanterns', 'The Lantern Shrine', 16, 700, 640, PlaceKind.shrine, 'A shrine on a rock in the sea, hung with a thousand paper lanterns. An old priest sweeps the steps and doesn\'t look up.', 'You ring the bell and bow. The priest nods, once, and hands you a cup of tea and a folded scrap of lacquer. (Might for three fights.)', brew: 'might', trophies: 3),
   Place('rocnest', 'The Great Nest', 15, 798, 26, PlaceKind.guarded, 'A nest the size of a cottage on the highest peak, woven from whole trees, and something huge and feathered sitting on it.', 'The mother griffin takes wing and is gone. In the nest: feathers by the armful, gold the aeriekin left as offerings, and eggshell like porcelain.', foe: ('griffin', null, Aura.ancient, 'The Mother Griffin'), purses: 3, trophies: 4, gems: 1),
+  // Relic guardians: they show once you hold the blueprint that needs what they guard.
+  Place('emberpit', 'The Ember Pit', 3, 600, 140, PlaceKind.guarded, 'A pit in the red rock, glowing from the bottom. An ork fire-priest sits in it, cross-legged, a coal the size of your head cupped in his hands. It is the old king\'s ember core, and he has been praying to it.', 'Skarr the Ember-Keeper falls into his own fire and doesn\'t come out. The ember core is still warm. It will be warm for a thousand years.', foe: ('orkShaman', null, Aura.blazing, 'Skarr the Ember-Keeper'), purses: 3, relic: (0, 1), above: 3),
+  Place('briarheart', 'The Briar Heart', 2, 140, 215, PlaceKind.guarded, 'Deep in the Thornwild, the brambles twist into a knot the size of a house, and the knot is breathing. Something at its heart keeps the whole wood growing.', 'The Briar Heart shudders, and lets go of the one living strand it was holding. It coils round your wrist, gently, like it\'s decided you\'ll do.', foe: ('thornEnt', null, Aura.venom, 'The Briar Heart'), purses: 2, relic: (2, 0), above: 3),
+  Place('elderheart', 'The Elder Heartwood', 9, 285, 160, PlaceKind.guarded, 'The oldest tree in the Silverwood, hollowed out by the elves into a hall. An elf in silver-leaf armour stands at its door, and has done for three hundred years.', 'Warden Aelindor kneels, and offers you a grip of heartwood with both hands. "The Grandmother asked for it back, once. I told her no. I find I can\'t tell you no."', foe: ('elfWarden', null, Aura.ancient, 'Warden Aelindor'), purses: 3, relic: (2, 1), above: 3),
   Place('frozencaravan', 'The Frozen Caravan', 18, 785, 238, PlaceKind.cache, 'A merchant caravan, frozen solid in the middle of the pass: wagons, oxen, drivers, all of it, still mid-stride under the ice. The strongbox is on the last wagon.', 'You chip it free. Inside: a hundred-year-old fortune, a bottle of something warming, and furs the reavers never found.', purses: 4, potions: 1, trophies: 3),
   Place('yeticave', 'The Yeti\'s Larder', 18, 612, 180, PlaceKind.guarded, 'A cave full of bones, and a yeti the size of a cottage asleep across the mouth of it. Something in there glitters.', 'Old Avalanche goes down like his name. Past the bones: everything he ever took off a traveller.', foe: ('yeti', null, Aura.ancient, 'Old Avalanche'), purses: 3, gems: 2, trophies: 2),
   Place('orchardroost', 'The Orchard Roost', 17, 300, 612, PlaceKind.guarded, 'An old orchard sank into the caves when the hill fell in. The fruit bats found it. Their king has eaten every fig in it, and is still hungry.', 'The Fig King flaps off into the dark, much too full to fight. Under the trees: a pile of seeds, a pile of coins, and fangs he lost in the figs.', foe: ('cavebat', null, Aura.gilded, 'The Fig King'), purses: 2, trophies: 3),

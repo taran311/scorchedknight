@@ -548,7 +548,8 @@ class _Satchel extends StatelessWidget {
         if (s.reagents[l] > 0) _Slot(tooltip: '${s.reagents[l]}× ${continents[l].reagent}: Old Wick makes wards from them', badge: '${s.reagents[l]}', child: MatIcon(MatShape.leaf, Color(continents[l].argb))),
       for (final e in s.relicParts.entries)
         if (relics[e.key] case final r? when e.value > 0 && !s.forged.contains(e.key))
-          for (var i = 0; i < e.value && i < r.parts.length; i++) _Slot(tooltip: '${r.parts[i]}: a part of ${r.name}', child: const Icon(Icons.extension, color: Color(0xFFFFD98A))),
+          for (var i = 0; i < r.parts.length; i++)
+            if (hasRelicPart(s.relicParts, e.key, i)) _Slot(tooltip: '${r.parts[i].name}: a part of ${r.name}', child: const Icon(Icons.extension, color: Color(0xFFFFD98A))),
     ];
     Widget group(String title, List<Widget> items, String empty) => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

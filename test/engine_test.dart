@@ -1189,6 +1189,50 @@ void main() {
     });
   });
 
+  test('relics: each part is a one-off quest in a different land, then the forge at its level', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(21), clock: () => DateTime(2026, 6, 1));
+    final s = e.state, k = s.knight..level = 30;
+    k.hp = maxHp(k);
+    // No blueprint yet: the guardian's place stays hidden.
+    expect(e.placeShown(placeById('emberpit')!), isFalse);
+    s.bossesDown.addAll({0, 1, 2, 3, 4});
+    expect(e.placeShown(placeById('emberpit')!), isTrue);
+    // The guardian of the ember core.
+    expect(e.explorePlace('emberpit'), isNull);
+    s.foeHp = 1;
+    e.takeTurn(BattleAction.skill);
+    expect(hasRelicPart(s.relicParts, 0, 1), isTrue);
+    expect(e.placeShown(placeById('emberpit')!), isTrue, reason: 'stays on the map, explored');
+    // The hilt, at the bottom of the Tomb of Kings.
+    e.enterDungeon('kingstomb');
+    s.dungeonRoom = dungeonRooms;
+    s.dungeonDoors
+      ..clear()
+      ..add(DoorClue.boss.name);
+    e.openDoor(0);
+    s.foeHp = 1;
+    k.hp = maxHp(k);
+    e.takeTurn(BattleAction.skill);
+    expect(hasRelicPart(s.relicParts, 0, 2), isTrue);
+    e.leaveDungeon();
+    // The crown shard: Gorbo, risen.
+    s.continent = 0;
+    s.heroicWins[0] = heroicStops;
+    e.exploreHeroic();
+    s.foeHp = 1;
+    k.hp = maxHp(k);
+    e.takeTurn(BattleAction.skill);
+    expect(relicPartsFound(s.relicParts, 0), 3);
+    k.coins = 0;
+    expect(e.whyNotForge(0), contains('gold'));
+    k
+      ..coins = 5000
+      ..level = 20;
+    expect(e.whyNotForge(0), contains('level'));
+    k.level = 30;
+    expect(e.forgeRelic(0), isNotNull);
+  });
+
   group('dungeons', () {
     GameEngine ready() {
       final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(9), clock: () => DateTime(2026, 6, 1));

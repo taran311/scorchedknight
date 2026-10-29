@@ -444,7 +444,9 @@ class GameEngine {
   bool placeShown(Place p) {
     final from = openers(p.land);
     final open = from.isEmpty || from.any(state.bossesDown.contains);
-    return open && (!p.hidden || places.every((o) => o.hidden || state.explored.contains(o.id)));
+    // A relic guardian only shows while you hold the blueprint and still need what it guards.
+    if (p.relic case (final r, final i) when !relicPartWanted(r, i) && !state.explored.contains(p.id)) return false;
+    return open && (!p.hidden || places.every((o) => o.hidden || o.relic != null || state.explored.contains(o.id)));
   }
 
   /// Why you can't explore place [id] now (null: you can).
@@ -471,7 +473,7 @@ class GameEngine {
     if (foe != null) {
       final at = lookIndex(foe.$1, p.land);
       final rare = Rare(at, foe.$3, name: foe.$4, look: foe.$2);
-      _begin(at, rare);
+      _begin(at, rare, above: p.above);
       state.place = p.id;
       _note('${p.name}. ${p.blurb} ${foe.$4} stands in your way!', EntryKind.gold);
       return null;
@@ -601,18 +603,27 @@ class GameEngine {
   /// perhaps the next part of the land's relic.
   String? _heroicWin(int c, bool risen) {
     state.heroicWins[c] = risen ? 0 : (state.heroicWins[c] ?? 0) + 1;
-    final relic = relics[c];
-    if (relic == null || state.forged.contains(c)) return null;
-    final have = state.relicParts[c] ?? 0;
-    if (have >= relic.parts.length) return null;
-    // The first part can turn up on any elite; the trail's end always gives one (up to the second);
-    // the last only ever comes from the risen boss.
-    final end = !risen && state.heroicWins[c] == heroicStops;
-    if (risen || (end && have < relic.parts.length - 1) || (have == 0 && _rng.nextDouble() < relicPartChance)) {
-      state.relicParts[c] = have + 1;
-      return relic.parts[have];
+    // A risen boss always carries the relic part it's keeping (if you hold that relic's blueprint).
+    if (!risen) return null;
+    for (final (r, i) in relicPartsOn(c)) {
+      if (relics[r]!.parts[i].risen && _grantPart(r, i)) return relics[r]!.parts[i].name;
     }
     return null;
+  }
+
+  /// Whether part [i] of relic [r] is still wanted: its blueprint found, the part not yet in hand,
+  /// the relic not yet forged.
+  bool relicPartWanted(int r, int i) => !state.forged.contains(r) && state.bossesDown.contains(r) && !hasRelicPart(state.relicParts, r, i);
+
+  /// Hands over part [i] of relic [r], if it's still wanted.
+  bool _grantPart(int r, int i) {
+    if (!relicPartWanted(r, i)) return false;
+    final relic = relics[r]!, part = relic.parts[i];
+    state.relicParts[r] = (state.relicParts[r] ?? 0) | (1 << i);
+    final found = relicPartsFound(state.relicParts, r);
+    _note('You have the ${part.name}! ($found of ${relic.parts.length} parts of ${relic.name})', EntryKind.gold);
+    if (found == relic.parts.length) _note('That\'s every part of ${relic.name}. Take them to Dunstan\'s forge.', EntryKind.gold);
+    return true;
   }
 
   /// Why Dunstan can't forge land [c]'s relic yet (null if she can).
@@ -621,8 +632,9 @@ class GameEngine {
     if (relic == null) return 'No relic here';
     if (state.forged.contains(c)) return 'Already forged';
     if (!heroicOpen(c)) return 'Find the blueprint first';
-    final have = state.relicParts[c] ?? 0;
+    final have = relicPartsFound(state.relicParts, c);
     if (have < relic.parts.length) return 'Parts $have/${relic.parts.length}';
+    if (state.knight.level < relic.minLevel) return 'Reach level ${relic.minLevel} to wield it';
     if (state.knight.coins < relic.gold) return 'Needs ${relic.gold} gold';
     return null;
   }
@@ -1109,6 +1121,13 @@ class GameEngine {
       return const [];
     }
     s.dungeonDoors.clear();
+    // A relic part waiting in this hoard (if you hold the blueprint that needs it).
+    for (final e in relics.entries) {
+      for (var i = 0; i < e.value.parts.length; i++) {
+        final p = e.value.parts[i];
+        if (p.source == PartSource.dungeon && p.at == d.id) _grantPart(e.key, i);
+      }
+    }
     final first = s.dungeonsDone.add(d.id);
     final gold = bossHoardGold(k.level);
     k.coins += gold;
@@ -2230,6 +2249,7 @@ class GameEngine {
       _passTime();
     } else if (placeWon != null) {
       state.explored.add(placeWon.id);
+      if (placeWon.relic case (final r, final i)) _grantPart(r, i);
       _passTime();
     } else if (state.raidFight) {
       raidWon = state.raid;
@@ -2438,11 +2458,6 @@ class GameEngine {
         _note('Jack leaves a sack of soot-toffee behind. Mags will buy anything: +$toffee gold.', EntryKind.gold);
       }
     }
-    if (relicPart != null) {
-      final relic = relics[c]!;
-      _note('Among the spoils: the $relicPart! (${state.relicParts[c]} of ${relic.parts.length} parts of ${relic.name})', EntryKind.gold);
-      if (state.relicParts[c] == relic.parts.length) _note('That\'s every part of ${relic.name}. Take them to Dunstan\'s forge.', EntryKind.gold);
-    }
     if (firstBoss && relics[c] != null) _note(relics[c]!.blueprint, EntryKind.gold);
     if (firstBoss) _note('${land.name}\'s Heroic trail is open: elite foes, and ${f.name} waiting at the end, risen.', EntryKind.gold);
     if (placeWon != null) {
@@ -2469,13 +2484,14 @@ class GameEngine {
   }
 
   /// Rarity odds (common to legendary) for a rare foe's drop: mostly rare and epic, now and then legendary.
+  /// (Legendaries were turning up about once a land; they're meant to be the find of a lifetime.)
   static List<int> rareOdds(Rare rare) => rare.pack
-      ? const [300, 400, 250, 47, 3]
+      ? const [600, 800, 500, 99, 1]
       : rare.name != null || rare.aura == Aura.ancient
-      ? const [0, 0, 55, 40, 5]
+      ? const [0, 0, 115, 82, 3]
       : rare.aura == Aura.cursed
-      ? const [0, 0, 55, 40, 5]
-      : const [0, 20, 58, 21, 1];
+      ? const [0, 0, 112, 84, 4]
+      : const [0, 40, 117, 42, 1];
 
   /// The affix a rare foe's aura puts on its drop.
   static Stat? auraStat(Aura a) => switch (a) {
@@ -2502,8 +2518,8 @@ class GameEngine {
     const odds = [
       [55, 35, 9, 1, 0],
       [0, 65, 30, 5, 0],
-      [0, 25, 60, 14, 1],
-      [0, 0, 55, 42, 3],
+      [0, 50, 120, 29, 1],
+      [0, 0, 110, 87, 3],
     ];
     // One piece per chest; a boss's grand chest holds two.
     final items = [for (var n = 0; n < (t == 3 ? 2 : 1); n++) loot.roll(k.heroClass, k.level, wielding: k.loadout.weapon, odds: odds[t])];

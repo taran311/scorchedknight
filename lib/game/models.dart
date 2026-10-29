@@ -636,7 +636,7 @@ class GameState {
     'dayWins': dayWins,
     'home': home,
     'heroic': {for (final e in heroicWins.entries) '${e.key}': e.value},
-    'parts': {for (final e in relicParts.entries) '${e.key}': e.value},
+    'partMask': {for (final e in relicParts.entries) '${e.key}': e.value},
     'forged': forged.toList(),
     'heroicFight': heroicFight,
     'seasonSeen': seasonSeen,
@@ -747,7 +747,10 @@ class GameState {
       dayWins: n('dayWins'),
       home: n('home'),
       heroicWins: {for (final e in ((j['heroic'] as Map?) ?? const {}).entries) int.parse(e.key as String): (e.value as num).toInt()},
-      relicParts: {for (final e in ((j['parts'] as Map?) ?? const {}).entries) int.parse(e.key as String): (e.value as num).toInt()},
+      // (Older saves counted parts found in order; now each part is a bit, found in any order.)
+      relicParts: j['partMask'] is Map
+          ? {for (final e in (j['partMask'] as Map).entries) int.parse(e.key as String): (e.value as num).toInt()}
+          : {for (final e in ((j['parts'] as Map?) ?? const {}).entries) int.parse(e.key as String): (1 << (e.value as num).toInt()) - 1},
       forged: {for (final x in (j['forged'] as List? ?? const [])) (x as num).toInt()},
       heroicFight: j['heroicFight'] as bool? ?? false,
       seasonSeen: j['seasonSeen'] as String? ?? '',

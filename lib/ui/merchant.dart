@@ -388,7 +388,7 @@ class ForgeWares extends StatelessWidget {
             x.ware(
               const Icon(Icons.hardware, color: Color(0xFFFFB04A), size: 26),
               'Forge ${e.key == 2 && k.heroClass == HeroClass.ranger ? 'Briarsong' : e.value.name}',
-              '${[for (var i = 0; i < e.value.parts.length; i++) '${i < (s.relicParts[e.key] ?? 0) ? '✓' : '·'} ${e.value.parts[i]}'].join('  ')} · from ${continents[e.key].name}\'s Heroic trail',
+              '${[for (var i = 0; i < e.value.parts.length; i++) '${hasRelicPart(s.relicParts, e.key, i) ? '✓' : '·'} ${e.value.parts[i].name}${hasRelicPart(s.relicParts, e.key, i) ? '' : ': ${e.value.parts[i].where}'}'].join('  ')} · level ${e.value.minLevel}+',
               CostButton(
                 label: '${e.value.gold} gold',
                 onTap: c.whyNotForge(e.key) == null

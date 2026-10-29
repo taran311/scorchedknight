@@ -366,8 +366,9 @@ class _Heroic extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final s = controller.state, at = s.heroicWins[land] ?? 0, risen = at >= heroicStops, relic = relics[land];
-    final parts = s.relicParts[land] ?? 0, forged = s.forged.contains(land);
+    final s = controller.state, at = s.heroicWins[land] ?? 0, risen = at >= heroicStops;
+    // Every relic with a part on this trail (whose blueprint you've found), and this land's own.
+    final shown = {for (final (r, i) in relicPartsOn(land)) if (s.bossesDown.contains(r) && relics[r]!.parts[i].risen) r, if (relics.containsKey(land)) land}.toList()..sort();
     const gold = Color(0xFFFFD98A);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -403,13 +404,14 @@ class _Heroic extends StatelessWidget {
                         Icon(Icons.workspace_premium, size: 20, color: risen ? const Color(0xFFFF8A3A) : gold.withValues(alpha: .5)),
                       ],
                     ),
-                    if (relic != null) ...[
+                    for (final r in shown) ...[
                       const SizedBox(height: 10),
                       _RelicReward(
-                        name: land == 2 && s.knight.heroClass == HeroClass.ranger ? 'Briarsong' : relic.name,
-                        parts: relic.parts,
-                        found: parts,
-                        forged: forged,
+                        name: r == 2 && s.knight.heroClass == HeroClass.ranger ? 'Briarsong' : relics[r]!.name,
+                        relic: relics[r]!,
+                        has: [for (var i = 0; i < relics[r]!.parts.length; i++) hasRelicPart(s.relicParts, r, i)],
+                        here: land,
+                        forged: s.forged.contains(r),
                       ),
                     ],
                   ],
@@ -433,16 +435,19 @@ class _Heroic extends StatelessWidget {
 /// The Heroic trail's prize: a chest, the relic it builds, and its parts as chips (found ones
 /// ticked). Elites on the trail drop the parts; Dunstan forges the relic once you have them all.
 class _RelicReward extends StatelessWidget {
-  const _RelicReward({required this.name, required this.parts, required this.found, required this.forged});
+  const _RelicReward({required this.name, required this.relic, required this.has, required this.here, required this.forged});
   final String name;
-  final List<String> parts;
-  final int found;
+  final Relic relic;
+
+  /// Which parts you hold, and the land whose trail this is.
+  final List<bool> has;
+  final int here;
   final bool forged;
 
   @override
   Widget build(BuildContext context) {
     const gold = Color(0xFFFFD98A), green = Color(0xFF9BE27A);
-    final all = found >= parts.length;
+    final parts = relic.parts, all = has.every((h) => h);
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 6, 10, 8),
       decoration: BoxDecoration(color: Colors.black.withValues(alpha: .3), borderRadius: BorderRadius.circular(4), border: Border.all(color: gold.withValues(alpha: .35))),
@@ -472,20 +477,20 @@ class _RelicReward extends StatelessWidget {
                     children: [
                       for (var i = 0; i < parts.length; i++)
                         Tooltip(
-                          message: i < found ? 'Found' : 'Elites on this trail carry it',
+                          message: has[i] ? 'Found' : 'Held by ${parts[i].where}',
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
-                              color: i < found ? green.withValues(alpha: .15) : Colors.black.withValues(alpha: .3),
+                              color: has[i] ? green.withValues(alpha: .15) : Colors.black.withValues(alpha: .3),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: i < found ? green.withValues(alpha: .7) : Palette.parch2.withValues(alpha: .3)),
+                              border: Border.all(color: has[i] ? green.withValues(alpha: .7) : Palette.parch2.withValues(alpha: .3)),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(i < found ? Icons.check : Icons.lock_outline, size: 14, color: i < found ? green : Palette.parch2.withValues(alpha: .7)),
+                                Icon(has[i] ? Icons.check : Icons.lock_outline, size: 14, color: has[i] ? green : Palette.parch2.withValues(alpha: .7)),
                                 const SizedBox(width: 4),
-                                Text(parts[i], style: Txt.label(size: 12.5, color: i < found ? green : Palette.parch2)),
+                                Text(parts[i].land == here || has[i] ? parts[i].name : '${parts[i].name} · ${continents[parts[i].land].name}', style: Txt.label(size: 12.5, color: has[i] ? green : Palette.parch2)),
                               ],
                             ),
                           ),
@@ -493,7 +498,7 @@ class _RelicReward extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 4),
-                  Text(all ? 'All parts found: take them to Dunstan\'s forge.' : 'Elites drop the parts. Bring all ${parts.length} to Dunstan.', style: Txt.onStone(size: 12.5, color: all ? green : Palette.parch2)),
+                  Text(all ? 'All parts found: take them to Dunstan\'s forge (level ${relic.minLevel}+).' : 'Each part is its own quest somewhere in the world (press and hold a part to see where). Dunstan forges it at level ${relic.minLevel}+.', style: Txt.onStone(size: 12.5, color: all ? green : Palette.parch2)),
                 ],
               ],
             ),

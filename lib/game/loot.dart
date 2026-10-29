@@ -1044,6 +1044,9 @@ class LootTable {
   LootTable([math.Random? random]) : _r = random ?? math.Random();
   final math.Random _r;
 
+  /// Below this level no random legendary drops; from it they grow more likely until [legendFull].
+  static const legendFrom = 15, legendFull = 26;
+
   Rarity _rarity(bool boss, [List<int>? odds]) {
     // Per 1000 drops from a regular foe: 550 common, 300 uncommon, 120 rare, 27 epic, 3 legendary.
     // Legendaries should be a moment, not a Tuesday.
@@ -1627,6 +1630,7 @@ class LootTable {
       case 'collar':
         return collarDrop(level);
     }
+    final early = earlyTrophies.contains(art);
     final (name, lore, stats) = switch (art) {
       'infernalsigil' => ('Infernal Sigil', 'Azgar\'s seal. It burns the hand of anyone unworthy. You seem fine.', {Stat.damage: 1.6, Stat.leech: 1.2, Stat.crit: 1.2}),
       'emberheart' => ('Emberheart', 'The last coal of the Ember King. It keeps you warm, and it is very sorry.', {Stat.damage: 2.0, Stat.burn: 2.0, Stat.vigour: 1.8, Stat.crit: 1.4}),
@@ -1654,13 +1658,17 @@ class LootTable {
       name: name,
       slot: GearSlot.trinket,
       art: art,
-      rarity: Rarity.legendary,
+      rarity: early ? Rarity.epic : Rarity.legendary,
       level: level,
       lore: lore,
-      value: _value(level, Rarity.legendary, GearSlot.trinket),
-      stats: {for (final e in stats.entries) e.key: _roll(e.key, level, e.value, _r)},
+      value: _value(level, early ? Rarity.epic : Rarity.legendary, GearSlot.trinket),
+      stats: {for (final e in stats.entries) e.key: _roll(e.key, level, e.value * (early ? .8 : 1), _r)},
     );
   }
+
+  /// The first lands' boss trophies (Gorbo's, the Colossus's, Bramblecrown's) are fine epics, not
+  /// legendaries: legendaries are for the middle and end of the road.
+  static const earlyTrophies = {'cyclopseye', 'phylactery', 'acorn'};
 
   /// A piece of a forged set (gloves, boots or a ring), made at Dunstan's from its blueprint: epic,
   /// at your level, with the set's own stats.
@@ -1764,11 +1772,12 @@ class LootTable {
     name: 'Gorbo\'s Eye',
     slot: GearSlot.trinket,
     art: 'cyclopseye',
-    rarity: Rarity.legendary,
+    // The first boss's trophy is a fine epic, not a legendary: legendaries should be earned.
+    rarity: Rarity.epic,
     level: level,
     lore: 'It still looks around when you\'re not watching it.',
-    value: _value(level, Rarity.legendary, GearSlot.trinket),
-    stats: {Stat.crit: _roll(Stat.crit, level, 1.8, _r), Stat.parry: _roll(Stat.parry, level, 1.2, _r), Stat.wisdom: _roll(Stat.wisdom, level, 1.5, _r)},
+    value: _value(level, Rarity.epic, GearSlot.trinket),
+    stats: {Stat.crit: _roll(Stat.crit, level, 1.6, _r), Stat.parry: _roll(Stat.parry, level, 1.1, _r), Stat.damage: _roll(Stat.damage, level, .8, _r)},
   );
 
   /// The Demon Hound's collar: a legendary trinket for any class.
@@ -1787,7 +1796,14 @@ class LootTable {
   /// Rolls one drop. [odds] overrides the rarity weights (common to legendary); [element] makes
   /// a rare foe's aura show up as the drop's first affix.
   GearItem roll(HeroClass heroClass, int level, {bool boss = false, List<int>? odds, Stat? element, GearItem? wielding, GearSlot? only, bool east = false}) {
-    final rarity = _rarity(boss, odds);
+    var rarity = _rarity(boss, odds);
+    // Legendaries belong to the middle and end of the road: none drop before [legendFrom], and
+    // they thin out below [legendFull] (a would-be legendary turns up as an epic instead). A
+    // drop that can only be legendary (the Lost Isle's hoard) always is.
+    final onlyLegend = odds != null && odds.take(4).every((w) => w == 0);
+    if (rarity == Rarity.legendary && !onlyLegend && level < legendFull && (level < legendFrom || _r.nextDouble() < (legendFull - level) / (legendFull - legendFrom))) {
+      rarity = Rarity.epic;
+    }
     final legends = _legends.where((l) => (l.heroClass == null || l.heroClass == heroClass) && (only == null || l.slot == only)).toList();
     if (rarity == Rarity.legendary && legends.isNotEmpty) {
       final pool = legends;

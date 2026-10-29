@@ -232,7 +232,7 @@ int foeLevelFor(int continent, int heroLevel) => math.max(heroLevel, continents[
 /// Turns a hero of the foe's level, in the gear such a hero usually has, needs to fell a common foe
 /// with plain attacks (skills and companions make it fewer), and how many times longer a boss
 /// takes.
-const turnsPerFoe = 5.8, bossTurns = 2.6;
+const turnsPerFoe = 5.8, bossTurns = 3.0;
 
 /// The foe in front of you now: its kind, and any shape a shapeshifter has taken.
 FoeType foeIn(GameState s) => formed(encounterType(s.foe, s.rare), s.form);
@@ -383,11 +383,12 @@ SwingDamage swingDamage(GameState state, double roll, {Special? special, AmmoTyp
 /// with its level and continent; bosses and rare foes hit harder.
 int foeAttack(int foeIndex, Rare? rare, int level) {
   final f = encounterType(foeIndex, rare), realm = landTier(realmAt(rare?.base ?? foeIndex));
-  var a = (13 + 4.6 * level) * (1 + .05 * realm);
+  var a = (13 + 5.6 * level) * (1 + .05 * realm);
   // The first few levels go easier on a new hero, while they learn the ropes (and the flat part of
   // the formula would otherwise make Cindervale the hardest land in the game, per foe).
   if (level < 5) a *= .7 + .075 * (level - 1);
-  if (f.boss) a *= 1.35;
+  // Bosses hit hard (Gorbo, the very first, a little less: he's where a new hero learns bosses).
+  if (f.boss) a *= realm == 0 ? 1.4 : 1.6;
   if (f.dragon) a += 1;
   if (f.rare) a *= f.named ? 1.35 : 1.2;
   if (f.pack) a *= 1.1;

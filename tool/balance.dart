@@ -83,7 +83,7 @@ final brewed = <Brew, int>{};
 final forgedAt = <String, List<int>>{};
 final legendsByLand = <int, int>{};
 final fineByArt = <String, int>{};
-final lootBySource = <String, int>{}, fightsBySource = <String, int>{};
+final lootBySource = <String, int>{}, fightsBySource = <String, int>{}, legendBySource = <String, int>{};
 
 void run(String style, int seed, Stats st, {void Function(GameEngine e, int land)? onBoss}) {
   const cls = HeroClass.knight;
@@ -247,6 +247,9 @@ void run(String style, int seed, Stats st, {void Function(GameEngine e, int land
       st.hurt[c].add(taken / mh);
     }
     lootBySource[kind] = (lootBySource[kind] ?? 0) + s.pendingLoot.length - before;
+    for (final g in s.pendingLoot.skip(before)) {
+      if (g.rarity == Rarity.legendary) legendBySource[kind] = (legendBySource[kind] ?? 0) + 1;
+    }
     fightsBySource[kind] = (fightsBySource[kind] ?? 0) + 1;
     if (s.encounter != null) {
       final b = s.pendingLoot.length;
@@ -488,8 +491,10 @@ void main(List<String> args) {
     if (args.contains('why')) print('  fine by art: ${(fineByArt.entries.toList()..sort((a, b) => b.value - a.value)).take(30).map((e) => '${e.key} ${(e.value / runs).toStringAsFixed(1)}').join(', ')}');
     fineByArt.clear();
     if (args.contains('why')) print('  drops by source (items / fights): ${lootBySource.entries.map((e) => '${e.key} ${(e.value / runs).toStringAsFixed(0)}/${((fightsBySource[e.key] ?? 0) / runs).toStringAsFixed(0)}').join(', ')}');
+    if (args.contains('why')) print('  legendaries by source, per run: ${legendBySource.entries.map((e) => '${e.key} ${(e.value / runs).toStringAsFixed(2)}').join(', ')}');
     lootBySource.clear();
     fightsBySource.clear();
+    legendBySource.clear();
     print('  legendaries per run, by land: ${[for (var c = 0; c < continents.length; c++) ((legendsByLand[c] ?? 0) / runs).toStringAsFixed(1)].join(' · ')}');
     print('== Knight, $style ($runs runs, ${st.finished} beat Vharrax) ==');
     for (var c = 0; c < continents.length; c++) {
