@@ -7,6 +7,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
 
 import '../art/battlegrounds.dart';
 import '../art/silhouette.dart';
@@ -41,6 +42,7 @@ import '../game/banter.dart';
 import '../audio/audio.dart';
 import 'cadence.dart';
 import 'theme.dart';
+import 'trace.dart';
 
 /// Where figures can be drawn (scene units), with room for leaps and fliers.
 /// (Kept to the stage plus a margin: every backlight layer is this big, every frame.)
@@ -788,6 +790,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   }
 
   void _playSwing(SwingResult r) {
+    if (tracing) traceMark('${r.action.name}${r.counter != null ? ' +counter' : ''}');
     if (const {BattleAction.potion, BattleAction.pet, BattleAction.flee}.contains(r.action)) {
       _playOther(r);
       return;
@@ -1525,6 +1528,9 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   // ---------- ticker ----------
 
   double _last = 0;
+
+  /// How long the last stage paint took to record (for ?trace).
+  double _paintMs = 0;
   void _tick(Duration elapsed) {
     // The stage keeps its own clock so a long combo can play faster (controller.stageSpeed).
     // (A slow frame on a phone used to be capped at 50 ms, so when the frame rate dipped the whole
@@ -1539,6 +1545,22 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     if (_shake > 0) _shake = math.max(0, _shake - realDt * .04);
     _clock += dt;
     final t = _clock;
+    if (tracing) {
+      traceFrame({
+        'real': double.parse(real.toStringAsFixed(1)),
+        'dt': double.parse(realDt.toStringAsFixed(1)),
+        'paint': double.parse(_paintMs.toStringAsFixed(1)),
+        'clock': double.parse(t.toStringAsFixed(1)),
+        'dash': double.parse(fx['dash']!.toStringAsFixed(3)),
+        'lunge': double.parse(fx['lunge']!.toStringAsFixed(3)),
+        'pounce': double.parse(fx['pounce']!.toStringAsFixed(3)),
+        'kclip': _knightClip == null ? null : (identical(_knightClip, crushClip) ? 'crush' : identical(_knightClip, swingClip) ? 'swing' : 'other'),
+        'kms': _knightClip == null ? null : (t - _knightClipStart).round(),
+        'fclip': _foeClip == null ? null : (t - _foeClipStart).round(),
+        'freeze': _freeze > 0,
+        'lite': _lite,
+      });
+    }
     final due = _schedule.where((s) => s.$1 <= t).toList();
     _schedule.removeWhere((s) => s.$1 <= t);
     for (final s in due) {
@@ -1684,12 +1706,30 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     // shadows), while hovering a tile repainted the whole fight. That was the sluggish feel.
     return Semantics(
       label: 'Your ${c.state.knight.heroClass.label.toLowerCase()} faces ${c.shownFoeType.name}',
-      child: RepaintBoundary(child: widget.fill
-          ? CustomPaint(painter: _ScenePainter(this), isComplex: true, willChange: true, child: const SizedBox.expand())
-          : AspectRatio(
-              aspectRatio: widget.aspectRatio,
-              child: CustomPaint(painter: _ScenePainter(this), isComplex: true, willChange: true),
-            )),
+      child: Stack(
+        children: [
+          RepaintBoundary(child: widget.fill
+              ? CustomPaint(painter: _ScenePainter(this), isComplex: true, willChange: true, child: const SizedBox.expand())
+              : AspectRatio(
+                  aspectRatio: widget.aspectRatio,
+                  child: CustomPaint(painter: _ScenePainter(this), isComplex: true, willChange: true),
+                )),
+          // ?trace on a phone: one tap copies the record, to paste into a message.
+          if (tracing)
+            Positioned(
+              right: 4,
+              bottom: 4,
+              child: TextButton(
+                style: TextButton.styleFrom(backgroundColor: const Color(0xCC000000), padding: const EdgeInsets.symmetric(horizontal: 8)),
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: traceDump()));
+                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Trace copied')));
+                },
+                child: const Text('Copy trace', style: TextStyle(color: Colors.white, fontSize: 12)),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -1706,7 +1746,7 @@ class _ScenePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final watch = _perf.contains('t') ? (Stopwatch()..start()) : null;
+    final watch = _perf.contains('t') || tracing ? (Stopwatch()..start()) : null;
     final t = s.now, c = s.c, still = s._reduceMotion, fx = s.fx;
     final k = c.state.knight;
     canvas.save();
@@ -2412,7 +2452,8 @@ class _ScenePainter extends CustomPainter {
       );
     }
     canvas.restore();
-    if (watch != null) {
+    if (watch != null) s._paintMs = watch.elapsedMicroseconds / 1000;
+    if (watch != null && _perf.contains('t')) {
       _perfMs += watch.elapsedMicroseconds / 1000;
       if (++_perfFrames == 120) {
         // ignore: avoid_print
