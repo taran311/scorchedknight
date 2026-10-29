@@ -4,6 +4,7 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'cadence.dart';
 
 import '../art/body.dart';
 import '../art/silhouette.dart';
@@ -49,10 +50,10 @@ class _HeroFigureState extends State<HeroFigure> with SingleTickerProviderStateM
   void _sync() {
     final want = widget.animate && !(WidgetsBinding.instance.platformDispatcher.accessibilityFeatures.disableAnimations);
     if (want && _ticker == null) {
-      // Breathing and a cape in the breeze look the same at 30 frames a second, at half the work.
+      // Breathing and a cape in the breeze: smooth on a computer, half the work on a phone.
       _ticker = createTicker((e) {
         final ms = e.inMicroseconds / 1000.0;
-        if (ms - _time.value >= 32) _time.value = ms;
+        if (_cadence.tick(ms, fps: _phone ? 30 : 60)) _time.value = ms;
       })..start();
     } else if (!want && _ticker != null) {
       _ticker!.dispose();
@@ -67,8 +68,16 @@ class _HeroFigureState extends State<HeroFigure> with SingleTickerProviderStateM
     super.dispose();
   }
 
+  final _cadence = Cadence();
+  bool _phone = false;
+
   @override
-  Widget build(BuildContext context) => RepaintBoundary(
+  Widget build(BuildContext context) {
+    _phone = MediaQuery.sizeOf(context).shortestSide < 600;
+    return _build();
+  }
+
+  Widget _build() => RepaintBoundary(
     child: CustomPaint(
       painter: _FigurePainter(widget.look, _time, still: _ticker == null, flip: widget.flip),
       size: Size.infinite,

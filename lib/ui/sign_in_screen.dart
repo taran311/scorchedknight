@@ -172,7 +172,7 @@ class _EmbersState extends State<_Embers> with SingleTickerProviderStateMixin {
   }
 
   @override
-  Widget build(BuildContext context) => CustomPaint(painter: _EmberPainter(_t));
+  Widget build(BuildContext context) => RepaintBoundary(child: CustomPaint(painter: _EmberPainter(_t)));
 }
 
 class _EmberPainter extends CustomPainter {

@@ -130,9 +130,77 @@ class _MapPageState extends State<MapPage> {
       _placePick = null;
     });
     if (c.whyNotTravel(land) != null) return;
+    if (!await _wardCheck(land) || !mounted) return;
     c.travel(land);
     await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => TrailPage(controller: c, land: land)));
     if (mounted) setState(() {});
+  }
+
+  /// Lands warned about this session while their ward couldn't be made yet (so it's said once, not
+  /// every time you go in).
+  static final _warned = <int>{};
+
+  /// Before going into a land with a hazard and no ward: says what it does and how to stop it.
+  /// When Old Wick can make the ward right now, it offers to (that one asks every time: it's a
+  /// single tap away). Returns whether to go in.
+  Future<bool> _wardCheck(int land) async {
+    final l = continents[land], s = c.state;
+    if (l.ward == null || s.warded.contains(land)) return true;
+    final why = c.whyNotWard(land);
+    if (why != null && _warned.contains(land)) return true;
+    _warned.add(land);
+    final reagent = continents[land - 1].reagent, have = s.reagents[land - 1];
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: Stone(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.warning_amber, color: Color(0xFFE0A070), size: 26),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text('${l.hazard} ahead', style: Txt.label(size: 19, color: const Color(0xFFE0A070), weight: FontWeight.w800))),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text('In ${l.name} you lose ${(hazardShare * 100).round()}% of your HP every turn you fight. Old Wick\'s ${l.ward} stops it.', style: Txt.onStone(size: 14.5, color: Palette.cream)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(Icons.shield_moon, color: Color(0xFF9ADFFF), size: 20),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '$reagentsForWard $reagent (you have $have) and ${wardPrice(land)} gold${have < reagentsForWard ? '. $reagent drops from foes in ${continents[land - 1].name}.' : ''}',
+                        style: Txt.onStone(size: 13.5, color: have >= reagentsForWard ? const Color(0xFF9BE27A) : Palette.parch2),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (why == null) ...[
+                  StoneButton(title: 'Get the ${l.ward} · ${wardPrice(land)} gold', tone: ButtonTone.amber, compact: true, onPressed: () => Navigator.of(context).pop('craft')),
+                  const SizedBox(height: 6),
+                ],
+                StoneButton(title: 'Go in anyway', compact: true, onPressed: () => Navigator.of(context).pop('go')),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (choice == 'craft') {
+      c.craftWard(land);
+      Audio.play(Sfx.coins);
+    }
+    return choice != null;
   }
 
   /// Off the road: wild area [a] (straight in if it's open; otherwise the panel says how to open it).

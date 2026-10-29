@@ -45,7 +45,7 @@ const spells = <Spell>[
   Spell('raisedead', 'Summon Undead', 'Raise a skeleton warrior that fights beside you for 4 turns', 3, 3, SpellKind.summon, 0xFFB07AFF, summons: 1, turns: 4),
   Spell('enfeeble', 'Enfeeble', 'Sap the foe\'s strength: its counters hit 40% softer for 4 turns', 4, 2, SpellKind.weaken, 0xFFB8A0D8, hex: 4),
   Spell('frostnova', 'Frost Nova', 'A burst of ice: 1.5x damage plus frost, and the foe is frozen and can\'t hit back', 5, 3, SpellKind.nova, 0xFF9ADFFF, mult: 1.5, element: Stat.frost),
-  Spell('bloodbolt', 'Bloodleech Bolt', 'A bolt that drinks: 1.5x damage, and you heal a third of it', 6, 3, SpellKind.drain, 0xFFB0302A, mult: 1.5, drain: .33),
+  Spell('bloodbolt', 'Blood Siphon', 'A crimson bolt that drinks: 1.5x damage, and you heal a third of it', 6, 3, SpellKind.drain, 0xFFB0302A, mult: 1.5, drain: .33),
   Spell('arcaneward', 'Arcane Ward', 'A shimmering ward that absorbs the next 3 counters', 7, 3, SpellKind.ward, 0xFF7FB8E8, wards: 3),
   Spell('sunder', 'Sunder Armour', 'Crack the foe\'s defences: your hits deal 25% more for 4 turns', 8, 3, SpellKind.expose, 0xFFE0A050, hex: 4),
   Spell('dragonfire', 'Summon Dragonfire', 'Call a dragon from the sky to breathe a fireball: 2.2x damage plus fire', 9, 5, SpellKind.dragon, 0xFFFF7A2A, mult: 2.2, element: Stat.burn),

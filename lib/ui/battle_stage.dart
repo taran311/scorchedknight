@@ -38,6 +38,7 @@ import '../game/rules.dart';
 import '../game/spells.dart';
 import '../game/banter.dart';
 import '../audio/audio.dart';
+import 'cadence.dart';
 import 'theme.dart';
 
 /// Where figures can be drawn (scene units), with room for leaps and fliers.
@@ -1416,8 +1417,10 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     _marks.removeWhere((m) => t - m.start > 1050);
     _shots.removeWhere((p) => t - p.start > p.duration);
     _drops.removeWhere((m) => t - m.start > 1700);
-    // Only blows, spells and their sparks need every frame. Between turns (breathing, drifting
-    // ash, a flickering aura) the stage draws half as often, which keeps phones cool and smooth.
+    // The stage draws at about 60 frames a second, in whole screen refreshes so the rhythm stays
+    // even: every refresh on a 60 Hz screen, every other on 120/144 Hz, every third on 165 Hz.
+    // (Drawing it at a fast monitor's full rate was all cost and no gain.) Between turns on a
+    // phone (breathing, drifting ash) it draws half as often again, to keep phones cool.
     final lively = _tweens.isNotEmpty ||
         _schedule.isNotEmpty ||
         // (A rare foe's aura sheds sparks all the time; those alone used to hold every rare fight
@@ -1432,14 +1435,10 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         _shake > 0 ||
         _freeze > 0 ||
         (_banner != null && t - _banner!.$3 < 2600);
-    if (lively || real - _lastFrame >= 32) {
-      _lastFrame = real;
-      _time.value = t;
-    }
+    if (_cadence.tick(real, fps: lively || !_lite ? 60 : 30)) _time.value = t;
   }
 
-  /// When the stage last drew a frame (real time).
-  double _lastFrame = 0;
+  final _cadence = Cadence();
 
   /// A phone: the lighter silhouette (no halo blur, one rim), for a smoother fight.
   bool _lite = false;
@@ -1480,17 +1479,26 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
 
   @override
   Widget build(BuildContext context) {
+    // Its own layer: the stage redraws up to 60 times a second, and without this every one of
+    // those frames repainted the whole screen around it too (the cards, the move tiles and their
+    // shadows), while hovering a tile repainted the whole fight. That was the sluggish feel.
     return Semantics(
       label: 'Your ${c.state.knight.heroClass.label.toLowerCase()} faces ${c.shownFoeType.name}',
-      child: widget.fill
+      child: RepaintBoundary(child: widget.fill
           ? CustomPaint(painter: _ScenePainter(this), isComplex: true, willChange: true, child: const SizedBox.expand())
           : AspectRatio(
               aspectRatio: widget.aspectRatio,
               child: CustomPaint(painter: _ScenePainter(this), isComplex: true, willChange: true),
-            ),
+            )),
     );
   }
 }
+
+/// Performance probes for testing (?perf=... in the address): b no backdrop, h no halo, f no
+/// figures, r figures without the silhouette passes, t log the time each frame takes to record.
+final _perf = Uri.base.queryParameters['perf'] ?? '';
+double _perfMs = 0;
+int _perfFrames = 0;
 
 class _ScenePainter extends CustomPainter {
   _ScenePainter(this.s) : super(repaint: s._time);
@@ -1498,6 +1506,7 @@ class _ScenePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    final watch = _perf.contains('t') ? (Stopwatch()..start()) : null;
     final t = s.now, c = s.c, still = s._reduceMotion, fx = s.fx;
     final k = c.state.knight;
     canvas.save();
@@ -1526,7 +1535,7 @@ class _ScenePainter extends CustomPainter {
     }
     final ground = specFor(settingFor(s._sceneLook));
     // (Recorded once per battleground and replayed: the landscape's shapes are only built once.)
-    canvas.drawPicture(battleground(s._sceneLook));
+    if (!_perf.contains('b')) canvas.drawPicture(battleground(s._sceneLook));
     for (final (at, r, col, start) in s._stains) {
       final a = (1 - ((t - start) / 6000)).clamp(0.0, 1.0);
       canvas.drawOval(Rect.fromCenter(center: at, width: r * 2.6, height: r * .9), Paint()..color = col.withValues(alpha: col.a * math.min(1.0, a * 2)));
@@ -1819,7 +1828,11 @@ class _ScenePainter extends CustomPainter {
         Paint()..shader = ui.Gradient.radial(glowAt, 220 * reaper.scale, [reaperGlow.withValues(alpha: .34 * reaperIn), reaperGlow.withValues(alpha: .1 * reaperIn), const Color(0x00000000)], const [0, .55, 1]),
       );
     }
-    silhouettePicture(canvas, figurePic, _figureBounds, rim: reaper != null ? Color.lerp(rimFor(ground), reaperGlow, reaperIn * .7)! : rimFor(ground), lite: s._lite);
+    if (_perf.contains('r')) {
+      canvas.drawPicture(figurePic);
+    } else if (!_perf.contains('f')) {
+      silhouettePicture(canvas, figurePic, _figureBounds, rim: reaper != null ? Color.lerp(rimFor(ground), reaperGlow, reaperIn * .7)! : rimFor(ground), lite: s._lite || _perf.contains('h'));
+    }
 
     // Sea specials: a breaking wave, and the Kraken's arms.
     if (fx['grasp']! > 0) drawKrakenGrasp(canvas, Offset(fx0, fy), fx['grasp']!, t);
@@ -2100,6 +2113,15 @@ class _ScenePainter extends CustomPainter {
       );
     }
     canvas.restore();
+    if (watch != null) {
+      _perfMs += watch.elapsedMicroseconds / 1000;
+      if (++_perfFrames == 120) {
+        // ignore: avoid_print
+        print('stage: ${(_perfMs / _perfFrames).toStringAsFixed(2)} ms to record a frame');
+        _perfMs = 0;
+        _perfFrames = 0;
+      }
+    }
   }
 
   void _shot(Canvas canvas, _Projectile p, double k) {

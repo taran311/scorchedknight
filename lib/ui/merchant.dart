@@ -429,12 +429,12 @@ class EnchanterWares extends StatelessWidget {
               final what = slot == EnchantSlot.weapon ? (kit.weapon?.name ?? 'No weapon') : armourTierById(kit.armour).name;
               return x.ware(
                 Icon(slot == EnchantSlot.weapon ? Icons.auto_fix_high : Icons.shield_moon, color: const Color(0xFFB89AE0), size: 26),
-                'Enchant: $what',
-                current == null ? 'No rune yet · a random ${slot.name} rune, tier I to III' : '${current.title}: ${current.describe}',
+                slot == EnchantSlot.weapon ? 'Your weapon' : 'Your armour',
+                '$what · ${current == null ? 'no rune yet. Choose one of three.' : '${current.title}: ${current.describe}'}',
                 k.scrolls > 0
                     ? CostButton(label: 'Read a scroll (${k.scrolls})', onTap: () => enchantFlow(context, c, slot, scroll: true))
                     : CostButton(
-                        label: current == null ? 'Enchant' : 'Reroll',
+                        label: current == null ? 'Enchant' : 'New runes',
                         onTap: k.coins >= enchantCost(k.level) ? () => enchantFlow(context, c, slot) : null,
                       ),
               );
@@ -536,45 +536,114 @@ class _MountPainter extends CustomPainter {
   bool shouldRepaint(_MountPainter old) => old.id != id;
 }
 
-/// Pays for a random rune (or, with [core], binds three of an elemental's cores into its rune for
-/// your weapon) and asks whether to keep it or what you had.
+/// Pays for runes (or reads a scroll) and offers three to choose from, or keep what you had. With
+/// [core], binds three of an elemental's cores into its own rune instead (one offer).
 Future<void> enchantFlow(BuildContext context, GameController c, EnchantSlot slot, {bool scroll = false, Elemental? core}) async {
   final kit = c.state.knight.loadout;
   final current = slot == EnchantSlot.weapon ? kit.weapon?.enchant : kit.armourEnchant;
-  final roll = core != null ? c.bindCores(core) : c.enchantOffer(slot, scroll: scroll);
-  if (roll == null || !context.mounted) return;
-  final tierCol = [const Color(0xFF9BC2E8), const Color(0xFFB07AFF), const Color(0xFFF09A2E)][roll.tier - 1];
-  final keep = await showDialog<bool>(
+  final bound = core != null ? c.bindCores(core) : null;
+  final choices = core != null ? [if (bound != null) bound] : c.enchantChoices(slot, scroll: scroll);
+  if (choices.isEmpty || !context.mounted) return;
+  if (choices.any((r) => r.tier == 3)) Audio.play(Sfx.epicDrop);
+  final pick = await showDialog<EnchantRoll>(
     context: context,
     barrierDismissible: false,
     builder: (context) => Dialog(
       backgroundColor: Colors.transparent,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 400),
+        constraints: const BoxConstraints(maxWidth: 420),
         child: Stone(
           padding: const EdgeInsets.all(14),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('The rune takes shape…', style: Txt.label(size: 12, color: Palette.parch2)),
-              Text(roll.title, style: Txt.label(size: 22, color: tierCol, weight: FontWeight.w900)),
-              if (roll.tier == 3) Text('A perfect rune!', style: Txt.label(size: 13, color: tierCol)),
-              const SizedBox(height: 4),
-              Text(roll.describe, style: Txt.onStone(size: 15, color: Palette.cream)),
+              Text(choices.length == 1 ? 'The rune takes shape…' : 'Three runes take shape. Choose one.', style: Txt.label(size: 15, color: Palette.amber)),
               const SizedBox(height: 10),
-              Text(current == null ? 'Nothing to replace.' : 'Currently: ${current.title}: ${current.describe}', style: Txt.onStone(size: 13.5)),
-              const SizedBox(height: 12),
-              StoneButton(title: current == null ? 'Bind the rune' : 'Take the new rune', tone: ButtonTone.blood, onPressed: () => Navigator.of(context).pop(true)),
-              const SizedBox(height: 6),
-              if (current != null) StoneButton(title: 'Keep ${current.title}', compact: true, onPressed: () => Navigator.of(context).pop(false)),
+              for (final r in choices) ...[
+                _RuneCard(roll: r, onTap: () => Navigator.of(context).pop(r)),
+                const SizedBox(height: 8),
+              ],
+              Text(current == null ? 'Nothing to replace yet.' : 'Now: ${current.title}: ${current.describe}', style: Txt.onStone(size: 13)),
+              if (current != null) ...[
+                const SizedBox(height: 8),
+                StoneButton(title: 'Keep ${current.title}', compact: true, onPressed: () => Navigator.of(context).pop()),
+              ],
             ],
           ),
         ),
       ),
     ),
   );
-  if (keep == true) c.applyEnchant(slot, roll);
+  if (pick != null) {
+    c.applyEnchant(slot, pick);
+    Audio.play(Sfx.coins);
+  }
+}
+
+/// One rune on offer: its name in its tier's colour (I blue, II violet, III orange), the tier as
+/// pips, and what it does. Tap to bind it.
+class _RuneCard extends StatefulWidget {
+  const _RuneCard({required this.roll, required this.onTap});
+  final EnchantRoll roll;
+  final VoidCallback onTap;
+
+  @override
+  State<_RuneCard> createState() => _RuneCardState();
+}
+
+class _RuneCardState extends State<_RuneCard> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = widget.roll, col = [const Color(0xFF9BC2E8), const Color(0xFFB07AFF), const Color(0xFFF09A2E)][r.tier - 1];
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 100),
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          decoration: BoxDecoration(
+            color: Color.lerp(const Color(0xFF1A1512), col, _hover ? .22 : .1),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: col.withValues(alpha: _hover ? 1 : .6), width: r.tier == 3 ? 2 : 1.4),
+            boxShadow: [if (r.tier == 3 || _hover) BoxShadow(color: col.withValues(alpha: .35), blurRadius: 10)],
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.auto_fix_high, color: col, size: 26),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(r.title, style: Txt.label(size: 17, color: col, weight: FontWeight.w800)),
+                    Text(r.describe, style: Txt.onStone(size: 14, color: Palette.cream)),
+                  ],
+                ),
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var i = 0; i < 3; i++)
+                    Container(
+                      width: 8,
+                      height: 8,
+                      margin: const EdgeInsets.only(left: 3),
+                      decoration: BoxDecoration(shape: BoxShape.circle, color: i < r.tier ? col : Colors.transparent, border: Border.all(color: col.withValues(alpha: .7))),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class CostButton extends StatelessWidget {

@@ -13,6 +13,7 @@ import '../art/poses.dart';
 import '../art/scenery.dart' show sceneSize;
 import '../art/silhouette.dart';
 import '../game/catalog.dart';
+import '../game/classes.dart' show HeroClass;
 import '../game/controller.dart';
 import '../game/models.dart' show GameState;
 import '../game/rules.dart';
@@ -403,10 +404,12 @@ class _Heroic extends StatelessWidget {
                       ],
                     ),
                     if (relic != null) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        forged ? '${relic.name} forged' : '${relic.name}: ${[for (var i = 0; i < relic.parts.length; i++) '${i < parts ? '✓' : '·'} ${relic.parts[i]}'].join('   ')}',
-                        style: Txt.onStone(size: 13.5, color: parts >= relic.parts.length || forged ? const Color(0xFF9BE27A) : Palette.parch),
+                      const SizedBox(height: 10),
+                      _RelicReward(
+                        name: land == 2 && s.knight.heroClass == HeroClass.ranger ? 'Briarsong' : relic.name,
+                        parts: relic.parts,
+                        found: parts,
+                        forged: forged,
                       ),
                     ],
                   ],
@@ -422,6 +425,80 @@ class _Heroic extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// The Heroic trail's prize: a chest, the relic it builds, and its parts as chips (found ones
+/// ticked). Elites on the trail drop the parts; Dunstan forges the relic once you have them all.
+class _RelicReward extends StatelessWidget {
+  const _RelicReward({required this.name, required this.parts, required this.found, required this.forged});
+  final String name;
+  final List<String> parts;
+  final int found;
+  final bool forged;
+
+  @override
+  Widget build(BuildContext context) {
+    const gold = Color(0xFFFFD98A), green = Color(0xFF9BE27A);
+    final all = found >= parts.length;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(8, 6, 10, 8),
+      decoration: BoxDecoration(color: Colors.black.withValues(alpha: .3), borderRadius: BorderRadius.circular(4), border: Border.all(color: gold.withValues(alpha: .35))),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(forged ? Icons.check_circle : Icons.inventory_2, size: 30, color: forged ? green : gold),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(text: 'REWARD  ', style: Txt.label(size: 11.5, color: gold)),
+                      TextSpan(text: name, style: Txt.label(size: 15, color: Palette.cream, weight: FontWeight.w800)),
+                      TextSpan(text: forged ? '  · forged' : '  · a relic weapon', style: Txt.label(size: 12, color: forged ? green : Palette.parch2)),
+                    ],
+                  ),
+                ),
+                if (!forged) ...[
+                  const SizedBox(height: 5),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 5,
+                    children: [
+                      for (var i = 0; i < parts.length; i++)
+                        Tooltip(
+                          message: i < found ? 'Found' : 'Elites on this trail carry it',
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: i < found ? green.withValues(alpha: .15) : Colors.black.withValues(alpha: .3),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: i < found ? green.withValues(alpha: .7) : Palette.parch2.withValues(alpha: .3)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(i < found ? Icons.check : Icons.lock_outline, size: 14, color: i < found ? green : Palette.parch2.withValues(alpha: .7)),
+                                const SizedBox(width: 4),
+                                Text(parts[i], style: Txt.label(size: 12.5, color: i < found ? green : Palette.parch2)),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(all ? 'All parts found: take them to Dunstan\'s forge.' : 'Elites drop the parts. Bring all ${parts.length} to Dunstan.', style: Txt.onStone(size: 12.5, color: all ? green : Palette.parch2)),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

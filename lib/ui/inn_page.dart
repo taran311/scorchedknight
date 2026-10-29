@@ -24,6 +24,7 @@ import '../game/crafting.dart' show smithName, mageName;
 import '../game/models.dart';
 import '../game/rules.dart';
 import 'account_panel.dart';
+import 'cadence.dart';
 import 'battle_screen.dart';
 import 'hero_page.dart';
 import 'class_picker.dart' show HeroOrHeroine;
@@ -810,15 +811,16 @@ class _InnSceneState extends State<_InnScene> with SingleTickerProviderStateMixi
   late final Ticker _ticker;
   final _t = ValueNotifier<double>(0);
   final _backdrop = _Backdrop();
+  final _cadence = Cadence();
+  bool _phone = false;
 
   @override
   void initState() {
     super.initState();
-    // Ambient life (breathing, drifting ash) is smooth at 30 frames a second: no need to draw the
-    // square 60 times a second.
+    // Ambient life (breathing, drifting ash): smooth on a computer, half the work on a phone.
     _ticker = createTicker((e) {
       final ms = e.inMicroseconds / 1000.0;
-      if (ms - _t.value >= 32) _t.value = ms;
+      if (_cadence.tick(ms, fps: _phone ? 30 : 60)) _t.value = ms;
     });
     if (!WidgetsBinding.instance.platformDispatcher.accessibilityFeatures.disableAnimations) _ticker.start();
   }
@@ -832,7 +834,12 @@ class _InnSceneState extends State<_InnScene> with SingleTickerProviderStateMixi
   }
 
   @override
-  Widget build(BuildContext context) => RepaintBoundary(
+  Widget build(BuildContext context) {
+    _phone = MediaQuery.sizeOf(context).shortestSide < 600;
+    return _build(context);
+  }
+
+  Widget _build(BuildContext context) => RepaintBoundary(
     child: CustomPaint(
       painter: _InnPainter(widget.look, _t, widget.repaired, widget.quest, widget.hover, widget.raid, widget.time, widget.home, widget.hallowash, _backdrop, MediaQuery.devicePixelRatioOf(context), lite: MediaQuery.sizeOf(context).width < 600),
     ),

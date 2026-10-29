@@ -2890,6 +2890,18 @@ class GameEngine {
     return roll;
   }
 
+  /// Pays (or reads a scroll) for three runes to choose from; keep one with [applyEnchant], or
+  /// keep what you had. Empty if you can't pay.
+  List<EnchantRoll> enchantChoices(EnchantSlot slot, {bool scroll = false}) {
+    final k = state.knight, cost = scroll ? 0 : enchantCost(k.level);
+    if (k.coins < cost || (scroll && k.scrolls <= 0) || (slot == EnchantSlot.weapon && k.loadout.weapon == null)) return const [];
+    k.coins -= cost;
+    if (scroll) k.scrolls--;
+    final choices = rollChoices(slot, k.level, _rng, skip: {if (dragonStage(k) == null) 'wyrmslayer'});
+    _note('${scroll ? 'You read a scroll of enchanting' : 'The enchanter works for $cost gold'}: ${choices.map((r) => r.title).join(', ')} take shape.', EntryKind.gold);
+    return choices;
+  }
+
   void applyEnchant(EnchantSlot slot, EnchantRoll roll) {
     final kit = state.knight.loadout;
     if (slot == EnchantSlot.weapon) {

@@ -75,6 +75,21 @@ EnchantRoll rollEnchant(EnchantSlot slot, int level, math.Random rng, {int tierF
   return EnchantRoll(e.id, tier, value);
 }
 
+/// Three different runes for [slot] to choose from (a scroll, or the enchanter's fee), each its
+/// own tier. Runes in [skip] aren't offered (Wyrmslayer to someone with no dragon). Each card's
+/// tier is a little less generous than a single roll's, so the chance that a III is among the
+/// three stays about what one roll's was (one in ten).
+List<EnchantRoll> rollChoices(EnchantSlot slot, int level, math.Random rng, {int count = 3, Set<String> skip = const {}}) {
+  final pool = enchantments.where((e) => e.slot == slot && !skip.contains(e.id)).toList()..shuffle(rng);
+  return [
+    for (final e in pool.take(count))
+      () {
+        final r = rng.nextDouble(), tier = r < .71 ? 1 : (r < .965 ? 2 : 3);
+        return EnchantRoll(e.id, tier, math.max(1, (statRoll(e.stat, level) * e.scale * const [.6, 1.0, 1.5][tier - 1]).round()));
+      }(),
+  ];
+}
+
 /// A chosen rune (by id), worked well: tier II, or III a quarter of the time (an elemental's cores
 /// bound by Old Wick).
 EnchantRoll boundRune(String id, int level, math.Random rng) {

@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 
 import '../art/looks.dart';
 import '../audio/audio.dart';
+import '../game/ammo.dart';
 import '../game/catalog.dart';
+import '../game/crafting.dart';
 import '../game/classes.dart';
 import '../game/controller.dart';
 import '../game/loot.dart';
@@ -17,6 +19,7 @@ import 'hero_view.dart';
 import 'item_icons.dart';
 import 'journal_panel.dart' show fmt;
 import 'loot_window.dart';
+import 'material_icons.dart';
 import 'merchant.dart';
 import 'theme.dart';
 
@@ -512,18 +515,53 @@ class _Satchel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = controller, k = c.state.knight, ds = dragonStage(k);
-    final slots = <Widget>[
-      for (var i = 0; i < k.potions; i++) _Slot(tooltip: 'Health potion: heals ${potionHeal(k)} HP. Drink it in a fight.', child: const ItemIcon(Item.potion)),
-      if (k.scrolls > 0) _Slot(tooltip: '${k.scrolls} scroll${k.scrolls == 1 ? '' : 's'} of enchanting: a free rune at the merchant', badge: '${k.scrolls}', child: const Icon(Icons.description, color: Color(0xFFE8DCC0))),
+    final c = controller, s = c.state, k = s.knight, ds = dragonStage(k);
+    // Everything you carry, in three groups: what's on your belt, what the forge and the tower
+    // turn into things, and what you've gathered for someone.
+    final belt = <Widget>[
+      if (k.potions > 0) _Slot(tooltip: '${k.potions} health potion${k.potions == 1 ? '' : 's'}: each heals ${potionHeal(k)} HP. Drink in a fight.', badge: '${k.potions}', child: const ItemIcon(Item.potion)),
+      if (k.scrolls > 0) _Slot(tooltip: '${k.scrolls} scroll${k.scrolls == 1 ? '' : 's'} of enchanting: a free rune at the enchanter', badge: '${k.scrolls}', child: const Icon(Icons.description, color: Color(0xFFE8DCC0))),
       _Slot(tooltip: '${fmt(k.coins)} gold', badge: fmt(k.coins), child: const ItemIcon(Item.coins)),
+      for (final e in k.ammo.entries)
+        if (ammoById(e.key) case final a? when e.value > 0) _Slot(tooltip: '${a.label(missileFor(k.loadout.weapon?.art) ?? Missile.bolt)} ×${e.value}: ${a.desc}', badge: '${e.value}', child: Icon(Icons.north_east, color: Color(a.argb))),
       if (ds?.name == 'Egg') _Slot(tooltip: 'Dragon egg: ${k.dragonXp} / 300 XP to hatch', child: const ItemIcon(Item.egg)),
       for (final d in k.ownedDyes.where((d) => d != k.dye))
         _Slot(tooltip: 'Wear ${dyeById(d).name}', onTap: () => c.wearDye(d), child: ItemIcon(Item.dye, tint: Color(dyeById(d).argb))),
     ];
-    while (slots.length < 8 || slots.length % 4 != 0) {
-      slots.add(const _Slot());
+    Widget? mat(String key, String name, Widget icon, String use) {
+      final n = s.mat(key);
+      return n > 0 ? _Slot(tooltip: '$n× $name: $use', badge: '$n', child: icon) : null;
     }
+    final craft = <Widget?>[
+      for (final g in Gem.values) mat(gemKey(g), g.label, MatIcon.gem(g), 'Old Wick sets it, or it makes ${g.ammo.label(Missile.bolt).toLowerCase()}'),
+      for (final m in Metal.values) mat(oreKey(m), m.ore, MatIcon.ore(m), '$smithName smelts it into bars'),
+      for (final m in Metal.values) mat(barKey(m), m.bar, MatIcon.bar(m), '$smithName forges and tempers with it'),
+      for (final e in Elemental.values) mat(coreKey(e), e.core, MatIcon.core(switch (e) { Elemental.ember => const Color(0xFFFF7A2A), Elemental.frost => const Color(0xFF9ADFFF), Elemental.mire => const Color(0xFF8FD36A) }), 'Old Wick makes a rune from it'),
+      for (final t in Trophy.values) mat(trophyKey(t), t.label, MatIcon.trophy(t), '$smithName forges set pieces from it'),
+      for (final key in s.mats.keys.where((k) => k.startsWith('bp:')))
+        _Slot(tooltip: '${_blueprintTitle(key)}: take it to $smithName', child: MatIcon.blueprint()),
+    ].whereType<Widget>().toList();
+    final gathered = <Widget>[
+      if (!s.innRepaired && s.timber > 0) _Slot(tooltip: 'Charred timber for Hob: ${s.timber}/$timberNeeded', badge: '${s.timber}', child: const ItemIcon(Item.timber)),
+      if (!s.innRepaired && s.ironScrap > 0) _Slot(tooltip: 'Iron scrap for Hob: ${s.ironScrap}/$ironNeeded', badge: '${s.ironScrap}', child: const ItemIcon(Item.iron)),
+      for (var l = 0; l < continents.length; l++)
+        if (s.reagents[l] > 0) _Slot(tooltip: '${s.reagents[l]}× ${continents[l].reagent}: Old Wick makes wards from them', badge: '${s.reagents[l]}', child: MatIcon(MatShape.leaf, Color(continents[l].argb))),
+      for (final e in s.relicParts.entries)
+        if (relics[e.key] case final r? when e.value > 0 && !s.forged.contains(e.key))
+          for (var i = 0; i < e.value && i < r.parts.length; i++) _Slot(tooltip: '${r.parts[i]}: a part of ${r.name}', child: const Icon(Icons.extension, color: Color(0xFFFFD98A))),
+    ];
+    Widget group(String title, List<Widget> items, String empty) => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(title, style: Txt.label(size: 15, color: Palette.amber)),
+        const SizedBox(height: 6),
+        if (items.isEmpty)
+          Text(empty, style: Txt.onStone(size: 12.5))
+        else
+          Wrap(spacing: 6, runSpacing: 6, children: [for (final w in items) SizedBox(width: 64, height: 64, child: w)]),
+        const SizedBox(height: 12),
+      ],
+    );
     return Stone(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -567,27 +605,22 @@ class _Satchel extends StatelessWidget {
               ],
             ),
           const Divider(color: Palette.stone3, height: 22),
-          Text('Satchel', style: Txt.label(size: 15, color: Palette.amber)),
-          const SizedBox(height: 6),
-          Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 360),
-              child: GridView.count(
-                crossAxisCount: 4,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 6,
-                crossAxisSpacing: 6,
-                children: slots,
-              ),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text('Potions are for fights. Tap a spare dye to wear it.', style: Txt.onStone(size: 12.5)),
+          group('Belt', belt, ''),
+          group('For the forge and the tower', craft, 'Nothing yet. Golems carry ore and gems, and some foes leave trophies.'),
+          if (gathered.isNotEmpty) group('Gathered', gathered, ''),
+          Text('Hover (or tap and hold) anything to see what it\'s for. Tap a spare dye to wear it.', style: Txt.onStone(size: 12.5)),
         ],
       ),
     );
   }
+}
+
+/// "Nightblood gloves blueprint", from its key ('bp:nightblood:gloves').
+String _blueprintTitle(String key) {
+  final parts = key.split(':');
+  final set = parts.length > 1 ? gearSetById(parts[1])?.name : null;
+  final slot = parts.length > 2 ? GearSlot.values.where((g) => g.name == parts[2]).firstOrNull : null;
+  return set == null || slot == null ? 'A blueprint' : '$set ${pieceNoun(slot)} blueprint';
 }
 
 class _Slot extends StatelessWidget {

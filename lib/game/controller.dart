@@ -641,6 +641,12 @@ class GameController extends ChangeNotifier {
     return r;
   }
 
+  List<EnchantRoll> enchantChoices(EnchantSlot slot, {bool scroll = false}) {
+    final r = engine.enchantChoices(slot, scroll: scroll);
+    _changed();
+    return r;
+  }
+
   String? whyNotBind(Elemental el) => engine.whyNotBind(el);
 
   EnchantRoll? bindCores(Elemental el) {

@@ -877,6 +877,20 @@ void main() {
     expect(t.bossTrinket('echostone', 25).name, 'The Echo Stone');
   });
 
+  test('runes: a scroll offers three different ones to choose from, never a useless Wyrmslayer', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(16));
+    final k = e.state.knight..level = 12;
+    for (var i = 0; i < 40; i++) {
+      k.scrolls = 1;
+      final choices = e.enchantChoices(EnchantSlot.weapon, scroll: true);
+      expect(choices.length, 3);
+      expect(choices.map((r) => r.id).toSet().length, 3);
+      expect(choices.any((r) => r.id == 'wyrmslayer'), isFalse);
+      expect(k.scrolls, 0);
+    }
+    expect(e.enchantChoices(EnchantSlot.armour, scroll: true), isEmpty); // no scroll left
+  });
+
   test('Dunstan tempers a farmed weapon up to your level, for bars and gold', () {
     final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(13));
     final k = e.state.knight..level = 20;
