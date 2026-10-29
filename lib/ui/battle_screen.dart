@@ -284,8 +284,9 @@ class _BattleScreenState extends State<BattleScreen> {
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           // Tap your card: everything you're wearing, and what it adds up to.
-                                          Expanded(flex: 5, child: GestureDetector(onTap: () => showGearGlance(context, c), child: HeroStrip(controller: c))),
+                                          Expanded(flex: 5, child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => showGearGlance(context, c), child: HeroStrip(controller: c))),
                                           const SizedBox(width: 5),
+                                          // Tap theirs: everything about it, in full.
                                           Expanded(flex: 6, child: _FoeCard(controller: c, foe: foe, fill: true)),
                                         ],
                                       ),
@@ -663,13 +664,15 @@ class _FoeCard extends StatelessWidget {
   final bool fill;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(listenable: controller.hpShown, builder: (context, _) => _card(context));
+
+  Widget _card(BuildContext context) {
     final c = controller, colour = foe.aura != null ? Color(foe.aura!.argb) : (foe.boss ? Palette.amber : Palette.cream);
     final realm = realmAt(c.state.rare?.base ?? c.state.foe);
     final aura = foe.aura;
     final weak = weakTo(foe), shrug = shrugsOff(foe);
     final hazard = c.state.inBattle && c.state.hazardIn(realm);
-    return FoeCard(
+    final card = FoeCard(
       fill: fill,
       name: foe.name,
       colour: colour,
@@ -679,7 +682,13 @@ class _FoeCard extends StatelessWidget {
       tags: [
         if (aura != null) FoeBadge(label: foe.pack ? 'PACK' : (foe.named ? 'RARE BOSS' : 'RARE'), colour: colour, solid: true, tip: aura.label),
         if (foe.boss && aura == null) const FoeBadge(label: 'BOSS', colour: Palette.amber, solid: true),
-        if (foe.kind != FoeKind.none) FoeBadge(icons: [Icon(kindIcon(foe.kind), size: 14, color: kindColour(foe.kind))], text: foe.kind.label, colour: kindColour(foe.kind)),
+        if (foe.kind != FoeKind.none) FoeBadge(
+            icons: [Icon(kindIcon(foe.kind), size: 14, color: kindColour(foe.kind))],
+            text: foe.kind.label,
+            wordy: true,
+            colour: kindColour(foe.kind),
+            tip: '${foe.kind.label}: weak to ${styleName(foe.kind.weakTo!)}, shrugs off ${styleName(foe.kind.resists!)}',
+          ),
         if (aura != null && !foe.pack && !foe.named) _perkBadge(aura),
       ],
       badges: [
@@ -703,6 +712,12 @@ class _FoeCard extends StatelessWidget {
           ),
         if (hazard) FoeBadge(icons: const [Icon(Icons.warning_amber, size: 15, color: Color(0xFFE0A070))], text: '−${(hazardShare * 100).round()}%/turn', colour: const Color(0xFFE0A070), tip: '${continents[realm].hazard}: you lose ${(hazardShare * 100).round()}% HP a turn'),
       ],
+    );
+    if (!fill) return card;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => showFoeGlance(context, name: foe.name, colour: colour, level: c.state.foeLevel, badges: [...card.tags, ...card.badges].whereType<FoeBadge>().toList()),
+      child: card,
     );
   }
 
@@ -734,7 +749,7 @@ class _FoeCard extends StatelessWidget {
       Aura.ancient => (Icons.workspace_premium, 'Best loot'),
     };
     final col = Color(a.argb);
-    return FoeBadge(icons: [Icon(icon, size: 14, color: col)], text: text, colour: col, tip: a.perk);
+    return FoeBadge(icons: [Icon(icon, size: 14, color: col)], text: text, wordy: true, colour: col, tip: a.perk);
   }
 }
 

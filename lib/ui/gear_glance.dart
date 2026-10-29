@@ -8,6 +8,7 @@ import '../game/controller.dart';
 import '../game/loot.dart';
 import '../game/rules.dart';
 import 'hero_view.dart';
+import 'hud.dart';
 import 'stat_icons.dart';
 import 'theme.dart';
 
@@ -124,3 +125,41 @@ class _Piece extends StatelessWidget {
     );
   }
 }
+
+/// The foe in full, from the phone's slim card: every badge with what it means.
+Future<void> showFoeGlance(BuildContext context, {required String name, required Color colour, required int level, required List<FoeBadge> badges}) => showModalBottomSheet<void>(
+  context: context,
+  backgroundColor: Colors.transparent,
+  isScrollControlled: true,
+  constraints: BoxConstraints(maxWidth: 560, maxHeight: MediaQuery.sizeOf(context).height * .6),
+  builder: (context) => Container(
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF3A2420), Color(0xFF1A1010)]),
+      border: Border.all(color: const Color(0xFF8E3A2A), width: 1.5),
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+    ),
+    padding: EdgeInsets.fromLTRB(12, 8, 12, 12 + MediaQuery.paddingOf(context).bottom),
+    child: SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Palette.stone3, borderRadius: BorderRadius.circular(2)))),
+          const SizedBox(height: 8),
+          Text('${name.toUpperCase()} · LV $level', style: Txt.label(size: 13, color: colour, weight: FontWeight.w800)),
+          const SizedBox(height: 8),
+          for (final b in badges)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 7),
+              child: Row(
+                children: [
+                  FoeBadge(label: b.label, icons: b.icons, text: b.text, colour: b.colour, solid: b.solid),
+                  if (b.tip != null) ...[const SizedBox(width: 8), Expanded(child: Text(b.tip!, style: Txt.onStone(size: 13, color: Palette.parch)))],
+                ],
+              ),
+            ),
+        ],
+      ),
+    ),
+  ),
+);

@@ -475,11 +475,16 @@ class GameController extends ChangeNotifier {
   int? _heldHeroHp, _koHp;
   bool _koShown = false;
 
+  /// Ticks when a blow lands and the shown HP changes. Only the HP bars listen to it: a blow
+  /// used to rebuild the whole battle screen (log, cards, move tiles) on the very frame it
+  /// landed, and on a phone that dropped the impact frame, which read as a hitch in the swing.
+  final hpShown = ValueNotifier<int>(0);
+
   /// Called by the stage when the foe's blow lands (or misses).
   void revealCounter() {
     _heldHeroHp = null;
     if (_koHp != null) _koShown = true;
-    notifyListeners();
+    hpShown.value++;
   }
 
   /// Called by the stage when a shapeshifter's shift plays: it shows in its new shape.
@@ -491,7 +496,7 @@ class GameController extends ChangeNotifier {
   /// Called by the stage when a blow lands.
   void revealDamage(int amount) {
     shownFoeHp = (shownFoeHp - amount).clamp(0, shownFoeMax);
-    notifyListeners();
+    hpShown.value++;
   }
 
   /// Called by the stage when the turn's animation ends.

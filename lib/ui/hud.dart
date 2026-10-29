@@ -37,7 +37,9 @@ class HeroCard extends StatelessWidget {
   final bool mana;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(listenable: controller.hpShown, builder: (context, _) => _card(context));
+
+  Widget _card(BuildContext context) {
     final s = controller.state, k = s.knight, mh = maxHp(k), hp = controller.shownHeroHp.clamp(0, mh);
     // Smaller on a phone so it doesn't cover the scene.
     // Smaller in a mid-size window; on a phone the page shrinks it to fit its own spot instead.
@@ -242,6 +244,8 @@ class FoeCard extends StatelessWidget {
                 decoration: BoxDecoration(color: Colors.black38, borderRadius: BorderRadius.circular(10), border: Border.all(color: Palette.parch.withValues(alpha: .4))),
                 child: Text('Lv $level', style: Txt.label(size: 12, color: Palette.parch, weight: FontWeight.w800)),
               ),
+              // Tap for the full story.
+              if (fill) const Icon(Icons.expand_more, size: 16, color: Color(0xFFE07A6A)),
             ],
           ),
           const SizedBox(height: 4),
@@ -255,7 +259,7 @@ class FoeCard extends StatelessWidget {
               alignment: Alignment.centerLeft,
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
-                child: Row(children: [for (final (i, w) in [...tags, ...badges].indexed) Padding(padding: EdgeInsets.only(left: i == 0 ? 0 : 3), child: w)]),
+                child: SlimBadges(child: Row(children: [for (final (i, w) in [...tags, ...badges].indexed) Padding(padding: EdgeInsets.only(left: i == 0 ? 0 : 3), child: w)])),
               ),
             )
           else ...[
@@ -276,7 +280,9 @@ class HeroStrip extends StatelessWidget {
   final GameController controller;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(listenable: controller.hpShown, builder: (context, _) => _card(context));
+
+  Widget _card(BuildContext context) {
     final s = controller.state, k = s.knight, mh = maxHp(k), hp = controller.shownHeroHp.clamp(0, mh);
     return Container(
       padding: const EdgeInsets.fromLTRB(7, 5, 7, 6),
@@ -319,7 +325,11 @@ class HeroStrip extends StatelessWidget {
                   ),
                 const Spacer(),
                 // A hint that the card opens your gear (tap it).
-                const Icon(Icons.backpack_outlined, size: 14, color: Palette.amberLo),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  decoration: BoxDecoration(color: Colors.black38, borderRadius: BorderRadius.circular(8), border: Border.all(color: Palette.amberLo)),
+                  child: const Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.backpack_outlined, size: 13, color: Palette.amber), SizedBox(width: 2), Icon(Icons.expand_more, size: 13, color: Palette.amber)]),
+                ),
               ],
             ),
           ),
@@ -332,8 +342,11 @@ class HeroStrip extends StatelessWidget {
 /// A small badge on the foe card: an optional word, then icons or a figure, edged in [colour].
 /// [tip] says it in full on hover.
 class FoeBadge extends StatelessWidget {
-  const FoeBadge({super.key, this.label, this.icons = const [], this.text, required this.colour, this.tip, this.solid = false});
+  const FoeBadge({super.key, this.label, this.icons = const [], this.text, required this.colour, this.tip, this.solid = false, this.wordy = false});
   final String? label, text, tip;
+
+  /// Its [text] is a word (Armoured, More gold) that the phone's slim card can drop for the icon.
+  final bool wordy;
   final List<Widget> icons;
   final Color colour;
 
@@ -342,6 +355,11 @@ class FoeBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // On the phone's slim card: icons where there are icons, words only where there aren't (the
+    // card opens a sheet with the full story, so no tooltip either).
+    final slim = context.dependOnInheritedWidgetOfExactType<SlimBadges>() != null;
+    final label = slim && icons.isNotEmpty ? null : this.label;
+    final text = slim && wordy && icons.isNotEmpty ? null : this.text;
     final badge = Container(
       height: 22,
       padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -353,15 +371,22 @@ class FoeBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (label != null) Text(label!, style: Txt.label(size: solid ? 11 : 11.5, color: colour, weight: FontWeight.w800)),
+          if (label != null) Text(label, style: Txt.label(size: solid ? 11 : 11.5, color: colour, weight: FontWeight.w800)),
           for (final (i, icon) in icons.indexed) Padding(padding: EdgeInsets.only(left: i == 0 && label == null ? 0 : 4), child: SizedBox(width: 15, height: 15, child: Center(child: icon))),
-          if (text != null) Padding(padding: EdgeInsets.only(left: icons.isEmpty && label == null ? 0 : 4), child: Text(text!, style: Txt.label(size: 12, color: Palette.cream, weight: FontWeight.w800))),
+          if (text != null) Padding(padding: EdgeInsets.only(left: icons.isEmpty && label == null ? 0 : 4), child: Text(text, style: Txt.label(size: 12, color: Palette.cream, weight: FontWeight.w800))),
         ],
       ),
     );
     // On a phone there's no hover: a tap shows the tip.
-    return tip == null ? badge : Tooltip(message: tip!, triggerMode: isPhone(context) ? TooltipTriggerMode.tap : null, showDuration: const Duration(seconds: 3), child: badge);
+    return tip == null || slim ? badge : Tooltip(message: tip!, triggerMode: isPhone(context) ? TooltipTriggerMode.tap : null, showDuration: const Duration(seconds: 3), child: badge);
   }
+}
+
+/// Marks badges as sitting on the phone's slim foe card.
+class SlimBadges extends InheritedWidget {
+  const SlimBadges({super.key, required super.child});
+  @override
+  bool updateShouldNotify(SlimBadges old) => false;
 }
 
 /// HP, XP and level, always at the top of the screen.
@@ -372,7 +397,9 @@ class StatsHeader extends StatelessWidget {
   final Widget? leading;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(listenable: controller.hpShown, builder: (context, _) => _card(context));
+
+  Widget _card(BuildContext context) {
     final s = controller.state, k = s.knight, mh = maxHp(k), hp = controller.shownHeroHp.clamp(0, mh);
     Widget chip(Widget child) => DecoratedBox(
       decoration: stoneDecoration(fill: Palette.stone1, raised: false),
