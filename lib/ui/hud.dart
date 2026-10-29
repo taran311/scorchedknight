@@ -246,8 +246,18 @@ class FoeCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Bar(value: hp, max: maxHp, height: 14, colours: const [Color(0xFF7FCB5A), Color(0xFF2F6A1F)], label: '${fmt(hp)} / ${fmt(maxHp)}'),
-          if (fill && tags.length + badges.length > 0)
-            Padding(padding: const EdgeInsets.only(top: 4), child: Wrap(spacing: 3, runSpacing: 3, children: [...tags, ...badges]))
+          if (fill)
+            // One row that scrolls sideways, never a second line, and there even when empty: the
+            // card (and the fight under it) keeps the same height whatever comes and goes.
+            Container(
+              height: 22,
+              margin: const EdgeInsets.only(top: 4),
+              alignment: Alignment.centerLeft,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(children: [for (final (i, w) in [...tags, ...badges].indexed) Padding(padding: EdgeInsets.only(left: i == 0 ? 0 : 3), child: w)]),
+              ),
+            )
           else ...[
             if (tags.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 5), child: Wrap(spacing: 4, runSpacing: 4, children: tags)),
             if (badges.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 4), child: Wrap(spacing: 4, runSpacing: 4, children: badges)),
@@ -307,6 +317,9 @@ class HeroStrip extends StatelessWidget {
                       border: Border.all(color: const Color(0xFF9ADFFF), width: 1),
                     ),
                   ),
+                const Spacer(),
+                // A hint that the card opens your gear (tap it).
+                const Icon(Icons.backpack_outlined, size: 14, color: Palette.amberLo),
               ],
             ),
           ),

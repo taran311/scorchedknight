@@ -494,7 +494,7 @@ class GameEngine {
       got.add('+$gold gold');
     }
     if (p.potions > 0) {
-      k.potions += p.potions;
+      _givePotions(p.potions);
       got.add('${p.potions} health potion${p.potions == 1 ? '' : 's'}');
     }
     for (final e in p.ore.entries) {
@@ -808,7 +808,7 @@ class GameEngine {
           final gold = (chestGold(k.level, d) * .6).round();
           s.packGold += gold;
           final flask = _rng.nextDouble() < .25;
-          if (flask) k.potions++;
+          if (flask) _givePotions();
           out = 'Behind a stump: the trapper\'s stash. (+$gold gold to your pack${flask ? ', and a health potion' : ''})';
         } else {
           final hurt = math.min(k.hp - 1, (mh * .12).round());
@@ -823,13 +823,15 @@ class GameEngine {
         out = 'The stew is lentils and wild garlic, and it\'s perfect. (+${k.hp - before} HP)${back ? ' Then you hear voices coming back up the path. Whoever owns this fire wants it back.' : ''}';
       case (WildEvent.pedlar, 0):
         final price = pedlarPrice(k.level);
-        if (s.packGold >= price) {
+        if (k.potions >= potionBelt) {
+          out = '"Your belt\'s already full, friend!" Pip looks almost offended. (Your belt holds $potionBelt.)';
+        } else if (s.packGold >= price) {
           s.packGold -= price;
-          k.potions++;
+          _givePotions();
           out = 'Pip counts the coins out of your pack and hands over a potion. (−$price gold from your pack, +1 potion)';
         } else if (k.coins >= price) {
           k.coins -= price;
-          k.potions++;
+          _givePotions();
           out = 'Pip takes your own coin, the pack being a bit light. (−$price gold, +1 potion)';
         } else {
           out = '"No coin, no potion." Pip shrugs his enormous pack and trudges off.';
@@ -878,6 +880,13 @@ class GameEngine {
   }
 
   /// Drinks a potion between fights.
+  /// Potions into your belt, up to [potionBelt]; the rest are left where they lie.
+  void _givePotions([int n = 1]) {
+    final k = state.knight, room = math.max(0, potionBelt - k.potions), got = math.min(n, room);
+    k.potions += got;
+    if (got < n) _note('Your potion belt is full ($potionBelt): you leave ${n - got == 1 ? 'one' : '${n - got}'} behind.');
+  }
+
   int drinkPotion() {
     final k = state.knight;
     if (state.inBattle || k.potions <= 0 || k.hp >= maxHp(k)) return 0;
@@ -1088,7 +1097,7 @@ class GameEngine {
         final before = k.hp;
         k.hp = math.min(mh, k.hp + (mh * shrineHeal).round());
         final potion = _rng.nextDouble() < shrinePotion;
-        if (potion) k.potions++;
+        if (potion) _givePotions();
         text = 'A little shrine, candles still lit. You kneel a moment. +${k.hp - before} HP${potion ? ' · a health potion on the altar' : ''}';
       case RoomKind.key:
         s.dungeonKey = true;
@@ -1243,7 +1252,7 @@ class GameEngine {
         _grantXp(xp);
         out = 'Together you corner the chicken. The goblin is so grateful he gives you his shiniest button. It\'s worth a surprising amount. (+$gold gold, +$xp XP)';
       default:
-        k.potions++;
+        _givePotions();
         out = 'You scoop up the chicken. Its farmer comes running, overjoyed, and presses a health potion on you. The goblin sulks. (+1 potion)';
     }
     _note(out, EntryKind.gold);
@@ -1299,6 +1308,7 @@ class GameEngine {
       ..foeBurn = 0
       ..foeBurnTurns = 0
       ..foeVenom = 0
+      ..potionsDrunk = 0
       ..fairyCharge = 0
       ..mended = false
       ..rallied = false
@@ -1365,6 +1375,7 @@ class GameEngine {
         return null;
       case BattleAction.potion:
         if (k.potions < 1) return 'No potions left';
+        if (state.potionsDrunk >= potionsPerFight) return 'No time for another this fight ($potionsPerFight a fight)';
         if (k.hp >= maxHp(k)) return 'Already at full health';
         return null;
       case BattleAction.cast:
@@ -1530,6 +1541,7 @@ class GameEngine {
     switch (action) {
       case BattleAction.potion:
         k.potions--;
+        state.potionsDrunk++;
         final before = k.hp;
         k.hp = math.min(maxHp(k), k.hp + potionHeal(k));
         r.potion = k.hp - before;
@@ -2309,7 +2321,7 @@ class GameEngine {
     }
     // Now and then a foe carries a health potion (bosses always do).
     final flask = f.boss || _rng.nextDouble() < potionDropChance;
-    if (flask) state.knight.potions++;
+    if (flask) _givePotions();
     // Hob's job: goblins carry off what the inn needs.
     String? jobFind;
     if (onHobsJob && c == 0 && rare == null && !f.boss) {
@@ -2465,7 +2477,7 @@ class GameEngine {
       _placeReward(placeWon);
     }
     if (raidWon == 'stall') {
-      k.potions++;
+      _givePotions();
       _note('You haul Mags\' stock back to her stall. She presses a health potion into your hand: "On the house. Don\'t tell anyone."', EntryKind.gold);
     } else if (raidWon == 'inn') {
       k.coins += r.coins;
@@ -2532,7 +2544,7 @@ class GameEngine {
       k.ammoLoaded ??= ammo.name;
     }
     k.coins += coins;
-    if (potion) k.potions++;
+    if (potion) _givePotions();
     state.pendingLoot.addAll(items);
     state.chestsOpened++;
     final find = ChestFind(tier, coins, items, potion: potion, ammo: ammo == null ? null : '$ammoBundle ${ammo.label(Missile.bolt).toLowerCase()}');
@@ -2580,7 +2592,7 @@ class GameEngine {
   bool takeHobsJob() {
     if (!jobOffered) return false;
     state.jobTaken = true;
-    state.knight.potions += jobPotions;
+    _givePotions(jobPotions);
     _note(hobsJob, EntryKind.gold);
     _note('Hob presses $jobPotions flasks of red into your hands. "On the house. Don\'t drink them all at once."', EntryKind.good);
     return true;
@@ -2598,7 +2610,7 @@ class GameEngine {
       ..timber = 0
       ..ironScrap = 0;
     state.knight.coins += innRepairReward;
-    state.knight.potions += innRepairPotions;
+    _givePotions(innRepairPotions);
     state.knight.hp = maxHp(state.knight);
     _note('Hob hammers the last plank into place and lights the fire. "Rooms are free for you, forever. And here, for your trouble." +$innRepairReward gold and $innRepairPotions potions.', EntryKind.gold);
     _note('With the goblins scattered, the rest of Cindervale\'s troubles come out of the ash: bandits, looters, wolves and worse.', EntryKind.plain);
@@ -2695,7 +2707,7 @@ class GameEngine {
           out = 'Mags challenges you to a round of knucklebones and wins. She bites every coin. (−$gold gold)';
         }
       case 'flask':
-        k.potions++;
+        _givePotions();
         out = 'Under your stool, someone\'s left a flask of red. Hob shrugs. "Finders keepers." (+1 potion)';
       case 'scroll':
         k.scrolls++;
@@ -2721,7 +2733,7 @@ class GameEngine {
     final healed = k.hp - before;
     _note(healed > 0 ? 'You sleep by the fire at the Soot & Kettle and recover $healed HP.' : 'You sleep by the fire. You were already fine, but the soup is good.', EntryKind.good);
     if (!state.day && state.home >= 1) {
-      k.potions++;
+      _givePotions();
       _note('From your herb garden: a fresh health potion.', EntryKind.good);
     }
     if (!state.day) {
@@ -2955,6 +2967,7 @@ class GameEngine {
     return switch (id) {
       'crossbow' => k.crossbow + 1 >= crossbows.length,
       'gloves' => k.gloves,
+      'potion' => k.potions >= potionBelt,
       'boots' => k.loadout.boots != null,
       _ => false,
     };
@@ -3002,7 +3015,7 @@ class GameEngine {
         k.crossbow++;
         what = withArticle(crossbows[k.crossbow].$1.toLowerCase());
       case 'potion':
-        k.potions++;
+        _givePotions();
         what = 'a health potion';
       case 'poison':
         k.poisonFights = 3;
@@ -3251,7 +3264,7 @@ class GameEngine {
     state.reagents[b.land] -= b.reagents;
     k.coins -= fee;
     if (b == Brew.healing) {
-      k.potions += healingDraughts;
+      _givePotions(healingDraughts);
       _note('Mags boils ${b.reagents} ${b.ingredient} down into $healingDraughts health potions ($fee gold).', EntryKind.gold);
     } else {
       k.brews[b.name] = b == Brew.reaperbane ? 1 : brewFights;

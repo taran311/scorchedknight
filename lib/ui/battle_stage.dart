@@ -215,8 +215,13 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   // ---------- timeline helpers ----------
 
   void _tween(String key, double to, double duration, {double delay = 0, Ease ease = easeInOut}) {
-    _tweens.add(_Tween(key, to, now + delay, _reduceMotion ? math.min(duration, 120) : duration, ease));
+    // With reduced motion asked for (many phones turn it on with battery saving), flashes and
+    // camera punches are cut short, but bodies still move at their own pace: capping everything
+    // made the knight teleport to the foe and back while his arms took their time, which read as lag.
+    _tweens.add(_Tween(key, to, now + delay, _reduceMotion && _flashy.contains(key) ? math.min(duration, 120) : duration, ease));
   }
+
+  static const _flashy = {'flash', 'kflash', 'screen', 'zoom', 'gloom', 'scar', 'storm'};
 
   void _at(double delay, VoidCallback f) => _schedule.add((now + delay, f));
 
@@ -1743,6 +1748,16 @@ final _perf = Uri.base.queryParameters['perf'] ?? '';
 double _perfMs = 0;
 int _perfFrames = 0;
 
+/// Text laid out once and kept (damage numbers, speech bubbles, aura tags): laying text out again
+/// every frame, for every number on screen, was a good part of a phone's frame during a hit.
+final _textCache = <String, TextPainter>{};
+TextPainter _laidOut(String key, TextPainter Function() make) {
+  final hit = _textCache[key];
+  if (hit != null) return hit;
+  if (_textCache.length > 80) _textCache.remove(_textCache.keys.first);
+  return _textCache[key] = make();
+}
+
 class _ScenePainter extends CustomPainter {
   _ScenePainter(this.s) : super(repaint: s._time);
   final _BattleStageState s;
@@ -2213,7 +2228,7 @@ class _ScenePainter extends CustomPainter {
         // Named and pack foes already have their full name in the corner above the stage, and
         // a long name here ran into it on phones; a plain rare just gets its short aura tag.
         if (!(s._foe.named || s._foe.pack)) {
-          final tp = TextPainter(text: TextSpan(text: '★ ${aura.label}', style: Txt.label(size: 14, color: auraColour(aura), weight: FontWeight.w800)), textDirection: TextDirection.ltr)..layout();
+          final tp = _laidOut('a:${aura.name}', () => TextPainter(text: TextSpan(text: '★ ${aura.label}', style: Txt.label(size: 14, color: auraColour(aura), weight: FontWeight.w800)), textDirection: TextDirection.ltr)..layout());
           tp.paint(canvas, Offset(fx0 - tp.width / 2, top - 20));
         }
       }
@@ -2362,14 +2377,14 @@ class _ScenePainter extends CustomPainter {
       final lift = s._foeLift;
       final head = Offset(_foeX + fx['enter']! * 440 - fx['lunge']! * 90 + lift.dx - 10, _groundY + lift.dy - s._foeHeight - 18);
       final action = bubble.$1.startsWith('*');
-      final tp = TextPainter(
+      final tp = _laidOut('b${action ? 'i' : ''}:${bubble.$1}', () => TextPainter(
         text: TextSpan(
           text: bubble.$1,
           style: Txt.body(size: 17, weight: FontWeight.w700, color: const Color(0xFF2A1C10), italic: action).copyWith(height: 1.15),
         ),
         textDirection: TextDirection.ltr,
         textAlign: TextAlign.center,
-      )..layout(maxWidth: 250);
+      )..layout(maxWidth: 250));
       final w = tp.width + 26, h = tp.height + 16;
       final box = Rect.fromLTWH((head.dx - w * .7).clamp(12.0, 948 - w), math.max(12.0, head.dy - h - 14), w, h);
       final tipX = head.dx.clamp(box.left + 18, box.right - 18);
@@ -2598,13 +2613,13 @@ class _ScenePainter extends CustomPainter {
         ? 1 - (age - .75) / .25
         : 1.0;
     final rise = age > .75 ? (age - .75) / .25 * 22 : 0.0;
-    final tp = TextPainter(
+    final tp = _laidOut('m:${m.text}', () => TextPainter(
       text: TextSpan(
         text: m.text,
         style: Txt.label(size: 30, color: Colors.white, weight: FontWeight.w800),
       ),
       textDirection: TextDirection.ltr,
-    )..layout();
+    )..layout());
     final w = math.max(54.0, tp.width + 22), h = 38.0;
     canvas.save();
     canvas.translate(m.pos.dx, m.pos.dy - rise);

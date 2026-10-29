@@ -23,6 +23,7 @@ import 'hud.dart';
 import 'journal_panel.dart' show fmt;
 import 'loot_window.dart';
 import 'encounter_window.dart';
+import 'gear_glance.dart';
 import 'item_icons.dart';
 import 'stat_icons.dart';
 import 'theme.dart';
@@ -174,11 +175,10 @@ class _BattleScreenState extends State<BattleScreen> {
   bool _potionShown = false;
   bool get _hasCompanion => petStage(c.state.knight) != null || dragonStage(c.state.knight) != null;
 
-  /// Shoot: up comes the timing bar (unless you've asked for auto-aim).
+  /// Shoot: up comes the timing bar. Every bolt is aimed by hand (no auto-aim: your timing is the skill).
   void _shoot() {
     if (_aiming) return;
     if (c.busy || c.outcome != null || !c.state.inBattle || c.whyNot(BattleAction.shoot) != null) return;
-    if (c.state.settings.autoAim) return _act(BattleAction.shoot);
     setState(() => _aiming = true);
   }
 
@@ -279,15 +279,12 @@ class _BattleScreenState extends State<BattleScreen> {
                                     Container(
                                       color: const Color(0xFF15110C),
                                       padding: const EdgeInsets.all(5),
-                                      // Room kept for a few rows of the foe's badges (slowed, burning,
-                                      // weak to...), so the fight below doesn't jump up and down as they
-                                      // come and go between turns.
-                                      constraints: const BoxConstraints(minHeight: 96),
                                       // You and the foe side by side, slim, so the fight gets the screen.
                                       child: Row(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          Expanded(flex: 5, child: HeroStrip(controller: c)),
+                                          // Tap your card: everything you're wearing, and what it adds up to.
+                                          Expanded(flex: 5, child: GestureDetector(onTap: () => showGearGlance(context, c), child: HeroStrip(controller: c))),
                                           const SizedBox(width: 5),
                                           Expanded(flex: 6, child: _FoeCard(controller: c, foe: foe, fill: true)),
                                         ],
@@ -308,7 +305,7 @@ class _BattleScreenState extends State<BattleScreen> {
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            HeroCard(controller: c, mana: true),
+                                            MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(onTap: () => showGearGlance(context, c), child: Tooltip(message: 'Your gear', child: HeroCard(controller: c, mana: true)))),
                                             const SizedBox(height: 6),
                                             ConstrainedBox(constraints: const BoxConstraints(maxWidth: 300), child: StatusBadges(state: s)),
                                           ],
@@ -561,11 +558,12 @@ class _BattleScreenState extends State<BattleScreen> {
           _SlotInfo('Health potion', const Color(0xFFFF8A8A), [
             ('❤️', 'Heals ${potionHeal(k)} HP', good),
             ('⏱️', 'Uses your turn', soft),
-            ('🧪', '${k.potions} left', soft),
+            ('🧪', '${k.potions} in your belt', soft),
+            ('✋', '${math.max(0, potionsPerFight - s.potionsDrunk)} of $potionsPerFight left this fight', s.potionsDrunk >= potionsPerFight ? bad : soft),
           ]),
           badge: '×${k.potions}',
           // Lights up when you're in trouble, so it's the first thing your eye finds.
-          glow: k.hp < maxHp(k) * .35,
+          glow: k.hp < maxHp(k) * .35 && s.potionsDrunk < potionsPerFight,
           tint: const Color(0xFF3A1A1A),
         ),
         if (_hasCompanion)

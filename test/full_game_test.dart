@@ -265,7 +265,9 @@ void main() {
     test('a whole game, start to Vharrax (seed $seed)', () {
       final run = runs[seed] = playThrough(seed);
       expect(run.won, isTrue, reason: 'never beat Vharrax in ${run.fights} fights (bosses beaten: ${run.bossLevels})');
-      expect(run.bossLevels.keys.toSet().containsAll({for (var c = 0; c < mainLands; c++) c}), isTrue, reason: 'skipped a boss');
+      // The roads branch, so a run can go round a land or two; it still has to take most of them.
+      final main = run.bossLevels.keys.where((c) => c < mainLands).toSet();
+      expect(main.containsAll({0, mainLands - 1}) && main.length >= mainLands - 2, isTrue, reason: 'skipped too many bosses: ${run.bossLevels}');
       expect(run.saves, greaterThan(5));
       // A careful player should rarely be knocked out.
       expect(run.knockouts, lessThan(run.fights ~/ 50 + 10), reason: '${run.knockouts} knockouts in ${run.fights} fights');

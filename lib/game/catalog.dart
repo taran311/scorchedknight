@@ -340,6 +340,10 @@ const buildFindChance = .3;
 const timberLands = {0, 2}, ironLands = {0, 3};
 
 const jobPotions = 2, innRepairPotions = 2, potionDropChance = .08;
+
+/// Your potion belt holds this many (more found while it's full is left behind), and you can only
+/// stop to drink so many in one fight: a potion is a breather, not a way to tank anything.
+const potionBelt = 5, potionsPerFight = 2;
 const hobsJob = 'Hob the innkeeper looks at the smouldering roof, then at you. "Goblins took the good timber and every nail I had. '
     'Bring me $timberNeeded lengths of timber and $ironNeeded sacks of iron, and you\'ll have a bed by the fire for life."';
 

@@ -79,7 +79,7 @@ class _Shop {
 
   Widget buy(String id) {
     final e = c.engine, k = c.state.knight;
-    if (e.owns(id) && !id.startsWith('dye:')) return Text('Owned', style: Txt.label(size: 13, color: ok));
+    if (e.owns(id) && !id.startsWith('dye:')) return Text(id == 'potion' ? 'Belt full' : 'Owned', style: Txt.label(size: 13, color: ok));
     final price = e.priceOf(id);
     return CostButton(
       label: '$price gold',
@@ -180,7 +180,7 @@ class MerchantWares extends StatelessWidget {
       children: [
         x.gold(),
         x.heading('Supplies'),
-        x.ware(const ItemIcon(Item.potion), 'Health potion', 'Heals ${potionHeal(k)} HP · you carry ${k.potions}', x.buy('potion')),
+        x.ware(const ItemIcon(Item.potion), 'Health potion', 'Heals ${potionHeal(k)} HP · belt ${k.potions}/$potionBelt · $potionsPerFight a fight', x.buy('potion')),
         x.ware(const Icon(Icons.diamond_outlined, color: Color(0xFF9ADFFF), size: 26), 'Jeweller\'s box', 'A mystery ring: uncommon to epic, now and then legendary', x.buy('ringbox')),
         x.heading('Mags\' brews · from the reagents your foes drop'),
         for (final b in Brew.values)

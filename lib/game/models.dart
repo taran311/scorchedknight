@@ -1,11 +1,12 @@
 // Saved game state. Pure Dart; serialised to JSON and kept in the browser.
 
+import 'dart:math' as math;
 import 'catalog.dart';
 import 'classes.dart';
 import 'loot.dart';
 
 class Settings {
-  Settings({this.name = 'Sir Smudge', this.guest = false, this.tourSeen = false, this.fastFights = false, this.autoAim = false, this.gore = true, this.music = .5, this.sound = .8, this.muted = false, this.autoSellJunk = true});
+  Settings({this.name = 'Sir Smudge', this.guest = false, this.tourSeen = false, this.fastFights = false, this.gore = true, this.music = .5, this.sound = .8, this.muted = false, this.autoSellJunk = true});
 
   /// Common and uncommon drops that are no upgrade are sold where they fall.
   bool autoSellJunk;
@@ -22,9 +23,6 @@ class Settings {
   /// Fights play a little quicker.
   bool fastFights;
 
-  /// Skip the crossbow's timing bar: every bolt flies true, no bullseyes.
-  bool autoAim;
-
   /// Blood on hits (off: sparks only).
   bool gore;
 
@@ -39,7 +37,6 @@ class Settings {
     if (guest) 'guest': true,
     if (tourSeen) 'tour': true,
     if (fastFights) 'fast': true,
-    if (autoAim) 'autoAim': true,
     if (!gore) 'gore': false,
     'music': music,
     'sound': sound,
@@ -52,7 +49,6 @@ class Settings {
     guest: j['guest'] == true,
     tourSeen: j['tour'] == true,
     fastFights: j['fast'] == true,
-    autoAim: j['autoAim'] == true,
     gore: j['gore'] != false,
     music: (j['music'] as num?)?.toDouble() ?? .5,
     sound: (j['sound'] as num?)?.toDouble() ?? .8,
@@ -278,11 +274,13 @@ class Knight {
   factory Knight.fromJson(Map<String, dynamic> j) {
     final cls = HeroClassInfo.parse(j['class'] as String?);
     final raw = (j['loadouts'] as Map?)?.cast<String, dynamic>() ?? {};
+    // Potions past the belt (saves from before it existed) are sold back at 20 gold each.
+    final pots = (j['potions'] as num?)?.toInt() ?? 3, extra = math.max(0, pots - potionBelt);
     return Knight(
       level: (j['level'] as num?)?.toInt() ?? 1,
       xp: (j['xp'] as num?)?.toInt() ?? 0,
       hp: (j['hp'] as num?)?.toInt() ?? 100,
-      coins: (j['coins'] as num?)?.toInt() ?? 0,
+      coins: ((j['coins'] as num?)?.toInt() ?? 0) + extra * 20,
       heroClass: cls,
       classChosen: j['classChosen'] as bool? ?? false,
       loadouts: {
@@ -294,7 +292,7 @@ class Knight {
       gloves: j['gloves'] as bool? ?? false,
       dye: j['dye'] as String? ?? 'crimson',
       ownedDyes: (j['ownedDyes'] as List?)?.cast<String>(),
-      potions: (j['potions'] as num?)?.toInt() ?? 3,
+      potions: pots - extra,
       poisonFights: (j['poison'] as num?)?.toInt() ?? 0,
       brews: {for (final e in ((j['brews'] as Map?) ?? const {}).entries) if (e.value is num) e.key as String: (e.value as num).toInt()},
       dragonXp: (j['dragonXp'] as num?)?.toInt(),
@@ -407,6 +405,7 @@ class GameState {
     this.foeBurn = 0,
     this.foeBurnTurns = 0,
     this.foeVenom = 0,
+    this.potionsDrunk = 0,
     this.fairyCharge = 0,
     this.fairyNext = 0,
     this.specialCharge = 0,
@@ -593,6 +592,9 @@ class GameState {
   /// venom in it (each does its share every turn, for the rest of the fight).
   int foeBurn, foeBurnTurns, foeVenom;
 
+  /// Potions drunk this fight (only [potionsPerFight] allowed).
+  int potionsDrunk;
+
   /// A fairy companion: attacks towards its next charm, and which charm is next.
   int fairyCharge, fairyNext;
 
@@ -700,6 +702,7 @@ class GameState {
       'exposed': foeExposed,
       if (foeBurnTurns > 0) 'burn': [foeBurn, foeBurnTurns],
       if (foeVenom > 0) 'venom': foeVenom,
+      if (potionsDrunk > 0) 'drunk': potionsDrunk,
       'fairyCharge': fairyCharge,
       'fairyNext': fairyNext,
       'mended': mended,
@@ -816,6 +819,7 @@ class GameState {
       foeBurn: (j['burn'] is List && (j['burn'] as List).length == 2) ? ((j['burn'] as List)[0] as num).toInt() : 0,
       foeBurnTurns: (j['burn'] is List && (j['burn'] as List).length == 2) ? ((j['burn'] as List)[1] as num).toInt() : 0,
       foeVenom: n('venom'),
+      potionsDrunk: n('drunk'),
       fairyCharge: n('fairyCharge'),
       fairyNext: n('fairyNext'),
       specialCharge: n('special'),

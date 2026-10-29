@@ -83,7 +83,11 @@ class _IntroScreenState extends State<IntroScreen> with SingleTickerProviderStat
                           child: const SizedBox(width: 84, height: 100, child: CustomPaint(painter: CrestPainter())),
                         ),
                         const SizedBox(height: 18),
-                        Text('SCORCHED KNIGHT', style: Txt.logo().copyWith(fontSize: 40, letterSpacing: 3)),
+                        // Shrinks to fit a narrow phone on one line (it used to wrap, left-aligned, off the edge).
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: FittedBox(fit: BoxFit.scaleDown, child: Text('SCORCHED KNIGHT', maxLines: 1, style: Txt.logo().copyWith(fontSize: 40, letterSpacing: 3))),
+                        ),
                         const SizedBox(height: 6),
                         Text('Survive the ashfall. Slay the flame.', style: Txt.label(size: 16, color: Palette.parch2)),
                       ],

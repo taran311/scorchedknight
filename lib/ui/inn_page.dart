@@ -1120,7 +1120,6 @@ class _SettingsWindowState extends State<_SettingsWindow> {
                 ],
               ),
               _toggle('Faster fights', Icons.fast_forward_rounded, _s.fastFights, (v) => _set((s) => s.fastFights = v)),
-              _toggle('Auto-aim crossbow', Icons.gps_fixed, _s.autoAim, (v) => _set((s) => s.autoAim = v)),
               _toggle('Blood & gore', Icons.water_drop_rounded, _s.gore, (v) => _set((s) => s.gore = v)),
               _toggle('Sell junk where it falls', Icons.sell_rounded, _s.autoSellJunk, (v) => _set((s) => s.autoSellJunk = v)),
               _toggle('Mute all', Icons.volume_off_rounded, _s.muted, (v) => _set((s) => s.muted = v)),
