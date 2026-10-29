@@ -476,27 +476,54 @@ class _RelicReward extends StatelessWidget {
                     runSpacing: 5,
                     children: [
                       for (var i = 0; i < parts.length; i++)
-                        Tooltip(
-                          message: has[i] ? 'Found' : 'Held by ${parts[i].where}',
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: has[i] ? green.withValues(alpha: .15) : Colors.black.withValues(alpha: .3),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: has[i] ? green.withValues(alpha: .7) : Palette.parch2.withValues(alpha: .3)),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(has[i] ? Icons.check : Icons.lock_outline, size: 14, color: has[i] ? green : Palette.parch2.withValues(alpha: .7)),
-                                const SizedBox(width: 4),
-                                Text(parts[i].land == here || has[i] ? parts[i].name : '${parts[i].name} · ${continents[parts[i].land].name}', style: Txt.label(size: 12.5, color: has[i] ? green : Palette.parch2)),
-                              ],
-                            ),
-                          ),
+                        Builder(
+                          builder: (context) {
+                            // Three looks: found (green, ticked), waiting in this land (gold and
+                            // glowing: this is the one to go after here), and elsewhere (greyed out).
+                            final local = !has[i] && parts[i].land == here;
+                            final col = has[i] ? green : (local ? gold : Palette.parch2);
+                            return Opacity(
+                              opacity: has[i] || local ? 1 : .45,
+                              child: Tooltip(
+                                message: has[i] ? 'Found' : 'Held by ${parts[i].where}',
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: has[i] ? green.withValues(alpha: .15) : (local ? gold.withValues(alpha: .18) : Colors.black.withValues(alpha: .3)),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: has[i] ? green.withValues(alpha: .7) : (local ? gold : Palette.parch2.withValues(alpha: .3)), width: local ? 1.6 : 1),
+                                    boxShadow: local ? [BoxShadow(color: gold.withValues(alpha: .45), blurRadius: 8)] : null,
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(has[i] ? Icons.check : (local ? Icons.place : Icons.lock_outline), size: 14, color: col),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        has[i] ? parts[i].name : (local ? '${parts[i].name} · HERE' : '${parts[i].name} · ${continents[parts[i].land].name}'),
+                                        style: Txt.label(size: 12.5, color: col, weight: local ? FontWeight.w800 : FontWeight.w700),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
                         ),
                     ],
                   ),
+                  // The one waiting in this land, spelled out.
+                  for (var i = 0; i < parts.length; i++)
+                    if (!has[i] && parts[i].land == here) ...[
+                      const SizedBox(height: 5),
+                      Row(
+                        children: [
+                          const Icon(Icons.place, size: 15, color: gold),
+                          const SizedBox(width: 4),
+                          Expanded(child: Text('Here: ${parts[i].name}, held by ${parts[i].where}.', style: Txt.label(size: 12.5, color: gold))),
+                        ],
+                      ),
+                    ],
                   const SizedBox(height: 4),
                   Text(all ? 'All parts found: take them to Dunstan\'s forge (level ${relic.minLevel}+).' : 'Each part is its own quest somewhere in the world (press and hold a part to see where). Dunstan forges it at level ${relic.minLevel}+.', style: Txt.onStone(size: 12.5, color: all ? green : Palette.parch2)),
                 ],
