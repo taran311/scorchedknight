@@ -23,6 +23,7 @@ import '../game/controller.dart';
 import '../game/crafting.dart' show smithName, mageName;
 import '../game/models.dart';
 import '../game/rules.dart';
+import 'account_panel.dart';
 import 'battle_screen.dart';
 import 'hero_page.dart';
 import 'class_picker.dart' show HeroOrHeroine;
@@ -1220,10 +1221,12 @@ class _CloudSection extends StatelessWidget {
               Text(
                 cloud.signedIn
                     ? 'Signed in as ${cloud.who}. Your hero follows you to any browser or phone you sign in on.${synced == null ? '' : ' Last saved up at ${synced.hour.toString().padLeft(2, '0')}:${synced.minute.toString().padLeft(2, '0')}.'}'
+                    : cloud.needsVerify
+                    ? 'Nearly there: check your email to finish signing in.'
                     : 'Sign in to keep your hero safe and play it on your phone and in the browser.',
                 style: note,
               ),
-              if (cloud.problem != null) ...[
+              if (cloud.signedIn && cloud.problem != null) ...[
                 const SizedBox(height: 4),
                 Text(cloud.problem!, style: Txt.onStone(size: 12.5, color: const Color(0xFFE0A070))),
               ],
@@ -1237,7 +1240,7 @@ class _CloudSection extends StatelessWidget {
                   ],
                 )
               else
-                StoneButton(title: 'Sign in with Google', tone: ButtonTone.amber, compact: true, onPressed: cloud.signIn),
+                const AccountPanel(compact: true),
             ],
           ),
         );

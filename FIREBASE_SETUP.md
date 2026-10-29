@@ -78,6 +78,27 @@ Google sign-in on Android only works for app builds whose signing key Firebase k
 Do the same later for your release key (step 7) and for Google Play's own signing key. You'll find
 Google Play's key in Play Console under **Test and release → App integrity → App signing**.
 
+## 5b. Email and password, and Facebook
+
+**Email and password** (works on web and Android, no extra setup in the game):
+
+1. **Authentication → Sign-in method → Add new provider → Email/Password → Enable** (leave
+   "Email link" off).
+2. **Authentication → Templates**: set the sender name to *Scorched Knight* and edit the
+   "Email address verification" and "Password reset" emails if you like.
+3. New accounts get a link to check their address; their hero doesn't sync until they've opened it.
+
+**Facebook** (browser only for now; it's off in the game until you do this):
+
+1. At developers.facebook.com, **Create app → Authenticate and request data from users with
+   Facebook Login**. Note the **App ID** and **App secret** (App settings → Basic).
+2. In Firebase: **Sign-in method → Add new provider → Facebook**, paste the App ID and secret, and
+   copy the **OAuth redirect URI** it shows.
+3. Back in Meta: **Facebook Login → Settings → Valid OAuth Redirect URIs**, paste that URI.
+4. In Meta's App settings → Basic, add a **Privacy Policy URL** and a **User data deletion** URL
+   (or instructions page), then switch the app to **Live**.
+5. In `lib/services/cloud.dart`, set `static const facebook = true;`.
+
 ## 6. Try it
 
 1. In the browser, start the game as usual (`run_web.bat`). Open **Settings (cog) → Sign in with Google**.

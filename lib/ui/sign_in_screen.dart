@@ -1,4 +1,4 @@
-// The first screen when cloud saves are on: sign in with Google so your hero is kept safe and
+// The first screen when cloud saves are on: sign in (Google, email, or Facebook when it's on) so your hero is kept safe and
 // follows you between the browser and the Android app, or play without an account (the hero stays
 // on this device, and you can sign in later from Settings).
 
@@ -12,7 +12,7 @@ import '../game/classes.dart';
 import '../game/controller.dart';
 import '../game/engine.dart' show shinesAt, sootFor;
 import '../game/models.dart';
-import '../services/cloud.dart';
+import 'account_panel.dart';
 import 'hero_view.dart';
 import 'hud.dart' show CrestPainter;
 import 'theme.dart';
@@ -26,21 +26,11 @@ class SignInScreen extends StatefulWidget {
 }
 
 class _SignInScreenState extends State<SignInScreen> {
-  bool _busy = false;
-
-  Future<void> _google() async {
-    setState(() => _busy = true);
-    // On success the app moves on by itself (and fetches your hero from the cloud).
-    await CloudSave.instance.signIn();
-    if (mounted) setState(() => _busy = false);
-  }
-
   @override
   Widget build(BuildContext context) {
     final c = widget.controller, k = c.state.knight;
     // Your own hero if this device has one; otherwise a fresh, sooty knight.
     final look = k.classChosen ? heroLook(k) : lookFor(HeroClass.knight, Loadout.starter(HeroClass.knight), soot: sootFor(1), shine: shinesAt(1));
-    final cloud = CloudSave.instance;
     return Scaffold(
       body: Stack(
         children: [
@@ -84,18 +74,13 @@ class _SignInScreenState extends State<SignInScreen> {
                               children: [
                                 Text(k.classChosen ? 'Welcome back, ${c.state.settings.name}' : 'Sign in to begin', style: Txt.label(size: 18, color: Palette.amber, weight: FontWeight.w800)),
                                 const SizedBox(height: 4),
-                                Text('Your hero is saved to your Google account: safe if this device is lost, and waiting for you on your phone or in any browser.', style: Txt.onStone(size: short ? 12.5 : 13.5)),
+                                Text('Your hero is saved to your account: safe if this device is lost, and waiting for you on your phone or in any browser.', style: Txt.onStone(size: short ? 12.5 : 13.5)),
                                 SizedBox(height: short ? 8 : 14),
-                                _busy
-                                    ? const Padding(padding: EdgeInsets.all(10), child: Center(child: CircularProgressIndicator(color: Palette.amber)))
-                                    : StoneButton(title: 'Continue with Google', tone: ButtonTone.amber, icon: const _GoogleMark(), onPressed: _google),
-                                if (cloud.problem != null) ...[
-                                  const SizedBox(height: 8),
-                                  Text(cloud.problem!, textAlign: TextAlign.center, style: Txt.onStone(size: 13, color: const Color(0xFFE0A070))),
-                                ],
+                                // On success the app moves on by itself (and fetches your hero from the cloud).
+                                AccountPanel(compact: short),
                                 SizedBox(height: short ? 4 : 10),
                                 TextButton(
-                                  onPressed: _busy ? null : c.playAsGuest,
+                                  onPressed: c.playAsGuest,
                                   child: Text('Play without an account', style: Txt.label(size: 14, color: Palette.parch)),
                                 ),
                                 Text('Your hero stays on this device. You can sign in any time from Settings.', textAlign: TextAlign.center, style: Txt.onStone(size: 12)),
@@ -137,21 +122,8 @@ class FetchingHeroScreen extends StatelessWidget {
 }
 
 /// Google's "G", drawn in its four colours (no image needed).
-class _GoogleMark extends StatelessWidget {
-  const _GoogleMark();
-
-  @override
-  Widget build(BuildContext context) => Container(
-    width: 26,
-    height: 26,
-    decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-    padding: const EdgeInsets.all(4),
-    child: const CustomPaint(painter: _GPainter()),
-  );
-}
-
-class _GPainter extends CustomPainter {
-  const _GPainter();
+class GoogleGPainter extends CustomPainter {
+  const GoogleGPainter();
 
   @override
   void paint(Canvas c, Size size) {
@@ -170,7 +142,7 @@ class _GPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_GPainter old) => false;
+  bool shouldRepaint(GoogleGPainter old) => false;
 }
 
 /// Embers drifting up the screen.

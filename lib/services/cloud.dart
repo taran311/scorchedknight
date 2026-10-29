@@ -1,4 +1,4 @@
-// Cloud saves: sign in with Google and the same hero follows you between the browser and the
+// Cloud saves: sign in with Google, Facebook or an email and password (verified by a link), and the same hero follows you between the browser and the
 // Android app. The save itself is the same JSON the device keeps locally, stored in Firestore at
 // players/{uid}. Everything here is optional: until Firebase is set up for this build (see
 // FIREBASE_SETUP.md), [CloudSave.available] stays false and the game just saves on the device.
@@ -36,8 +36,15 @@ class CloudSave extends ChangeNotifier implements SaveCloud {
 
   bool _googleReady = false;
 
+  /// Facebook sign-in (browser only). Off until the Meta app is set up: see FIREBASE_SETUP.md.
+  static const facebook = false;
+
+  /// Signed up with an email and password but hasn't opened the link we sent yet. Their hero
+  /// doesn't sync until they have, so nobody can claim an address that isn't theirs.
+  bool get needsVerify => user != null && !user!.emailVerified && user!.providerData.every((p) => p.providerId == 'password');
+
   @override
-  bool get signedIn => user != null;
+  bool get signedIn => user != null && !needsVerify;
 
   @override
   void markSynced() {
@@ -101,8 +108,7 @@ class CloudSave extends ChangeNotifier implements SaveCloud {
       notifyListeners();
       return false;
     } on FirebaseAuthException catch (e) {
-      // Closing the pop-up isn't a problem worth reporting.
-      problem = e.code == 'popup-closed-by-user' || e.code == 'cancelled-popup-request' || e.code == 'web-context-canceled' ? null : 'Sign-in failed (${e.code}).';
+      problem = _say(e.code);
       notifyListeners();
       return false;
     } catch (e) {
@@ -112,12 +118,102 @@ class CloudSave extends ChangeNotifier implements SaveCloud {
     }
   }
 
+  /// Facebook's pop-up (browser only).
+  Future<bool> signInFacebook() => _run(() => FirebaseAuth.instance.signInWithPopup(FacebookAuthProvider()));
+
+  /// A new account: sends the link to check the address, then waits for it ([needsVerify]).
+  Future<bool> signUpEmail(String email, String password) => _run(() async {
+    final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(email: email.trim(), password: password);
+    await cred.user?.sendEmailVerification();
+    return cred;
+  });
+
+  Future<bool> signInEmail(String email, String password) => _run(() => FirebaseAuth.instance.signInWithEmailAndPassword(email: email.trim(), password: password));
+
+  /// Sends the link to set a new password. Says so even when there's no such account, so the
+  /// form can't be used to find out who plays.
+  Future<void> resetPassword(String email) async {
+    if (!available) return;
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email.trim());
+      problem = null;
+      notice = 'If there\'s an account for ${email.trim()}, a link to set a new password is on its way.';
+    } on FirebaseAuthException catch (e) {
+      problem = _say(e.code);
+    }
+    notifyListeners();
+  }
+
+  /// A line to show that isn't a problem ("Link sent").
+  String? notice;
+
+  Future<void> resendVerification() async {
+    try {
+      await user?.sendEmailVerification();
+      problem = null;
+      notice = 'Sent again to ${user?.email}. Check your spam folder too.';
+    } on FirebaseAuthException catch (e) {
+      problem = _say(e.code);
+    }
+    notifyListeners();
+  }
+
+  /// After they've opened the link: picks up that the address is now verified.
+  Future<void> checkVerified() async {
+    try {
+      await user?.reload();
+      user = FirebaseAuth.instance.currentUser;
+      problem = user != null && !user!.emailVerified ? 'Not verified yet. Open the link in the email first.' : null;
+      notice = null;
+    } catch (e) {
+      problem = 'Couldn\'t check (you may be offline).';
+    }
+    notifyListeners();
+  }
+
+  Future<bool> _run(Future<UserCredential> Function() go) async {
+    if (!available) return false;
+    try {
+      final cred = await go();
+      user = cred.user;
+      problem = null;
+      notice = null;
+      notifyListeners();
+      return user != null;
+    } on FirebaseAuthException catch (e) {
+      problem = _say(e.code);
+      notifyListeners();
+      return false;
+    } catch (e) {
+      problem = 'Sign-in failed.';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Firebase's error codes, in plain words.
+  String? _say(String code) => switch (code) {
+    'popup-closed-by-user' || 'cancelled-popup-request' || 'web-context-canceled' => null,
+    'invalid-email' => 'That doesn\'t look like an email address.',
+    'email-already-in-use' => 'There\'s already an account for that email. Sign in instead.',
+    'weak-password' => 'Pick a longer password (at least 8 characters).',
+    'invalid-credential' || 'wrong-password' || 'user-not-found' || 'invalid-login-credentials' => 'That email and password don\'t match.',
+    'too-many-requests' => 'Too many tries. Wait a minute and try again.',
+    'network-request-failed' => 'Couldn\'t connect. Check you\'re online.',
+    'account-exists-with-different-credential' => 'That email already signs in another way (try Google).',
+    'operation-not-allowed' => 'That way of signing in isn\'t switched on yet.',
+    'popup-blocked' => 'Your browser blocked the sign-in window. Allow pop-ups and try again.',
+    _ => 'Sign-in failed ($code).',
+  };
+
   Future<void> signOut() async {
     if (!available) return;
     await FirebaseAuth.instance.signOut();
     if (!kIsWeb && _googleReady) await GoogleSignIn.instance.signOut();
     user = null;
     lastSync = null;
+    problem = null;
+    notice = null;
     notifyListeners();
   }
 
