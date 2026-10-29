@@ -101,6 +101,8 @@ void drawHead(Canvas c, Skeleton sk, Look look, double t, {bool still = false}) 
       _oniHead(c, r, look);
     case HeadKind.bat:
       _batHead(c, r, look);
+    case HeadKind.yeti:
+      _yetiHead(c, r, look);
   }
   if (look.crown && look.head == HeadKind.shifter) {
     // The Thousandfold: a ring of faces, like the Mother of Masks, but every one of them its own.
@@ -2455,4 +2457,62 @@ void _batHead(Canvas c, double r, Look look) {
   final glow = look.eyeGlow ?? const Color(0xFFFFB04A), eye = Offset(r * .6, -r * .28);
   c.drawCircle(eye, r * .24, Paint()..color = glow.withValues(alpha: .55)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5));
   _ellipse(c, eye, r * .16, r * .12, Paint()..color = glow);
+}
+
+/// A yeti's head: a shaggy mane of white fur round the back and under the chin, horns curling
+/// forward, a blue face, a heavy fur brow over glowing eyes, and two tusks.
+void _yetiHead(Canvas c, double r, Look look) {
+  final fur = look.skin, dark = [shade(fur[0], -.15), shade(fur[1], -.2), shade(fur[2], -.2)];
+  const n = 13;
+  final mane = Path();
+  for (var i = 0; i <= n; i++) {
+    final a = (60 + i * 250 / n) * math.pi / 180;
+    final rr = r * (1.12 + .06 * math.sin(i * 1.9));
+    final p = Offset(math.cos(a) * rr - r * .15, math.sin(a) * rr * 1.05 + r * .15);
+    if (i == 0) {
+      mane.moveTo(p.dx, p.dy);
+    } else {
+      final a2 = (60 + (i - .5) * 250 / n) * math.pi / 180;
+      final rc = r * (1.5 + .12 * math.sin(i * 2.3));
+      mane.quadraticBezierTo(math.cos(a2) * rc - r * .15, math.sin(a2) * rc * 1.05 + r * .15, p.dx, p.dy);
+    }
+  }
+  mane
+    ..lineTo(r * .2, r * .2)
+    ..close();
+  fillPath(c, mane, dark, Offset(-r * 1.4, -r * 1.4), Offset(r, r));
+  for (final (x, far) in const [(-.1, true), (.35, false)]) {
+    final horn = Path()
+      ..moveTo(r * (x - .25), -r * .75)
+      ..quadraticBezierTo(r * (x - .1), -r * 1.6, r * (x + .55), -r * 1.45)
+      ..quadraticBezierTo(r * (x + .15), -r * 1.25, r * (x + .15), -r * .7)
+      ..close();
+    fillPath(c, horn, far ? const [Color(0xFFA8A090), Color(0xFF6A6458), Color(0xFF2A2620)] : const [Color(0xFFD8D0C0), Color(0xFF9A9080), Color(0xFF4A4438)], Offset(r * (x - .2), -r * 1.6), Offset(r * (x + .5), -r * .7));
+  }
+  final head = Path()
+    ..moveTo(-r * .9, r * .6)
+    ..quadraticBezierTo(-r * 1.05, -r * .95, r * .15, -r * .95)
+    ..quadraticBezierTo(r * .95, -r * .9, r * 1.1, -r * .2)
+    ..quadraticBezierTo(r * 1.25, r * .6, r * .7, r * 1.0)
+    ..quadraticBezierTo(-r * .1, r * 1.25, -r * .9, r * .6)
+    ..close();
+  fillPath(c, head, fur, Offset(-r, -r), Offset(r, r));
+  final face = Path()
+    ..moveTo(r * .1, -r * .55)
+    ..quadraticBezierTo(r * .95, -r * .65, r * 1.05, -r * .05)
+    ..quadraticBezierTo(r * 1.1, r * .65, r * .55, r * .85)
+    ..quadraticBezierTo(r * .05, r * .7, r * .05, r * .1)
+    ..close();
+  fillPath(c, face, ramp(0xFF5A7AA8, .2, .5), Offset(r * .1, -r * .6), Offset(r * 1.1, r * .8), width: 1.1);
+  for (final (x0, len) in const [(.05, .5), (.35, .55), (.65, .45)]) {
+    c.drawPath(poly([Offset(r * x0, -r * .6), Offset(r * (x0 + .15), -r * .85), Offset(r * (x0 + len), -r * .42), Offset(r * (x0 + .2), -r * .5)]), Paint()..color = fur[0]);
+  }
+  final glow = look.eyeGlow ?? const Color(0xFF9ADFFF), eye = Offset(r * .62, -r * .28);
+  c.drawCircle(eye, r * .22, Paint()..color = glow.withValues(alpha: .55)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5));
+  _ellipse(c, eye, r * .14, r * .1, Paint()..color = glow);
+  _ellipse(c, Offset(r * 1.0, r * .08), r * .13, r * .09, Paint()..color = const Color(0xFF1A2230));
+  c.drawPath(poly([Offset(r * 1.0, r * .42), Offset(r * .35, r * .45), Offset(r * .85, r * .68)]), Paint()..color = const Color(0xFF14101A));
+  for (final x in const [.48, .9]) {
+    c.drawPath(poly([Offset(r * x - 2.4, r * .43), Offset(r * x + .5, r * .15), Offset(r * x + 2.4, r * .44)]), Paint()..color = const Color(0xFFF2EEE0));
+  }
 }

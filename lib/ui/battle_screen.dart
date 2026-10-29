@@ -17,6 +17,7 @@ import '../game/models.dart';
 import '../game/rules.dart';
 import '../game/spells.dart';
 import '../game/wilds.dart';
+import '../game/dungeons.dart' show dungeonRooms;
 import 'battle_stage.dart';
 import 'hud.dart';
 import 'journal_panel.dart' show fmt;
@@ -28,7 +29,7 @@ import 'theme.dart';
 import 'trail_data.dart';
 
 /// What the battle screen should start with, once the stage is listening.
-enum BattleStart { explore, boss, resume, raid, heroic, wild }
+enum BattleStart { explore, boss, resume, raid, heroic, wild, dungeon }
 
 /// What the screen hands back when it closes: back to the map, or (knocked out) to the Inn.
 enum BattleExit { map, inn }
@@ -48,6 +49,9 @@ class _BattleScreenState extends State<BattleScreen> {
 
   /// A fight out in the wilds: its winnings go into your pack, and afterwards it's back to the path.
   late final bool _wild = widget.start == BattleStart.wild || c.state.wildFight;
+
+  /// A fight in a dungeon room: afterwards it's back to the doors.
+  late final bool _dungeon = widget.start == BattleStart.dungeon || c.state.dungeonFight;
 
   /// The crossbow's timing bar is up, waiting for you to loose the bolt.
   bool _aiming = false;
@@ -91,7 +95,7 @@ class _BattleScreenState extends State<BattleScreen> {
         if (!c.startRaid()) c.resumeFight();
       case BattleStart.heroic:
         c.exploreHeroic();
-      case BattleStart.wild:
+      case BattleStart.wild || BattleStart.dungeon:
         c.arriveWild();
     }
   }
@@ -310,7 +314,9 @@ class _BattleScreenState extends State<BattleScreen> {
                                       Positioned(
                                         left: 10,
                                         bottom: 6,
-                                        child: _wild && s.wild != null
+                                        child: _dungeon && c.dungeonNow != null
+                                            ? Text('${c.dungeonNow!.name} · room ${math.min(s.dungeonRoom + 1, dungeonRooms + 1)}', style: Txt.label(size: 13, color: Color(c.dungeonNow!.argb)))
+                                            : _wild && s.wild != null
                                             ? Text('${wildAreas[s.wild!].name} · step ${s.wildDepth}', style: Txt.label(size: 13, color: Color(wildAreas[s.wild!].argb)))
                                             : Text(land.name, style: Txt.label(size: 13, color: Color(land.argb))),
                                       ),
@@ -576,7 +582,7 @@ class _BattleScreenState extends State<BattleScreen> {
           _SlotInfo('Flee', const Color(0xFFBFB09A), [
             ('🏃', '${(flee * 100).round()}% to escape', plain),
             ('📈', '+${(fleeStep * 100).round()}% each failed try', soft),
-            if (s.wild != null) ('🎒', 'Drops ${(fightFleeLoss * 100).round()}% of your pack', bad) else ('🏠', 'Back to the inn', soft),
+            if (s.dungeonFight) ('🚪', 'Back out and bar the door', soft) else if (s.wild != null) ('🎒', 'Drops ${(fightFleeLoss * 100).round()}% of your pack', bad) else ('🏠', 'Back to the inn', soft),
           ]),
           badge: '${(flee * 100).round()}%',
         ),
@@ -587,6 +593,19 @@ class _BattleScreenState extends State<BattleScreen> {
   List<Widget> _resultButtons() {
     final o = c.outcome!;
     final waiting = c.nextLoot != null;
+    if (_dungeon) {
+      // In a dungeon: one room, then back to the doors (or, knocked out, home).
+      return [
+        if (waiting && o == Outcome.won)
+          Expanded(child: StoneButton(title: 'Choose your spoils', tone: ButtonTone.blood, onPressed: () => resolvePendingLoot(context, c).then((_) => mounted ? setState(() {}) : null)))
+        else
+          Expanded(
+            child: o == Outcome.knockedOut
+                ? StoneButton(title: 'Wake up at the Soot & Kettle', tone: ButtonTone.blood, onPressed: () => _close(BattleExit.inn))
+                : StoneButton(title: c.dungeonCleared ? 'Claim the hoard' : 'Back to the doors', tone: ButtonTone.blood, onPressed: () => _close(BattleExit.map)),
+          ),
+      ];
+    }
     if (_wild) {
       // Out in the wilds: one fight, then back to the path (or, knocked out, home).
       return [
@@ -1144,6 +1163,7 @@ class _Result extends StatelessWidget {
             if (k.companion != null) _Spoil(const Icon(Icons.pets, size: 17, color: _green), 'New companion!', _green, big: true, tip: k.companion),
             if (k.prize != null) _Spoil(const Icon(Icons.diamond, size: 17, color: Color(0xFFFFB04A)), k.prize!.name, Color(k.prize!.rarity.argb), big: true),
             for (final l in k.opened) _Spoil(const Icon(Icons.map, size: 17, color: _gold), isSideLand(l) ? 'Found: ${continents[l].name}' : 'Open: ${continents[l].name}', _gold, big: true),
+            for (final h in k.hoard) _Spoil(const Icon(Icons.diamond, size: 17, color: _gold), h, _gold, big: true),
             if (k.trophy != null) _Spoil(const Icon(Icons.emoji_events, size: 17, color: Palette.cream), k.trophy!, Palette.cream, tip: 'For $smithName\'s forge'),
             if (k.blueprint != null) _Spoil(const Icon(Icons.description, size: 17, color: Color(0xFF8AB8F0)), k.blueprint!, const Color(0xFF8AB8F0), big: true, tip: 'A blueprint. Take it to $smithName'),
           ]);

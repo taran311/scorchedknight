@@ -323,7 +323,7 @@ double specialChanceAt(int since) => math.min(1, specialBase + specialStep * sin
 
 /// A quest weapon's special attack. It charges with each full swing and fires on its own.
 class Special {
-  const Special(this.name, this.desc, this.mult, this.argb, {this.heal = 0, this.coins = 0, this.crit = false, this.sure = false, this.volley = 0, this.element, this.meteor = false, this.wave = false, this.kraken = false, this.rain = false, this.cleave = false, this.dragon = false, this.dice = false, this.deadrun = false, this.storm = false, this.bats = false, this.demon = false, this.legion = false, this.wolves = false, this.stun = 0, this.selfHurt = 0, this.summon = 0, this.expose = 0});
+  const Special(this.name, this.desc, this.mult, this.argb, {this.heal = 0, this.coins = 0, this.crit = false, this.sure = false, this.volley = 0, this.element, this.meteor = false, this.wave = false, this.kraken = false, this.rain = false, this.cleave = false, this.dragon = false, this.dice = false, this.deadrun = false, this.storm = false, this.bats = false, this.demon = false, this.legion = false, this.wolves = false, this.avalanche = false, this.stun = 0, this.selfHurt = 0, this.summon = 0, this.expose = 0});
   final String name, desc;
 
   /// Multiplies the swing's base damage.
@@ -355,6 +355,9 @@ class Special {
   /// dead riding out, lightning from the sky, a swarm of bats, a demon from a burning rift, the
   /// dead clawing up out of the ground, ghost wolves.
   final bool dragon, dice, deadrun, storm, bats, demon, legion, wolves;
+
+  /// The mountain comes down: great shards of ice fall on the foe.
+  final bool avalanche;
 
   /// What it leaves behind: the chance the foe is stunned out of its next blow, a share of your
   /// own health it costs you, skeletons that stay to fight (for 2 turns), and turns the foe's
@@ -401,6 +404,7 @@ const specials = <String, Special>{
   'nightswarm': Special('Night Swarm', 'A storm of bats pours over the foe: 2x damage, and you drink 15 HP from it', 2, 0xFF9A8ABA, bats: true, heal: 15, sure: true),
   'hellgate': Special('Hellgate', 'A demon claws out of a burning rift and strikes: double damage plus fire, but it takes its price (5% of your health)', 2, 0xFFE0402A, element: Stat.burn, demon: true, selfHurt: .05, sure: true),
   'legion': Special('Rise, Legion', 'The dead claw up out of the ground and tear at the foe: 2x damage, and one stays to fight for 2 turns', 2, 0xFF8A5AC0, legion: true, summon: 1, sure: true),
+  'avalanche': Special('Avalanche', 'The mountain answers: a fall of ice crashes down on the foe, 2x damage plus frost, and half the time it\'s frozen out of its next blow', 2, 0xFFBFE8FF, element: Stat.frost, avalanche: true, stun: .5, sure: true),
   'moonpack': Special('Moon Pack', 'Ghost wolves race out of the dark and tear its guard open: 2x damage, and your hits deal 25% more for 2 turns', 2, 0xFF9ADFFF, wolves: true, expose: 2, sure: true),
 };
 
@@ -1520,6 +1524,32 @@ class LootTable {
     );
   }
 
+  /// The Rimeforged weapons the Frostmarch's giants and reavers carry: epic, one per hero, cold
+  /// enough to burn (frost) and heavy enough to turn a blow (guard). The mountain comes when it's
+  /// called: Avalanche, with its stats a little lower to pay for it.
+  GearItem frostDrop(HeroClass heroClass, int level) {
+    const rime = 0xFF9AC0DC;
+    final (name, art, stats, lore) = switch (heroClass) {
+      HeroClass.knight => ('Rimeforged greataxe', 'greataxe', <Stat, double>{Stat.damage: 1.45, Stat.frost: 1.3, Stat.guard: .9}, 'Forged in a giant\'s hearth from ice that never melts. Frost creeps up your gauntlets when you swing it, and it doesn\'t hurt at all.'),
+      HeroClass.ranger => ('Rimeforged bow', 'longbow', <Stat, double>{Stat.damage: 1.4, Stat.frost: 1.3, Stat.crit: .9}, 'A giant\'s rib, strung with frozen gut. The arrows come off it white with rime.'),
+      HeroClass.mage => ('Rimeforged staff', 'crystalstaff', <Stat, double>{Stat.damage: 1.3, Stat.frost: 1.3, Stat.wisdom: .9}, 'A shard of glacier on a black iron rod. Snow falls wherever you point it.'),
+    };
+    return GearItem(
+      id: _id(),
+      name: name,
+      slot: GearSlot.weapon,
+      art: art,
+      tint: rime,
+      rarity: Rarity.epic,
+      level: level,
+      heroClass: heroClass,
+      lore: lore,
+      special: 'avalanche',
+      value: _value(level, Rarity.epic, GearSlot.weapon),
+      stats: _tuned(stats, level, heroClass, farmedEdge / 1.35),
+    );
+  }
+
   /// A rune-engraved weapon for [heroClass]: legendary, with a perfect rune already bound and the
   /// Runic Surge special. Only the Dragonbone Warden guards these.
   GearItem runeWeapon(HeroClass heroClass, int level) {
@@ -1609,6 +1639,7 @@ class LootTable {
       'starleaf' => ('Starleaf Brooch', 'Queen Ithriel\'s own brooch: a silver leaf with a star caught in it. The elves say it never lets an arrow fly crooked.', {Stat.crit: 2.4, Stat.dodge: 2.2, Stat.regen: 1.8}),
       'runependant' => ('Thane\'s Rune-Pendant', 'A runestone on a chain as thick as your thumb. Grimnar says it was his grandmother\'s. It hums when you\'re hit.', {Stat.guard: 2.9, Stat.block: 2.6, Stat.vigour: 2.5}),
       'echostone' => ('The Echo Stone', 'A violet stone from the Roost Mother\'s nest, set in silver wings. Hold it to your ear and you hear the cave, and every blow coming before it lands.', {Stat.damage: .7, Stat.dodge: 1.5, Stat.leech: 1.4, Stat.crit: 1.1}),
+      'rimeheart' => ('The Rimeheart', 'The Jarl\'s heart-stone: a lump of blue glacier ice in a cage of black iron. It never melts, and the cold in it keeps you standing.', {Stat.frost: 1.25, Stat.guard: 1.2, Stat.vigour: 1.05, Stat.damage: .55}),
       'blossomseal' => ('Shogun\'s Blossom Seal', 'The Iron Shogun\'s seal: a cherry blossom carved in red jade. Duels fought under it are always fair, and always short.', {Stat.crit: 1.6, Stat.parry: 1.5, Stat.damage: 1.3}),
       'stormfeather' => ('Thunderwing\'s Plume', 'One feather from the Storm Roc, as long as your arm. It hums before a storm, and your blows come down like lightning.', {Stat.crit: 1.7, Stat.dodge: 1.5, Stat.damage: 1.3}),
       'mirrorheart' => ('Heart of the Thousandfold', 'A grey, slippery heart that changes shape in your hand: a bird, a fist, your own face. It wants to be useful.', {Stat.damage: 1.5, Stat.crit: 1.5, Stat.dodge: 1.5}),

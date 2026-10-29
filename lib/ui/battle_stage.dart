@@ -27,6 +27,7 @@ import '../art/rig.dart';
 import '../art/scenery.dart';
 import '../game/ammo.dart';
 import '../game/catalog.dart';
+import '../game/dungeons.dart' show dungeonById;
 import '../game/classes.dart';
 import '../game/controller.dart';
 import '../game/loot.dart';
@@ -109,7 +110,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   bool _reduceMotion = false;
 
   // animation state
-  final Map<String, double> fx = {'flash': 0, 'kflash': 0, 'alpha': 1, 'enter': 0, 'dying': 0, 'slash': 0, 'fire': 0, 'lunge': 0, 'wyrm': 0, 'bones': 0, 'ward': 0, 'pounce': 0, 'wave': 0, 'grasp': 0, 'charge': 0, 'spectral': 0, 'flee': 0, 'ko': 0, 'dash': 0, 'screen': 0, 'zoom': 0, 'swoop': 0, 'kback': 0, 'gloom': 0, 'reaper': 0, 'reap': 0, 'soul': 0, 'scar': 0, 'wolf': 0, 'deadrun': 0, 'legion': 0, 'demon': 0, 'wolves': 0, 'bats': 0, 'storm': 0, 'die': 0, 'blade': 0};
+  final Map<String, double> fx = {'flash': 0, 'kflash': 0, 'alpha': 1, 'enter': 0, 'dying': 0, 'slash': 0, 'fire': 0, 'lunge': 0, 'wyrm': 0, 'bones': 0, 'ward': 0, 'pounce': 0, 'wave': 0, 'grasp': 0, 'charge': 0, 'spectral': 0, 'flee': 0, 'ko': 0, 'dash': 0, 'screen': 0, 'zoom': 0, 'swoop': 0, 'kback': 0, 'gloom': 0, 'reaper': 0, 'reap': 0, 'soul': 0, 'scar': 0, 'wolf': 0, 'deadrun': 0, 'legion': 0, 'demon': 0, 'wolves': 0, 'bats': 0, 'storm': 0, 'die': 0, 'blade': 0, 'ice': 0};
 
   /// How long the Reaper's visit takes, from the killing blow to the fallen hero.
   static const _reapMs = 3400.0;
@@ -328,6 +329,11 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   /// The foe whose land sets the scene: a rare in borrowed clothes (Jack, the Hidden Ones) still
   /// fights you in the land it turned up in.
   String get _sceneLook => foeAt(c.shownRare?.base ?? c.shownFoe).look;
+
+  /// A dungeon fight happens in the dungeon (fixed when the fight starts, so the scene doesn't jump
+  /// as the run ends).
+  late final Setting? _dungeonScene = c.state.dungeonFight ? Setting.values.asNameMap()[dungeonById(c.state.dungeon)?.setting] : null;
+  Setting get _scene => _dungeonScene ?? settingFor(_sceneLook);
   bool get _isKraken => isSeaLook(_foe.look);
   static const _krakenScale = .82;
   static const _houndScale = 2.5;
@@ -549,6 +555,24 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       _at(d0 + hit, () => _spark('bolt', _foeChest + const Offset(0, -30), 30, speed: 7, life: 500, radius: 3));
       _at(d0 + hit + 200, () {
         if (c.lastSwing?.specialStun == true) _mark('Stunned!', [colour, shade(colour, -.5)], _foeChest + const Offset(0, -110));
+      });
+    }
+    if (sp.avalanche) {
+      // The mountain comes down: shards of ice fall out of the sky onto the foe and burst.
+      _at(d0 + hit - 520, () {
+        _stormSeed = _rng.nextInt(1 << 20);
+        fx['ice'] = .001;
+        _tween('ice', .999, 900, ease: (p) => p);
+      });
+      _at(d0 + hit - 40, () {
+        _tween('screen', .3, 40);
+        _tween('screen', 0, 300, delay: 40);
+        _punch(.8);
+      });
+      _at(d0 + hit, () => _spark('rime', _foeChest + const Offset(0, 40), 36, dir: -math.pi / 2, spread: 2.8, speed: 7, life: 900, radius: 5, gravity: .15));
+      _at(d0 + hit + 380, () => fx['ice'] = 0);
+      _at(d0 + hit + 200, () {
+        if (c.lastSwing?.specialStun == true) _mark('Frozen!', [colour, shade(colour, -.5)], _foeChest + const Offset(0, -110));
       });
     }
     if (sp.bats) {
@@ -1531,7 +1555,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     }
     _stains.removeWhere((st) => t - st.$4 > 6000);
     if (!_reduceMotion) {
-      final style = specFor(settingFor(_sceneLook)).moteStyle, ash = style == MoteStyle.embers, snow = style.falls;
+      final style = specFor(_scene).moteStyle, ash = style == MoteStyle.embers, snow = style.falls;
       for (final m in _motes) {
         var y = m.pos.dy + m.vel.dy * (ash ? 1.6 : (snow ? -1.4 : .4)) * dt / 16;
         var x = m.pos.dx + math.sin(t / 1400 + m.gravity) * (snow ? .6 : .25) + (ash ? .2 : 0);
@@ -1679,7 +1703,7 @@ class _ScenePainter extends CustomPainter {
     final above = math.max(0.0, size.height * visibleW / size.width - sceneSize.height);
     canvas.translate(-left, above);
     if (above > 0) {
-      final sky = specFor(settingFor(s._sceneLook)).sky;
+      final sky = specFor(s._scene).sky;
       canvas.drawRect(Rect.fromLTWH(left - 2, -above - 2, visibleW + 4, above + 4), Paint()..color = sky.first);
     }
     if (s._shake > 0) canvas.translate(math.sin(t * .09) * s._shake, math.cos(t * .13) * s._shake * .5);
@@ -1691,9 +1715,9 @@ class _ScenePainter extends CustomPainter {
       canvas.scale(1 + .07 * zoom);
       canvas.translate(-fc.dx, -fc.dy);
     }
-    final ground = specFor(settingFor(s._sceneLook));
+    final ground = specFor(s._scene);
     // (Recorded once per battleground and replayed: the landscape's shapes are only built once.)
-    if (!_perf.contains('b')) canvas.drawPicture(battleground(s._sceneLook));
+    if (!_perf.contains('b')) canvas.drawPicture(battlegroundOf(s._scene));
     for (final (at, r, col, start) in s._stains) {
       final a = (1 - ((t - start) / 6000)).clamp(0.0, 1.0);
       canvas.drawOval(Rect.fromCenter(center: at, width: r * 2.6, height: r * .9), Paint()..color = col.withValues(alpha: col.a * math.min(1.0, a * 2)));
@@ -2054,6 +2078,21 @@ class _ScenePainter extends CustomPainter {
       canvas.drawPath(path, strokePaint(const Color(0xFFB8D8FF).withValues(alpha: .6 * storm), 16)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10));
       canvas.drawPath(path, strokePaint(const Color(0xFFFFFFFF).withValues(alpha: storm), 4));
       canvas.drawCircle(end, 60 * storm, Paint()..color = const Color(0xFFCFE8FF).withValues(alpha: .5 * storm)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 20));
+    }
+    final ice = fx['ice']!;
+    if (ice > 0) {
+      // Avalanche: a dozen great shards of ice dropping onto the foe, one after another.
+      final r = math.Random(s._stormSeed);
+      for (var i = 0; i < 12; i++) {
+        final dx = (r.nextDouble() - .5) * 150, len = 40 + r.nextDouble() * 50, w = 12 + r.nextDouble() * 12, lag = i * .035;
+        final p = ((ice - lag) / .6).clamp(0.0, 1.0);
+        if (p <= 0 || p >= 1) continue;
+        final floor = fy - s._foeHeight * (.15 + r.nextDouble() * .5);
+        final tip = Offset(fx0 + dx + (1 - p) * 60, -80 + (floor + 80) * p * p);
+        final shard = poly([tip, tip + Offset(-w / 2 - 12, -len), tip + Offset(w / 2 - 12, -len)]);
+        canvas.drawPath(shard, Paint()..shader = ui.Gradient.linear(tip + Offset(-w / 2, 0), tip + Offset(w / 2, 0), const [Color(0xFFF2FAFF), Color(0xFF9AD0F0), Color(0xFF4A80A8)], const [0, .5, 1]));
+        canvas.drawPath(shard, strokePaint(const Color(0xCCFFFFFF), 1.2));
+      }
     }
     final bats = fx['bats']!;
     if (bats > 0) {

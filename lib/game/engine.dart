@@ -19,6 +19,7 @@ import 'events.dart';
 import 'encounters.dart';
 import 'rules.dart';
 import 'wilds.dart';
+import 'dungeons.dart';
 
 /// What you can do on your turn: swing your blade, your Shield Bash (or Mighty Blow), cast an Ember
 /// Rite, shoot your crossbow, drink a potion, command your companion, or run.
@@ -44,7 +45,7 @@ class ChestFind {
 }
 
 class KillResult {
-  const KillResult(this.foeIndex, this.name, this.xp, this.coins, this.levelUps, this.loot, {this.egg = false, this.orkGear, this.entGear, this.runeGear, this.prize, this.foe, this.chest, this.companion, this.opened = const [], this.trophy, this.blueprint, this.boss = false, this.won = false, this.reagents = 0, this.jobFind, this.potion = false, this.relicPart, this.packGold = 0, this.packed = const [], this.junkGold = 0, this.jackpot = 0});
+  const KillResult(this.foeIndex, this.name, this.xp, this.coins, this.levelUps, this.loot, {this.egg = false, this.orkGear, this.entGear, this.runeGear, this.prize, this.foe, this.chest, this.companion, this.opened = const [], this.trophy, this.blueprint, this.boss = false, this.won = false, this.reagents = 0, this.jobFind, this.potion = false, this.relicPart, this.packGold = 0, this.packed = const [], this.junkGold = 0, this.jackpot = 0, this.hoard = const []});
 
   /// A lucky purse: extra gold on top of the usual (already counted in [coins]).
   final int jackpot;
@@ -91,6 +92,9 @@ class KillResult {
 
   /// A relic part found on a Heroic trail.
   final String? relicPart;
+
+  /// A dungeon boss's hoard: what was in it (empty for any other foe).
+  final List<String> hoard;
 
   /// It was carrying a health potion.
   final bool potion;
@@ -918,6 +922,224 @@ class GameEngine {
     return null;
   }
 
+  // ---------------- dungeons ----------------
+
+  /// A dungeon opens once its land's boss is down.
+  bool dungeonOpen(Dungeon d) => state.bossesDown.contains(d.land);
+
+  /// Why you can't go into dungeon [id] now (null: you can, or you're already in it).
+  String? whyNotDungeon(String id) {
+    final d = dungeonById(id);
+    if (d == null) return 'No such place';
+    if (!dungeonOpen(d)) return 'Opens when ${continents[d.land].boss.name} falls';
+    if (state.dungeon == id) return null;
+    if (state.knight.level < d.minLevel) return 'Reach level ${d.minLevel} to go down';
+    if (state.inBattle) return 'Not mid-fight';
+    if (state.wild != null) return 'You\'re out in ${wildAreas[state.wild!].name}';
+    if (state.dungeon != null) return 'You\'re already down in ${dungeonById(state.dungeon)!.name}';
+    return null;
+  }
+
+  /// Goes down into dungeon [id] (or carries on a run already under way there).
+  bool enterDungeon(String id) {
+    if (whyNotDungeon(id) != null) return false;
+    if (state.dungeon == id) return true;
+    final d = dungeonById(id)!;
+    state
+      ..dungeon = id
+      ..dungeonRoom = 0
+      ..dungeonKey = false
+      ..dungeonFight = false
+      ..continent = d.land;
+    state.dungeonPath.clear();
+    _rollDoors();
+    _note('You go down into ${d.name}. ${d.blurb}', EntryKind.gold);
+    return true;
+  }
+
+  Dungeon? get dungeonNow => dungeonById(state.dungeon);
+
+  /// The boss is down and the hoard is yours: all that's left is the way out.
+  bool get dungeonCleared => state.dungeon != null && state.dungeonRoom > dungeonRooms;
+
+  /// The doors in front of you now.
+  List<DoorClue> get dungeonDoors => [for (final d in state.dungeonDoors) DoorClue.values.byName(d)];
+
+  void _rollDoors() {
+    final s = state;
+    s.dungeonDoors.clear();
+    if (s.dungeonRoom > dungeonRooms) return;
+    if (s.dungeonRoom == dungeonRooms) {
+      s.dungeonDoors.add(DoorClue.boss.name);
+      return;
+    }
+    final n = _rng.nextBool() ? 3 : 2;
+    final total = doorWeights.values.fold<double>(0, (a, b) => a + b);
+    for (var i = 0; i < n; i++) {
+      var r = _rng.nextDouble() * total;
+      for (final e in doorWeights.entries) {
+        r -= e.value;
+        if (r <= 0) {
+          s.dungeonDoors.add(e.key.name);
+          break;
+        }
+      }
+      if (s.dungeonDoors.length <= i) s.dungeonDoors.add(DoorClue.growl.name);
+    }
+    if (_rng.nextDouble() < lockedChance) s.dungeonDoors[_rng.nextInt(n)] = DoorClue.locked.name;
+  }
+
+  /// Why door [i] won't open (null: it will).
+  String? whyNotDoor(int i) {
+    final s = state;
+    if (s.dungeon == null || i < 0 || i >= s.dungeonDoors.length) return 'No such door';
+    if (s.inBattle) return 'Not mid-fight';
+    if (s.dungeonDoors[i] == DoorClue.locked.name && !s.dungeonKey) return 'Locked. Find a key.';
+    return null;
+  }
+
+  /// Opens door [i] and steps through. A fight room begins its fight (open the battle screen);
+  /// anything else is dealt with at once. What it was, and what happened, come back.
+  (RoomKind, String)? openDoor(int i) {
+    if (whyNotDoor(i) != null) return null;
+    final s = state, d = dungeonNow!;
+    final clue = DoorClue.values.byName(s.dungeonDoors[i]);
+    final kind = roomBehind(clue, _rng.nextDouble(), hasKey: s.dungeonKey);
+    s.dungeonPath.add(kind.name);
+    if (kind.isFight) {
+      s.dungeonDoors.removeAt(i);
+      return (kind, _dungeonFight(d, kind));
+    }
+    final text = _dungeonRoom(kind);
+    s.dungeonRoom++;
+    _rollDoors();
+    return (kind, text);
+  }
+
+  /// Starts the fight behind a door: one of the dungeon's foes (an elite one with an aura), or its
+  /// boss.
+  String _dungeonFight(Dungeon d, RoomKind kind) {
+    final s = state;
+    final int at;
+    Rare? rare;
+    if (kind == RoomKind.boss) {
+      final (name, base, look, aura) = d.boss;
+      at = lookIndex(base, d.land);
+      rare = Rare(at, aura, name: name, look: look);
+    } else {
+      at = lookIndex(d.foes[_rng.nextInt(d.foes.length)], d.land);
+      if (kind == RoomKind.elite) rare = Rare(at, Aura.values[_rng.nextInt(Aura.values.length)]);
+    }
+    _begin(at, rare, above: dungeonLevels(s.dungeonRoom, kind, s.knight.level));
+    s.dungeonFight = true;
+    final f = encounterType(at, rare);
+    final line = switch (kind) {
+      RoomKind.boss => '${f.name} rises to meet you. This is their hall, and you are in it.',
+      RoomKind.elite => 'Something big waits in the dark: ${withArticle(f.name)}!',
+      RoomKind.ambush => 'It was too quiet. ${_cap(withArticle(f.name))} drops on you from the dark!',
+      _ => '${_cap(withArticle(f.name))} is waiting behind the door.',
+    };
+    _note(line, kind == RoomKind.fight ? EntryKind.plain : EntryKind.gold);
+    return line;
+  }
+
+  /// A room with no fight in it: what's there, and what it did.
+  String _dungeonRoom(RoomKind kind) {
+    final s = state, k = s.knight, mh = maxHp(k), room = s.dungeonRoom;
+    final String text;
+    switch (kind) {
+      case RoomKind.treasure:
+        final gold = treasureGold(k.level, room);
+        k.coins += gold;
+        final finds = ['+$gold gold'];
+        if (_rng.nextDouble() < treasureGearChance) {
+          final g = loot.roll(k.heroClass, k.level, wielding: k.loadout.weapon, odds: treasureOdds);
+          s.pendingLoot.add(g);
+          finds.add(g.name);
+        }
+        if (_rng.nextDouble() < .3) {
+          final gem = Gem.values[_rng.nextInt(Gem.values.length)];
+          s.addMat(gemKey(gem), 1);
+          finds.add(withArticle(gem.label.toLowerCase()));
+        }
+        text = 'A chest in the corner, and nobody watching it. ${finds.join(' · ')}';
+      case RoomKind.trap:
+        final tale = trapTales[_rng.nextInt(trapTales.length)];
+        if (_rng.nextDouble() < trapSpot) {
+          text = tale.$2;
+        } else {
+          final before = k.hp;
+          k.hp = math.max(1, k.hp - (mh * (trapHurtMin + _rng.nextDouble() * (trapHurtMax - trapHurtMin))).round());
+          text = '${tale.$1} −${before - k.hp} HP';
+        }
+      case RoomKind.shrine:
+        final before = k.hp;
+        k.hp = math.min(mh, k.hp + (mh * shrineHeal).round());
+        final potion = _rng.nextDouble() < shrinePotion;
+        if (potion) k.potions++;
+        text = 'A little shrine, candles still lit. You kneel a moment. +${k.hp - before} HP${potion ? ' · a health potion on the altar' : ''}';
+      case RoomKind.key:
+        s.dungeonKey = true;
+        text = 'An empty room, and on a hook by the door, an iron key. Somewhere down here is a lock it fits.';
+      case RoomKind.vault:
+        s.dungeonKey = false;
+        final gold = vaultGold(k.level);
+        k.coins += gold;
+        final g = loot.roll(k.heroClass, k.level, wielding: k.loadout.weapon, odds: vaultOdds);
+        s.pendingLoot.add(g);
+        final gems = 1 + _rng.nextInt(2);
+        for (var i = 0; i < gems; i++) {
+          s.addMat(gemKey(Gem.values[_rng.nextInt(Gem.values.length)]), 1);
+        }
+        text = 'The key turns. Behind the door: the vault, untouched. +$gold gold · ${g.name} · $gems gem${gems == 1 ? '' : 's'}';
+      default:
+        text = '';
+    }
+    _note(text, kind == RoomKind.trap ? EntryKind.damage : EntryKind.gold);
+    return text;
+  }
+
+  /// A fight in a dungeon won: on to the next room, or (the boss) the hoard.
+  List<String> _dungeonWin() {
+    final s = state, d = dungeonNow!, k = s.knight;
+    final boss = s.dungeonPath.isNotEmpty && s.dungeonPath.last == RoomKind.boss.name;
+    s.dungeonRoom = boss ? dungeonRooms + 1 : s.dungeonRoom + 1;
+    if (!boss) {
+      _rollDoors();
+      return const [];
+    }
+    s.dungeonDoors.clear();
+    final first = s.dungeonsDone.add(d.id);
+    final gold = bossHoardGold(k.level);
+    k.coins += gold;
+    final g = loot.roll(k.heroClass, k.level, wielding: k.loadout.weapon, odds: first ? hoardOdds : hoardOddsAgain);
+    s.pendingLoot.add(g);
+    for (var i = 0; i < 2; i++) {
+      s.addMat(gemKey(Gem.values[_rng.nextInt(Gem.values.length)]), 1);
+    }
+    _note('Behind ${d.boss.$1}\'s throne: the hoard. +$gold gold, ${g.name} and two gems.', EntryKind.gold);
+    return ['+$gold gold', g.name, '2 gems'];
+  }
+
+  /// Climbs back out of the dungeon (the run ends; a cleared one can be run again).
+  bool leaveDungeon() {
+    if (state.dungeon == null || state.inBattle) return false;
+    final d = dungeonNow!;
+    _note(dungeonCleared ? 'You climb out of ${d.name} with the hoard on your back.' : 'You climb back out of ${d.name}.');
+    _closeDungeon();
+    return true;
+  }
+
+  void _closeDungeon() {
+    state
+      ..dungeon = null
+      ..dungeonRoom = 0
+      ..dungeonKey = false
+      ..dungeonFight = false;
+    state.dungeonDoors.clear();
+    state.dungeonPath.clear();
+  }
+
   // ---------------- wandering encounters ----------------
 
   /// After a win on the road, now and then something odd turns up.
@@ -1075,6 +1297,7 @@ class GameEngine {
     state
       ..heroicFight = false
       ..wildFight = false
+      ..dungeonFight = false
       ..foeBurn = 0
       ..foeBurnTurns = 0
       ..foeVenom = 0;
@@ -1302,6 +1525,14 @@ class GameEngine {
             r.packLoss = lost;
             _endBattle();
             _note(lost.none ? 'You flee from $foeName and lose it in the scrub.' : 'You flee from $foeName, and ${lost.summary} spills out of your pack as you run.', lost.none ? EntryKind.plain : EntryKind.damage);
+            return r;
+          }
+          if (state.dungeonFight) {
+            // In a dungeon you back out of the room and bar the door: the run goes on.
+            if (state.dungeonPath.isNotEmpty) state.dungeonPath.removeLast();
+            if (state.dungeonDoors.isEmpty) _rollDoors();
+            _endBattle();
+            _note('You back out of the room and bar the door on $foeName.');
             return r;
           }
           _endBattle();
@@ -1799,11 +2030,17 @@ class GameEngine {
     k.hp = maxHp(k);
     final wild = state.wildFight;
     // Struggling on a land's trail: the town starts suggesting the wilds for better gear.
-    if (!wild && !state.raidFight && !state.heroicFight) {
+    final dungeon = state.dungeonFight;
+    if (!wild && !dungeon && !state.raidFight && !state.heroicFight) {
       final c = realmAt(state.rare?.base ?? state.foe);
       state.struggle[c] = (state.struggle[c] ?? 0) + 1;
     }
     _endBattle();
+    if (dungeon) {
+      final d = dungeonNow;
+      _closeDungeon();
+      if (d != null) _note('Somebody drags you up out of ${d.name}. The run is over.', EntryKind.damage);
+    }
     _note('$foeName knocks you flat. You wake up by the fire at the Soot & Kettle, sootier than ever${lost > 0 ? ', and $lost gold lighter' : ''}.', EntryKind.damage);
     if (wild) {
       // The scavengers of the wilds go through your pack before anyone finds you.
@@ -1849,6 +2086,7 @@ class GameEngine {
     if (drop != null) state.pendingLoot.add(drop);
     GearItem? orkPrize, wyrm, bonePrize, entPrize, rune, prize;
     String? raidWon, relicPart;
+    var hoard = const <String>[];
     final boost = rare == null ? 1.0 : 1.5;
     if (f.ork && !_hasPrize(k, _orkArt(k.heroClass)) && _rng.nextDouble() < (f.boss ? orkGearChanceBoss : orkGearChance) * boost) {
       orkPrize = loot.orkDrop(k.heroClass, k.level);
@@ -1890,6 +2128,12 @@ class GameEngine {
       // The Hollowdeep's Duskwing weapons: one per hero, like the elves' Thornbloom.
       entPrize = loot.batDrop(k.heroClass, k.level);
       state.trophies.add('duskwing');
+      state.pendingLoot.add(entPrize);
+    }
+    if (c == frostLand && !state.trophies.contains('rimeforged') && _rng.nextDouble() < (f.boss ? frostGearChanceBoss : frostGearChance) * boost) {
+      // The Frostmarch's Rimeforged weapons: one per hero.
+      entPrize = loot.frostDrop(k.heroClass, k.level);
+      state.trophies.add('rimeforged');
       state.pendingLoot.add(entPrize);
     }
     if (f.look == runeLook && !_hasRuneWeapon(k) && _rng.nextDouble() < (f.rare ? runeChanceRare : runeChance)) {
@@ -1980,6 +2224,9 @@ class GameEngine {
     } else if (state.heroicFight) {
       relicPart = _heroicWin(c, f.boss);
       _maybeRaid();
+      _passTime();
+    } else if (state.dungeonFight) {
+      hoard = _dungeonWin();
       _passTime();
     } else if (placeWon != null) {
       state.explored.add(placeWon.id);
@@ -2211,7 +2458,7 @@ class GameEngine {
     }
     if (ups > 0) _note('You reached level ${k.level}. ${shineLine(k.level)}', EntryKind.gold);
     final junkGold = _sellJunk(loot0);
-    return KillResult(i, f.name, r.xp, r.coins + jackpot, ups, jackpot: jackpot, drop, junkGold: junkGold, egg: egg, orkGear: orkPrize, entGear: entPrize, runeGear: rune, prize: prize, foe: f, chest: chest, companion: companion, opened: opened, trophy: trophies > 0 ? '${trophies > 1 ? '$trophies× ' : ''}${trophy!.label}' : null, blueprint: blueprint, boss: f.boss && rare == null, won: won, reagents: reagents, jobFind: jobFind, potion: flask, relicPart: relicPart, packGold: packGold, packed: packed);
+    return KillResult(i, f.name, r.xp, r.coins + jackpot, ups, jackpot: jackpot, drop, junkGold: junkGold, egg: egg, orkGear: orkPrize, entGear: entPrize, runeGear: rune, prize: prize, foe: f, chest: chest, companion: companion, opened: opened, trophy: trophies > 0 ? '${trophies > 1 ? '$trophies× ' : ''}${trophy!.label}' : null, blueprint: blueprint, boss: f.boss && rare == null, won: won, reagents: reagents, jobFind: jobFind, potion: flask, relicPart: relicPart, packGold: packGold, packed: packed, hoard: hoard);
   }
 
   void _gainPet(Pet p) {

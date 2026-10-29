@@ -25,11 +25,20 @@ const _alphaWolf = HoundLook(
   mane: Color(0xFFD8DCE4),
 );
 
+/// A Frostmarch snow wolf: white, with a pale blue back and ice-blue eyes.
+const _snowWolf = HoundLook(
+  coat: [Color(0xFFF4F6FA), Color(0xFFB8C8D8), Color(0xFF4A5A6E)],
+  belly: Color(0xFFFFFFFF),
+  eye: Color(0xFF7AD8FF),
+  mane: Color(0xFFFFFFFF),
+);
+
 /// Scale and height (for health bars and aura) of each beast foe.
 const _beasts = <String, (double scale, double height)>{
   'wolf': (1.55, 140),
   'jackal': (1.4, 128),
   'alphawolf': (2.3, 205),
+  'snowwolf': (1.7, 150),
   'bear': (1.25, 150),
   'cavebear': (1.7, 205),
   'spider': (1.25, 120),
@@ -56,8 +65,8 @@ void drawBeastFoe(Canvas c, String look, Offset at, double t, {double hit = 0, d
   final layered = alpha < 1 || tint != null;
   if (layered) c.saveLayer(null, Paint()..color = Color.fromRGBO(0, 0, 0, alpha)..colorFilter = tint);
   switch (look) {
-    case 'wolf' || 'alphawolf' || 'jackal':
-      drawHound(c, switch (look) { 'wolf' => wolfLook, 'jackal' => _jackal, _ => _alphaWolf }, Offset.zero, scale, t, still: still);
+    case 'wolf' || 'alphawolf' || 'jackal' || 'snowwolf':
+      drawHound(c, switch (look) { 'wolf' => wolfLook, 'jackal' => _jackal, 'snowwolf' => _snowWolf, _ => _alphaWolf }, Offset.zero, scale, t, still: still);
     case 'bear' || 'cavebear':
       drawBear(c, look == 'bear' ? brownBear : caveBear, Offset.zero, scale, t, hit: hit, still: still);
     case 'spider' || 'spiderqueen':

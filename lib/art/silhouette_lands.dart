@@ -21,7 +21,7 @@ void paintSilhouetteLand(Canvas c, Setting s, BattlegroundSpec sp) {
   final horizon = sp.sky.last;
   // Each layer from far to near: closer to the sky's colour far off, near-black up close.
   Color layer(double k) => Color.lerp(horizon, _night, k)!;
-  final indoor = s == Setting.crypt || s == Setting.lair || s == Setting.tomb || s == Setting.deepforge || s == Setting.roost;
+  final indoor = s == Setting.crypt || s == Setting.lair || s == Setting.tomb || s == Setting.deepforge || s == Setting.roost || s == Setting.icecave;
 
   // ---- Sky ----
   c.drawRect(Offset.zero & sceneSize, _vertical(sp.sky, 0, _ground));
@@ -294,6 +294,36 @@ void _features(Canvas c, Setting s, BattlegroundSpec sp, SeededRandom r, double 
           _glowcaps(c, x, base + 8, r);
         }
       }
+    case Setting.frostruin:
+      // A city frozen solid: towers and domes sheathed in ice on the far side, broken walls and
+      // drifts close by.
+      if (!near) {
+        for (final (x, h) in const [(160.0, 200.0), (420.0, 260.0), (610.0, 170.0), (820.0, 230.0)]) {
+          _frozenTower(c, x, base + 4, h, fill, lit, r);
+        }
+      } else {
+        for (final x in spots(4, 80)) {
+          _column(c, x, base + 6, 110 + r.next() * 80, fill, r);
+        }
+        for (final x in spots(6, 60)) {
+          _spike(c, x, base + 6, 40 + r.next() * 40, 24, fill);
+        }
+      }
+    case Setting.icecave:
+      // Under the glacier: a ceiling hung with great icicles, frozen columns, a blue glow far back.
+      if (!near) {
+        for (var i = 0; i < 22; i++) {
+          final x = r.next() * 960, h = 40 + r.next() * 120;
+          c.drawPath(poly([Offset(x - 14, 0), Offset(x, h), Offset(x + 14, 0)]), fill);
+        }
+        for (final x in [140.0, 500.0, 860.0]) {
+          _stalagmite(c, x, base + 4, 160 + r.next() * 80, fill);
+        }
+      } else {
+        for (final x in [40.0, 920.0]) {
+          _stalagmite(c, x, base + 6, 260, fill);
+        }
+      }
     case Setting.crypt || Setting.lair || Setting.deepforge:
       // Indoors: great arches or cave mouths framing the fight, torches between.
       if (!near) {
@@ -500,6 +530,24 @@ void _arch(Canvas c, double x, double base, double h, Paint p) {
       Offset.zero,
     );
   c.drawPath(path, p);
+}
+
+/// A tower of the frozen city: a tall shaft with a dome or a spire, ice hanging from its ledges, a
+/// window or two still lit.
+void _frozenTower(Canvas c, double x, double base, double h, Paint p, double lit, SeededRandom r) {
+  final w = h * .2;
+  c.drawRect(Rect.fromLTWH(x - w / 2, base - h, w, h), p);
+  if (r.next() < .5) {
+    c.drawCircle(Offset(x, base - h), w * .6, p);
+  } else {
+    c.drawPath(poly([Offset(x - w * .6, base - h), Offset(x, base - h - w * 1.6), Offset(x + w * .6, base - h)]), p);
+  }
+  for (var i = 0; i < 4; i++) {
+    final ix = x - w / 2 + (i + .5) * w / 4;
+    c.drawPath(poly([Offset(ix - 3, base - h * .62), Offset(ix, base - h * .62 + 10 + (i % 2) * 8), Offset(ix + 3, base - h * .62)]), p);
+  }
+  c.drawRect(Rect.fromLTWH(x - w * .7, base - h * .62 - 6, w * 1.4, 6), p);
+  if (r.next() < .7) _window(c, Rect.fromLTWH(x - 4, base - h * .4, 8, 14), lit * .7);
 }
 
 void _caveMouth(Canvas c, double x, double base, double h, Paint p) {

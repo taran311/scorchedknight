@@ -192,6 +192,18 @@ const _byLook = <String, Banter>{
     hurt: ['*a shriek that brings dust down from the roof*'],
     fall: ['*she folds her wings, and lets the dark take her*'],
   ),
+  // ---- The Frostmarch ----
+  'frostReaver': Banter(enter: ['The cold takes everyone. Today it takes you.', '*he bangs his axe on his shield, twice*'], fall: ['Tell the Jarl... I fell... facing you...']),
+  'frostSkald': Banter(enter: ['I will sing of this. Short song.', '*she breathes out, and the air turns to snow*'], fall: ['A good verse... to end on...']),
+  'snowwolf': Banter(enter: ['*a white shape detaches itself from the snow*', '*a howl, and three more answer it*'], fall: ['*it lies down in the snow, and the snow covers it*']),
+  'yeti': Banter(enter: ['*a roar that shakes snow off the whole mountainside*', '*it beats its chest, and the ice cracks*'], fall: ['*it sits down in the drift, very slowly*']),
+  'frostGiant': Banter(enter: ['LITTLE WARM THING. COME HERE.', '*the ground shakes with every step*'], fall: ['*it topples like a glacier calving*']),
+  'iceWraith': Banter(enter: ['*your breath freezes in front of you*', 'So... warm...'], fall: ['*it shatters like a dropped icicle*']),
+  'frostJarl': Banter(
+    enter: ['Kneel to the ice, little ember. Everyone does, in the end.', '*he rises from a throne carved out of the glacier*'],
+    hurt: ['*the ice crown flares blue*'],
+    fall: ['The thaw... comes...'],
+  ),
   // ---- The Blossom Isles ----
   'ronin': Banter(enter: ['I have no master. Today, I have an opponent.', '*he rests a hand on his sword, and waits*'], fall: ['A good cut. A good end.']),
   'ashigaru': Banter(enter: ['Halt! The ports are closed by order of the Shogun!', 'Spears! Spears up!']),

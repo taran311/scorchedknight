@@ -11,7 +11,7 @@ import 'paint_kit.dart';
 import 'silhouette_lands.dart';
 import 'scenery.dart' show sceneSize;
 
-enum Setting { forest, road, graveyard, plague, village, castle, warcamp, ruins, crypt, elderwood, blightwood, heartgrove, orkcamp, totems, lair, swamp, ice, volcano, boneyard, summit, coast, desert, tomb, moor, moonwood, deepforge, fogshore, jungle, shiftisle, aerie, blossom, roost }
+enum Setting { forest, road, graveyard, plague, village, castle, warcamp, ruins, crypt, elderwood, blightwood, heartgrove, orkcamp, totems, lair, swamp, ice, volcano, boneyard, summit, coast, desert, tomb, moor, moonwood, deepforge, fogshore, jungle, shiftisle, aerie, blossom, roost, frostruin, icecave }
 
 /// How the floating particles behave: drifting dust, rising embers or ash, or falling snow.
 enum MoteStyle { drift, embers, snow, spores, leaves }
@@ -141,6 +141,14 @@ const foeSettings = <String, Setting>{
   'batkinCaller': Setting.roost,
   'batkinGuard': Setting.roost,
   'roostMother': Setting.roost,
+  // The Frostmarch: glaciers, a city frozen solid, and the ice caves under it.
+  'frostReaver': Setting.frostruin,
+  'frostSkald': Setting.frostruin,
+  'frostJarl': Setting.frostruin,
+  'frostGiant': Setting.ice,
+  'yeti': Setting.ice,
+  'snowwolf': Setting.ice,
+  'iceWraith': Setting.icecave,
   // The Skyreach Aeries.
   'harpy': Setting.aerie,
   'aerieWarden': Setting.aerie,
@@ -209,6 +217,35 @@ const _specs = <Setting, BattlegroundSpec>{
     grass: Color(0xFF0E0A12),
     mote: Color(0x998AF0E0),
     jagged: 2,
+  ),
+  // The Frostmarch's drowned-in-ice city: a cold blue dusk over towers sheathed in ice.
+  Setting.frostruin: BattlegroundSpec(
+    sky: [Color(0xFF1A2A4A), Color(0xFF3A5A8A), Color(0xFF8AA8CC), Color(0xFFD8E6F2)],
+    glow: Color(0xFFDFF0FF),
+    far: Color(0xFF7A90AC),
+    ridge: Color(0xFF5A708C),
+    hill: Color(0xFF8AA0B8),
+    ground: [Color(0xFFD8E4EE), Color(0xFF7A90A4)],
+    path: [Color(0xFFB8C8D6), Color(0xFF6A8098)],
+    grass: Color(0xFF5A7088),
+    mote: Color(0xEEFFFFFF),
+    moteStyle: MoteStyle.snow,
+    mist: Color(0x40E8F4FF),
+    sun: Offset(320, 170),
+    jagged: 1.6,
+  ),
+  // The ice caves: blue light through a glacier roof, icicles, frozen shapes in the walls.
+  Setting.icecave: BattlegroundSpec(
+    sky: [Color(0xFF0A1424), Color(0xFF16304E), Color(0xFF2E5A82), Color(0xFF6AA0C8)],
+    glow: Color(0xFF9ADFFF),
+    far: Color(0xFF1E3A58),
+    ridge: Color(0xFF16304A),
+    hill: Color(0xFF1A3450),
+    ground: [Color(0xFF8AB0CC), Color(0xFF2A4A68)],
+    path: [Color(0xFFB8D4E8), Color(0xFF5A7A98)],
+    grass: Color(0xFF1A2E44),
+    mote: Color(0xAADFF4FF),
+    jagged: 2.4,
   ),
   // The Blossom Isles: a pink dusk, pagodas on the hills, and petals always falling.
   Setting.blossom: BattlegroundSpec(
@@ -655,8 +692,9 @@ Color rimFor(BattlegroundSpec g) => Color.lerp(g.glow.withValues(alpha: 1), cons
 final Map<Setting, ui.Picture> _cache = {};
 
 /// The battleground picture for a foe (by look key).
-ui.Picture battleground(String look) {
-  final s = settingFor(look);
+ui.Picture battleground(String look) => battlegroundOf(settingFor(look));
+
+ui.Picture battlegroundOf(Setting s) {
   return _cache.putIfAbsent(s, () {
     final rec = ui.PictureRecorder();
     paintSilhouetteLand(Canvas(rec, Offset.zero & sceneSize), s, specFor(s));
@@ -1141,6 +1179,31 @@ void _props(Canvas c, Setting s, BattlegroundSpec sp, SeededRandom r) {
           ..quadraticBezierTo(905, 400, 890, 412),
         strokePaint(const Color(0xFF3E6A2E), 3),
       );
+    case Setting.frostruin:
+      // A toppled statue's frozen head, a broken pillar furred with rime, a sword stuck in the snow.
+      final stone = ramp(0xFF9AA8B8, .3, .5);
+      fillPath(c, Path()..addRect(const Rect.fromLTWH(70, 330, 26, 82)), stone, const Offset(70, 0), const Offset(96, 0));
+      fillPath(c, poly(const [Offset(64, 330), Offset(102, 330), Offset(96, 318), Offset(80, 326), Offset(70, 316)]), stone, const Offset(64, 0), const Offset(102, 0));
+      c.drawRect(const Rect.fromLTWH(64, 326, 38, 6), Paint()..color = const Color(0xFFF2FAFF));
+      fillPath(c, Path()..addOval(const Rect.fromLTWH(860, 372, 60, 44)), stone, const Offset(860, 0), const Offset(920, 0));
+      c.drawPath(poly(const [Offset(866, 384), Offset(890, 366), Offset(916, 384)]), Paint()..color = const Color(0xFFF2FAFF));
+      c.drawLine(const Offset(540, 410), const Offset(548, 368), strokePaint(const Color(0xFF8A9AAA), 3));
+      c.drawLine(const Offset(536, 376), const Offset(556, 380), strokePaint(const Color(0xFF6A5A4A), 3));
+      for (final x in spots) {
+        c.drawOval(Rect.fromCenter(center: Offset(x, 412), width: 40, height: 8), Paint()..color = const Color(0xCCF2FAFF));
+      }
+    case Setting.icecave:
+      // Icicles over the fight, and pale crystals glowing at the cave's edges.
+      for (var i = 0; i < 18; i++) {
+        final x = 20 + i * 53.0 + r.next() * 20, h = 20 + r.next() * 50;
+        c.drawPath(poly([Offset(x - 7, 0), Offset(x, h), Offset(x + 7, 0)]), Paint()..shader = ui.Gradient.linear(Offset(x - 7, 0), Offset(x + 7, 0), const [Color(0xFFDFF4FF), Color(0xFF8AC0E0), Color(0xFF3A6A90)], const [0, .5, 1]));
+      }
+      for (final x in const [70.0, 900.0]) {
+        c.drawCircle(Offset(x, 396), 46, _radial(Offset(x, 396), 46, const Color(0xFF9ADFFF), const [.45, .12, 0], const [0, .45, 1]));
+        for (final (dx, h) in const [(-12.0, 30.0), (0.0, 46.0), (12.0, 24.0)]) {
+          c.drawPath(poly([Offset(x + dx - 6, 412), Offset(x + dx, 412 - h), Offset(x + dx + 6, 412)]), Paint()..shader = ui.Gradient.linear(Offset(x + dx - 6, 0), Offset(x + dx + 6, 0), const [Color(0xFFF2FAFF), Color(0xFF9AD0F0), Color(0xFF4A80A8)], const [0, .5, 1]));
+        }
+      }
     case Setting.ice:
       // Ice shards poking through the snow.
       for (final x in spots) {

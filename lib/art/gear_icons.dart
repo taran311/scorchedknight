@@ -293,6 +293,17 @@ void _trinket(Canvas c, String art, Color gem) {
       c.drawLine(const Offset(0, -4), const Offset(0, 8), rune);
       c.drawLine(const Offset(0, -2), const Offset(4, 2), rune);
       c.drawLine(const Offset(0, 3), const Offset(-4, 7), rune);
+    case 'rimeheart':
+      // A lump of glacier ice in a cage of black iron bands, cold mist round it.
+      c.drawLine(const Offset(-8, -16), const Offset(0, -10), strokePaint(const Color(0xFF6A6E78), 2));
+      c.drawLine(const Offset(8, -16), const Offset(0, -10), strokePaint(const Color(0xFF6A6E78), 2));
+      c.drawCircle(const Offset(0, 2), 15, Paint()..color = const Color(0x559ADFFF)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5));
+      final ice = poly(const [Offset(0, -10), Offset(9, -4), Offset(11, 5), Offset(4, 13), Offset(-5, 12), Offset(-11, 4), Offset(-8, -5)]);
+      fillPath(c, ice, const [Color(0xFFF2FAFF), Color(0xFF8AC0E0), Color(0xFF2E5A82)], const Offset(-11, -10), const Offset(11, 13));
+      c.drawPath(poly(const [Offset(-4, -6), Offset(1, -7), Offset(-2, 1)]), Paint()..color = const Color(0xCCFFFFFF));
+      final band = strokePaint(const Color(0xFF2A2C34), 2.2);
+      c.drawLine(const Offset(0, -10), const Offset(0, 13), band);
+      c.drawLine(const Offset(-10, 3), const Offset(10, 3), band);
     case 'echostone':
       // A violet stone between two silver bat wings, on a cord, with the echo rippling off it.
       c.drawLine(const Offset(-8, -16), const Offset(0, -9), strokePaint(const Color(0xFFB8B0C8), 1.6));

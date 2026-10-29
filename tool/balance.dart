@@ -13,6 +13,7 @@ import '../lib/game/engine.dart';
 import '../lib/game/loot.dart';
 import '../lib/game/models.dart';
 import '../lib/game/wilds.dart';
+import '../lib/game/dungeons.dart';
 import '../lib/game/rules.dart';
 import '../lib/game/spells.dart';
 
@@ -391,6 +392,79 @@ void wildsReport(int runs) {
   }
 }
 
+// ---------------- dungeons ----------------
+
+class DungeonStats {
+  int runs = 0, cleared = 0, kos = 0, left = 0, rooms = 0, fights = 0, gold = 0, fine = 0, potions = 0;
+}
+
+/// One run into dungeon [d]: picks doors by how hurt it is (quiet ones when low), drinks potions
+/// below 45%, and climbs out if it's nearly dead and out of potions.
+void dungeonRun(GameEngine e, Dungeon d, DungeonStats w, Random rng) {
+  final s = e.state, k = s.knight;
+  e.rest();
+  final gold0 = k.coins, pots0 = k.potions;
+  e.enterDungeon(d.id);
+  w.runs++;
+  while (!e.dungeonCleared) {
+    final mh = maxHp(k);
+    while (k.hp < mh * .45 && k.potions > 0) {
+      e.drinkPotion();
+    }
+    if (k.hp < mh * .3 && k.potions == 0) {
+      w.left++;
+      break;
+    }
+    final doors = s.dungeonDoors;
+    var pick = doors.indexOf(DoorClue.locked.name);
+    if (pick < 0 || !s.dungeonKey) {
+      final low = k.hp < mh * .55;
+      final order = low ? [DoorClue.quiet, DoorClue.glitter, DoorClue.growl, DoorClue.boss] : [DoorClue.glitter, DoorClue.growl, DoorClue.quiet, DoorClue.boss];
+      final open = [for (var i = 0; i < doors.length; i++) if (doors[i] != DoorClue.locked.name) i];
+      pick = rng.nextDouble() < .5 ? open[rng.nextInt(open.length)] : open.reduce((a, b) => order.indexOf(DoorClue.values.byName(doors[a])) <= order.indexOf(DoorClue.values.byName(doors[b])) ? a : b);
+    }
+    final out = e.openDoor(pick);
+    if (out == null) break;
+    w.rooms++;
+    if (out.$1.isFight) {
+      w.fights++;
+      if (!_fightOut(e, rng)) {
+        w.kos++;
+        break;
+      }
+    }
+  }
+  if (e.dungeonCleared) w.cleared++;
+  w.gold += k.coins - gold0;
+  w.potions += pots0 - k.potions;
+  w.fine += _fine(s.pendingLoot);
+  s.pendingLoot.clear();
+  e.leaveDungeon();
+}
+
+void dungeonsReport(int runs) {
+  side = true;
+  for (final d in dungeons) {
+    final w = DungeonStats();
+    var level = 0, seen = 0;
+    for (var i = 0; i < runs; i++) {
+      var done = false;
+      run('all', 3000 + i, Stats(), onBoss: (e, land) {
+        if (done || !e.state.bossesDown.contains(d.land) || e.state.knight.level < d.minLevel) return;
+        done = true;
+        level += e.state.knight.level;
+        seen++;
+        for (var trip = 0; trip < 6; trip++) {
+          dungeonRun(_clone(e, i * 31 + trip), d, w, Random(i * 17 + trip));
+        }
+      });
+    }
+    final r = max(1, w.runs);
+    print('${d.name.padRight(20)} at level ${(level / max(1, seen)).toStringAsFixed(1).padLeft(4)} · runs ${w.runs} · cleared ${(w.cleared / r * 100).round()}% · knocked out ${(w.kos / r * 100).round()}% · climbed out ${(w.left / r * 100).round()}% · '
+        'rooms/run ${(w.rooms / r).toStringAsFixed(1)} · gold/run ${(w.gold / r).round()} · epic+/run ${(w.fine / r).toStringAsFixed(2)} · potions/run ${(w.potions / r).toStringAsFixed(1)}');
+  }
+}
+
 String avg(List<num> xs) => xs.isEmpty ? '-' : (xs.fold<num>(0, (a, b) => a + b) / xs.length).toStringAsFixed(1);
 String pct(List<double> xs) => xs.isEmpty ? '-' : '${(xs.reduce((a, b) => a + b) / xs.length * 100).round()}%';
 
@@ -399,6 +473,7 @@ void main(List<String> args) {
   brews = !args.contains('nobrews');
   side = args.contains('side');
   if (args.contains('wilds')) return wildsReport(runs);
+  if (args.contains('dungeons')) return dungeonsReport(runs);
   // 'all' uses every tool; 'nocast' never casts; 'blade' only swings (and bashes): a pure melee
   // knight should still get there, just harder.
   for (final style in const ['all', 'nocast', 'blade']) {

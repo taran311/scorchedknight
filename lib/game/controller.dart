@@ -17,6 +17,7 @@ import 'models.dart';
 import 'events.dart';
 import 'rules.dart' show Trait;
 import 'wilds.dart';
+import 'dungeons.dart';
 
 sealed class StageEvent {}
 
@@ -313,6 +314,35 @@ class GameController extends ChangeNotifier {
     final exit = engine.leaveWild();
     _changed();
     return exit;
+  }
+
+  // ---- dungeons ----
+
+  bool dungeonOpen(Dungeon d) => engine.dungeonOpen(d);
+  String? whyNotDungeon(String id) => engine.whyNotDungeon(id);
+  Dungeon? get dungeonNow => engine.dungeonNow;
+  bool get dungeonCleared => engine.dungeonCleared;
+  List<DoorClue> get dungeonDoors => engine.dungeonDoors;
+  String? whyNotDoor(int i) => engine.whyNotDoor(i);
+
+  bool enterDungeon(String id) {
+    final ok = engine.enterDungeon(id);
+    if (ok) _changed();
+    return ok;
+  }
+
+  /// Opens a door. A fight is already under way when this returns a fight room: open the battle
+  /// screen with BattleStart.dungeon.
+  (RoomKind, String)? openDoor(int i) {
+    final out = engine.openDoor(i);
+    _changed();
+    return out;
+  }
+
+  bool leaveDungeon() {
+    final ok = engine.leaveDungeon();
+    _changed();
+    return ok;
   }
 
   int drinkPotion() {

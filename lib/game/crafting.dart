@@ -203,6 +203,12 @@ const trophyLooks = <String, Trophy>{
   'batkinCaller': Trophy.fang,
   'batkinGuard': Trophy.fang,
   'roostMother': Trophy.fang,
+  // The Frostmarch's furs.
+  'frostReaver': Trophy.pelt,
+  'frostGiant': Trophy.pelt,
+  'frostJarl': Trophy.pelt,
+  'yeti': Trophy.pelt,
+  'snowwolf': Trophy.pelt,
   'werewolf': Trophy.pelt,
   'werewolfStalker': Trophy.pelt,
   'werewolfBrute': Trophy.pelt,

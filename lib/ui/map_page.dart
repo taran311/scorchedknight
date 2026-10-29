@@ -19,12 +19,14 @@ import 'trail_data.dart';
 import 'trail_page.dart';
 import 'wilds_page.dart';
 import '../game/wilds.dart';
+import '../game/dungeons.dart';
+import 'dungeon_page.dart';
 
 /// The map is 1000 wide and this tall: the lands, and the Shattered Sea along the bottom.
 const _mapH = 700.0;
 
 /// Where each continent sits on the 1000 × [_mapH] map.
-const _spots = <Offset>[Offset(150, 470), Offset(390, 455), Offset(260, 250), Offset(560, 270), Offset(800, 320), Offset(732, 470), Offset(850, 150), Offset(420, 335), Offset(100, 320), Offset(320, 95), Offset(575, 44), Offset(110, 48), Offset(905, 476), Offset(560, 632), Offset(900, 638), Offset(900, 40), Offset(748, 628), Offset(400, 585)];
+const _spots = <Offset>[Offset(150, 470), Offset(390, 455), Offset(260, 250), Offset(560, 270), Offset(800, 320), Offset(732, 470), Offset(850, 150), Offset(420, 335), Offset(100, 320), Offset(320, 95), Offset(575, 44), Offset(110, 48), Offset(905, 476), Offset(560, 632), Offset(900, 638), Offset(900, 40), Offset(748, 628), Offset(400, 585), Offset(700, 215)];
 
 /// A land's patch on the map (the side lands are smaller).
 Size _blobSize(int i) => isSideLand(i) ? const Size(130, 84) : const Size(170, 118);
@@ -106,6 +108,21 @@ class _MapPageState extends State<MapPage> {
   /// A place picked on the map (shown in the panel instead of a land).
   String? _placePick;
 
+  /// A dungeon picked on the map (shown in the panel instead of a land).
+  String? _dungeonPick;
+
+  /// Down into a dungeon (or back to the run under way in it).
+  Future<void> _delve(Dungeon d) async {
+    if (c.whyNotDungeon(d.id) != null) return;
+    if (c.state.dungeon != d.id) {
+      if (!await _wardCheck(d.land) || !mounted) return;
+      c.enterDungeon(d.id);
+      Audio.play(Sfx.quest);
+    }
+    await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => DungeonPage(controller: c)));
+    if (mounted) setState(() {});
+  }
+
   /// Explores a place: its guard's fight, or what's there at once.
   Future<void> _explore(Place p) async {
     if (c.whyNotExplore(p.id) != null) return;
@@ -128,6 +145,7 @@ class _MapPageState extends State<MapPage> {
       _pick = land;
       _wildPick = null;
       _placePick = null;
+      _dungeonPick = null;
     });
     if (c.whyNotTravel(land) != null) return;
     if (!await _wardCheck(land) || !mounted) return;
@@ -208,6 +226,7 @@ class _MapPageState extends State<MapPage> {
     setState(() {
       _wildPick = a;
       _placePick = null;
+      _dungeonPick = null;
     });
     if (!c.wildOpen(a)) return;
     // Straight in, unless a trip elsewhere is under way (then the page shows that one).
@@ -274,7 +293,9 @@ class _MapPageState extends State<MapPage> {
                                               child: CustomPaint(
                                                 painter: _MapPainter(
                                                   open: [for (var i = 0; i < continents.length; i++) c.whyNotTravel(i) == null],
-                                                  selected: _wildPick == null && _placePick == null ? _pick : -1,
+                                                  selected: _wildPick == null && _placePick == null && _dungeonPick == null ? _pick : -1,
+                                                  delves: [for (final d in dungeons) if (c.whyNotTravel(d.land) == null) (d, c.dungeonOpen(d), s.dungeonsDone.contains(d.id), s.dungeon == d.id)],
+                                                  delvePicked: _dungeonPick,
                                                   pins: [for (final p in places) if (c.placeShown(p)) (p, s.explored.contains(p.id), c.whyNotExplore(p.id) == null)],
                                                   pinPicked: _placePick,
                                                   beaten: s.bossesDown,
@@ -286,7 +307,16 @@ class _MapPageState extends State<MapPage> {
                                             ),
                                             for (var i = 0; i < continents.length; i++) _hotspot(_spots[i] + const Offset(0, -10), _blobSize(i).width - 20, _blobSize(i).height, k, continents[i].name, () => _enter(i)),
                                             for (final p in places)
-                                              if (c.placeShown(p)) _hotspot(Offset(p.x, p.y + 6), math.max(46, 40 / k), math.max(46, 40 / k), k, p.name, () => setState(() => _placePick = p.id)),
+                                              if (c.placeShown(p)) _hotspot(Offset(p.x, p.y + 6), math.max(46, 40 / k), math.max(46, 40 / k), k, p.name, () => setState(() {
+                                                _placePick = p.id;
+                                                _dungeonPick = null;
+                                              })),
+                                            for (final d in dungeons)
+                                              if (c.whyNotTravel(d.land) == null) _hotspot(Offset(d.x, d.y), math.max(46, 40 / k), math.max(46, 40 / k), k, d.name, () => setState(() {
+                                                _dungeonPick = d.id;
+                                                _placePick = null;
+                                                _wildPick = null;
+                                              })),
                                             for (var a = 0; a < wildAreas.length; a++) _hotspot(_wildSpots[a] + const Offset(0, 8), 150, 86, k, wildAreas[a].name, () => _wilds(a)),
                                             _hotspot(_innSpot + const Offset(0, 2), 120, 70, k, 'Back to the Soot & Kettle', _home),
                                           ],
@@ -307,7 +337,9 @@ class _MapPageState extends State<MapPage> {
                                     child: Text('Drag the map to look around; pinch to zoom.', textAlign: TextAlign.center, style: Txt.label(size: 12, color: Palette.parch2)),
                                   ),
                                 const SizedBox(height: 10),
-                                if (placeById(_placePick) case final p?)
+                                if (dungeonById(_dungeonPick) case final d?)
+                                  _DungeonPanel(controller: c, dungeon: d, onGo: () => _delve(d))
+                                else if (placeById(_placePick) case final p?)
                                   _PlacePanel(controller: c, place: p, onGo: () => _explore(p))
                                 else if (_wildPick case final a?) _WildPanel(controller: c, area: a, onGo: () => _wilds(a)) else _ContinentPanel(controller: c, index: _pick, onEnter: () => _enter(_pick)),
                               ],
@@ -453,6 +485,52 @@ class _PlacePanel extends StatelessWidget {
   }
 }
 
+/// A dungeon picked on the map: what's down there, and the way in (or what opens it).
+class _DungeonPanel extends StatelessWidget {
+  const _DungeonPanel({required this.controller, required this.dungeon, required this.onGo});
+  final GameController controller;
+  final Dungeon dungeon;
+  final VoidCallback onGo;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = controller, s = c.state, d = dungeon, why = c.whyNotDungeon(d.id), here = s.dungeon == d.id, done = s.dungeonsDone.contains(d.id);
+    final col = Color(d.argb);
+    return Stone(
+      child: _panel(
+        context,
+        Container(
+          width: 70,
+          height: 70,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(3),
+            border: Border.all(color: done ? Palette.amber : Palette.stone0, width: 2),
+            gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color.lerp(col, Colors.black, .4)!, const Color(0xFF0E0A08)]),
+          ),
+          child: Icon(why != null && !here ? Icons.lock : (done ? Icons.star : Icons.stairs), color: done ? Palette.amber : Palette.cream, size: 34),
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(d.name, style: Txt.label(size: 22, color: col, weight: FontWeight.w800)),
+            Text(
+              '${continents[d.land].name} · ${here ? 'room ${math.min(s.dungeonRoom + 1, dungeonRooms + 1)} of ${dungeonRooms + 1}' : (done ? '${d.boss.$1} beaten' : 'ruled by ${d.boss.$1}')}',
+              style: Txt.label(size: 13, color: Palette.amber),
+            ),
+            const SizedBox(height: 2),
+            Text(why ?? d.blurb, maxLines: 3, overflow: TextOverflow.ellipsis, style: Txt.onStone(size: 15, color: why == null ? Palette.parch2 : Palette.cream)),
+          ],
+        ),
+        StoneButton(
+          title: here ? 'Back down' : (why == null ? (done ? 'Delve again' : 'Delve') : 'Locked'),
+          tone: ButtonTone.blood,
+          onPressed: why == null ? onGo : null,
+        ),
+      ),
+    );
+  }
+}
+
 /// What you found at a place.
 class _PlaceFound extends StatelessWidget {
   const _PlaceFound({required this.place, required this.text});
@@ -535,7 +613,12 @@ class _WildPanel extends StatelessWidget {
 /// The parchment map: the road, the six lands, fog over the ones not reached yet, and the wilds
 /// off the road between them.
 class _MapPainter extends CustomPainter {
-  _MapPainter({required this.open, required this.selected, required this.beaten, required this.wildsOpen, this.wildPicked, this.trip, this.pins = const [], this.pinPicked});
+  _MapPainter({required this.open, required this.selected, required this.beaten, required this.wildsOpen, this.wildPicked, this.trip, this.pins = const [], this.pinPicked, this.delves = const [], this.delvePicked});
+
+  /// Dungeons shown: each with whether it's open, whether its boss is beaten, and whether you're
+  /// down in it now.
+  final List<(Dungeon, bool, bool, bool)> delves;
+  final String? delvePicked;
 
   /// Places shown: each with whether it's explored, and whether it can be explored now.
   final List<(Place, bool, bool)> pins;
@@ -633,6 +716,10 @@ class _MapPainter extends CustomPainter {
     // Places to explore: a red orb on a pin (dim once explored, with a tick).
     for (final (p, done, ready) in pins) {
       _pin(canvas, Offset(p.x, p.y), p.name, done, ready, p.id == pinPicked);
+    }
+    // Dungeons: a stair down into the dark, under a stone arch.
+    for (final (d, open, done, here) in delves) {
+      _delve(canvas, Offset(d.x, d.y), d.name, open, done, here, d.id == delvePicked);
     }
     // The Inn: a little house with a tankard sign, where it all starts.
     _inn(canvas, _innSpot);
@@ -762,6 +849,16 @@ class _MapPainter extends CustomPainter {
         for (final (dx, dy) in const [(20.0, -20.0), (30.0, -24.0), (36.0, -14.0), (24.0, -12.0)]) {
           c.drawCircle(at + Offset(dx, dy), 6, Paint()..color = const Color(0xFFF0A8C0).withValues(alpha: open ? .9 : .35));
         }
+      case 18: // snowy peaks with a frozen tower between them
+        for (final (dx, h, w) in const [(-28.0, 40.0, 30.0), (24.0, 48.0, 34.0)]) {
+          final b = at + Offset(dx, 14);
+          c.drawPath(poly([b + Offset(-w, 0), b + Offset(0, -h), b + Offset(w, 0)]), fill);
+          c.drawPath(poly([b + Offset(-w * .35, -h * .65), b + Offset(0, -h), b + Offset(w * .35, -h * .65), b + Offset(w * .1, -h * .55), b + Offset(-w * .1, -h * .6)]), Paint()..color = const Color(0xFFF2F6FA).withValues(alpha: open ? .95 : .4));
+        }
+        final tw = at + const Offset(-2, 14);
+        c.drawRect(Rect.fromLTWH(tw.dx - 5, tw.dy - 34, 10, 34), Paint()..color = const Color(0xFF9AC0DC).withValues(alpha: open ? .95 : .4));
+        c.drawRect(Rect.fromLTWH(tw.dx - 5, tw.dy - 34, 10, 34), ink..strokeWidth = 1.4);
+        c.drawPath(poly([tw + const Offset(-8, -34), tw + const Offset(0, -46), tw + const Offset(8, -34)]), fill);
       case 17: // a cave mouth in a hill, and bats pouring out of it
         final h = at + const Offset(0, 14);
         c.drawPath(Path()..moveTo(h.dx - 48, h.dy)..quadraticBezierTo(h.dx - 30, h.dy - 40, h.dx, h.dy - 38)..quadraticBezierTo(h.dx + 32, h.dy - 36, h.dx + 48, h.dy)..close(), fill);
@@ -818,6 +915,49 @@ class _MapPainter extends CustomPainter {
       textDirection: TextDirection.ltr,
     )..layout();
     tp.paint(c, Offset((at.dx - tp.width / 2).clamp(8, 992 - tp.width), at.dy + 11));
+  }
+
+  /// A dungeon's mouth: a stone arch over steps going down into the dark, a glow if you're down
+  /// there now, a star once its boss is beaten.
+  void _delve(Canvas c, Offset at, String name, bool open, bool done, bool here, bool picked) {
+    final a = open ? 1.0 : .45;
+    if (picked) c.drawCircle(at, 19, strokePaint(const Color(0xFFFFE6A0), 3));
+    if (here) c.drawCircle(at, 20, Paint()..color = const Color(0xFFFFB04A).withValues(alpha: .45)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8));
+    final arch = Path()
+      ..moveTo(at.dx - 15, at.dy + 10)
+      ..lineTo(at.dx - 15, at.dy - 4)
+      ..arcToPoint(Offset(at.dx + 15, at.dy - 4), radius: const Radius.circular(15))
+      ..lineTo(at.dx + 15, at.dy + 10)
+      ..close();
+    c.drawPath(arch, Paint()..color = const Color(0xFF8A7A62).withValues(alpha: a));
+    final mouth = Path()
+      ..moveTo(at.dx - 9, at.dy + 10)
+      ..lineTo(at.dx - 9, at.dy - 2)
+      ..arcToPoint(Offset(at.dx + 9, at.dy - 2), radius: const Radius.circular(9))
+      ..lineTo(at.dx + 9, at.dy + 10)
+      ..close();
+    c.drawPath(mouth, Paint()..color = const Color(0xFF140E0A).withValues(alpha: a));
+    for (var i = 0; i < 3; i++) {
+      c.drawLine(Offset(at.dx - 7 + i * 1.5, at.dy + 8 - i * 3.5), Offset(at.dx + 7 - i * 1.5, at.dy + 8 - i * 3.5), strokePaint(const Color(0xFF6A5A46).withValues(alpha: a), 1.6));
+    }
+    c.drawPath(arch, strokePaint(const Color(0xFF2A1A0E).withValues(alpha: a), 1.8));
+    if (done) {
+      final star = Path();
+      for (var i = 0; i < 10; i++) {
+        final r = i.isEven ? 7.0 : 3.0, ang = -math.pi / 2 + i * math.pi / 5;
+        final p = at + const Offset(15, -16) + Offset(math.cos(ang) * r, math.sin(ang) * r);
+        i == 0 ? star.moveTo(p.dx, p.dy) : star.lineTo(p.dx, p.dy);
+      }
+      c.drawPath(star..close(), Paint()..color = const Color(0xFFE3A548));
+      c.drawPath(star, strokePaint(const Color(0xFF3A2614), 1));
+    } else if (!open) {
+      _padlock(c, at + const Offset(15, 6), .45);
+    }
+    final tp = TextPainter(
+      text: TextSpan(text: name, style: Txt.inkLabel(size: 13, color: open ? const Color(0xFF2A1A0E) : const Color(0xFF6A5A44))),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    tp.paint(c, Offset((at.dx - tp.width / 2).clamp(8, 992 - tp.width), at.dy + 12));
   }
 
   void _padlock(Canvas c, Offset at, [double scale = 1]) {
@@ -913,6 +1053,8 @@ class _MapPainter extends CustomPainter {
       old.beaten.length != beaten.length ||
       old.wildPicked != wildPicked ||
       old.pinPicked != pinPicked ||
+      old.delvePicked != delvePicked ||
+      old.delves.toString() != delves.toString() ||
       old.pins.length != pins.length ||
       old.pins.where((p) => p.$2).length != pins.where((p) => p.$2).length ||
       old.trip != trip ||

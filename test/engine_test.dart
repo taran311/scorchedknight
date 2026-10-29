@@ -15,6 +15,7 @@ import 'package:scorchedknight/game/models.dart';
 import 'package:scorchedknight/game/mounts.dart';
 import 'package:scorchedknight/game/rules.dart';
 import 'package:scorchedknight/game/wilds.dart';
+import 'package:scorchedknight/game/dungeons.dart';
 
 /// Fights the current foe with plain attacks (and potions when low) until it's over.
 SwingResult fightOut(GameEngine e) {
@@ -47,7 +48,7 @@ void main() {
   });
 
   test('every continent has foes, a boss and a level', () {
-    expect(continents.length, mainLands + 11);
+    expect(continents.length, mainLands + 12);
     for (var c = 0; c < continents.length; c++) {
       expect(foeIndexes(c), isNotEmpty);
       expect(foeAt(bossIndex(c)).boss, isTrue);
@@ -69,6 +70,7 @@ void main() {
     expect(continents[mainLands + 8].name, 'The Skyreach Aeries');
     expect(continents[eastLand].name, 'The Blossom Isles');
     expect(continents[batLand].name, 'The Hollowdeep');
+    expect(continents[frostLand].name, 'The Frostmarch');
   });
 
   test('the roads branch: choose your own way, and only the Ember Throne waits on one land', () {
@@ -881,6 +883,22 @@ void main() {
     expect(t.bossTrinket('echostone', 25).name, 'The Echo Stone');
   });
 
+  test('the Frostmarch: opened by Grimtusk, its Rimeforged weapons bring the mountain down', () {
+    expect(openers(frostLand), [3]);
+    expect(landTrophyName(frostLand), 'pelt');
+    final t = LootTable(Random(18));
+    for (final c in HeroClass.values) {
+      double mean(GearItem Function() make) => [for (var i = 0; i < 60; i++) make().score].reduce((a, b) => a + b) / 60;
+      final rime = t.frostDrop(c, 30);
+      expect(rime.special, 'avalanche');
+      expect(rime.stat(Stat.frost), greaterThan(0), reason: '$c');
+      final d = mean(() => t.frostDrop(c, 30)), b = mean(() => t.batDrop(c, 30));
+      expect(d, closeTo(b, b * .08), reason: '$c');
+    }
+    expect(specials['avalanche']!.stun, greaterThan(0));
+    expect(t.bossTrinket('rimeheart', 30).name, 'The Rimeheart');
+  });
+
   test('runes: a scroll offers three different ones to choose from, never a useless Wyrmslayer', () {
     final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(16));
     final k = e.state.knight..level = 12;
@@ -1168,6 +1186,114 @@ void main() {
       expect(e.wildHint(1), isNull);
       e.state.struggle[1] = struggleHint;
       expect(e.wildHint(1), 0);
+    });
+  });
+
+  group('dungeons', () {
+    GameEngine ready() {
+      final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(9), clock: () => DateTime(2026, 6, 1));
+      e.state.knight.level = 10;
+      e.state.knight.hp = maxHp(e.state.knight);
+      return e;
+    }
+
+    test('every dungeon\'s foes and boss live in its land', () {
+      for (final d in dungeons) {
+        for (final look in [...d.foes, d.boss.$2]) {
+          expect(realmAt(lookIndex(look, d.land)), d.land, reason: '${d.name}: $look');
+        }
+      }
+    });
+
+    test('open once the land\'s boss falls, and one run at a time', () {
+      final e = ready();
+      expect(e.whyNotDungeon('warrens'), isNotNull);
+      e.state.bossesDown.addAll([0, 1]);
+      expect(e.enterDungeon('warrens'), isTrue);
+      expect(e.state.dungeonDoors.length, inInclusiveRange(2, 3));
+      expect(e.whyNotDungeon('ossuary'), isNotNull);
+    });
+
+    test('door by door to the boss, and its hoard', () {
+      final e = ready()..state.bossesDown.add(0);
+      e.enterDungeon('warrens');
+      var guard = 0;
+      while (!e.dungeonCleared && guard++ < 200) {
+        e.state.knight.hp = maxHp(e.state.knight);
+        // Never a locked door without a key.
+        final i = e.state.dungeonDoors.indexWhere((d) => d != DoorClue.locked.name || e.state.dungeonKey);
+        final out = e.openDoor(i)!;
+        if (out.$1.isFight) {
+          expect(e.state.inBattle, isTrue);
+          expect(e.state.dungeonFight, isTrue);
+          e.state.foeHp = 1;
+          final r = e.takeTurn(BattleAction.skill);
+          expect(r.kill, isNotNull);
+          if (out.$1 == RoomKind.boss) expect(r.kill!.hoard, isNotEmpty);
+        }
+      }
+      expect(e.dungeonCleared, isTrue);
+      expect(e.state.dungeonsDone, contains('warrens'));
+      expect(e.state.dungeonPath.length, dungeonRooms + 1);
+      expect(e.state.dungeonPath.last, RoomKind.boss.name);
+      expect(e.state.pendingLoot, isNotEmpty);
+      expect(e.leaveDungeon(), isTrue);
+      expect(e.state.dungeon, isNull);
+    });
+
+    test('knocked out ends the run; fleeing bars the door and the run goes on', () {
+      final e = ready()..state.bossesDown.add(0);
+      e.enterDungeon('warrens');
+      e.state.dungeonDoors
+        ..clear()
+        ..addAll([DoorClue.growl.name, DoorClue.quiet.name]);
+      e.openDoor(0);
+      expect(e.state.inBattle, isTrue);
+      for (var i = 0; i < 40 && e.state.inBattle; i++) {
+        e.takeTurn(BattleAction.flee);
+      }
+      expect(e.state.inBattle, isFalse);
+      expect(e.state.dungeon, 'warrens');
+      expect(e.state.dungeonRoom, 0);
+      expect(e.state.dungeonDoors, [DoorClue.quiet.name]);
+      e.state.dungeonDoors
+        ..clear()
+        ..add(DoorClue.growl.name);
+      e.openDoor(0);
+      e.state.knight.hp = 1;
+      for (var i = 0; i < 40 && e.state.inBattle; i++) {
+        e.state.knight.hp = 1;
+        e.takeTurn(BattleAction.pet);
+      }
+      expect(e.state.dungeon, isNull);
+    });
+
+    test('a locked door needs a key; a vault spends it', () {
+      final e = ready()..state.bossesDown.add(0);
+      e.enterDungeon('warrens');
+      e.state.dungeonDoors
+        ..clear()
+        ..add(DoorClue.locked.name);
+      expect(e.whyNotDoor(0), isNotNull);
+      e.state.dungeonKey = true;
+      final coins = e.state.knight.coins;
+      final out = e.openDoor(0)!;
+      expect(out.$1, RoomKind.vault);
+      expect(e.state.dungeonKey, isFalse);
+      expect(e.state.knight.coins, greaterThan(coins));
+      expect(e.state.pendingLoot, isNotEmpty);
+    });
+
+    test('a run in progress survives a save', () {
+      final e = ready()..state.bossesDown.add(0);
+      e.enterDungeon('warrens');
+      e.state.dungeonKey = true;
+      e.state.dungeonsDone.add('ossuary');
+      final back = GameState.fromJson(jsonDecode(jsonEncode(e.state.toJson())) as Map<String, dynamic>);
+      expect(back.dungeon, 'warrens');
+      expect(back.dungeonDoors, e.state.dungeonDoors);
+      expect(back.dungeonKey, isTrue);
+      expect(back.dungeonsDone, {'ossuary'});
     });
   });
 }

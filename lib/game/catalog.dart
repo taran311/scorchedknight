@@ -327,6 +327,8 @@ String? landTrophyName(int land) => switch (land) {
   15 => 'feather',
   // The Hollowdeep's bats leave fangs, like Ravenmoor's vampires: the same Nightblood set.
   17 => 'fang',
+  // The Frostmarch's wolves, yetis and fur-clad reavers leave pelts, like the Weald's werewolves.
+  18 => 'pelt',
   _ => null,
 };
 
@@ -818,7 +820,36 @@ const continents = <Continent>[
       NamedRare('Nightwhisper', 'batkin', Aura.cursed),
     ],
   ),
+  Continent(
+    name: 'The Frostmarch',
+    blurb: 'North of the orklands, the Burning went the other way: the sky froze, and so did everything under it. Glaciers have swallowed a whole city. The reavers who live in its ruins worship the frost giants, and the frost giants let them.',
+    minLevel: 27,
+    tier: 4,
+    opensAfter: 3,
+    argb: 0xFF9AC0DC,
+    foes: [
+      FoeType('Frostbound Reaver', 'frostReaver'),
+      FoeType('Rime Skald', 'frostSkald', hp: .9, strike: Strike.magic),
+      FoeType('Snow Wolf', 'snowwolf', hp: .85, beast: true),
+      FoeType('Yeti', 'yeti', hp: 1.15, beast: true),
+      FoeType('Frost Giant', 'frostGiant', hp: 1.2, armoured: true),
+      FoeType('Ice Wraith', 'iceWraith', hp: .85, spirit: true, aloft: true, strike: Strike.magic, element: 'frost'),
+    ],
+    boss: FoeType('Jarl Hrimgar the Ice-Crowned', 'frostJarl', boss: true, hp: 1.25, armoured: true),
+    companion: Companion.none,
+    companionText: 'Jarl Hrimgar falls to one knee, and the ice crown cracks clean in two. Somewhere under the glacier, the frozen city groans. By morning there is water running in its streets for the first time in a hundred years.',
+    prize: 'rimeheart',
+    reagent: 'Frost lily',
+    packs: [('snowwolf', 'Snow Wolf Pack'), ('frostReaver', 'Reaver Warband')],
+    named: [
+      NamedRare('Old Whitefang', 'snowwolf', Aura.ancient),
+      NamedRare('The Pale Huntress', 'frostReaver', Aura.frost),
+    ],
+  ),
 ];
+
+/// The Frostmarch: its giants and reavers carry the Rimeforged weapons (one per hero).
+const frostLand = 18;
 
 /// The Hollowdeep: its bats and batkin carry the Duskwing weapons (one per hero).
 const batLand = 17;
@@ -1171,6 +1202,9 @@ const elfGearChance = .05, elfGearChanceBoss = .3;
 /// hero, like the elves' Thornbloom.
 const batGearChance = .05, batGearChanceBoss = .3;
 
+/// The chance a foe of the Frostmarch carries a Rimeforged weapon. One per hero.
+const frostGearChance = .05, frostGearChanceBoss = .3;
+
 /// Lucky moments, rolled every time they could happen. An opening: a free second blow (this share
 /// of the first) on an attack. A second wind: after a hit lands, you get this share of your health
 /// back. A jackpot: a foe's purse is three times as fat.
@@ -1366,6 +1400,8 @@ const places = <Place>[
   Place('mirrorhall', 'The Hall of Mirrors', 14, 868, 600, PlaceKind.shrine, 'A ruined hall full of mirrors, and in every one, a different you: older, younger, a goblin, a dragon. One of them winks.', 'You stare until your reflection settles back into your own shape, and feel stronger for it. (Might for three fights.) The mirrors shed their silver skins at your feet.', brew: 'might', trophies: 3),
   Place('castleoflanterns', 'The Lantern Shrine', 16, 700, 640, PlaceKind.shrine, 'A shrine on a rock in the sea, hung with a thousand paper lanterns. An old priest sweeps the steps and doesn\'t look up.', 'You ring the bell and bow. The priest nods, once, and hands you a cup of tea and a folded scrap of lacquer. (Might for three fights.)', brew: 'might', trophies: 3),
   Place('rocnest', 'The Great Nest', 15, 798, 26, PlaceKind.guarded, 'A nest the size of a cottage on the highest peak, woven from whole trees, and something huge and feathered sitting on it.', 'The mother griffin takes wing and is gone. In the nest: feathers by the armful, gold the aeriekin left as offerings, and eggshell like porcelain.', foe: ('griffin', null, Aura.ancient, 'The Mother Griffin'), purses: 3, trophies: 4, gems: 1),
+  Place('frozencaravan', 'The Frozen Caravan', 18, 785, 238, PlaceKind.cache, 'A merchant caravan, frozen solid in the middle of the pass: wagons, oxen, drivers, all of it, still mid-stride under the ice. The strongbox is on the last wagon.', 'You chip it free. Inside: a hundred-year-old fortune, a bottle of something warming, and furs the reavers never found.', purses: 4, potions: 1, trophies: 3),
+  Place('yeticave', 'The Yeti\'s Larder', 18, 612, 180, PlaceKind.guarded, 'A cave full of bones, and a yeti the size of a cottage asleep across the mouth of it. Something in there glitters.', 'Old Avalanche goes down like his name. Past the bones: everything he ever took off a traveller.', foe: ('yeti', null, Aura.ancient, 'Old Avalanche'), purses: 3, gems: 2, trophies: 2),
   Place('orchardroost', 'The Orchard Roost', 17, 300, 612, PlaceKind.guarded, 'An old orchard sank into the caves when the hill fell in. The fruit bats found it. Their king has eaten every fig in it, and is still hungry.', 'The Fig King flaps off into the dark, much too full to fight. Under the trees: a pile of seeds, a pile of coins, and fangs he lost in the figs.', foe: ('cavebat', null, Aura.gilded, 'The Fig King'), purses: 2, trophies: 3),
   Place('lostisle', 'The Lost Isle', 0, 228, 20, PlaceKind.cache, 'Out past the coast, an island that isn\'t on any map but yours, now you\'ve been everywhere else. A rowing boat waits on the shore.', 'On the island, under a crooked tree: the old king\'s last treasure, buried before the Burning.', purses: 6, legendary: true, hidden: true),
 ];

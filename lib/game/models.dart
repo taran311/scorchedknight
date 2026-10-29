@@ -362,6 +362,13 @@ class GameState {
     this.wildFight = false,
     this.wildAlert = false,
     this.warlordMet = false,
+    this.dungeon,
+    this.dungeonRoom = 0,
+    List<String>? dungeonDoors,
+    List<String>? dungeonPath,
+    this.dungeonKey = false,
+    this.dungeonFight = false,
+    Set<String>? dungeonsDone,
     this.pint = false,
     this.malric = 0,
     this.form,
@@ -420,6 +427,9 @@ class GameState {
        pack = pack ?? [],
        mats = mats ?? {},
        wildBest = wildBest ?? {},
+       dungeonDoors = dungeonDoors ?? [],
+       dungeonPath = dungeonPath ?? [],
+       dungeonsDone = dungeonsDone ?? {},
        struggle = struggle ?? {},
        heroicWins = heroicWins ?? {},
        relicParts = relicParts ?? {},
@@ -500,6 +510,16 @@ class GameState {
   List<GearItem> pack;
   String? wildEvent;
   bool wildFight, wildAlert, warlordMet;
+
+  /// A dungeon run under way: which dungeon, the room you're in (rooms cleared so far), the doors
+  /// in front of you (DoorClue names), what each room behind you turned out to be (RoomKind
+  /// names), whether you carry a key, and whether the fight under way is in it. [dungeonsDone]:
+  /// dungeons whose boss you've beaten.
+  String? dungeon;
+  int dungeonRoom;
+  List<String> dungeonDoors, dungeonPath;
+  bool dungeonKey, dungeonFight;
+  final Set<String> dungeonsDone;
 
   /// Had a pint at the Soot & Kettle since the last fight (one is plenty).
   bool pint;
@@ -633,6 +653,15 @@ class GameState {
       'wildAlert': wildAlert,
       'warlordMet': warlordMet,
     },
+    if (dungeon != null) ...{
+      'dungeon': dungeon,
+      'dungeonRoom': dungeonRoom,
+      'dungeonDoors': dungeonDoors,
+      'dungeonPath': dungeonPath,
+      if (dungeonKey) 'dungeonKey': true,
+      if (dungeonFight) 'dungeonFight': true,
+    },
+    if (dungeonsDone.isNotEmpty) 'dungeonsDone': dungeonsDone.toList(),
     if (pint) 'pint': true,
     if (malric > 0) 'malric': malric,
     if (form != null) 'form': form,
@@ -733,6 +762,13 @@ class GameState {
       wildFight: j['wildFight'] == true,
       wildAlert: j['wildAlert'] == true,
       warlordMet: j['warlordMet'] == true,
+      dungeon: j['dungeon'] as String?,
+      dungeonRoom: n('dungeonRoom'),
+      dungeonDoors: [...((j['dungeonDoors'] as List?) ?? const []).whereType<String>()],
+      dungeonPath: [...((j['dungeonPath'] as List?) ?? const []).whereType<String>()],
+      dungeonKey: j['dungeonKey'] == true,
+      dungeonFight: j['dungeonFight'] == true,
+      dungeonsDone: {...((j['dungeonsDone'] as List?) ?? const []).whereType<String>()},
       pint: j['pint'] == true,
       malric: n('malric'),
       form: (j['form'] as num?)?.toInt(),

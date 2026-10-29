@@ -82,6 +82,8 @@ enum HeadKind {
   oni,
   // The batkin of the Hollowdeep: great splayed ears, a leaf nose, small fangs and glowing eyes.
   bat,
+  // The yetis of the Frostmarch: a shaggy white mane, curled horns, a blue face and tusks.
+  yeti,
 }
 
 enum TorsoKind { plain, leather, studded, scales, mail, plate, robe, fur, rags, ribs, bark, stone, lamellar, dragonplate }
@@ -1519,6 +1521,52 @@ Look _batkin({String rank = 'skulker'}) {
   );
 }
 
+/// The Frostmarch: reavers in furs and mail with nasal helms, round shields and axes; frost giants
+/// with skin like glacier ice and beards of hoarfrost; the Jarl in a crown of black iron; and the
+/// yetis, all white shag and tusks.
+Look _frost({String rank = 'reaver'}) {
+  final giant = rank == 'giant', jarl = rank == 'jarl', yeti = rank == 'yeti', skald = rank == 'skald';
+  final skin = giant || jarl ? ramp(0xFF9AC0DC, .25, .5) : (yeti ? ramp(0xFFF2F4F8, .15, .45) : ramp(0xFFE8C4A8, .25, .45));
+  final fur = ramp(yeti ? 0xFFE8ECF2 : 0xFF8A7A66, .25, .5);
+  final mail = ramp(jarl ? 0xFF3A3E46 : 0xFF7A8088, .3, .5);
+  final wool = ramp(skald ? 0xFF3A5A8A : 0xFF5A4A3A, .3, .5);
+  return Look(
+    build: giant || jarl ? 'giant' : (yeti ? 'brute' : 'human'),
+    scale: jarl ? 1.5 : (giant ? 1.4 : (yeti ? 1.25 : 1)),
+    stance: skald ? Stance.mage : Stance.knight,
+    skin: skin,
+    torso: yeti ? fur : (giant ? fur : (skald ? wool : mail)),
+    torsoKind: yeti || giant ? TorsoKind.fur : (skald ? TorsoKind.robe : (jarl ? TorsoKind.plate : TorsoKind.mail)),
+    upper: yeti || giant ? skin : mail,
+    fore: skin,
+    hand: yeti ? ramp(0xFF6A84A8, .2, .5) : (giant || jarl ? skin : ramp(0xFF5A3E26, .25, .5)),
+    thigh: yeti ? fur : wool,
+    shin: yeti ? fur : (giant || jarl ? fur : ramp(0xFF8A7A66, .25, .5)),
+    boot: yeti ? ramp(0xFF6A84A8, .2, .5) : ramp(0xFF3A2A1C, .2, .5),
+    skirt: skald ? wool : null,
+    ruff: yeti ? null : (jarl ? const Color(0xFFF2F4F8) : const Color(0xFFB8A890)),
+    pauldron: jarl ? mail : null,
+    tabard: jarl ? const Color(0xFF2A3A5A) : null,
+    belt: const Color(0xFF3A2416),
+    trim: jarl ? const Color(0xFFBFE8FF) : const Color(0xFFC8A860),
+    head: yeti ? HeadKind.yeti : (jarl || skald ? HeadKind.bare : HeadKind.nasal),
+    hair: giant || jarl || skald ? const Color(0xFFE8F0F4) : const Color(0xFFC88A3A),
+    beard: yeti ? null : (giant || jarl || skald ? const Color(0xFFE8F0F4) : const Color(0xFFC88A3A)),
+    crown: jarl,
+    eyeGlow: giant || jarl || yeti ? const Color(0xFF9ADFFF) : (skald ? const Color(0xFFBFF0FF) : null),
+    talons: yeti,
+    weapon: switch (rank) {
+      'giant' => Weapon.club,
+      'jarl' => Weapon.greataxe,
+      'skald' => Weapon.staff,
+      'yeti' => Weapon.none,
+      _ => Weapon.axe,
+    },
+    weaponGlow: jarl || skald ? const Color(0xFFBFF0FF) : null,
+    shield: rank == 'reaver' ? const ShieldLook(field: Color(0xFF3A5A8A), trim: Color(0xFFD8D8E0), kind: ShieldKind.round) : null,
+  );
+}
+
 /// The Skyreach Aeries: harpies (wild-haired, feathered wings, talons) and the aeriekin, proud
 /// bird-folk with hawks' heads and great wings, in sky-blue and bronze. Wardens carry a spear and
 /// wear bronze; skyshots carry a longbow; stormcallers a staff that crackles.
@@ -1613,6 +1661,13 @@ final Map<String, Look> foeLooks = {
   'batkin': _batkin(),
   'batkinCaller': _batkin(rank: 'caller'),
   'batkinGuard': _batkin(rank: 'guard'),
+  // The Frostmarch.
+  'frostReaver': _frost(),
+  'frostSkald': _frost(rank: 'skald'),
+  'frostGiant': _frost(rank: 'giant'),
+  'frostJarl': _frost(rank: 'jarl'),
+  'yeti': _frost(rank: 'yeti'),
+  'iceWraith': _spirit(robe: 0xFFA8D4EC, head: HeadKind.banshee, eyes: const Color(0xFFBFF0FF), hair: const Color(0xFFDFF4FF)),
   // The Skyreach Aeries.
   'harpy': _aerie(rank: 'harpy'),
   'aerieWarden': _aerie(),
