@@ -342,7 +342,14 @@ SwingDamage swingDamage(GameState state, double roll, {Special? special, AmmoTyp
   // The companion's blow: dragon fire (boosted by dragonkin gear) or a pet's bite.
   final chip = pet != null ? pet.bite + k.level ~/ 6 : (ds == null || ds.chip == 0 ? 0 : ds.chip + k.level ~/ 5 + s.dragonkin);
   final poison = s.poison + (k.poisonFights > 0 ? 4 + k.level ~/ 3 : 0), extra = sp?.element == null ? 0 : 3 * k.level;
-  int ammoAdds(Stat st) => (shot?.stat == st ? bonus : 0) + (cast?.element == st ? 3 * k.level : 0);
+  // Blessed shots: light against the living, heavy against the unholy; frost shots a smaller chill.
+  final unholy = foe.undead || foe.demon || foe.element == 'poison';
+  int shotAdds(Stat st) => shot?.stat != st ? 0 : switch (shot!) {
+    AmmoType.blessed => holyShot(k.level, unholy),
+    AmmoType.frost => (bonus * frostShare).round(),
+    _ => bonus,
+  };
+  int ammoAdds(Stat st) => shotAdds(st) + (cast?.element == st ? 3 * k.level : 0);
   final burn = s.burn + (sp?.element == Stat.burn ? extra : 0) + ammoAdds(Stat.burn) + (pet?.burn ?? 0);
   // An elemental shrugs off its own element and takes double from its opposite.
   int el(Stat st, int v) => foe.element == null ? v : (foe.element == st.name ? 0 : (elementWeakness(foe.element!) == st.name ? v * 2 : v));

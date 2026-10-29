@@ -398,7 +398,11 @@ void main() {
     expect(e.takeTurn(BattleAction.attack).shifted, isNull);
     // It always leaves its shifting skin.
     s.foeHp = 1;
-    final kill = e.takeTurn(BattleAction.skill).kill;
+    KillResult? kill;
+    for (var i = 0; i < 20 && kill == null; i++) {
+      k.hp = 1 << 20;
+      kill = e.takeTurn(BattleAction.attack).kill; // (a blow can miss now and then)
+    }
     expect(kill, isNotNull);
     expect(s.mat(trophyKey(Trophy.skin)), greaterThanOrEqualTo(0));
     expect(s.form, isNull);
@@ -889,6 +893,94 @@ void main() {
       expect(k.scrolls, 0);
     }
     expect(e.enchantChoices(EnchantSlot.armour, scroll: true), isEmpty); // no scroll left
+  });
+
+  test('special shots: fire burns on, venom stacks, frost freezes now and then', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.ranger), random: Random(17));
+    final s = e.state, k = s.knight..level = 10;
+    expect(e.travel(0), isTrue);
+    var burned = 0, venomed = 0, froze = 0, stacks = 0;
+    for (var fight = 0; fight < 30; fight++) {
+      e.explore();
+      if (!s.inBattle) continue;
+      s.foeHp = s.foeMax = 100000; // a long fight, so the effects can show
+      k.hp = 100000;
+      final kind = AmmoType.values[fight % 3 == 0 ? 0 : (fight % 3 == 1 ? 4 : 3)];
+      k.ammo[kind.name] = 5;
+      k.ammoLoaded = kind.name;
+      for (var i = 0; i < 4; i++) {
+        final r = e.takeTurn(BattleAction.shoot);
+        burned += r.burned;
+        venomed += r.venomed;
+        if (r.froze) froze++;
+      }
+      stacks = max(stacks, s.foeVenom);
+      // The fight's state survives a save.
+      final back = GameState.fromJson((jsonDecode(jsonEncode(s.toJson())) as Map).cast<String, dynamic>());
+      expect(back.foeVenom, s.foeVenom);
+      expect(back.foeBurnTurns, s.foeBurnTurns);
+      s.foeHp = 1;
+      while (s.inBattle) {
+        k.hp = 100000;
+        e.takeTurn(BattleAction.attack);
+      }
+      expect(s.foeVenom, 0); // a new fight starts clean
+    }
+    expect(burned, greaterThan(0));
+    expect(venomed, greaterThan(0));
+    expect(stacks, greaterThan(1));
+    expect(froze, greaterThan(0));
+    expect(gemFor(AmmoType.frost), Gem.sapphire);
+    expect(gemFor(AmmoType.venom), Gem.emerald);
+  });
+
+  test('legendary weapons each carry their own special, from their class\'s set', () {
+    for (final e in legendSpecials.entries) {
+      for (final id in e.value) {
+        expect(specials[id], isNotNull, reason: id);
+      }
+      expect(legendSpecial('Some Blade', e.key), legendSpecial('Some Blade', e.key)); // always the same
+    }
+    // Across a class's legendaries, more than one special turns up.
+    final t = LootTable(Random(18));
+    final seen = <String>{};
+    for (var i = 0; i < 600; i++) {
+      final g = t.roll(HeroClass.knight, 30, odds: const [0, 0, 0, 0, 100], only: GearSlot.weapon);
+      if (g.special != null) seen.add(g.special!);
+    }
+    // The knight's nine legendaries carry nine different specials.
+    expect(seen, containsAll(['cleave', 'stormcall', 'hellgate', 'fatesroll', 'deadcharge', 'legion', 'wyrmcall', 'moonpack', 'nightswarm']));
+    expect(LootTable(Random(1)).batDrop(HeroClass.ranger, 20).special, 'nightswarm');
+  });
+
+  test('the Roll of Fate comes up lucky or unlucky, and unlucky bites back', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(19));
+    final s = e.state, k = s.knight..level = 10;
+    k.loadout.weapon = GearItem(id: 'dice', name: 'Test dice blade', slot: GearSlot.weapon, art: 'longsword', rarity: Rarity.legendary, level: 10, heroClass: HeroClass.knight, special: 'fatesroll', value: 1, stats: const {Stat.damage: 20});
+    expect(e.travel(0), isTrue);
+    var lucky = 0, unlucky = 0, bitten = 0;
+    for (var f = 0; f < 40; f++) {
+      e.explore();
+      if (!s.inBattle) continue;
+      s.foeHp = s.foeMax = 100000;
+      for (var i = 0; i < 4; i++) {
+        k.hp = maxHp(k);
+        final r = e.takeTurn(BattleAction.attack);
+        if (r.damage.special?.name == 'Lucky!') lucky++;
+        if (r.damage.special?.name == 'Unlucky!') {
+          unlucky++;
+          if (r.selfHurt > 0) bitten++;
+        }
+      }
+      s.foeHp = 1;
+      while (s.inBattle) {
+        k.hp = 100000;
+        e.takeTurn(BattleAction.attack);
+      }
+    }
+    expect(lucky, greaterThan(unlucky));
+    expect(unlucky, greaterThan(0));
+    expect(bitten, unlucky);
   });
 
   test('Dunstan tempers a farmed weapon up to your level, for bars and gold', () {

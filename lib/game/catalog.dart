@@ -1171,6 +1171,13 @@ const elfGearChance = .05, elfGearChanceBoss = .3;
 /// hero, like the elves' Thornbloom.
 const batGearChance = .05, batGearChanceBoss = .3;
 
+/// Lucky moments, rolled every time they could happen. An opening: a free second blow (this share
+/// of the first) on an attack. A second wind: after a hit lands, you get this share of your health
+/// back. A jackpot: a foe's purse is three times as fat.
+const openingChance = .06, openingShare = .5;
+const secondWindChance = .05, secondWindHeal = .12;
+const jackpotChance = .04;
+
 /// Elemental arms (see LootTable.elementArms): the chance a fire or frost elemental leaves its
 /// weapon, and the chance one of the Aeries' foes (dawn) or Ravenmoor's night-walkers (shadow) does.
 const elementArmsChance = .25, landArmsChance = .04;

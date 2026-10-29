@@ -44,7 +44,10 @@ class ChestFind {
 }
 
 class KillResult {
-  const KillResult(this.foeIndex, this.name, this.xp, this.coins, this.levelUps, this.loot, {this.egg = false, this.orkGear, this.entGear, this.runeGear, this.prize, this.foe, this.chest, this.companion, this.opened = const [], this.trophy, this.blueprint, this.boss = false, this.won = false, this.reagents = 0, this.jobFind, this.potion = false, this.relicPart, this.packGold = 0, this.packed = const [], this.junkGold = 0});
+  const KillResult(this.foeIndex, this.name, this.xp, this.coins, this.levelUps, this.loot, {this.egg = false, this.orkGear, this.entGear, this.runeGear, this.prize, this.foe, this.chest, this.companion, this.opened = const [], this.trophy, this.blueprint, this.boss = false, this.won = false, this.reagents = 0, this.jobFind, this.potion = false, this.relicPart, this.packGold = 0, this.packed = const [], this.junkGold = 0, this.jackpot = 0});
+
+  /// A lucky purse: extra gold on top of the usual (already counted in [coins]).
+  final int jackpot;
 
   /// Gold for junk sold where it fell (see GameEngine.isJunk).
   final int junkGold;
@@ -138,6 +141,18 @@ class SwingResult {
 
   /// HP the lizardfolk regrew at the end of the turn, and HP your Sunscale set regrew.
   int regrew = 0, regrown = 0;
+
+  /// Fire and venom (from burning and venom shots) that ate at the foe this turn, and whether a
+  /// frost shot froze it out of its next blow.
+  int burned = 0, venomed = 0;
+  bool froze = false;
+
+  /// A special's stun took (the foe misses its next blow), and the health a special cost you.
+  bool specialStun = false;
+  int selfHurt = 0;
+
+  /// Lucky moments: an opening for a free extra blow, and a second wind after a hit.
+  int opening = 0, secondWind = 0;
 
   /// A shapeshifter took a new shape this turn (what it became).
   String? shifted;
@@ -1040,6 +1055,9 @@ class GameEngine {
       ..foeSlowed = 0
       ..foeWeakened = 0
       ..foeExposed = 0
+      ..foeBurn = 0
+      ..foeBurnTurns = 0
+      ..foeVenom = 0
       ..fairyCharge = 0
       ..mended = false
       ..rallied = false
@@ -1056,7 +1074,10 @@ class GameEngine {
   void _endBattle() {
     state
       ..heroicFight = false
-      ..wildFight = false;
+      ..wildFight = false
+      ..foeBurn = 0
+      ..foeBurnTurns = 0
+      ..foeVenom = 0;
     if (state.inspired > 0) state.inspired--;
     state.pint = false;
     if (state.raidFight) {
@@ -1182,12 +1203,16 @@ class GameEngine {
     final move = k.loadout.weapon?.specialMove;
     Special? fire;
     if (move != null && action == BattleAction.attack) {
-      state.specialCharge++;
-      if (state.specialCharge >= specialCharge) {
+      // A roll on every attack (the longer it waits, the likelier), like the old adventures.
+      if (_rng.nextDouble() < specialChanceAt(state.specialCharge)) {
         state.specialCharge = 0;
         fire = move;
         // Poseidon's Trident calls the sea or the Kraken, as the tide decides.
         if (identical(move, specials['poseidon'])) fire = specials[_rng.nextBool() ? 'tidalwave' : 'krakencall'];
+        // The Roll of Fate: sixes more often than snake eyes.
+        if (identical(move, specials['fatesroll'])) fire = specials[_rng.nextDouble() < .6 ? 'luckyroll' : 'unluckyroll'];
+      } else {
+        state.specialCharge++;
       }
     }
     // Special bolts: one per crossbow shot, while they last.
@@ -1291,6 +1316,14 @@ class GameEngine {
       case BattleAction.attack || BattleAction.skill || BattleAction.cast || BattleAction.shoot:
         _strike(r, fire, cast, foeName);
     }
+    if (shot != null && !r.miss && state.foeHp > 0) _shotTakes(shot, r, foe, foeName);
+    if (fire != null) _specialTakes(fire, r, foe, foeName);
+    // A lucky moment: the foe leaves an opening, and you get a free second blow in.
+    if (action == BattleAction.attack && fire == null && !r.miss && state.foeHp > 0 && _rng.nextDouble() < openingChance) {
+      r.opening = math.max(1, (d.base * openingShare).round());
+      state.foeHp -= r.opening;
+      _note('An opening! You get a second blow in for ${r.opening}.', EntryKind.damage);
+    }
 
     if (striking) {
       // Dual wielding: the off-hand weapon strikes after every blade attack, even if the main blow
@@ -1317,6 +1350,7 @@ class GameEngine {
       }
       _bite(r);
     }
+    _burnAndVenom(r, foe, foeName);
     r.kill = _checkKill();
     if (r.kill == null) {
       _maybeShift(r);
@@ -1332,7 +1366,7 @@ class GameEngine {
       if (r.hazard > 0) _note('${continents[land].hazard}: −${r.hazard} HP. ${continents[land].hazardText}; Old Wick could craft a ${continents[land].ward}.', EntryKind.damage);
     }
     // Lizardfolk: wounds close between blows, unless fire touched them this turn.
-    if (state.inBattle && foe.regrows && r.damage.burn == 0 && state.foeHp < state.foeMax) {
+    if (state.inBattle && foe.regrows && r.damage.burn == 0 && r.burned == 0 && state.foeHp < state.foeMax) {
       final before = state.foeHp;
       state.foeHp = math.min(state.foeMax, state.foeHp + (state.foeMax * regrowShare).round());
       r.regrew = state.foeHp - before;
@@ -1360,6 +1394,81 @@ class GameEngine {
       ..skillWait = math.max(0, state.skillWait - 1)
       ..petWait = math.max(0, state.petWait - 1);
     return r;
+  }
+
+  /// What a special shot leaves behind: a burning shot sets the foe ablaze, a venom shot adds a
+  /// stack of venom, a frost shot may freeze it out of its next blow.
+  void _shotTakes(AmmoType shot, SwingResult r, FoeType foe, String foeName) {
+    final k = state.knight;
+    switch (shot) {
+      case AmmoType.fire:
+        // Ents burn twice as hard; demons, the Ember King and fire elementals hardly at all.
+        final tick = foe.element == 'burn' ? 0 : (burnTick(k.level) * (foe.ent ? 2 : (foe.demon || foe.look == 'emberKing' ? .5 : (foe.element == 'frost' ? 2 : 1)))).round();
+        if (tick > 0) {
+          state
+            ..foeBurn = tick
+            ..foeBurnTurns = burnTurns;
+          _note('$foeName catches fire.', EntryKind.damage);
+        }
+      case AmmoType.venom:
+        if (!foe.venomous && foe.element != 'poison') {
+          state.foeVenom++;
+          _note(state.foeVenom == 1 ? 'Venom gets into $foeName.' : 'More venom: $foeName has ${state.foeVenom} doses in it now.', EntryKind.damage);
+        }
+      case AmmoType.frost:
+        if (!state.foeFrozen && foe.element != 'frost' && _rng.nextDouble() < freezeChance * (foe.boss ? .5 : 1)) {
+          state.foeFrozen = true;
+          r.froze = true;
+          _note('The frost bites deep: $foeName is frozen solid!', EntryKind.good);
+        }
+      case AmmoType.blessed || AmmoType.leech:
+        break;
+    }
+  }
+
+  /// What a special attack leaves behind: a stun, its price in your own health (and, for the
+  /// dice, a point of mana), the dead who stay to fight, a foe's guard torn open.
+  void _specialTakes(Special sp, SwingResult r, FoeType foe, String foeName) {
+    final k = state.knight;
+    if (sp.stun > 0 && state.foeHp > 0 && !state.foeFrozen && _rng.nextDouble() < sp.stun) {
+      state.foeFrozen = true;
+      r.specialStun = true;
+      _note('$foeName reels, stunned.', EntryKind.good);
+    }
+    if (sp.selfHurt > 0) {
+      final before = k.hp;
+      k.hp = math.max(1, k.hp - (maxHp(k) * sp.selfHurt).round());
+      r.selfHurt = before - k.hp;
+      if (sp.dice) state.mana = math.max(0, state.mana - 1);
+      _note(sp.dice ? 'The dice bite back: −${r.selfHurt} HP.' : 'The demon takes its price: −${r.selfHurt} HP.', EntryKind.damage);
+    }
+    if (sp.summon > 0 && state.foeHp > 0) {
+      state
+        ..summons = math.min(3, state.summons + sp.summon)
+        ..summonTurns = math.max(state.summonTurns, 2);
+      r.summons = state.summons;
+      _note('One of the dead stays to fight beside you.', EntryKind.good);
+    }
+    if (sp.expose > 0) state.foeExposed = math.max(state.foeExposed, sp.expose + 1);
+  }
+
+  /// Fire and venom eat at the foe every turn while they last (ents shrug off half the venom).
+  void _burnAndVenom(SwingResult r, FoeType foe, String foeName) {
+    if (!state.inBattle || state.foeHp <= 0) return;
+    final k = state.knight;
+    if (state.foeBurnTurns > 0) {
+      r.burned = math.min(state.foeHp, state.foeBurn);
+      state
+        ..foeHp -= r.burned
+        ..foeBurnTurns -= 1;
+      _note('$foeName burns for ${r.burned}.', EntryKind.damage);
+    }
+    if (state.foeVenom > 0 && state.foeHp > 0) {
+      final v = (state.foeVenom * venomTick(k.level) * (foe.ent ? .5 : 1)).round();
+      r.venomed = math.min(state.foeHp, v);
+      state.foeHp -= r.venomed;
+      _note('The venom eats at $foeName for ${r.venomed}.', EntryKind.damage);
+    }
   }
 
   /// A shapeshifter takes a new shape: on its first turn, and again when it's badly hurt (a boss at
@@ -1471,10 +1580,14 @@ class GameEngine {
       r.pet = pet;
       state.foeHp -= d.chip;
       _note('Your ${pet.$2.name.toLowerCase()} bites for ${d.chip}.', EntryKind.damage);
+      // A fairy's charm comes when it comes: about one bite in [charm], likelier the longer since.
       final every = pet.$2.charm;
       if (every > 0) {
-        state.fairyCharge++;
-        if (state.fairyCharge >= every) _charm(r);
+        if (_rng.nextDouble() < math.min(1.0, (1 + state.fairyCharge * .5) / every)) {
+          _charm(r);
+        } else {
+          state.fairyCharge++;
+        }
       }
     } else if (ds != null) {
       r.dragon = ds;
@@ -1487,7 +1600,7 @@ class GameEngine {
   void _charm(SwingResult r) {
     final k = state.knight, pet = petStage(k)!;
     state.fairyCharge = 0;
-    final charm = FairyCharm.values[state.fairyNext % FairyCharm.values.length];
+    final charm = FairyCharm.values[_rng.nextInt(FairyCharm.values.length)];
     state.fairyNext++;
     r.charm = charm;
     switch (charm) {
@@ -1645,6 +1758,13 @@ class GameEngine {
       final how = blocked ? (hurt == 0 ? 'You block it completely.' : 'You block most of it: $hurt gets through.') : 'It hits you for $hurt.';
       _note('$foeName strikes. $how${thorns > 0 ? ' Your thorns bite for $thorns.' : ''}${r.reflected > 0 ? ' Your mirror hurls ${r.reflected} back!' : ''}', hurt > 0 ? EntryKind.damage : EntryKind.plain);
       if (thorns > 0 || r.reflected > 0) r.kill = _checkKill();
+      // A lucky moment: now and then a hit that lands puts fight back in you instead.
+      if (r.kill == null && hurt > 0 && k.hp > 0 && _rng.nextDouble() < secondWindChance) {
+        final before = k.hp;
+        k.hp = math.max(k.hp, math.min(maxHp(k), k.hp + (maxHp(k) * secondWindHeal).round()));
+        r.secondWind = k.hp - before;
+        if (r.secondWind > 0) _note('Second wind! You shake it off and recover ${r.secondWind} HP.', EntryKind.good);
+      }
       if (r.kill == null && k.hp <= 0) {
         if (brewOn(k, Brew.reaperbane)) {
           // Reaper's Bane: he comes for you, and his scythe goes right through you.
@@ -1702,7 +1822,10 @@ class GameEngine {
     final c = realmAt(rare?.base ?? i), firstBoss = f.boss && rare == null && !state.bossesDown.contains(c) && !state.wildFight;
     // Out in the wilds, whatever this foe leaves goes into your pack (see the end of this).
     final wild = state.wildFight, coins0 = k.coins, loot0 = state.pendingLoot.length;
-    k.coins += r.coins;
+    // A lucky moment: now and then a foe was carrying far more than it should.
+    final jackpot = _rng.nextDouble() < jackpotChance ? r.coins * 2 : 0;
+    k.coins += r.coins + jackpot;
+    if (jackpot > 0) _note('Jackpot! It was carrying a fat purse: +$jackpot gold.', EntryKind.gold);
     final ups = _grantXp(r.xp);
     final gearLevel = wild ? k.level + wildGearLift(state.wildDepth) : k.level;
     // Not every foe carries something worth taking; rare foes and bosses always do.
@@ -2088,7 +2211,7 @@ class GameEngine {
     }
     if (ups > 0) _note('You reached level ${k.level}. ${shineLine(k.level)}', EntryKind.gold);
     final junkGold = _sellJunk(loot0);
-    return KillResult(i, f.name, r.xp, r.coins, ups, drop, junkGold: junkGold, egg: egg, orkGear: orkPrize, entGear: entPrize, runeGear: rune, prize: prize, foe: f, chest: chest, companion: companion, opened: opened, trophy: trophies > 0 ? '${trophies > 1 ? '$trophies× ' : ''}${trophy!.label}' : null, blueprint: blueprint, boss: f.boss && rare == null, won: won, reagents: reagents, jobFind: jobFind, potion: flask, relicPart: relicPart, packGold: packGold, packed: packed);
+    return KillResult(i, f.name, r.xp, r.coins + jackpot, ups, jackpot: jackpot, drop, junkGold: junkGold, egg: egg, orkGear: orkPrize, entGear: entPrize, runeGear: rune, prize: prize, foe: f, chest: chest, companion: companion, opened: opened, trophy: trophies > 0 ? '${trophies > 1 ? '$trophies× ' : ''}${trophy!.label}' : null, blueprint: blueprint, boss: f.boss && rare == null, won: won, reagents: reagents, jobFind: jobFind, potion: flask, relicPart: relicPart, packGold: packGold, packed: packed);
   }
 
   void _gainPet(Pet p) {

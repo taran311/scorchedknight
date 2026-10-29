@@ -111,18 +111,22 @@ const armourRecipes = <String, Recipe>{
 bool isCrafted(String armourId) => armourRecipes.containsKey(armourId);
 
 /// Gems: rarer than ore, from any foe. Each one makes a bundle of special bolts.
-enum Gem { ruby, pearl, garnet }
+enum Gem { ruby, pearl, garnet, sapphire, emerald }
 
 extension GemInfo on Gem {
   String get label => switch (this) {
     Gem.ruby => 'Ruby',
     Gem.pearl => 'Pearl',
     Gem.garnet => 'Garnet',
+    Gem.sapphire => 'Sapphire',
+    Gem.emerald => 'Emerald',
   };
   int get argb => switch (this) {
     Gem.ruby => 0xFFE0302A,
     Gem.pearl => 0xFFF4EEDC,
     Gem.garnet => 0xFF8A1A3A,
+    Gem.sapphire => 0xFF3A6AE0,
+    Gem.emerald => 0xFF2EA860,
   };
 
   /// The bolts it makes.
@@ -130,6 +134,8 @@ extension GemInfo on Gem {
     Gem.ruby => AmmoType.fire,
     Gem.pearl => AmmoType.blessed,
     Gem.garnet => AmmoType.leech,
+    Gem.sapphire => AmmoType.frost,
+    Gem.emerald => AmmoType.venom,
   };
 }
 

@@ -114,6 +114,7 @@ void weaponRange(LootTable loot, int level) {
       ('ent', avg(() => loot.entDrop(c, level))),
       ('bone', avg(() => loot.boneDrop(c, level, armour: false))),
       ('elf (Thornbloom)', avg(() => loot.elfDrop(c, level))),
+      ('bat (Duskwing)', avg(() => loot.batDrop(c, level))),
       for (final k in ['flame', 'frost', 'dawn', 'shadow']) ('arms: $k', avg(() => loot.elementArms(k, c, level))),
       ('rune', avg(() => loot.runeWeapon(c, level))),
       ('relic: Thornwild', avg(() => loot.relicWeapon(2, level, c))),

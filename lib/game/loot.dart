@@ -316,9 +316,14 @@ const leechCap = 25;
 /// Full swings it takes to charge a special attack; it fires on the last of them.
 const specialCharge = 4;
 
+/// Specials fire at random: this chance on any attack, a little more for each attack since the
+/// last (so a dry spell never runs long). About one attack in four, on average.
+const specialBase = .15, specialStep = .045;
+double specialChanceAt(int since) => math.min(1, specialBase + specialStep * since);
+
 /// A quest weapon's special attack. It charges with each full swing and fires on its own.
 class Special {
-  const Special(this.name, this.desc, this.mult, this.argb, {this.heal = 0, this.coins = 0, this.crit = false, this.sure = false, this.volley = 0, this.element, this.meteor = false, this.wave = false, this.kraken = false, this.rain = false, this.cleave = false});
+  const Special(this.name, this.desc, this.mult, this.argb, {this.heal = 0, this.coins = 0, this.crit = false, this.sure = false, this.volley = 0, this.element, this.meteor = false, this.wave = false, this.kraken = false, this.rain = false, this.cleave = false, this.dragon = false, this.dice = false, this.deadrun = false, this.storm = false, this.bats = false, this.demon = false, this.legion = false, this.wolves = false, this.stun = 0, this.selfHurt = 0, this.summon = 0, this.expose = 0});
   final String name, desc;
 
   /// Multiplies the swing's base damage.
@@ -345,6 +350,17 @@ class Special {
 
   /// Arrows or bolts rain down from the sky; a great sweeping blow.
   final bool rain, cleave;
+
+  /// What comes for the foe (for the animation): a dragon breathing fire, the dice of fate, the
+  /// dead riding out, lightning from the sky, a swarm of bats, a demon from a burning rift, the
+  /// dead clawing up out of the ground, ghost wolves.
+  final bool dragon, dice, deadrun, storm, bats, demon, legion, wolves;
+
+  /// What it leaves behind: the chance the foe is stunned out of its next blow, a share of your
+  /// own health it costs you, skeletons that stay to fight (for 2 turns), and turns the foe's
+  /// guard is torn open (your hits deal 25% more).
+  final double stun, selfHurt;
+  final int summon, expose;
 }
 
 const specials = <String, Special>{
@@ -374,7 +390,32 @@ const specials = <String, Special>{
   'bramblelash': Special('Bramblelash', 'The briar lashes out and roots the foe: 3x damage plus poison, and you recover 15 HP', 3, 0xFF6FBF4A, element: Stat.poison, heal: 15, sure: true),
   'briarvolley': Special('Briarsong', 'Arrows that burst into thorns where they land: 3x damage plus poison, and you recover 15 HP', 3, 0xFF6FBF4A, volley: 4, element: Stat.poison, heal: 15, sure: true),
   'meteor': Special('Meteor', 'Calls down a falling star: triple damage plus fire', 3, 0xFFFF7A2A, element: Stat.burn, meteor: true, sure: true),
+  // The legendary specials: each named legendary weapon carries one of its class's (see
+  // [legendSpecial]). All are worth about the same; they just do it differently.
+  'wyrmcall': Special('Wyrmcall', 'A dragon answers: it sweeps down and bathes the foe in fire, 1.6x damage plus fire', 1.6, 0xFFFF7A2A, element: Stat.burn, dragon: true, sure: true),
+  'fatesroll': Special('Roll of Fate', 'Roll the bones: lucky, the blade blazes for 3x damage; unlucky, a plain hit and the dice bite back', 1, 0xFFF2C14E, dice: true, sure: true),
+  'luckyroll': Special('Lucky!', 'Sixes! The blade blazes: 3x damage', 3, 0xFFF2C14E, dice: true, sure: true),
+  'unluckyroll': Special('Unlucky!', 'Snake eyes: a plain hit, and the dice bite back (8% of your health and a point of mana)', 1, 0xFFB06AE0, dice: true, selfHurt: .08, sure: true),
+  'deadcharge': Special('Charge of the Dead', 'A host of the dead rides out of the ground and straight through the foe: 2.3x damage', 2.3, 0xFFB07AFF, deadrun: true, sure: true),
+  'stormcall': Special('Stormcall', 'Lightning splits the sky and strikes the foe: 2x damage, and half the time it\'s stunned out of its next blow', 2, 0xFFCFE8FF, storm: true, stun: .5, sure: true),
+  'nightswarm': Special('Night Swarm', 'A storm of bats pours over the foe: 2x damage, and you drink 15 HP from it', 2, 0xFF9A8ABA, bats: true, heal: 15, sure: true),
+  'hellgate': Special('Hellgate', 'A demon claws out of a burning rift and strikes: double damage plus fire, but it takes its price (5% of your health)', 2, 0xFFE0402A, element: Stat.burn, demon: true, selfHurt: .05, sure: true),
+  'legion': Special('Rise, Legion', 'The dead claw up out of the ground and tear at the foe: 2x damage, and one stays to fight for 2 turns', 2, 0xFF8A5AC0, legion: true, summon: 1, sure: true),
+  'moonpack': Special('Moon Pack', 'Ghost wolves race out of the dark and tear its guard open: 2x damage, and your hits deal 25% more for 2 turns', 2, 0xFF9ADFFF, wolves: true, expose: 2, sure: true),
 };
+
+/// The specials a class's named legendary weapons carry: each weapon always the same one (picked
+/// by its name), so a legendary is known by its special.
+const legendSpecials = <HeroClass, List<String>>{
+  HeroClass.knight: ['cleave', 'fatesroll', 'deadcharge', 'hellgate', 'stormcall'],
+  HeroClass.mage: ['arcanestorm', 'wyrmcall', 'legion', 'stormcall', 'hellgate'],
+  HeroClass.ranger: ['arrowrain', 'moonpack', 'stormcall', 'fatesroll', 'nightswarm'],
+};
+
+String legendSpecial(String name, HeroClass c) {
+  final pool = legendSpecials[c]!;
+  return pool[name.codeUnits.fold<int>(0, (a, b) => (a * 31 + b) & 0x7fffffff) % pool.length];
+}
 
 /// The special every legendary weapon of a class carries.
 String classSpecial(HeroClass c) => switch (c) {
@@ -939,8 +980,11 @@ double _base(Stat s, int level) {
 // Legendaries: named, fixed effects, scaled by level.
 
 class _Legend {
-  const _Legend(this.name, this.slot, this.art, this.heroClass, this.stats, this.lore);
+  const _Legend(this.name, this.slot, this.art, this.heroClass, this.stats, this.lore, {this.special});
   final String name, art, lore;
+
+  /// A weapon's own special attack (otherwise one is picked for it by name).
+  final String? special;
   final GearSlot slot;
   final HeroClass? heroClass;
   final Map<Stat, double> stats; // multipliers on the normal roll
@@ -956,9 +1000,16 @@ const _legends = <_Legend>[
   _Legend('Ring of the Phoenix', _rg, 'ring', null, {Stat.burn: 2.0, Stat.regen: 1.6}, 'It was ash once. It will be again, and then gold.'),
   _Legend('Band of the Duellist', _rg, 'ring', null, {Stat.parry: 2.0, Stat.crit: 1.5}, 'Worn on the sword hand, where it catches the light.'),
   _Legend('Bloodstone Signet', _rg, 'ring', null, {Stat.lifesteal: 2.2, Stat.damage: 1.0}, 'Its stone darkens a little after every fight.'),
-  _Legend('Oathkeeper', _w, 'longsword', HeroClass.knight, {Stat.damage: 1.6, Stat.lifesteal: 1.5, Stat.guard: 1.0}, 'It has never broken a promise, nor a shield.'),
-  _Legend('Dawnbreaker', _w, 'mace', HeroClass.knight, {Stat.damage: 1.3, Stat.smite: 2.5, Stat.burn: 1.0}, 'The dead flinch at its shadow.'),
-  _Legend('Grimtooth', _w, 'axe', HeroClass.knight, {Stat.damage: 1.9, Stat.crit: 1.4}, 'Notched from a hundred quarrels.'),
+  // The knight's legendary weapons: each has its own special attack.
+  _Legend('Oathkeeper', _w, 'longsword', HeroClass.knight, {Stat.damage: 1.6, Stat.lifesteal: 1.5, Stat.guard: 1.0}, 'It has never broken a promise, nor a shield.', special: 'cleave'),
+  _Legend('Dawnbreaker', _w, 'mace', HeroClass.knight, {Stat.damage: 1.3, Stat.smite: 2.5, Stat.burn: 1.0}, 'The dead flinch at its shadow. Raise it high, and the sky answers.', special: 'stormcall'),
+  _Legend('Grimtooth', _w, 'axe', HeroClass.knight, {Stat.damage: 1.9, Stat.crit: 1.4}, 'Notched from a hundred quarrels. Something below the earth likes the sound it makes.', special: 'hellgate'),
+  _Legend('Gambler\'s Edge', _w, 'rapier', HeroClass.knight, {Stat.damage: 1.5, Stat.crit: 1.8}, 'Won in a game of bones from a man who swore he never lost. The dice came with it.', special: 'fatesroll'),
+  _Legend('Gravewarden', _w, 'halberd', HeroClass.knight, {Stat.damage: 1.7, Stat.smite: 1.6}, 'Carried by the last captain of the barrow guard. His men still answer when it calls.', special: 'deadcharge'),
+  _Legend('Legion\'s Due', _w, 'greatsword', HeroClass.knight, {Stat.damage: 1.8, Stat.guard: 1.0}, 'Forged on a battlefield from the swords of the fallen, who never quite left it.', special: 'legion'),
+  _Legend('Wyrmcaller', _w, 'spear', HeroClass.knight, {Stat.damage: 1.5, Stat.burn: 1.6}, 'Its head is a dragon\'s tooth. Hold it up, and somewhere in the ash, something big turns its head.', special: 'wyrmcall'),
+  _Legend('Moonfang', _w, 'scimitar', HeroClass.knight, {Stat.damage: 1.6, Stat.dodge: 1.2, Stat.crit: 1.0}, 'Silver, curved like a new moon. Wolves no one can see run beside whoever holds it.', special: 'moonpack'),
+  _Legend('The Bat-King\'s Flail', _w, 'flail', HeroClass.knight, {Stat.damage: 1.6, Stat.leech: 1.0}, 'Taken from the Bat Tower. Swing it, and the dark itself takes wing.', special: 'nightswarm'),
   _Legend("The Warden's Bulwark", _o, 'tower', HeroClass.knight, {Stat.guard: 2.2, Stat.thorns: 2.0, Stat.vigour: 1.0}, 'Carried by the last keeper of the Cindervale gate.'),
   _Legend('Crown of the Last King', _h, 'sallet', HeroClass.knight, {Stat.vigour: 1.8, Stat.crit: 1.5, Stat.fortune: 1.0}, 'The last king before the Great Burning wore it. He would want it worn.'),
   _Legend('Hearthfire Staff', _w, 'crystalstaff', HeroClass.mage, {Stat.damage: 1.3, Stat.burn: 2.4, Stat.dragonkin: 1.5}, 'Warm to the touch, even in winter.'),
@@ -1462,8 +1513,10 @@ class LootTable {
       level: level,
       heroClass: heroClass,
       lore: lore,
+      // The bats come when it's called: Night Swarm, with its stats a little lower to pay for it.
+      special: 'nightswarm',
       value: _value(level, Rarity.epic, GearSlot.weapon),
-      stats: _tuned(stats, level, heroClass, farmedEdge),
+      stats: _tuned(stats, level, heroClass, farmedEdge / 1.35),
     );
   }
 
@@ -1555,7 +1608,7 @@ class LootTable {
       'heartsblood' => ('Heart\'s Blood', 'A drop of the Countess, set in a crystal vial. It is still warm, and it still wants.', {Stat.leech: 2.0, Stat.lifesteal: 2.0, Stat.crit: 1.5}),
       'starleaf' => ('Starleaf Brooch', 'Queen Ithriel\'s own brooch: a silver leaf with a star caught in it. The elves say it never lets an arrow fly crooked.', {Stat.crit: 2.4, Stat.dodge: 2.2, Stat.regen: 1.8}),
       'runependant' => ('Thane\'s Rune-Pendant', 'A runestone on a chain as thick as your thumb. Grimnar says it was his grandmother\'s. It hums when you\'re hit.', {Stat.guard: 2.9, Stat.block: 2.6, Stat.vigour: 2.5}),
-      'echostone' => ('The Echo Stone', 'A violet stone from the Roost Mother\'s nest, set in silver wings. Hold it to your ear and you hear the cave, and every blow coming before it lands.', {Stat.dodge: 1.6, Stat.leech: 1.5, Stat.crit: 1.4}),
+      'echostone' => ('The Echo Stone', 'A violet stone from the Roost Mother\'s nest, set in silver wings. Hold it to your ear and you hear the cave, and every blow coming before it lands.', {Stat.damage: .7, Stat.dodge: 1.5, Stat.leech: 1.4, Stat.crit: 1.1}),
       'blossomseal' => ('Shogun\'s Blossom Seal', 'The Iron Shogun\'s seal: a cherry blossom carved in red jade. Duels fought under it are always fair, and always short.', {Stat.crit: 1.6, Stat.parry: 1.5, Stat.damage: 1.3}),
       'stormfeather' => ('Thunderwing\'s Plume', 'One feather from the Storm Roc, as long as your arm. It hums before a storm, and your blows come down like lightning.', {Stat.crit: 1.7, Stat.dodge: 1.5, Stat.damage: 1.3}),
       'mirrorheart' => ('Heart of the Thousandfold', 'A grey, slippery heart that changes shape in your hand: a bird, a fist, your own face. It wants to be useful.', {Stat.damage: 1.5, Stat.crit: 1.5, Stat.dodge: 1.5}),
@@ -1717,8 +1770,8 @@ class LootTable {
         level: level,
         heroClass: l.heroClass,
         lore: l.lore,
-        // Legendary weapons carry their class's special attack.
-        special: l.slot == _w ? classSpecial(l.heroClass ?? heroClass) : null,
+        // Legendary weapons carry a special attack: each its own, from its class's (by its name).
+        special: l.slot == _w ? (l.special ?? legendSpecial(l.name, l.heroClass ?? heroClass)) : null,
         value: _value(level, rarity, l.slot),
         // Named legendary weapons are tuned like every other signature weapon; the rest roll as written.
         stats: l.slot == _w ? _tuned(l.stats, level, l.heroClass ?? heroClass, legendEdge) : {for (final e in l.stats.entries) e.key: _roll(e.key, level, e.value, _r)},

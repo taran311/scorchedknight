@@ -16,7 +16,7 @@ import '../game/ammo.dart';
 import '../game/brews.dart';
 import '../game/catalog.dart';
 import '../game/controller.dart';
-import '../game/loot.dart' show specialCharge;
+import '../game/loot.dart' show specialChanceAt;
 import '../game/models.dart';
 import '../game/rules.dart';
 import '../game/spells.dart';
@@ -485,9 +485,9 @@ class StatusBadges extends StatelessWidget {
     final items = <(String, Color, String)>[
       if (move != null)
         (
-          '${move.name} ${'●' * state.specialCharge}${'○' * (specialCharge - state.specialCharge)}',
+          '${move.name} · ${(specialChanceAt(state.specialCharge) * 100).round()}%',
           Color(move.argb),
-          'Special attack: ${move.desc}. Charges with each attack and fires on the ${specialCharge}th.',
+          'Special attack: ${move.desc}. A chance on every attack, a little higher each time it doesn\'t fire.',
         ),
       if (k.poisonFights > 0) ('Poisoned blade · ${k.poisonFights}', const Color(0xFF9BE27A), 'Poison on every attack for ${k.poisonFights} more ${k.poisonFights == 1 ? 'fight' : 'fights'}'),
       for (final (b, left) in activeBrews(k))

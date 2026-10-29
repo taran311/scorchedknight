@@ -12,7 +12,7 @@ import '../game/catalog.dart';
 import '../game/controller.dart';
 import '../game/crafting.dart' show smithName;
 import '../game/engine.dart';
-import '../game/loot.dart' show specialCharge, Stat, RarityInfo, GearSlotLabel;
+import '../game/loot.dart' show specialChanceAt, Stat, RarityInfo, GearSlotLabel;
 import '../game/models.dart';
 import '../game/rules.dart';
 import '../game/spells.dart';
@@ -493,7 +493,7 @@ class _BattleScreenState extends State<BattleScreen> {
             ('⚔️', '~${(swing * bladeEdge * mightBoost(k)).round()} damage', plain),
             if (aloft) ('🦅', 'Out of reach ${pct(aloftMelee)}', bad),
             if (triangle(kind, AttackStyle.blade) != 1) edgeLine(triangle(kind, AttackStyle.blade), 'blades'),
-            if (special != null) ('⚡', 'Charges your special ${s.specialCharge}/$specialCharge', soft),
+            if (special != null) ('⚡', '${(specialChanceAt(s.specialCharge) * 100).round()}% chance of ${special.name}', soft),
           ]),
           badge: bladeEdge != 1 ? pct(bladeEdge) : '$swing',
           glow: bladeEdge > 1,
@@ -539,7 +539,8 @@ class _BattleScreenState extends State<BattleScreen> {
             if (aloft) ('🦅', 'Easy shot in the air ${pct(aloftShot)}', good),
             if (triangle(kind, AttackStyle.bolt) != 1) edgeLine(triangle(kind, AttackStyle.bolt), 'bolts'),
           ]),
-          badge: boltEdge != 1 ? pct(boltEdge) : '${(crossbowShare(k) * 100).round()}%',
+          // Its damage, like Attack's (a percentage read as "weaker than attacking").
+          badge: boltEdge != 1 ? pct(boltEdge) : '${(swing * crossbowShare(k) * aimBoost(k)).round()}',
           glow: boltEdge > 1,
         ),
         if (_hasPotions)
@@ -668,6 +669,9 @@ class _FoeCard extends StatelessWidget {
         if (c.state.inBattle && c.state.foeWeakened > 0) FoeBadge(label: 'Weakened ${c.state.foeWeakened}', colour: const Color(0xFFB8A0D8), tip: 'Its blows land 40% softer · ${c.state.foeWeakened} turns left'),
         if (c.state.inBattle && c.state.foeExposed > 0) FoeBadge(label: 'Exposed ${c.state.foeExposed}', colour: const Color(0xFFE0A050), tip: 'Your hits deal 25% more · ${c.state.foeExposed} turns left'),
         if (c.state.inBattle && c.state.foeAsleep > 0) const FoeBadge(label: 'Asleep', colour: Color(0xFFB8A0E8), tip: 'It sleeps through its next blow'),
+        if (c.state.inBattle && c.state.foeFrozen) const FoeBadge(label: 'Frozen', colour: Color(0xFF9ADFFF), tip: 'Frozen solid: it misses its next blow'),
+        if (c.state.inBattle && c.state.foeBurnTurns > 0) FoeBadge(label: 'Burning ${c.state.foeBurnTurns}', colour: const Color(0xFFFF8A3A), tip: '${c.state.foeBurn} fire a turn · ${c.state.foeBurnTurns} turns left'),
+        if (c.state.inBattle && c.state.foeVenom > 0) FoeBadge(label: 'Venom ×${c.state.foeVenom}', colour: const Color(0xFF8FD36A), tip: 'Each dose eats at it every turn, for the rest of the fight'),
         if (c.state.inBattle && !c.busy) FoeBadge(icons: const [Icon(Icons.flash_on, size: 15, color: Color(0xFFFF8A70))], text: '~${counterDamage(c.state)}', colour: const Color(0xFFE0A090), tip: 'Hits for about ${counterDamage(c.state)}'),
         if (foe.mimic && c.state.lastStyle != null)
           FoeBadge(

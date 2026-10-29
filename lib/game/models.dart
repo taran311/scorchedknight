@@ -397,6 +397,9 @@ class GameState {
     this.foeSlowed = 0,
     this.foeWeakened = 0,
     this.foeExposed = 0,
+    this.foeBurn = 0,
+    this.foeBurnTurns = 0,
+    this.foeVenom = 0,
     this.fairyCharge = 0,
     this.fairyNext = 0,
     this.specialCharge = 0,
@@ -566,6 +569,10 @@ class GameState {
   /// miss), weakened (hits 40% softer) and exposed (your hits deal 25% more).
   int foeAsleep, foeSlowed, foeWeakened, foeExposed;
 
+  /// Burning bolts: fire the foe takes each turn, and turns of it left. Venom bolts: stacks of
+  /// venom in it (each does its share every turn, for the rest of the fight).
+  int foeBurn, foeBurnTurns, foeVenom;
+
   /// A fairy companion: attacks towards its next charm, and which charm is next.
   int fairyCharge, fairyNext;
 
@@ -662,6 +669,8 @@ class GameState {
       'slowed': foeSlowed,
       'weakened': foeWeakened,
       'exposed': foeExposed,
+      if (foeBurnTurns > 0) 'burn': [foeBurn, foeBurnTurns],
+      if (foeVenom > 0) 'venom': foeVenom,
       'fairyCharge': fairyCharge,
       'fairyNext': fairyNext,
       'mended': mended,
@@ -765,6 +774,9 @@ class GameState {
       foeSlowed: n('slowed'),
       foeWeakened: n('weakened'),
       foeExposed: n('exposed'),
+      foeBurn: (j['burn'] is List && (j['burn'] as List).length == 2) ? ((j['burn'] as List)[0] as num).toInt() : 0,
+      foeBurnTurns: (j['burn'] is List && (j['burn'] as List).length == 2) ? ((j['burn'] as List)[1] as num).toInt() : 0,
+      foeVenom: n('venom'),
       fairyCharge: n('fairyCharge'),
       fairyNext: n('fairyNext'),
       specialCharge: n('special'),
@@ -783,9 +795,9 @@ class GameState {
   }
 }
 
-/// Special bolts kept from the current three kinds; poisoned, frost and barbed bolts (retired)
-/// come back as burning bolts, one for one.
-const _boltKinds = {'fire', 'blessed', 'leech'};
+/// Special bolts kept by kind (the five of them); retired kinds (poisoned and barbed) come back
+/// as burning bolts, one for one.
+const _boltKinds = {'fire', 'blessed', 'leech', 'frost', 'venom'};
 Map<String, int> _ammo(Object? raw) {
   final out = <String, int>{};
   for (final e in ((raw as Map?) ?? const {}).entries) {

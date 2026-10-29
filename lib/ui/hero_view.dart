@@ -267,7 +267,7 @@ class GearDetails extends StatelessWidget {
       return [
         InfoChip(icon: ItemIcon(Item.swords, size: sz), text: 'With ${kind.weapons}', dense: dense),
         if (kind == OffhandKind.wand || kind == OffhandKind.sidearm || (kind == OffhandKind.parrying && g.heroClass != HeroClass.ranger))
-          InfoChip(icon: Icon(Icons.call_split, size: sz, color: Palette.parch2), text: 'Dual wield ${(dualStrikeShare * 100).round()}%', dense: dense),
+          InfoChip(icon: Icon(Icons.call_split, size: sz, color: Palette.parch2), text: 'Off-hand +${(dualStrikeShare * 100).round()}%', dense: dense),
       ];
     }
     return const [];

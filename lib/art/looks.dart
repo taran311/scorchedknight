@@ -478,10 +478,11 @@ String portraitSignature(Knight k) {
   return [k.heroClass.name, l.armour, for (final g in [l.weapon, l.activeOffhand, l.helm, l.gloves, l.boots, l.cape, k.trinket]) g?.id, k.dye, k.gloves, k.poisonFights > 0, k.female, k.level].join('|');
 }
 
-Look heroLook(Knight k) => lookFor(k.heroClass, k.loadout, dye: k.dye, gloves: k.gloves, poisoned: k.poisonFights > 0, trinket: k.trinket, female: k.female, soot: sootFor(k.level), shine: shinesAt(k.level));
+/// [glow] lights the weapon up for a moment (a lucky Roll of Fate).
+Look heroLook(Knight k, {Color? glow}) => lookFor(k.heroClass, k.loadout, dye: k.dye, gloves: k.gloves, poisoned: k.poisonFights > 0, trinket: k.trinket, female: k.female, soot: sootFor(k.level), shine: shinesAt(k.level), glow: glow);
 
 /// A look for any class and loadout (used for the hero and the class picker).
-Look lookFor(HeroClass c, Loadout l, {String dye = 'crimson', bool gloves = false, bool poisoned = false, GearItem? trinket, bool female = false, double soot = 0, bool shine = false}) {
+Look lookFor(HeroClass c, Loadout l, {String dye = 'crimson', bool gloves = false, bool poisoned = false, GearItem? trinket, bool female = false, double soot = 0, bool shine = false, Color? glow}) {
   final dyeCol = Color(dyeById(dye).argb);
   final w = l.weapon, o = l.activeOffhand; // a mismatched off-hand is stowed, not held
   final gl = l.gloves == null ? null : gearRamp(l.gloves!), bt = l.boots == null ? null : gearRamp(l.boots!);
@@ -489,7 +490,7 @@ Look lookFor(HeroClass c, Loadout l, {String dye = 'crimson', bool gloves = fals
   final capeCol = l.cape?.tint == null ? null : Color(l.cape!.tint!);
   final weapon = Weapon.fromArt(w?.art);
   final off = _shieldFor(o) != null ? Weapon.none : Weapon.fromArt(o?.art);
-  final glow = poisoned ? elementGlow(Stat.poison) : elementGlow(w?.element);
+  final lit = glow ?? (poisoned ? elementGlow(Stat.poison) : elementGlow(w?.element));
   final legendary = [w, o, l.helm, trinket].any((g) => g?.rarity == Rarity.legendary);
   final skin = ramp(0xFFC99474, .25, .45);
   // Blackened mail and plate come with an iron full helm until a better one drops.
@@ -556,7 +557,7 @@ Look lookFor(HeroClass c, Loadout l, {String dye = 'crimson', bool gloves = fals
         weapon: weapon == Weapon.none ? Weapon.longsword : weapon,
         offhand: off,
         poisoned: poisoned,
-        weaponGlow: glow,
+        weaponGlow: lit,
         weaponTint: w?.tint == null ? null : Color(w!.tint!),
         legendary: legendary,
         weaponRarity: w == null || w.rarity == Rarity.common ? null : Color(w.rarity.argb),
@@ -600,7 +601,7 @@ Look lookFor(HeroClass c, Loadout l, {String dye = 'crimson', bool gloves = fals
         beard: !female && (l.armour == 'archmage' || l.armour == 'astral') ? const Color(0xFFD8D2C4) : null,
         weapon: weapon == Weapon.none ? Weapon.staff : weapon,
         offhand: off,
-        weaponGlow: glow ?? const Color(0xFFFF9A3A),
+        weaponGlow: lit ?? const Color(0xFFFF9A3A),
         weaponTint: w?.tint == null ? null : Color(w!.tint!),
         offhandGlow: elementGlow(o?.element),
         legendary: legendary,
@@ -647,7 +648,7 @@ Look lookFor(HeroClass c, Loadout l, {String dye = 'crimson', bool gloves = fals
         quiver: const Color(0xFF6E4A2A),
         weapon: weapon == Weapon.none ? Weapon.bow : weapon,
         offhand: off,
-        weaponGlow: glow,
+        weaponGlow: lit,
         weaponTint: w?.tint == null ? null : Color(w!.tint!),
         offhandGlow: elementGlow(o?.element),
         legendary: legendary,

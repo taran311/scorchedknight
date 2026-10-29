@@ -12,7 +12,7 @@ import '../audio/audio.dart';
 import '../art/creatures.dart' show drawFoeDragon, foeDragons;
 import '../game/ammo.dart';
 import '../game/catalog.dart';
-import '../game/rules.dart' show crossbowShare;
+import '../game/rules.dart' show crossbowShare, fullSwing, aimBoost;
 import '../game/mounts.dart';
 import '../game/brews.dart';
 import '../game/classes.dart';
@@ -213,7 +213,7 @@ class MerchantWares extends StatelessWidget {
           const Icon(Icons.gps_fixed, color: Color(0xFFC8A070), size: 26),
           k.crossbow + 1 < crossbows.length ? crossbows[k.crossbow + 1].$1 : crossbows.last.$1,
           k.crossbow + 1 < crossbows.length
-              ? 'A bolt deals ${(crossbows[k.crossbow + 1].$2 * 100).round()}% of an attack (yours: ${(crossbowShare(k) * 100).round()}%), and ×$aloftShot against foes aloft'
+              ? 'Shots hit for about ${(fullSwing(k) * crossbows[k.crossbow + 1].$2 * aimBoost(k)).round()} (yours now: ${(fullSwing(k) * crossbowShare(k) * aimBoost(k)).round()}), and ×$aloftShot against foes in the air'
               : 'The best crossbow there is. You have it.',
           x.buy('crossbow'),
         ),
@@ -465,7 +465,7 @@ class EnchanterWares extends StatelessWidget {
               child: Icon(Icons.north_east, size: 16, color: Color(a.argb)),
             ),
             a.label(Missile.bolt),
-            '${a.desc} (+${ammoBonus(k.level)})${(k.ammo[a.name] ?? 0) > 0 ? ' · you have ${k.ammo[a.name]}' : ''}',
+            '${a.describe(k.level)}${(k.ammo[a.name] ?? 0) > 0 ? ' · you have ${k.ammo[a.name]}' : ''}',
             extra: x.have(MatIcon.gem(gemFor(a), size: 16), s.mat(gemKey(gemFor(a))), 1),
             Row(
               mainAxisSize: MainAxisSize.min,

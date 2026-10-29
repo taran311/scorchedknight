@@ -216,7 +216,7 @@ class _PaperDoll extends StatelessWidget {
       (const Icon(Icons.swap_horiz, size: 20, color: Palette.parch), '${(parryChance(k) * 100).round()}%', 'Parry chance'),
       (const Icon(Icons.security, size: 20, color: Palette.parch), '${(blockChance(k) * 100).round()}%', 'Block chance'),
       (const Icon(Icons.gavel, size: 20, color: Color(0xFFFFD98A)), '×$bashMult', '${skillName(k)}: ×$bashMult and dazes the foe, every 4 turns'),
-      (const Icon(Icons.gps_fixed, size: 20, color: Palette.parch), '${(crossbowShare(k) * 100).round()}%', 'Crossbow: ${(crossbowShare(k) * 100).round()}% of an attack, ×$aloftShot against foes aloft'),
+      (const Icon(Icons.gps_fixed, size: 20, color: Palette.parch), '~${(fullSwing(k) * crossbowShare(k) * aimBoost(k)).round()}', 'Crossbow shot: about ${(fullSwing(k) * crossbowShare(k) * aimBoost(k)).round()} damage, ×$aloftShot against foes in the air, and it fires special bolts'),
       if (h.poison > 0 || k.poisonFights > 0) (const Icon(Icons.science, size: 20, color: Color(0xFF9BE27A)), '+${h.poison + (k.poisonFights > 0 ? 4 + k.level ~/ 3 : 0)}', 'Poison per attack'),
       if (h.burn > 0) (const Icon(Icons.whatshot, size: 20, color: Color(0xFFFF7A2A)), '+${h.burn}', 'Fire per attack'),
       if (h.frost > 0) (const Icon(Icons.ac_unit, size: 20, color: Color(0xFF9ADFFF)), '+${h.frost}', 'Frost per attack'),
