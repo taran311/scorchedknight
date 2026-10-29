@@ -128,14 +128,30 @@ class _HaloPainter extends CustomPainter {
   bool shouldRepaint(_HaloPainter old) => old.t != t || old.col != col;
 }
 
-class _LootWindow extends StatelessWidget {
+class _LootWindow extends StatefulWidget {
   const _LootWindow({required this.controller, required this.item, this.title});
   final GameController controller;
   final GearItem item;
   final String? title;
 
   @override
-  Widget build(BuildContext context) {
+  State<_LootWindow> createState() => _LootWindowState();
+}
+
+class _LootWindowState extends State<_LootWindow> {
+  GameController get controller => widget.controller;
+  GearItem get item => widget.item;
+  String? get title => widget.title;
+
+  /// The window as it opened. Your choice is made the moment you tap, while the window is still
+  /// fading out; building it again then showed the new state (the piece already worn, Equip
+  /// greyed out) for a frame or two, a flicker under your thumb. So it's built once and kept.
+  Widget? _built;
+
+  @override
+  Widget build(BuildContext context) => _built ??= _build(context);
+
+  Widget _build(BuildContext context) {
     final k = controller.state.knight, old = controller.engine.equippedFor(item), col = rarityColour(item.rarity);
     final cant = controller.engine.whyNotWear(item);
     final better = cant == null && (item.slot == GearSlot.armour ? armourTierById(item.art).reduction > armourTierById(k.loadouts[item.heroClass ?? k.heroClass]!.armour).reduction : old == null || item.score > old.score);

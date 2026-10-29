@@ -104,26 +104,30 @@ Pose? sampleClip(Pose base, List<Keyframe> keys, double ms) {
   return Pose(List.generate(a.v.length, (j) => h00 * a.v[j] + h10 * tangent(i - 1, j) * h + h01 * b.v[j] + h11 * tangent(i, j) * h));
 }
 
-/// Wind-up, lunge with a step, slash, recover. The blade connects at [swingHitMs], the same pace
-/// a foe's blow lands at.
+/// Raise the sword while closing in, slash, hold, recover. The body's travel to the foe is the
+/// stage's dash (one smooth curve); the clip only adds the last lean into the blow, so the two
+/// never fight. The blade connects at [swingHitMs].
 const swingClip = <Keyframe>[
-  Keyframe(120, {J.nS: -40, J.nE: 120, J.nW: 70, J.lean: -6, J.nH: 4, J.nK: 14, J.fH: -8, J.fK: 10, J.dx: -6}, easeOut),
-  Keyframe(260, {J.nS: 96, J.nE: 12, J.nW: 58, J.lean: 16, J.nH: 40, J.nK: 22, J.fH: -26, J.fK: 6, J.dx: 190, J.head: 6}, easeIn),
-  Keyframe(340, {J.nS: 92, J.nE: 10, J.nW: 56, J.lean: 14, J.nH: 40, J.nK: 24, J.fH: -26, J.fK: 6, J.dx: 190}),
-  Keyframe(680, {}),
+  Keyframe(200, {J.nS: -40, J.nE: 120, J.nW: 70, J.lean: -6, J.nH: 4, J.nK: 14, J.fH: -8, J.fK: 10, J.dx: 6}),
+  Keyframe(320, {J.nS: 96, J.nE: 12, J.nW: 58, J.lean: 16, J.nH: 40, J.nK: 22, J.fH: -26, J.fK: 6, J.dx: 40, J.head: 6}, easeIn),
+  Keyframe(420, {J.nS: 92, J.nE: 10, J.nW: 56, J.lean: 14, J.nH: 40, J.nK: 24, J.fH: -26, J.fK: 6, J.dx: 40}),
+  Keyframe(780, {}),
 ];
 
 /// How long any blow takes to land, yours or a foe's, so the two sides fight at the same pace.
-const strikeMs = 260.0;
+const strikeMs = 320.0;
 const swingHitMs = strikeMs;
 
-/// The stunning blow: the weapon goes up over your head and comes crashing straight down, the
-/// knees bending into it. Lands at [swingHitMs], like the plain swing.
+/// How far the dash carries you toward the foe for a blow (in dash units: 1 is the stage's reach).
+const swingDash = 1.57, crushDash = 1.62;
+
+/// The stunning blow: the weapon goes up over your head as you close in, then comes crashing
+/// straight down, the knees bending into it. Lands at [swingHitMs], like the plain swing.
 const crushClip = <Keyframe>[
-  Keyframe(130, {J.nS: 172, J.nE: 40, J.nW: 10, J.fS: 70, J.fE: 60, J.lean: -10, J.head: -6, J.nH: 6, J.nK: 10, J.fH: -6, J.fK: 8, J.dx: 20}, easeOut),
-  Keyframe(260, {J.nS: 62, J.nE: 0, J.nW: 40, J.fS: 40, J.fE: 30, J.lean: 26, J.head: 10, J.nH: 46, J.nK: 40, J.fH: -30, J.fK: 26, J.dx: 180}, easeIn),
-  Keyframe(360, {J.nS: 58, J.nE: 0, J.nW: 42, J.fS: 40, J.fE: 30, J.lean: 24, J.head: 8, J.nH: 46, J.nK: 42, J.fH: -30, J.fK: 28, J.dx: 180}),
-  Keyframe(720, {}),
+  Keyframe(200, {J.nS: 172, J.nE: 40, J.nW: 10, J.fS: 70, J.fE: 60, J.lean: -10, J.head: -6, J.nH: 6, J.nK: 10, J.fH: -6, J.fK: 8, J.dx: 6}),
+  Keyframe(320, {J.nS: 62, J.nE: 0, J.nW: 40, J.fS: 40, J.fE: 30, J.lean: 26, J.head: 10, J.nH: 46, J.nK: 40, J.fH: -30, J.fK: 26, J.dx: 40}, easeIn),
+  Keyframe(430, {J.nS: 58, J.nE: 0, J.nW: 42, J.fS: 40, J.fE: 30, J.lean: 24, J.head: 8, J.nH: 46, J.nK: 42, J.fH: -30, J.fK: 28, J.dx: 40}),
+  Keyframe(800, {}),
 ];
 
 const hitClip = <Keyframe>[

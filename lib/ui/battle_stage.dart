@@ -808,7 +808,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     final nEffects = [r.damage.poison, r.damage.burn, r.damage.frost, r.damage.smite].where((n) => n > 0).length;
     final dragonFire = (r.dragon != null && r.dragon!.name != 'Egg') || r.pet != null;
     // The foe's turn comes once your blow, its effects and any dragon fire have landed.
-    final counterAt = math.max(hitAt + 160 * nEffects + 360, dragonFire ? hitAt + 760.0 : 0.0);
+    final counterAt = math.max(hitAt + 160 * nEffects + 440, dragonFire ? hitAt + 760.0 : 0.0);
     final end = [950.0, hitAt + 160 * nEffects + 60, if (dragonFire) hitAt + 580, if (r.counter != null) counterAt + 760, if (r.knockedOut || r.cheatedDeath) counterAt + strikeMs + _reapMs].reduce(math.max);
     // Mounted: the day's first strike opens with a charge, played before the blow.
     if (r.chargeHit > 0 && r.mount != null) _playCharge(r);
@@ -884,12 +884,10 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
           // A quick slash, or for the stunning blow, an overhead crush.
           _knightClip = bash ? crushClip : swingClip;
           _knightClipStart = now;
-          // A step in behind the blow (a full charge for a bash), then back to your mark. The step
-          // keeps exactly the swing's own timing (wind-up, then accelerating into the hit, then
-          // easing home with the recovery): when it ran on its own curve, the body raced ahead,
-          // stalled, then lurched again, and the swing felt like it was dropping frames.
-          _tween('dash', bash ? 1 : .92, swingHitMs - 110, delay: 110, ease: easeIn);
-          _tween('dash', 0, 340, delay: swingHitMs + 80, ease: easeInOut);
+          // Run in to the foe on one smooth curve, arriving just before the blade comes down (the
+          // clip raises the sword on the way), then glide back to your mark after the hold.
+          _tween('dash', bash ? crushDash : swingDash, swingHitMs - 60, ease: easeInOut);
+          _tween('dash', 0, 380, delay: swingHitMs + 100, ease: easeInOut);
         });
         if (bash) {
           // The ground cracks where it lands: dust thrown out both ways, and the screen jolts.
@@ -1815,7 +1813,7 @@ class _ScenePainter extends CustomPainter {
         // Afterimages streaming behind the charge (just one on a phone: each is a whole extra knight
         // to draw, and three of them dropped frames mid-swing).
         for (var i = 1; i <= (s._lite ? 1 : 3); i++) {
-          drawHumanoid(canvas, hero, kPose, t, DrawOptions(at: Offset(kx - i * 48 * dash, _groundY), scale: _knightScale, alpha: .32 / i * dash, shadow: false), still: true);
+          drawHumanoid(canvas, hero, kPose, t, DrawOptions(at: Offset(kx - i * 48 * math.min(dash, 1), _groundY), scale: _knightScale, alpha: .32 / i * math.min(dash, 1), shadow: false), still: true);
         }
       }
       drawHumanoid(
