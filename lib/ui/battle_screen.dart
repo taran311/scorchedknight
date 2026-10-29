@@ -12,7 +12,7 @@ import '../game/catalog.dart';
 import '../game/controller.dart';
 import '../game/crafting.dart' show smithName;
 import '../game/engine.dart';
-import '../game/loot.dart' show specialCharge, Stat;
+import '../game/loot.dart' show specialCharge, Stat, RarityInfo, GearSlotLabel;
 import '../game/models.dart';
 import '../game/rules.dart';
 import '../game/spells.dart';
@@ -163,8 +163,11 @@ class _BattleScreenState extends State<BattleScreen> {
   ];
 
   /// Potion and companion tiles only show when you have one, to keep the hotbar clean. (Rites
-  /// stay, even short of mana, so you can plan ahead.)
-  bool get _hasPotions => c.state.knight.potions > 0;
+  /// stay, even short of mana, so you can plan ahead.) Once the potion tile is up it stays for the
+  /// rest of the fight, greyed out at ×0: the moves sliding along under your thumb mid-fight felt
+  /// wrong, and would send a number key to the wrong move. (A new fight starts afresh.)
+  bool get _hasPotions => _potionShown = (_potionShown && c.state.turn > 0) || c.state.knight.potions > 0;
+  bool _potionShown = false;
   bool get _hasCompanion => petStage(c.state.knight) != null || dragonStage(c.state.knight) != null;
 
   /// Shoot: up comes the timing bar (unless you've asked for auto-aim).
@@ -660,6 +663,11 @@ class _FoeCard extends StatelessWidget {
       badges: [
         if (weak.isNotEmpty) FoeBadge(label: 'Weak', icons: [for (final w in weak) _wayIcon(w)], colour: const Color(0xFF9BE27A), tip: 'Weak to ${weak.join(', ')}'),
         if (shrug.isNotEmpty) FoeBadge(label: 'Resists', icons: [for (final w in shrug) Opacity(opacity: .75, child: _wayIcon(w))], colour: const Color(0xFFE07A6A), tip: 'Shrugs off ${shrug.join(', ')}'),
+        // What you've put on it, with the turns left.
+        if (c.state.inBattle && c.state.foeSlowed > 0) FoeBadge(label: 'Slowed ${c.state.foeSlowed}', colour: const Color(0xFF6ABF9A), tip: 'Half its blows miss · ${c.state.foeSlowed} turns left'),
+        if (c.state.inBattle && c.state.foeWeakened > 0) FoeBadge(label: 'Weakened ${c.state.foeWeakened}', colour: const Color(0xFFB8A0D8), tip: 'Its blows land 40% softer · ${c.state.foeWeakened} turns left'),
+        if (c.state.inBattle && c.state.foeExposed > 0) FoeBadge(label: 'Exposed ${c.state.foeExposed}', colour: const Color(0xFFE0A050), tip: 'Your hits deal 25% more · ${c.state.foeExposed} turns left'),
+        if (c.state.inBattle && c.state.foeAsleep > 0) const FoeBadge(label: 'Asleep', colour: Color(0xFFB8A0E8), tip: 'It sleeps through its next blow'),
         if (c.state.inBattle && !c.busy) FoeBadge(icons: const [Icon(Icons.flash_on, size: 15, color: Color(0xFFFF8A70))], text: '~${counterDamage(c.state)}', colour: const Color(0xFFE0A090), tip: 'Hits for about ${counterDamage(c.state)}'),
         if (foe.mimic && c.state.lastStyle != null)
           FoeBadge(
@@ -1101,70 +1109,107 @@ class _Result extends StatelessWidget {
   /// Drawn on the dark command deck instead of parchment.
   final bool onDark;
 
+  static const _green = Color(0xFF9BE27A), _gold = Color(0xFFF2C14E);
+
   @override
   Widget build(BuildContext context) {
-    final c = controller, k = c.lastKill, r = c.lastSwing;
-    final (title, colour, lines) = switch (c.outcome!) {
-      Outcome.won when k != null && k.wild => (
-        'Victory!',
-        Palette.goldText,
-        [
-          '+${fmt(k.xp)} XP${k.levelUps > 0 ? ' · level ${c.state.knight.level}!' : ''}',
-          'Into your pack: ${fmt(k.packGold)} gold${k.packed.isEmpty ? '' : ', ${k.packed.map((g) => g.name).join(', ')}'}.',
-          if (k.potion) 'It was carrying a health potion (${c.state.knight.potions} now).',
-          'Pack: ${fmt(c.state.packGold)} gold, ${c.state.pack.length} piece${c.state.pack.length == 1 ? '' : 's'} of gear. Not yours until you get it home.',
-        ],
-      ),
-      Outcome.won => (
-        k?.won == true ? 'Vharrax the Ember King is no more!' : (k?.boss == true ? '${k!.name} is defeated!' : 'Victory!'),
-        Palette.goldText,
-        [
-          if (k != null) '+${fmt(k.xp)} XP · +${fmt(k.coins)} gold${k.levelUps > 0 ? ' · level ${c.state.knight.level}!' : ''}',
-          if (k?.potion == true) 'It was carrying a health potion (${c.state.knight.potions} now).',
-          if (k?.jobFind != null) 'For Hob: ${k!.jobFind} (timber ${c.state.timber}/$timberNeeded, iron ${c.state.ironScrap}/$ironNeeded).',
-          if ((k?.reagents ?? 0) > 0) 'Gathered ${k!.reagents} ${continents[c.state.continent].reagent} (${c.state.reagents[c.state.continent]} now), for Old Wick\'s wards.',
-          if (k?.chest != null) 'You open ${withArticle(k!.chest!.tier.label.toLowerCase())}: ${k.chest!.summary}.',
-          if (k?.companion != null) k!.companion!,
-          if (k?.prize != null) 'Its treasure: ${k!.prize!.name}.',
-          for (final l in k?.opened ?? const <int>[]) isSideLand(l) ? 'Off the road, a new land: ${continents[l].name}!' : 'The way to ${continents[l].name} is open!',
-          if (k?.trophy != null) 'A trophy: ${k!.trophy}, for $smithName\'s forge.',
-          if (k?.blueprint != null) 'A blueprint! The ${k!.blueprint}. Take it to $smithName.',
-          if (k?.won == true) 'The Great Burning is over. The world can start growing back, and so can your eyebrows. (The adventure carries on: every continent is still there to fight in.)',
-        ],
-      ),
-      Outcome.fled when r?.packLoss != null => (
-        'You got away!',
-        Palette.inkSoft,
-        [r!.packLoss!.none ? 'Your pack was empty, so nothing fell out as you ran.' : 'As you ran, ${r.packLoss!.summary} fell out of your pack.', 'You\'re still out in the wilds.'],
-      ),
-      Outcome.fled => ('You got away!', Palette.inkSoft, ['You don\'t stop running until you\'re back at the Soot & Kettle. Nothing won, nothing lost but a little dignity.']),
-      Outcome.knockedOut when r?.wildExit != null => (
-        'Knocked out!',
-        const Color(0xFF7A1D14),
-        [
-          'Scavengers went through your pack while you lay in the ash${r!.packLoss!.none ? ', and found it empty.' : ': ${r.packLoss!.summary} gone.'}',
-          if (r.wildExit!.gold > 0 || r.wildExit!.items > 0) 'The innkeeper finds you and what\'s left: ${r.wildExit!.gold} gold${r.wildExit!.items > 0 ? ' and ${r.wildExit!.items} piece${r.wildExit!.items == 1 ? '' : 's'} of gear' : ''}.',
-          if ((r.goldLost) > 0) 'Someone helped themselves to ${r.goldLost} of your own gold too.',
-        ],
-      ),
-      Outcome.knockedOut => (
-        'Knocked out!',
-        const Color(0xFF7A1D14),
-        [
-          'The innkeeper finds you in a ditch and drags you back to the Soot & Kettle.${(r?.goldLost ?? 0) > 0 ? ' Someone helped themselves to ${r!.goldLost} gold on the way.' : ''} You\'re patched up and ready to go again.',
-          if (c.wildHint(c.state.continent) case final a?) 'Struggling here? Better gear waits in ${wildAreas[a].name} (on the map), and the deeper you dare, the better it gets.',
-        ],
-      ),
-    };
+    final c = controller, k = c.lastKill, r = c.lastSwing, s = c.state;
+    // A win is a row of spoils, each an icon and a few words; everything else is a line or two.
+    final spoils = <_Spoil>[];
+    var lines = <String>[];
+    final String title;
+    switch (c.outcome!) {
+      case Outcome.won:
+        title = k?.won == true ? 'The Ember King is no more!' : (k?.boss == true ? 'Boss defeated!' : 'Victory!');
+        if (k != null) {
+          final chest = k.chest;
+          spoils.addAll([
+            if (k.levelUps > 0) _Spoil(const Icon(Icons.arrow_upward, size: 18, color: _green), 'Level ${s.knight.level}!', _green, big: true),
+            _Spoil(const Icon(Icons.auto_awesome, size: 17, color: Color(0xFFB8D8FF)), '+${fmt(k.xp)} XP', const Color(0xFFB8D8FF)),
+            if (k.wild)
+              _Spoil(const ItemIcon(Item.coins, size: 18), '+${fmt(k.packGold)} to your pack', _gold, tip: 'Gold and gear in your pack are only yours once you get them home')
+            else
+              _Spoil(const ItemIcon(Item.coins, size: 18), '+${fmt(k.coins + (chest?.coins ?? 0))}', _gold),
+            if (k.potion || chest?.potion == true) const _Spoil(ItemIcon(Item.potion, size: 18), 'Potion', Color(0xFFE88A70)),
+            if (k.jobFind != null)
+              _Spoil(ItemIcon(k.jobFind!.contains('Timber') ? Item.timber : Item.iron, size: 18), k.jobFind!.contains('Timber') ? 'Timber ${s.timber}/$timberNeeded' : 'Iron ${s.ironScrap}/$ironNeeded', Palette.cream, tip: 'For Hob\'s repairs'),
+            if (k.reagents > 0) _Spoil(const Icon(Icons.local_florist, size: 17, color: Color(0xFFE0A0D0)), '+${k.reagents} ${continents[s.continent].reagent}', const Color(0xFFE0A0D0), tip: 'For Old Wick\'s wards (${s.reagents[s.continent]} now)'),
+            if (chest != null) _Spoil(const Icon(Icons.inventory_2, size: 17, color: _gold), chest.tier.label, _gold),
+            for (final g in [...?chest?.items, if (k.wild) ...k.packed]) _Spoil(const Icon(Icons.shield_outlined, size: 17), g.name, Color(g.rarity.argb), tip: '${g.rarity.label} ${g.slot.label.toLowerCase()}'),
+            if (chest?.ammo != null) _Spoil(const Icon(Icons.north_east, size: 17, color: Palette.cream), chest!.ammo!, Palette.cream),
+            if (k.companion != null) _Spoil(const Icon(Icons.pets, size: 17, color: _green), 'New companion!', _green, big: true, tip: k.companion),
+            if (k.prize != null) _Spoil(const Icon(Icons.diamond, size: 17, color: Color(0xFFFFB04A)), k.prize!.name, Color(k.prize!.rarity.argb), big: true),
+            for (final l in k.opened) _Spoil(const Icon(Icons.map, size: 17, color: _gold), isSideLand(l) ? 'Found: ${continents[l].name}' : 'Open: ${continents[l].name}', _gold, big: true),
+            if (k.trophy != null) _Spoil(const Icon(Icons.emoji_events, size: 17, color: Palette.cream), k.trophy!, Palette.cream, tip: 'For $smithName\'s forge'),
+            if (k.blueprint != null) _Spoil(const Icon(Icons.description, size: 17, color: Color(0xFF8AB8F0)), k.blueprint!, const Color(0xFF8AB8F0), big: true, tip: 'A blueprint. Take it to $smithName'),
+          ]);
+          if (k.won) lines = ['The Great Burning is over. Your eyebrows can start growing back.'];
+        }
+      case Outcome.fled when r?.packLoss != null:
+        title = 'You got away!';
+        lines = [r!.packLoss!.none ? 'Nothing fell out of your pack.' : 'Dropped as you ran: ${r.packLoss!.summary}.'];
+      case Outcome.fled:
+        title = 'You got away!';
+        lines = ['Back to the Soot & Kettle, a little less dignified.'];
+      case Outcome.knockedOut when r?.wildExit != null:
+        title = 'Knocked out!';
+        lines = [
+          r!.packLoss!.none ? 'Scavengers found your pack empty.' : 'Scavengers took ${r.packLoss!.summary}.',
+          if (r.wildExit!.gold > 0 || r.wildExit!.items > 0) 'Hob saved ${r.wildExit!.gold} gold${r.wildExit!.items > 0 ? ' and ${r.wildExit!.items} piece${r.wildExit!.items == 1 ? '' : 's'} of gear' : ''}.',
+          if (r.goldLost > 0) '−${r.goldLost} of your own gold.',
+        ];
+      case Outcome.knockedOut:
+        title = 'Knocked out!';
+        lines = [
+          'Hob dragged you back to the inn.${(r?.goldLost ?? 0) > 0 ? ' −${r!.goldLost} gold.' : ''}',
+          if (c.wildHint(s.continent) case final a?) 'Tip: better gear waits in ${wildAreas[a].name}.',
+        ];
+    }
+    final colour = c.outcome == Outcome.knockedOut ? (onDark ? const Color(0xFFE88A70) : const Color(0xFF7A1D14)) : (onDark ? Palette.amber : Palette.goldText);
     final body = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: onDark ? Txt.label(size: 20, color: c.outcome == Outcome.knockedOut ? const Color(0xFFE88A70) : Palette.amber, weight: FontWeight.w800) : Txt.inkLabel(size: 18, color: colour)),
-        const SizedBox(height: 4),
-        for (final l in lines) Padding(padding: const EdgeInsets.only(bottom: 3), child: Text(l, style: onDark ? Txt.onStone(size: 14.5, color: Palette.cream) : Txt.body(size: 14.5))),
+        Text(title, style: onDark ? Txt.label(size: 20, color: colour, weight: FontWeight.w800) : Txt.inkLabel(size: 18, color: colour)),
+        const SizedBox(height: 6),
+        if (spoils.isNotEmpty) Wrap(spacing: 6, runSpacing: 6, children: spoils),
+        for (final l in lines) Padding(padding: const EdgeInsets.only(top: 4), child: Text(l, style: onDark ? Txt.onStone(size: 14.5, color: Palette.cream) : Txt.body(size: 14.5))),
       ],
     );
     return onDark ? body : Parchment(child: body);
+  }
+}
+
+/// One thing won: an icon and a few words, in a chip. The big ones (a level, a new land, a
+/// companion) glow in their colour.
+class _Spoil extends StatelessWidget {
+  const _Spoil(this.icon, this.text, this.colour, {this.big = false, this.tip});
+  final Widget icon;
+  final String text;
+  final Color colour;
+  final bool big;
+  final String? tip;
+
+  @override
+  Widget build(BuildContext context) {
+    final chip = Container(
+      height: 30,
+      padding: const EdgeInsets.symmetric(horizontal: 9),
+      decoration: BoxDecoration(
+        color: big ? Color.lerp(const Color(0xE0120E0A), colour, .22) : const Color(0xD0120E0A),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: colour.withValues(alpha: big ? .9 : .45), width: big ? 1.5 : 1),
+        boxShadow: big ? [BoxShadow(color: colour.withValues(alpha: .35), blurRadius: 8)] : null,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconTheme.merge(data: IconThemeData(color: colour), child: SizedBox(width: 18, height: 18, child: Center(child: icon))),
+          const SizedBox(width: 6),
+          Flexible(child: Text(text, overflow: TextOverflow.ellipsis, style: Txt.label(size: 14, color: big ? colour : Palette.cream, weight: FontWeight.w800))),
+        ],
+      ),
+    );
+    return tip == null ? chip : Tooltip(message: tip!, triggerMode: isPhone(context) ? TooltipTriggerMode.tap : null, child: chip);
   }
 }
 
@@ -1188,13 +1233,19 @@ class _AimBar extends StatefulWidget {
 }
 
 class _AimBarState extends State<_AimBar> with SingleTickerProviderStateMixin {
-  late final _dial = AnimationController(vsync: this, duration: Duration(milliseconds: (950 / widget.speed).round()))..repeat(reverse: true);
+  late final _dial = AnimationController(vsync: this, duration: Duration(milliseconds: (950 / widget.speed).round()));
   final _focus = FocusNode();
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _focus.requestFocus());
+    // Start sweeping once the bar is on screen, so the frame that lays it out doesn't swallow the
+    // first stretch of the sweep (that was the stutter as it set off from the left).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _focus.requestFocus();
+      _dial.repeat(reverse: true);
+    });
   }
 
   @override
@@ -1204,8 +1255,8 @@ class _AimBarState extends State<_AimBar> with SingleTickerProviderStateMixin {
     super.dispose();
   }
 
-  // An eased sweep: quick through the middle, lingering a touch at the ends.
-  double get _pos => Curves.easeInOutSine.transform(_dial.value);
+  // Mostly an even sweep, easing just a little at the ends: a full stop there read as a hitch.
+  double get _pos => .75 * _dial.value + .25 * Curves.easeInOutSine.transform(_dial.value);
 
   void _loose() {
     _dial.stop();
@@ -1240,7 +1291,10 @@ class _AimBarState extends State<_AimBar> with SingleTickerProviderStateMixin {
               onTapDown: (_) => _loose(),
               child: SizedBox(
                 height: 46,
-                child: AnimatedBuilder(animation: _dial, builder: (context, _) => CustomPaint(painter: _AimPainter(_pos, widget.zone), size: Size.infinite)),
+                // Only the needle repaints each frame; the bar under it is drawn once.
+                child: RepaintBoundary(
+                  child: CustomPaint(painter: _AimPainter(widget.zone), foregroundPainter: _NeedlePainter(_dial, () => _pos), size: Size.infinite),
+                ),
               ),
             ),
           ),
@@ -1251,8 +1305,8 @@ class _AimBarState extends State<_AimBar> with SingleTickerProviderStateMixin {
 }
 
 class _AimPainter extends CustomPainter {
-  _AimPainter(this.pos, this.zone);
-  final double pos, zone;
+  _AimPainter(this.zone);
+  final double zone;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1281,12 +1335,25 @@ class _AimPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.6
       ..color = const Color(0xFF6A3A0A));
-    // The dial: a bright needle with a glow, overshooting the bar a little.
-    final x = bar.left + bar.width * pos;
+  }
+
+  @override
+  bool shouldRepaint(_AimPainter old) => old.zone != zone;
+}
+
+/// The dial's needle, repainted every frame straight from the animation (no rebuilds), with a
+/// soft halo instead of a blur, which is cheaper to draw.
+class _NeedlePainter extends CustomPainter {
+  _NeedlePainter(Listenable dial, this.pos) : super(repaint: dial);
+  final double Function() pos;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // A bright needle with a halo, overshooting the bar a little.
+    final bar = Rect.fromLTWH(6, 8, size.width - 12, size.height - 16), x = bar.left + bar.width * pos();
     canvas.drawLine(Offset(x, 0), Offset(x, size.height), Paint()
-      ..color = const Color(0x99FFF0C0)
-      ..strokeWidth = 8
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4));
+      ..color = const Color(0x55FFF0C0)
+      ..strokeWidth = 9);
     canvas.drawLine(Offset(x, 2), Offset(x, size.height - 2), Paint()
       ..color = const Color(0xFFFFFFFF)
       ..strokeWidth = 3
@@ -1295,7 +1362,7 @@ class _AimPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_AimPainter old) => old.pos != pos || old.zone != zone;
+  bool shouldRepaint(_NeedlePainter old) => false;
 }
 
 /// On a phone (no hover): the picked move's card, laid out in the deck above the moves: what it

@@ -66,10 +66,12 @@ var side = false;
 /// A side land worth a visit: open, its boss still up, and you're its level.
 int? sideToDo(GameEngine e) {
   final s = e.state, k = s.knight;
+  // The lowest-level one first, as a player would.
+  int? best;
   for (var i = mainLands; i < continents.length; i++) {
-    if (e.whyNotTravel(i) == null && !s.bossesDown.contains(i) && k.level >= continents[i].minLevel + 2) return i;
+    if (e.whyNotTravel(i) == null && !s.bossesDown.contains(i) && k.level >= continents[i].minLevel + 2 && (best == null || continents[i].minLevel < continents[best].minLevel)) best = i;
   }
-  return null;
+  return best;
 }
 
 /// Whether the auto-player uses Mags' brews (pass 'nobrews' to compare without), and how often.

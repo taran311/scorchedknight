@@ -11,7 +11,7 @@ import 'paint_kit.dart';
 import 'silhouette_lands.dart';
 import 'scenery.dart' show sceneSize;
 
-enum Setting { forest, road, graveyard, plague, village, castle, warcamp, ruins, crypt, elderwood, blightwood, heartgrove, orkcamp, totems, lair, swamp, ice, volcano, boneyard, summit, coast, desert, tomb, moor, moonwood, deepforge, fogshore, jungle, shiftisle, aerie, blossom }
+enum Setting { forest, road, graveyard, plague, village, castle, warcamp, ruins, crypt, elderwood, blightwood, heartgrove, orkcamp, totems, lair, swamp, ice, volcano, boneyard, summit, coast, desert, tomb, moor, moonwood, deepforge, fogshore, jungle, shiftisle, aerie, blossom, roost }
 
 /// How the floating particles behave: drifting dust, rising embers or ash, or falling snow.
 enum MoteStyle { drift, embers, snow, spores, leaves }
@@ -135,6 +135,12 @@ const foeSettings = <String, Setting>{
   'onmyoji': Setting.blossom,
   'oni': Setting.blossom,
   'shogun': Setting.blossom,
+  // The Hollowdeep.
+  'cavebat': Setting.roost,
+  'batkin': Setting.roost,
+  'batkinCaller': Setting.roost,
+  'batkinGuard': Setting.roost,
+  'roostMother': Setting.roost,
   // The Skyreach Aeries.
   'harpy': Setting.aerie,
   'aerieWarden': Setting.aerie,
@@ -190,6 +196,20 @@ const foeSettings = <String, Setting>{
 Setting settingFor(String look) => foeSettings[look] ?? Setting.road;
 
 const _specs = <Setting, BattlegroundSpec>{
+  // The Hollowdeep: a cavern lit violet from somewhere deeper, glowcaps along the floor, bats
+  // hanging from the roof in their thousands.
+  Setting.roost: BattlegroundSpec(
+    sky: [Color(0xFF0E0A14), Color(0xFF1E1628), Color(0xFF3A2A4A), Color(0xFF5A4A7A)],
+    glow: Color(0xFFB8A0FF),
+    far: Color(0xFF241C30),
+    ridge: Color(0xFF1C1626),
+    hill: Color(0xFF181220),
+    ground: [Color(0xFF2E2838), Color(0xFF120E16)],
+    path: [Color(0xFF4A4058), Color(0xFF241E2C)],
+    grass: Color(0xFF0E0A12),
+    mote: Color(0x998AF0E0),
+    jagged: 2,
+  ),
   // The Blossom Isles: a pink dusk, pagodas on the hills, and petals always falling.
   Setting.blossom: BattlegroundSpec(
     sky: [Color(0xFF3A2A4A), Color(0xFF8A5A7A), Color(0xFFE8A0A8), Color(0xFFFFE0C8)],
@@ -1045,6 +1065,16 @@ void _props(Canvas c, Setting s, BattlegroundSpec sp, SeededRandom r) {
       }
       _totem(c, 510, 412);
       c.drawCircle(const Offset(510, 360), 70, _radial(const Offset(510, 360), 70, const Color(0xFF8BE05A), const [.5, .15, 0], const [0, .4, 1]));
+    case Setting.roost:
+      // Glowcaps at the cavern's edges.
+      for (final x in const [70.0, 900.0]) {
+        c.drawCircle(Offset(x, 400), 40, _radial(Offset(x, 400), 40, const Color(0xFF8AF0E0), const [.4, .12, 0], const [0, .45, 1]));
+        for (var i = 0; i < 3; i++) {
+          final dx = (i - 1) * 12.0, h = 10.0 + i * 6;
+          c.drawLine(Offset(x + dx, 412), Offset(x + dx, 412 - h), strokePaint(const Color(0xFFB8D8D0), 2.2));
+          c.drawOval(Rect.fromCenter(center: Offset(x + dx, 412 - h), width: 14, height: 8), Paint()..color = const Color(0xFFC8FFF4));
+        }
+      }
     case Setting.deepforge:
       // An anvil, and a brazier of forge-coals glowing beside it.
       final iron = ramp(0xFF5A5E66, .3, .5);

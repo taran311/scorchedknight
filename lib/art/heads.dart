@@ -99,6 +99,8 @@ void drawHead(Canvas c, Skeleton sk, Look look, double t, {bool still = false}) 
       _topknot(c, r, look);
     case HeadKind.oni:
       _oniHead(c, r, look);
+    case HeadKind.bat:
+      _batHead(c, r, look);
   }
   if (look.crown && look.head == HeadKind.shifter) {
     // The Thousandfold: a ring of faces, like the Mother of Masks, but every one of them its own.
@@ -2399,4 +2401,58 @@ void _birdHead(Canvas c, double r, Look look) {
   c.drawCircle(eye, r * .14, Paint()..color = look.eyeGlow ?? const Color(0xFFFFD84A));
   c.drawCircle(eye, r * .07, Paint()..color = const Color(0xFF14100A));
   c.drawLine(eye + Offset(-r * .2, -r * .16), eye + Offset(r * .22, -r * .1), strokePaint(shade(f[2], -.35), 2.2));
+}
+
+/// A batkin's head: broad pointed ears splayed back and forward (ridged inside), a round furry
+/// skull, a short snout with an upturned leaf nose, small fangs and glowing eyes.
+void _batHead(Canvas c, double r, Look look) {
+  final fur = look.skin, dark = [shade(fur[1], -.25), shade(fur[2], -.2), shade(fur[2], -.5)];
+  for (final (b0, b1, tip, ramp, inner) in [(-.75, .0, const Offset(-.95, -2.05), dark, const Color(0xFF5A3640)), (-.2, .55, const Offset(.62, -2.0), fur, const Color(0xFF9A6070))]) {
+    final ear = Path()
+      ..moveTo(r * b0, -r * .6)
+      ..quadraticBezierTo(r * (b0 - .05), -r * 1.4, r * tip.dx, r * tip.dy)
+      ..quadraticBezierTo(r * (b1 + .1), -r * 1.3, r * b1, -r * .75)
+      ..close();
+    fillPath(c, ear, ramp, tip * r, Offset(r * (b0 + b1) / 2, -r * .6));
+    final cx = (b0 + b1) / 2;
+    c.drawPath(
+      Path()
+        ..moveTo(r * (b0 + .15), -r * .75)
+        ..quadraticBezierTo(r * (b0 + .05), -r * 1.35, r * (tip.dx * .8 + cx * .2), r * (tip.dy * .85 - .05))
+        ..quadraticBezierTo(r * (b1 - .05), -r * 1.25, r * (b1 - .12), -r * .82)
+        ..close(),
+      Paint()..color = inner,
+    );
+    for (final k in const [.35, .6]) {
+      c.drawLine(Offset(r * (cx + (tip.dx - cx) * k * .6), -r * (.8 + .2 * k)), Offset(r * (cx + (tip.dx - cx) * (k + .25)), r * (-.8 + (tip.dy + .8) * (k + .15))), strokePaint(shade(inner, -.4).withValues(alpha: .6), 1.2));
+    }
+  }
+  final head = Path()
+    ..moveTo(-r * .85, r * .55)
+    ..quadraticBezierTo(-r * 1.05, -r * .9, r * .1, -r * .92)
+    ..quadraticBezierTo(r * .85, -r * .88, r * .95, -r * .35)
+    ..quadraticBezierTo(r * 1.2, -r * .2, r * 1.22, r * .15)
+    ..quadraticBezierTo(r * 1.2, r * .55, r * .9, r * .6)
+    ..quadraticBezierTo(r * .3, r * 1.1, -r * .45, r * .95)
+    ..close();
+  fillPath(c, head, fur, Offset(-r, -r), Offset(r * 1.3, r));
+  // Tufts of fur at the cheek and throat.
+  for (final (x, y) in const [(-.7, .7), (-.4, .95), (-.05, 1.0)]) {
+    c.drawPath(poly([Offset(r * (x - .15), r * (y - .25)), Offset(r * (x - .05), r * (y + .25)), Offset(r * (x + .15), r * (y - .2))]), Paint()..color = fur[1]);
+  }
+  final leaf = Path()
+    ..moveTo(r * 1.0, -r * .05)
+    ..quadraticBezierTo(r * 1.0, -r * .5, r * 1.12, -r * .62)
+    ..quadraticBezierTo(r * 1.3, -r * .4, r * 1.26, -r * .02)
+    ..close();
+  fillPath(c, leaf, [shade(fur[1], -.1), shade(fur[1], -.3), shade(fur[1], -.6)], Offset(r, -r * .6), Offset(r * 1.3, 0), width: 1.1);
+  _ellipse(c, Offset(r * 1.16, r * .1), r * .13, r * .09, Paint()..color = const Color(0xFF1A1012));
+  c.drawPath(poly([Offset(r * 1.18, r * .3), Offset(r * .55, r * .36), Offset(r * 1.0, r * .56)]), Paint()..color = const Color(0xFF240A10));
+  for (final x in const [.72, 1.02]) {
+    c.drawPath(poly([Offset(r * x - 2, r * .33), Offset(r * x, r * .62), Offset(r * x + 2, r * .33)]), Paint()..color = const Color(0xFFF2ECE0));
+  }
+  c.drawPath(Path()..moveTo(r * .2, -r * .52)..quadraticBezierTo(r * .55, -r * .66, r * .9, -r * .46), strokePaint(shade(fur[2], -.35), 3.2));
+  final glow = look.eyeGlow ?? const Color(0xFFFFB04A), eye = Offset(r * .6, -r * .28);
+  c.drawCircle(eye, r * .24, Paint()..color = glow.withValues(alpha: .55)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5));
+  _ellipse(c, eye, r * .16, r * .12, Paint()..color = glow);
 }

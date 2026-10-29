@@ -325,6 +325,8 @@ String? landTrophyName(int land) => switch (land) {
   13 => 'coral',
   14 => 'skin',
   15 => 'feather',
+  // The Hollowdeep's bats leave fangs, like Ravenmoor's vampires: the same Nightblood set.
+  17 => 'fang',
   _ => null,
 };
 
@@ -791,7 +793,35 @@ const continents = <Continent>[
       NamedRare('Kuro the Unseen', 'shinobi', Aura.cursed),
     ],
   ),
+  Continent(
+    name: 'The Hollowdeep',
+    blurb: 'Caves under the fen hills, where the bats fled when the sky burned. There are millions of them down there now, and they have grown large. The batkin who live among them hunt by ear, and they can hear you breathing.',
+    minLevel: 19,
+    tier: 3,
+    opensAfter: 1,
+    argb: 0xFF7A6A9A,
+    foes: [
+      FoeType('Giant Cave Bat', 'cavebat', hp: .75, beast: true, aloft: true),
+      FoeType('Batkin Skulker', 'batkin', hp: .85, evasive: true),
+      FoeType('Batkin Echo-Caller', 'batkinCaller', hp: .9, strike: Strike.magic),
+      FoeType('Batkin Roost-Guard', 'batkinGuard', armoured: true),
+      FoeType('Cave Bear', 'cavebear', hp: 1.05, beast: true),
+    ],
+    boss: FoeType('The Roost Mother', 'roostMother', boss: true, hp: 1.2, beast: true, aloft: true),
+    companion: Companion.none,
+    companionText: 'The Roost Mother folds her wings and drops into the dark below. Ten thousand bats pour out of the caves at once, past you, up into a sky that isn\'t burning any more. The batkin watch them go, and then they watch you.',
+    prize: 'echostone',
+    reagent: 'Glowcap',
+    packs: [('cavebat', 'Bat Swarm')],
+    named: [
+      NamedRare('Old Shriek', 'cavebat', Aura.ancient),
+      NamedRare('Nightwhisper', 'batkin', Aura.cursed),
+    ],
+  ),
 ];
+
+/// The Hollowdeep: its bats and batkin carry the Duskwing weapons (one per hero).
+const batLand = 17;
 
 /// The Blossom Isles: their weapons, armour and helms only drop there.
 const eastLand = 16;
@@ -1137,6 +1167,10 @@ const entGearChance = .12, entGearChanceBoss = .4;
 /// The elves of the Silverwood carry a Thornbloom weapon: the chance one leaves it (once per hero).
 const elfGearChance = .05, elfGearChanceBoss = .3;
 
+/// The chance a foe of the Hollowdeep carries a Duskwing weapon (a boss far more often). One per
+/// hero, like the elves' Thornbloom.
+const batGearChance = .05, batGearChanceBoss = .3;
+
 /// Elemental arms (see LootTable.elementArms): the chance a fire or frost elemental leaves its
 /// weapon, and the chance one of the Aeries' foes (dawn) or Ravenmoor's night-walkers (shadow) does.
 const elementArmsChance = .25, landArmsChance = .04;
@@ -1325,6 +1359,7 @@ const places = <Place>[
   Place('mirrorhall', 'The Hall of Mirrors', 14, 868, 600, PlaceKind.shrine, 'A ruined hall full of mirrors, and in every one, a different you: older, younger, a goblin, a dragon. One of them winks.', 'You stare until your reflection settles back into your own shape, and feel stronger for it. (Might for three fights.) The mirrors shed their silver skins at your feet.', brew: 'might', trophies: 3),
   Place('castleoflanterns', 'The Lantern Shrine', 16, 700, 640, PlaceKind.shrine, 'A shrine on a rock in the sea, hung with a thousand paper lanterns. An old priest sweeps the steps and doesn\'t look up.', 'You ring the bell and bow. The priest nods, once, and hands you a cup of tea and a folded scrap of lacquer. (Might for three fights.)', brew: 'might', trophies: 3),
   Place('rocnest', 'The Great Nest', 15, 798, 26, PlaceKind.guarded, 'A nest the size of a cottage on the highest peak, woven from whole trees, and something huge and feathered sitting on it.', 'The mother griffin takes wing and is gone. In the nest: feathers by the armful, gold the aeriekin left as offerings, and eggshell like porcelain.', foe: ('griffin', null, Aura.ancient, 'The Mother Griffin'), purses: 3, trophies: 4, gems: 1),
+  Place('orchardroost', 'The Orchard Roost', 17, 300, 612, PlaceKind.guarded, 'An old orchard sank into the caves when the hill fell in. The fruit bats found it. Their king has eaten every fig in it, and is still hungry.', 'The Fig King flaps off into the dark, much too full to fight. Under the trees: a pile of seeds, a pile of coins, and fangs he lost in the figs.', foe: ('cavebat', null, Aura.gilded, 'The Fig King'), purses: 2, trophies: 3),
   Place('lostisle', 'The Lost Isle', 0, 228, 20, PlaceKind.cache, 'Out past the coast, an island that isn\'t on any map but yours, now you\'ve been everywhere else. A rowing boat waits on the shore.', 'On the island, under a crooked tree: the old king\'s last treasure, buried before the Burning.', purses: 6, legendary: true, hidden: true),
 ];
 

@@ -71,8 +71,11 @@ class _Tween {
 }
 
 class _Particle {
-  _Particle(this.kind, this.pos, this.vel, this.life, this.radius, this.gravity);
+  _Particle(this.kind, this.pos, this.vel, this.life, this.radius, this.gravity, {this.ambient = false});
   final String kind;
+
+  /// Background drift (a rare foe's aura, miasma): doesn't keep the stage at full frame rate.
+  final bool ambient;
   Offset pos, vel;
   double age = 0;
   final double life, radius, gravity;
@@ -144,6 +147,13 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
 
   /// A big centred announcement (a rare foe stepping onto the road).
   (String, Color, double)? _banner;
+
+  /// When the summoned dead last swung (they dash in and slash with the swing clip).
+  double _bonesAt = -1e9;
+
+  /// A companion that joins after a boss: it isn't drawn until this time, then pops in with a
+  /// "New companion!" tag over it.
+  double? _arrival;
 
   GameController get c => widget.controller;
   double get now => _clock;
@@ -403,6 +413,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         _shots.clear();
         _chest = null;
         _banner = null;
+        _arrival = null;
         _beam = null;
         _trail = null;
         _bursts.clear();
@@ -696,12 +707,13 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       });
     }
     if (r.summonHit > 0) {
-      // The summoned dead lunge in after your blow.
+      // The summoned dead rush in after your blow, slash, and fall back.
       _at(d0 + hitAt + 120, () {
-        _tween('bones', 1, 140, ease: easeOut);
-        _tween('bones', 0, 300, delay: 180);
+        _bonesAt = now;
+        _tween('bones', 1, 260, ease: easeOut);
+        _tween('bones', 0, 380, delay: 620);
       });
-      _at(d0 + hitAt + 260, () {
+      _at(d0 + hitAt + 120 + swingHitMs, () {
         _spark('curse', _foeChest + const Offset(-30, 30), 8, speed: 3, life: 450, radius: 3);
         _mark('${r.summonHit}', const [Color(0xFFC89AFF), Color(0xFF5A2E7A)], _foeChest + const Offset(-60, 60));
         c.revealDamage(r.summonHit);
@@ -1295,8 +1307,21 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       _at(d0 + 450, () => _chest = (tier, now));
       _at(d0 + 1050, () => _spark(tier == ChestTier.ancient ? 'curse' : 'holy', _chestAt + const Offset(0, -24), 26, lift: 3, speed: 3.4, life: 1100, radius: 4, gravity: .05));
     }
+    if (k.companion != null) {
+      // Hidden until the boss is down, then it bounds in with its tag.
+      _arrival = now + d0 + 1300;
+      _at(d0 + 1300, () {
+        final at = _companionAt(c.state.knight);
+        _spark('holy', at, 22, dir: -math.pi / 2, spread: 1.2, speed: 3, life: 1000, radius: 3.5, lift: 1.5, gravity: -.02);
+        _burst(at, const Color(0xFF9BE27A), 1);
+        Audio.play(Sfx.rareDrop);
+      });
+    }
     _at(d0 + 2700, c.killFinished);
   }
+
+  /// Where a companion stands (or hovers), for its arrival.
+  static Offset _companionAt(Knight k) => petStage(k)?.$1 == Pet.fairy ? const Offset(_knightX - 60, _groundY - 210) : const Offset(120, _groundY - 40);
 
   // ---------- ticker ----------
 
@@ -1371,7 +1396,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
           Aura.ancient => 'bone',
         };
         _particles.add(
-          _Particle(kind, Offset(_foeX + (_rng.nextDouble() - .5) * _foeHeight * .5, _groundY - _rng.nextDouble() * _foeHeight), Offset((_rng.nextDouble() - .5) * .3, -.9), 1300, 2.5 + _rng.nextDouble() * 2, -.005),
+          _Particle(kind, Offset(_foeX + (_rng.nextDouble() - .5) * _foeHeight * .5, _groundY - _rng.nextDouble() * _foeHeight), Offset((_rng.nextDouble() - .5) * .3, -.9), 1300, 2.5 + _rng.nextDouble() * 2, -.005, ambient: true),
         );
       }
       if (!_isDragon && _foeLook.miasma && _rng.nextDouble() < .25) {
@@ -1383,6 +1408,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
             1400,
             6 + _rng.nextDouble() * 8,
             0,
+            ambient: true,
           ),
         );
       }
@@ -1394,7 +1420,9 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     // ash, a flickering aura) the stage draws half as often, which keeps phones cool and smooth.
     final lively = _tweens.isNotEmpty ||
         _schedule.isNotEmpty ||
-        _particles.length > 12 ||
+        // (A rare foe's aura sheds sparks all the time; those alone used to hold every rare fight
+        // at full frame rate, which made the whole screen feel sluggish.)
+        _particles.where((p) => !p.ambient).length > 12 ||
         _shots.isNotEmpty ||
         _bursts.isNotEmpty ||
         _marks.isNotEmpty ||
@@ -1515,7 +1543,8 @@ class _ScenePainter extends CustomPainter {
     final outer = canvas, figures = ui.PictureRecorder();
     canvas = Canvas(figures, _figureBounds);
 
-    final ds = dragonStage(k), pet = petStage(k);
+    final arriving = s._arrival != null && t < s._arrival!;
+    final ds = dragonStage(k), pet = arriving ? null : petStage(k);
     if (pet != null && pet.$1 == Pet.fairy) {
       // A fairy hovering at your shoulder; it darts to the foe when it strikes.
       final p = fx['pounce']!, stage = petStages[pet.$1]!.indexOf(pet.$2);
@@ -1628,8 +1657,13 @@ class _ScenePainter extends CustomPainter {
     if (summons > 0) {
       final bone = foeLooks['skeleton']!;
       for (var i = 0; i < summons.clamp(0, 3); i++) {
-        final x = _knightX + 230 - i * 60.0 + fx['bones']! * 70;
-        drawHumanoid(canvas, bone, idlePose(bone.stance, t, phase: i * 1.3, still: still), t, DrawOptions(at: Offset(x, _groundY + 6 - i * 4), scale: .78), still: still);
+        // At rest a little ahead of you; on their turn they rush to the foe, near enough that the
+        // swing's lunge carries the blade into it.
+        final home = _knightX + 150 - i * 50.0, target = _foeX - 230 - i * 34.0;
+        final x = home + (target - home) * fx['bones']!;
+        final idle = idlePose(bone.stance, t, phase: i * 1.3, still: still);
+        final pose = still ? idle : (sampleClip(idle, swingClip, t - s._bonesAt - i * 70) ?? idle);
+        drawHumanoid(canvas, bone, pose, t, DrawOptions(at: Offset(x, _groundY + 6 - i * 4), scale: .78), still: still);
       }
     }
     // An arcane ward shimmering round the hero.
@@ -1791,9 +1825,11 @@ class _ScenePainter extends CustomPainter {
     if (fx['grasp']! > 0) drawKrakenGrasp(canvas, Offset(fx0, fy), fx['grasp']!, t);
     if (fx['wave']! > 0) drawWave(canvas, const Offset(_knightX - 120, _groundY), Offset(fx0 + 80, fy), fx['wave']!, t);
 
-    // health bar over the foe
-    if (fx['dying']! < .05 && fx['enter']! < .05) {
-      final top = _groundY + lift.dy - s._foeHeight * 1.18 - 34, frac = (c.shownFoeHp / c.shownFoeMax).clamp(0.0, 1.0);
+    // health bar over the foe (left off for a foe so tall it would sit under the foe's card in the
+    // corner, which shows its health and what you've put on it anyway)
+    final barTop = _groundY + lift.dy - s._foeHeight * 1.18 - 34;
+    if (fx['dying']! < .05 && fx['enter']! < .05 && barTop > 125) {
+      final top = barTop, frac = (c.shownFoeHp / c.shownFoeMax).clamp(0.0, 1.0);
       // Slide the bar toward the true value; a pale ghost lingers, then follows.
       final dt = (t - s._barT).clamp(0.0, 100.0);
       s._barT = t;
@@ -1816,18 +1852,6 @@ class _ScenePainter extends CustomPainter {
       // Quarter ticks.
       for (var q = 1; q < 4; q++) {
         canvas.drawLine(Offset(x0 + w * q / 4, top + 1), Offset(x0 + w * q / 4, top + 8), Paint()..color = Colors.black.withValues(alpha: .35)..strokeWidth = 1);
-      }
-      final st = c.state, hexes = [
-        if (st.foeSlowed > 0) ('Slowed ${st.foeSlowed}', const Color(0xFF6ABF9A)),
-        if (st.foeWeakened > 0) ('Weak ${st.foeWeakened}', const Color(0xFFB8A0D8)),
-        if (st.foeExposed > 0) ('Exposed ${st.foeExposed}', const Color(0xFFE0A050)),
-        if (st.foeAsleep > 0) ('Asleep ${st.foeAsleep}', const Color(0xFFB8A0E8)),
-      ];
-      var hx = fx0 - 36.0;
-      for (final (label, col) in hexes) {
-        final tp = TextPainter(text: TextSpan(text: label, style: Txt.label(size: 11.5, color: col, weight: FontWeight.w800)), textDirection: TextDirection.ltr)..layout();
-        tp.paint(canvas, Offset(hx, top + 11));
-        hx += tp.width + 6;
       }
       if (aura != null) {
         canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(x0 - 2.5, top - 2.5, w + 5, 14), const Radius.circular(3.5)), strokePaint(auraColour(aura), 1.6));
@@ -2045,6 +2069,21 @@ class _ScenePainter extends CustomPainter {
         final at = Offset(left + visibleW / 2 - tp.width / 2, 120 - 10 * age);
         canvas.drawRect(Rect.fromLTWH(left, at.dy - 8, visibleW, tp.height + 16), Paint()..color = Colors.black.withValues(alpha: .45 * a));
         tp.paint(canvas, at);
+      }
+    }
+    // "New companion!" over a companion that's just joined.
+    if (s._arrival case final at?) {
+      final age = (t - at) / 3200;
+      if (age > 1) {
+        s._arrival = null;
+      } else if (age >= 0) {
+        final a = (age < .1 ? age / .1 : 1 - math.max(0.0, (age - .75) / .25)).clamp(0.0, 1.0).toDouble();
+        final spot = _BattleStageState._companionAt(k) + Offset(0, (petStage(k)?.$1 == Pet.fairy ? -50 : -90) - 12 * age);
+        final tp = TextPainter(text: TextSpan(text: 'New companion!', style: Txt.label(size: 22, color: const Color(0xFF9BE27A).withValues(alpha: a), weight: FontWeight.w900)), textDirection: TextDirection.ltr)..layout();
+        final box = Rect.fromCenter(center: spot, width: tp.width + 22, height: tp.height + 8);
+        canvas.drawRRect(RRect.fromRectAndRadius(box, const Radius.circular(14)), Paint()..color = Colors.black.withValues(alpha: .55 * a));
+        canvas.drawRRect(RRect.fromRectAndRadius(box, const Radius.circular(14)), strokePaint(const Color(0xFF9BE27A).withValues(alpha: .7 * a), 1.5));
+        tp.paint(canvas, spot - Offset(tp.width / 2, tp.height / 2));
       }
     }
     for (final (i, d) in s._drops.indexed) {

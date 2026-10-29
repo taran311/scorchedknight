@@ -21,7 +21,7 @@ void paintSilhouetteLand(Canvas c, Setting s, BattlegroundSpec sp) {
   final horizon = sp.sky.last;
   // Each layer from far to near: closer to the sky's colour far off, near-black up close.
   Color layer(double k) => Color.lerp(horizon, _night, k)!;
-  final indoor = s == Setting.crypt || s == Setting.lair || s == Setting.tomb || s == Setting.deepforge;
+  final indoor = s == Setting.crypt || s == Setting.lair || s == Setting.tomb || s == Setting.deepforge || s == Setting.roost;
 
   // ---- Sky ----
   c.drawRect(Offset.zero & sceneSize, _vertical(sp.sky, 0, _ground));
@@ -276,6 +276,24 @@ void _features(Canvas c, Setting s, BattlegroundSpec sp, SeededRandom r, double 
           _brazier(c, x, base - 110, 1, fill, lit, wall: true);
         }
       }
+    case Setting.roost:
+      // The Hollowdeep: cave mouths into deeper dark, bats hanging from the roof in rows, and
+      // glowcaps lighting the floor.
+      if (!near) {
+        for (final x in [120.0, 480.0, 840.0]) {
+          _caveMouth(c, x, base + 4, 220, fill);
+        }
+        for (var i = 0; i < 26; i++) {
+          _hangingBat(c, 20 + r.next() * 920, 6 + r.next() * 70, .7 + r.next() * .5, fill);
+        }
+      } else {
+        for (final x in [40.0, 920.0]) {
+          _stalagmite(c, x, base + 6, 200, fill);
+        }
+        for (final x in [80.0, 360.0, 520.0, 880.0]) {
+          _glowcaps(c, x, base + 8, r);
+        }
+      }
     case Setting.crypt || Setting.lair || Setting.deepforge:
       // Indoors: great arches or cave mouths framing the fight, torches between.
       if (!near) {
@@ -500,6 +518,33 @@ void _caveMouth(Canvas c, double x, double base, double h, Paint p) {
   for (var i = 0; i < 5; i++) {
     final sx = x - h * .5 + i * h * .25;
     c.drawPath(poly([Offset(sx - 8, base - h * .92), Offset(sx, base - h * .7 + (i.isOdd ? 20 : 0)), Offset(sx + 8, base - h * .92)]), p);
+  }
+}
+
+/// A bat asleep upside down, hung by its feet from the roof at [top]: wings wrapped round it.
+void _hangingBat(Canvas c, double x, double top, double k, Paint p) {
+  c.drawLine(Offset(x - 2 * k, top), Offset(x - 2 * k, top + 5 * k), strokePaint(p.color, 1.2));
+  c.drawLine(Offset(x + 2 * k, top), Offset(x + 2 * k, top + 5 * k), strokePaint(p.color, 1.2));
+  c.drawOval(Rect.fromCenter(center: Offset(x, top + 13 * k), width: 11 * k, height: 18 * k), p);
+  // Ears pointing down at the bottom.
+  c.drawPath(poly([Offset(x - 4 * k, top + 19 * k), Offset(x - 3 * k, top + 26 * k), Offset(x - 1 * k, top + 20 * k)]), p);
+  c.drawPath(poly([Offset(x + 1 * k, top + 20 * k), Offset(x + 3 * k, top + 26 * k), Offset(x + 4 * k, top + 19 * k)]), p);
+}
+
+/// A cluster of glowcaps: pale stems and caps lit from inside, a teal glow round them.
+void _glowcaps(Canvas c, double x, double base, SeededRandom r) {
+  const glow = Color(0xFF8AF0E0);
+  c.drawCircle(Offset(x, base - 10), 44, _radial(Offset(x, base - 10), 44, glow, const [.35, .1, 0], const [0, .45, 1]));
+  for (var i = 0; i < 4; i++) {
+    final dx = (r.next() - .5) * 40, h = 8 + r.next() * 18, w = 8 + r.next() * 10;
+    c.drawLine(Offset(x + dx, base), Offset(x + dx, base - h), strokePaint(const Color(0xFFB8D8D0), 2.2));
+    c.drawPath(
+      Path()
+        ..moveTo(x + dx - w / 2, base - h)
+        ..quadraticBezierTo(x + dx, base - h - w * .9, x + dx + w / 2, base - h)
+        ..close(),
+      Paint()..color = Color.lerp(glow, const Color(0xFFFFFFFF), .3)!,
+    );
   }
 }
 

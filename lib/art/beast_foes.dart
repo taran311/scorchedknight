@@ -4,6 +4,7 @@
 
 import 'package:flutter/painting.dart';
 
+import 'bats.dart';
 import 'beasts.dart';
 import 'body.dart';
 import 'hounds.dart';
@@ -37,6 +38,9 @@ const _beasts = <String, (double scale, double height)>{
   'moonhorn': (1.3, 255),
   'centaur': (1.1, 230),
   'centaurchief': (1.25, 270),
+  // The Hollowdeep's bats hover, so their height runs from the ground to the tips of their ears.
+  'cavebat': (1.15, 195),
+  'roostMother': (1.7, 290),
 };
 
 bool isBeastLook(String look) => _beasts.containsKey(look);
@@ -58,6 +62,8 @@ void drawBeastFoe(Canvas c, String look, Offset at, double t, {double hit = 0, d
       drawBear(c, look == 'bear' ? brownBear : caveBear, Offset.zero, scale, t, hit: hit, still: still);
     case 'spider' || 'spiderqueen':
       drawSpider(c, look == 'spider' ? giantSpider : spiderQueen, Offset.zero, scale, t, hit: hit, still: still);
+    case 'cavebat' || 'roostMother':
+      drawBat(c, look == 'cavebat' ? caveBat : roostMother, Offset.zero, scale, t, hit: hit, still: still);
     case 'unicorn' || 'moonhorn':
       drawHorse(c, look == 'unicorn' ? unicornLook : moonhornLook, Offset.zero, scale, t, still: still);
     case 'centaur' || 'centaurchief':

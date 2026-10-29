@@ -1763,6 +1763,12 @@ class GameEngine {
       state.trophies.add('thornbloom');
       state.pendingLoot.add(entPrize);
     }
+    if (c == batLand && !state.trophies.contains('duskwing') && _rng.nextDouble() < (f.boss ? batGearChanceBoss : batGearChance) * boost) {
+      // The Hollowdeep's Duskwing weapons: one per hero, like the elves' Thornbloom.
+      entPrize = loot.batDrop(k.heroClass, k.level);
+      state.trophies.add('duskwing');
+      state.pendingLoot.add(entPrize);
+    }
     if (f.look == runeLook && !_hasRuneWeapon(k) && _rng.nextDouble() < (f.rare ? runeChanceRare : runeChance)) {
       rune = loot.runeWeapon(k.heroClass, k.level);
       state.trophies.add(rune.art);

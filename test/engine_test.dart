@@ -47,7 +47,7 @@ void main() {
   });
 
   test('every continent has foes, a boss and a level', () {
-    expect(continents.length, mainLands + 10);
+    expect(continents.length, mainLands + 11);
     for (var c = 0; c < continents.length; c++) {
       expect(foeIndexes(c), isNotEmpty);
       expect(foeAt(bossIndex(c)).boss, isTrue);
@@ -68,6 +68,7 @@ void main() {
     expect(continents[mainLands + 7].name, 'The Changeling Isle');
     expect(continents[mainLands + 8].name, 'The Skyreach Aeries');
     expect(continents[eastLand].name, 'The Blossom Isles');
+    expect(continents[batLand].name, 'The Hollowdeep');
   });
 
   test('the roads branch: choose your own way, and only the Ember Throne waits on one land', () {
@@ -857,6 +858,23 @@ void main() {
       }
       expect(found, isTrue, reason: '$c');
     }
+  });
+
+  test('the Hollowdeep: opened by the Gloomfen, and its Duskwing weapons drink from every blow', () {
+    expect(openers(batLand), [1]);
+    expect(landTrophyName(batLand), 'fang');
+    final t = LootTable(Random(15));
+    for (final c in HeroClass.values) {
+      final dusk = t.batDrop(c, 25);
+      double mean(GearItem Function() make) => [for (var i = 0; i < 60; i++) make().score].reduce((a, b) => a + b) / 60;
+      expect(dusk.rarity, Rarity.epic);
+      expect(dusk.slot, GearSlot.weapon);
+      expect(dusk.stat(Stat.leech), greaterThan(0), reason: '$c');
+      // Tuned to the same edge as the other one-per-hero farmed weapons.
+      final d = mean(() => t.batDrop(c, 25)), e = mean(() => t.elfDrop(c, 25));
+      expect(d, closeTo(e, e * .06), reason: '$c');
+    }
+    expect(t.bossTrinket('echostone', 25).name, 'The Echo Stone');
   });
 
   test('Dunstan tempers a farmed weapon up to your level, for bars and gold', () {

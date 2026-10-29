@@ -80,6 +80,8 @@ enum HeadKind {
   eboshi,
   topknot,
   oni,
+  // The batkin of the Hollowdeep: great splayed ears, a leaf nose, small fangs and glowing eyes.
+  bat,
 }
 
 enum TorsoKind { plain, leather, studded, scales, mail, plate, robe, fur, rags, ribs, bark, stone, lamellar, dragonplate }
@@ -1480,6 +1482,42 @@ Look _blossom({String rank = 'ronin'}) {
   );
 }
 
+/// The Hollowdeep's batkin: furred bat-folk with leathery wings folded at their backs. Skulkers
+/// are lean and carry hooked sickles; echo-callers wear a ragged robe and carry a staff that hums
+/// violet; roost-guards wear scale over their fur and carry a glaive.
+Look _batkin({String rank = 'skulker'}) {
+  final caller = rank == 'caller', guard = rank == 'guard';
+  final fur = ramp(caller ? 0xFF3A3040 : (guard ? 0xFF4A3E38 : 0xFF5A4A52), .25, .55);
+  final wing = ramp(caller ? 0xFF4A3A5A : 0xFF5A4450, .2, .6);
+  final cloth = ramp(caller ? 0xFF2E2440 : 0xFF2A2226, .3, .5);
+  final scale = ramp(0xFF5A5A62, .3, .55);
+  return Look(
+    build: guard ? 'brute' : 'lean',
+    scale: guard ? 1.1 : 1,
+    stance: caller ? Stance.mage : (guard ? Stance.knight : Stance.rogue),
+    skin: fur,
+    torso: guard ? scale : (caller ? cloth : fur),
+    torsoKind: guard ? TorsoKind.scales : (caller ? TorsoKind.robe : TorsoKind.fur),
+    upper: fur,
+    fore: fur,
+    hand: darker(fur),
+    thigh: caller ? cloth : fur,
+    shin: fur,
+    boot: darker(fur),
+    skirt: caller ? cloth : null,
+    pauldron: guard ? scale : null,
+    belt: const Color(0xFF1A1216),
+    trim: caller ? const Color(0xFFB07AFF) : null,
+    head: HeadKind.bat,
+    eyeGlow: caller ? const Color(0xFFB07AFF) : const Color(0xFFFFB04A),
+    wings: wing,
+    talons: true,
+    tattered: caller,
+    weapon: caller ? Weapon.staff : (guard ? Weapon.glaive : Weapon.sickle),
+    weaponGlow: caller ? const Color(0xFFB07AFF) : null,
+  );
+}
+
 /// The Skyreach Aeries: harpies (wild-haired, feathered wings, talons) and the aeriekin, proud
 /// bird-folk with hawks' heads and great wings, in sky-blue and bronze. Wardens carry a spear and
 /// wear bronze; skyshots carry a longbow; stormcallers a staff that crackles.
@@ -1571,6 +1609,9 @@ final Map<String, Look> foeLooks = {
   'onmyoji': _blossom(rank: 'onmyoji'),
   'oni': _blossom(rank: 'oni'),
   'shogun': _blossom(rank: 'shogun'),
+  'batkin': _batkin(),
+  'batkinCaller': _batkin(rank: 'caller'),
+  'batkinGuard': _batkin(rank: 'guard'),
   // The Skyreach Aeries.
   'harpy': _aerie(rank: 'harpy'),
   'aerieWarden': _aerie(),

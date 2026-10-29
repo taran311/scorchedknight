@@ -293,6 +293,26 @@ void _trinket(Canvas c, String art, Color gem) {
       c.drawLine(const Offset(0, -4), const Offset(0, 8), rune);
       c.drawLine(const Offset(0, -2), const Offset(4, 2), rune);
       c.drawLine(const Offset(0, 3), const Offset(-4, 7), rune);
+    case 'echostone':
+      // A violet stone between two silver bat wings, on a cord, with the echo rippling off it.
+      c.drawLine(const Offset(-8, -16), const Offset(0, -9), strokePaint(const Color(0xFFB8B0C8), 1.6));
+      c.drawLine(const Offset(8, -16), const Offset(0, -9), strokePaint(const Color(0xFFB8B0C8), 1.6));
+      c.drawCircle(const Offset(0, 2), 15, Paint()..color = const Color(0x44B08AFF)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5));
+      for (final side in const [-1.0, 1.0]) {
+        final wing = Path()
+          ..moveTo(side * 4, -2)
+          ..lineTo(side * 15, -8)
+          ..quadraticBezierTo(side * 12, -2, side * 15, 3)
+          ..quadraticBezierTo(side * 10, 2, side * 11, 7)
+          ..quadraticBezierTo(side * 7, 4, side * 4, 7)
+          ..close();
+        fillPath(c, wing, const [Color(0xFFF0EEF4), Color(0xFFA8A4B4), Color(0xFF4A4658)], Offset(side * 15, -8), Offset(side * 4, 7));
+      }
+      fillPath(c, poly(const [Offset(0, -8), Offset(6, 1), Offset(0, 11), Offset(-6, 1)]), const [Color(0xFFE0C8FF), Color(0xFF8A5AD8), Color(0xFF2A1450)], const Offset(-6, -8), const Offset(6, 11));
+      for (final r in const [17.0, 21.0]) {
+        c.drawArc(Rect.fromCircle(center: const Offset(0, 2), radius: r), -.5, 1.0, false, strokePaint(const Color(0x99C8A8FF), 1.2));
+        c.drawArc(Rect.fromCircle(center: const Offset(0, 2), radius: r), math.pi - .5, 1.0, false, strokePaint(const Color(0x99C8A8FF), 1.2));
+      }
     case 'blossomseal':
       // A cherry blossom carved in red jade, on a silk cord.
       c.drawLine(const Offset(-8, -16), const Offset(0, -8), strokePaint(const Color(0xFFE8C060), 1.6));

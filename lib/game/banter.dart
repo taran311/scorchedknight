@@ -182,6 +182,16 @@ const _byLook = <String, Banter>{
     hurt: ['*thunder, much too close*'],
     fall: ['*the storm breaks, and the sun comes out*'],
   ),
+  // ---- The Hollowdeep ----
+  'cavebat': Banter(enter: ['*a shriek so high you feel it in your teeth*', '*it drops off the roof and opens its wings*'], fall: ['*it flutters into the dark and doesn\'t come back*']),
+  'batkin': Banter(enter: ['I heard you three caves back, surface-walker.', '*click... click... click*'], fall: ['So loud... you were so loud...']),
+  'batkinCaller': Banter(enter: ['Listen. Hear that? That\'s your heart, going fast.', '*she hums, and the whole cave hums with her*'], fall: ['The echo... stops...']),
+  'batkinGuard': Banter(enter: ['None pass to the Roost.', '*he folds his wings and levels the glaive*'], fall: ['The Mother... will hear of this.']),
+  'roostMother': Banter(
+    enter: ['*every bat in the cave falls silent at once*', '*she unfolds wings that touch both walls of the cavern*'],
+    hurt: ['*a shriek that brings dust down from the roof*'],
+    fall: ['*she folds her wings, and lets the dark take her*'],
+  ),
   // ---- The Blossom Isles ----
   'ronin': Banter(enter: ['I have no master. Today, I have an opponent.', '*he rests a hand on his sword, and waits*'], fall: ['A good cut. A good end.']),
   'ashigaru': Banter(enter: ['Halt! The ports are closed by order of the Shogun!', 'Spears! Spears up!']),

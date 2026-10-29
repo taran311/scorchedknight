@@ -1443,6 +1443,30 @@ class LootTable {
     );
   }
 
+  /// The Duskwing weapons the Hollowdeep's bats and batkin carry: epic, one per hero, and each
+  /// drinks a little from every blow (leech) on top of its own strength.
+  GearItem batDrop(HeroClass heroClass, int level) {
+    const dusk = 0xFF7A6A9A;
+    final (name, art, stats, lore) = switch (heroClass) {
+      HeroClass.knight => ('Duskwing scimitar', 'scimitar', <Stat, double>{Stat.damage: 1.45, Stat.leech: 1.2, Stat.dodge: 1.0}, 'Black steel, curved like a wing. It drinks a little from every cut, and passes some of it on to you.'),
+      HeroClass.ranger => ('Duskwing bow', 'longbow', <Stat, double>{Stat.damage: 1.4, Stat.leech: 1.0, Stat.crit: 1.0}, 'Strung with bat-wing sinew. You hear where the arrow will land before you loose it.'),
+      HeroClass.mage => ('Echo-caller\'s staff', 'crystalstaff', <Stat, double>{Stat.damage: 1.3, Stat.leech: 1.1, Stat.wisdom: .9}, 'Black wood and a violet crystal that hums. Every spell you cast comes back to you, a little.'),
+    };
+    return GearItem(
+      id: _id(),
+      name: name,
+      slot: GearSlot.weapon,
+      art: art,
+      tint: dusk,
+      rarity: Rarity.epic,
+      level: level,
+      heroClass: heroClass,
+      lore: lore,
+      value: _value(level, Rarity.epic, GearSlot.weapon),
+      stats: _tuned(stats, level, heroClass, farmedEdge),
+    );
+  }
+
   /// A rune-engraved weapon for [heroClass]: legendary, with a perfect rune already bound and the
   /// Runic Surge special. Only the Dragonbone Warden guards these.
   GearItem runeWeapon(HeroClass heroClass, int level) {
@@ -1531,6 +1555,7 @@ class LootTable {
       'heartsblood' => ('Heart\'s Blood', 'A drop of the Countess, set in a crystal vial. It is still warm, and it still wants.', {Stat.leech: 2.0, Stat.lifesteal: 2.0, Stat.crit: 1.5}),
       'starleaf' => ('Starleaf Brooch', 'Queen Ithriel\'s own brooch: a silver leaf with a star caught in it. The elves say it never lets an arrow fly crooked.', {Stat.crit: 2.4, Stat.dodge: 2.2, Stat.regen: 1.8}),
       'runependant' => ('Thane\'s Rune-Pendant', 'A runestone on a chain as thick as your thumb. Grimnar says it was his grandmother\'s. It hums when you\'re hit.', {Stat.guard: 2.9, Stat.block: 2.6, Stat.vigour: 2.5}),
+      'echostone' => ('The Echo Stone', 'A violet stone from the Roost Mother\'s nest, set in silver wings. Hold it to your ear and you hear the cave, and every blow coming before it lands.', {Stat.dodge: 1.6, Stat.leech: 1.5, Stat.crit: 1.4}),
       'blossomseal' => ('Shogun\'s Blossom Seal', 'The Iron Shogun\'s seal: a cherry blossom carved in red jade. Duels fought under it are always fair, and always short.', {Stat.crit: 1.6, Stat.parry: 1.5, Stat.damage: 1.3}),
       'stormfeather' => ('Thunderwing\'s Plume', 'One feather from the Storm Roc, as long as your arm. It hums before a storm, and your blows come down like lightning.', {Stat.crit: 1.7, Stat.dodge: 1.5, Stat.damage: 1.3}),
       'mirrorheart' => ('Heart of the Thousandfold', 'A grey, slippery heart that changes shape in your hand: a bird, a fist, your own face. It wants to be useful.', {Stat.damage: 1.5, Stat.crit: 1.5, Stat.dodge: 1.5}),

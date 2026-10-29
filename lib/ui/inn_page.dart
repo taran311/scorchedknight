@@ -938,7 +938,7 @@ class _InnPainter extends CustomPainter {
     }
     // A raid: a red alarm over the place they hit.
     if (raid != null) {
-      final at = (raid == 'inn' ? const Offset(620, 300) : const Offset(206, 268)) + Offset(0, math.sin(t / 300) * 4);
+      final at = (raid == 'inn' ? const Offset(620, 300) : const Offset(229, 268)) + Offset(0, math.sin(t / 300) * 4);
       final pulse = .5 + .5 * math.sin(t / 200);
       canvas.drawCircle(at, 22, Paint()..color = const Color(0xFFFF3A2A).withValues(alpha: .25 + .2 * pulse)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10));
       canvas.drawCircle(at, 15, Paint()..color = const Color(0xFFB0281C));

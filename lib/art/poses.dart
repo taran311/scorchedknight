@@ -10,7 +10,7 @@ final Map<Stance, Pose> stances = {
   Stance.mage: Pose.of({J.lean: 2, J.head: -2, J.nS: 26, J.nE: 64, J.nW: 86, J.fS: 40, J.fE: 70, J.nH: 16, J.nK: 10, J.fH: -14, J.fK: 8}),
   Stance.ranger: Pose.of({J.lean: 8, J.head: -6, J.nS: 40, J.nE: 26, J.nW: 0, J.fS: 54, J.fE: -2, J.nH: 22, J.nK: 16, J.fH: -20, J.fK: 12}),
   Stance.goblin: Pose.of({J.lean: 20, J.head: -14, J.nS: 40, J.nE: 52, J.nW: 46, J.fS: 8, J.fE: 40, J.fW: 90, J.nH: 20, J.nK: 28, J.fH: -14, J.fK: 24}),
-  Stance.rogue: Pose.of({J.lean: 12, J.head: -6, J.nS: 46, J.nE: 62, J.nW: 150, J.fS: 22, J.fE: 78, J.fW: 150, J.nH: 22, J.nK: 20, J.fH: -18, J.fK: 16}),
+  Stance.rogue: Pose.of({J.lean: 12, J.head: -6, J.nS: 46, J.nE: 62, J.nW: 15, J.fS: 22, J.fE: 78, J.fW: 5, J.nH: 22, J.nK: 20, J.fH: -18, J.fK: 16}),
   Stance.zombie: Pose.of({J.lean: 16, J.head: 14, J.nS: 80, J.nE: 8, J.fS: 72, J.fE: 14, J.nH: 6, J.nK: 6, J.fH: -8, J.fK: 8}),
   Stance.pillager: Pose.of({J.lean: 6, J.head: -4, J.nS: 8, J.nE: 104, J.nW: 100, J.fS: 34, J.fE: 46, J.fW: 90, J.nH: 16, J.nK: 12, J.fH: -14, J.fK: 8}),
   Stance.ent: Pose.of({J.lean: 3, J.head: 4, J.nS: 34, J.nE: 34, J.nW: 20, J.fS: 22, J.fE: 30, J.nH: 9, J.nK: 5, J.fH: -9, J.fK: 5}),

@@ -64,10 +64,10 @@ class BestiaryPreview extends StatelessWidget {
     final fresh = <(String, void Function(Canvas, Size))>[
       ('Sir Malric the Ashen', (c, s) => _humanoid(c, s, auraLook(foeLooks[malricLook]!, Aura.blazing, named: true))),
       ('You, as the wolf', (c, s) => _humanoid(c, s, wolfformLook, flip: false)),
-      for (final look in const ['ashenKnight', 'ashenChampion', 'malric', 'thrall', 'vampireSpawn', 'bloodBride', 'vampireKnight', 'countess', 'woodsman', 'werewolf', 'werewolfStalker', 'werewolfBrute', 'werewolfAlpha', 'elfRanger', 'elfBlade', 'elfWarden', 'elfDruid', 'elfQueen', 'dwarfAxe', 'dwarfShield', 'dwarfXbow', 'dwarfRune', 'dwarfThane', 'elementalEmber', 'elementalFrost', 'elementalMire', 'facelessWanderer', 'facelessMimic', 'facelessChoir', 'facelessWarden', 'facelessMother', 'lizardGuard', 'lizardSkirmisher', 'lizardShaman', 'lizardChampion', 'lizardKing', 'merrowRaider', 'merrowCaller', 'merrowGuard', 'drownedSailor', 'shifter', 'shifterSly', 'shifterHulk', 'thousandfold', 'harpy', 'aerieWarden', 'aerieSkyshot', 'aerieCaller', 'ronin', 'ashigaru', 'shinobi', 'onmyoji', 'oni', 'shogun'])
+      for (final look in const ['ashenKnight', 'ashenChampion', 'malric', 'thrall', 'vampireSpawn', 'bloodBride', 'vampireKnight', 'countess', 'woodsman', 'werewolf', 'werewolfStalker', 'werewolfBrute', 'werewolfAlpha', 'elfRanger', 'elfBlade', 'elfWarden', 'elfDruid', 'elfQueen', 'dwarfAxe', 'dwarfShield', 'dwarfXbow', 'dwarfRune', 'dwarfThane', 'elementalEmber', 'elementalFrost', 'elementalMire', 'facelessWanderer', 'facelessMimic', 'facelessChoir', 'facelessWarden', 'facelessMother', 'lizardGuard', 'lizardSkirmisher', 'lizardShaman', 'lizardChampion', 'lizardKing', 'merrowRaider', 'merrowCaller', 'merrowGuard', 'drownedSailor', 'shifter', 'shifterSly', 'shifterHulk', 'thousandfold', 'harpy', 'aerieWarden', 'aerieSkyshot', 'aerieCaller', 'ronin', 'ashigaru', 'shinobi', 'onmyoji', 'oni', 'shogun', 'batkin', 'batkinCaller', 'batkinGuard'])
         (look, (c, s) => _humanoid(c, s, foeLooks[look]!)),
     ];
-    fresh.addAll([for (final look in const ['seaSerpent', 'leviathan', 'kraken', 'griffin', 'stormRoc']) (look, (Canvas c, Size s) => _foe(c, s, FoeType(look, look)))]);
+    fresh.addAll([for (final look in const ['seaSerpent', 'leviathan', 'kraken', 'griffin', 'stormRoc', 'cavebat', 'roostMother']) (look, (Canvas c, Size s) => _foe(c, s, FoeType(look, look)))]);
     if (Uri.base.queryParameters.containsKey('new')) return _grid(fresh);
     entries.addAll(fresh.take(2));
     // Companions.

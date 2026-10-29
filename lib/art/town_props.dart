@@ -13,17 +13,17 @@ const _ink = Color(0xFF0A0807);
 const _lamp = Color(0xFFFFB04A);
 const _ground = 470.0;
 
-/// The places you can go from the square, and where they sit. The forge and the hedge-mage's tower
-/// stand further up the lane, behind the signpost and the stall.
+/// The places you can go from the square, and where they sit, left to right: the signpost at the
+/// edge, the forge up the lane, Mags' stall, Old Wick's tower, the inn and your tent.
 enum TownSpot { gate, stall, inn, tent, forge, enchanter }
 
 const townSpots = <TownSpot, Rect>{
   TownSpot.gate: Rect.fromLTWH(0, 352, 56, 123),
-  TownSpot.stall: Rect.fromLTWH(96, 290, 232, 185),
+  TownSpot.stall: Rect.fromLTRB(140, 326, 324, 475),
   TownSpot.inn: Rect.fromLTWH(424, 150, 392, 325),
   TownSpot.tent: Rect.fromLTWH(828, 328, 132, 147),
-  // The smithy up the lane, clear of the signpost now it stands at the very edge of the square.
-  TownSpot.forge: Rect.fromLTWH(46, 214, 92, 216),
+  // The smithy up the lane, between the signpost and the stall, its own patch of the square.
+  TownSpot.forge: Rect.fromLTRB(66, 194, 140, 420),
   TownSpot.enchanter: Rect.fromLTWH(318, 96, 100, 330),
 };
 
@@ -58,7 +58,15 @@ void paintSignpost(Canvas c, double t) {
   );
 }
 
-/// Dunstan's forge, up the lane behind the signpost: a squat stone smithy with a great chimney
+/// Where the forge stands: drawn at the left edge, then moved along the lane to sit between the
+/// signpost and Mags' stall.
+const _forgeShift = Offset(62, -14);
+
+/// Mags' stall is drawn a little smaller than life, anchored at its right-hand foot, so the forge
+/// has room beside it.
+const _stallScale = .8, _stallPivot = Offset(318, _ground);
+
+/// Dunstan's forge, up the lane between the signpost and the stall: a squat stone smithy with a great chimney
 /// glowing at the mouth and spitting sparks, the forge's glow pulsing through its open front each
 /// time the hammer falls, and an iron anvil hung out as its sign.
 void paintForge(Canvas c, double t) {
@@ -66,6 +74,8 @@ void paintForge(Canvas c, double t) {
   // The hammer: a beat every 1.3 seconds, the glow jumping with each blow.
   final beat = (t % 1300) / 1300, strike = math.max(0.0, 1 - beat * 5);
   final glow = .7 + .3 * math.sin(t / 130) * math.sin(t / 71) + .5 * strike;
+  c.save();
+  c.translate(_forgeShift.dx, _forgeShift.dy);
   // Smoke from the chimney.
   for (var i = 0; i < 5; i++) {
     final p = ((t / 3000) + i / 5) % 1.0;
@@ -113,6 +123,7 @@ void paintForge(Canvas c, double t) {
   final anvil = poly(const [Offset(32, 258), Offset(70, 258), Offset(64, 266), Offset(58, 266), Offset(60, 276), Offset(42, 276), Offset(44, 266), Offset(38, 266), Offset(28, 261)]);
   c.drawPath(anvil, Paint()..color = _ink);
   c.drawPath(anvil, strokePaint(hot.withValues(alpha: .5 * glow), 1.2));
+  c.restore();
 }
 
 /// Old Wick's tower, up the lane between the stall and the inn: a narrow, leaning stone tower in a
@@ -187,6 +198,10 @@ void paintEnchanterTower(Canvas c, double t) {
 /// rig).
 void paintStall(Canvas c, double t, void Function(Canvas) drawMags) {
   const wood = Color(0xFF241810), woodLit = Color(0xFF3E2A1C);
+  c.save();
+  c.translate(_stallPivot.dx, _stallPivot.dy);
+  c.scale(_stallScale);
+  c.translate(-_stallPivot.dx, -_stallPivot.dy);
   // The lantern's warmth, filling the stall.
   c.drawCircle(const Offset(206, 372), 120, Paint()..color = _lamp.withValues(alpha: .2)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 34));
 
@@ -320,6 +335,7 @@ void paintStall(Canvas c, double t, void Function(Canvas) drawMags) {
     c.drawLine(Offset(304, y), Offset(324, y), strokePaint(const Color(0xFF4A3A2A), 2));
   }
   c.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(302, _ground - 34, 24, 34), const Radius.circular(6)), strokePaint(_ink, 1.4));
+  c.restore();
 }
 
 /// One of Mags' wares, standing on [base]: a round flask, a tall bottle, a little vial, a jar or a
@@ -579,7 +595,7 @@ void paintLantern(Canvas c, Offset at, double t, {double size = 1}) {
 
 /// Hallowash in the square: grinning pumpkins on doorsteps and counters, and bats over the roofs.
 void paintHallowash(Canvas c, double t) {
-  for (final (at, size) in const [(Offset(586, 466), 1.0), (Offset(656, 466), .85), (Offset(290, 408), .7), (Offset(72, 468), .9), (Offset(828, 468), .8), (Offset(742, 404), .6)]) {
+  for (final (at, size) in const [(Offset(586, 466), 1.0), (Offset(656, 466), .85), (Offset(296, 421), .56), (Offset(72, 468), .9), (Offset(828, 468), .8), (Offset(742, 404), .6)]) {
     _jack(c, at, size, t);
   }
   // Bats, flitting about the chimney and the moon.

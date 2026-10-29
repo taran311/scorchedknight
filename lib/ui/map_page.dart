@@ -24,7 +24,7 @@ import '../game/wilds.dart';
 const _mapH = 700.0;
 
 /// Where each continent sits on the 1000 × [_mapH] map.
-const _spots = <Offset>[Offset(150, 470), Offset(390, 455), Offset(260, 250), Offset(560, 270), Offset(800, 320), Offset(715, 470), Offset(850, 150), Offset(420, 335), Offset(100, 320), Offset(320, 95), Offset(575, 44), Offset(110, 48), Offset(905, 476), Offset(560, 632), Offset(920, 645), Offset(900, 40), Offset(745, 655)];
+const _spots = <Offset>[Offset(150, 470), Offset(390, 455), Offset(260, 250), Offset(560, 270), Offset(800, 320), Offset(732, 470), Offset(850, 150), Offset(420, 335), Offset(100, 320), Offset(320, 95), Offset(575, 44), Offset(110, 48), Offset(905, 476), Offset(560, 632), Offset(900, 638), Offset(900, 40), Offset(748, 628), Offset(400, 585)];
 
 /// A land's patch on the map (the side lands are smaller).
 Size _blobSize(int i) => isSideLand(i) ? const Size(130, 84) : const Size(170, 118);
@@ -33,7 +33,7 @@ Size _blobSize(int i) => isSideLand(i) ? const Size(130, 84) : const Size(170, 1
 const _innSpot = Offset(58, 542);
 
 /// Where the three wild areas lie, off the road between the lands.
-const _wildSpots = <Offset>[Offset(590, 510), Offset(480, 120), Offset(690, 110)];
+const _wildSpots = <Offset>[Offset(560, 524), Offset(480, 120), Offset(690, 110)];
 
 /// On a phone the whole map is small, so it can be pinched to zoom and dragged around.
 /// On a phone the map gets a tall window of its own, drawn big enough to read, opening on the land
@@ -178,12 +178,13 @@ class _MapPageState extends State<MapPage> {
                         padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
                         child: Center(
                           child: ConstrainedBox(
-                            constraints: BoxConstraints(maxWidth: fitWidth(context, aspect: 1000 / _mapH, below: 130)),
+                            constraints: BoxConstraints(maxWidth: fitWidth(context, aspect: 1000 / _mapH, below: 200)),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                // On a phone, your card and the way home sit above the map, not on it.
-                                if (isPhone(context)) ...[
+                                // Your card and the way home sit above the map, not on it (they used to
+                                // cover the lands in the corners).
+                                ...[
                                   Row(
                                     children: [
                                       Expanded(child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: HeroCard(controller: c))),
@@ -220,10 +221,6 @@ class _MapPageState extends State<MapPage> {
                                               if (c.placeShown(p)) _hotspot(Offset(p.x, p.y + 6), math.max(46, 40 / k), math.max(46, 40 / k), k, p.name, () => setState(() => _placePick = p.id)),
                                             for (var a = 0; a < wildAreas.length; a++) _hotspot(_wildSpots[a] + const Offset(0, 8), 150, 86, k, wildAreas[a].name, () => _wilds(a)),
                                             _hotspot(_innSpot + const Offset(0, 2), 120, 70, k, 'Back to the Soot & Kettle', _home),
-                                            if (!isPhone(context)) ...[
-                                              Positioned(left: 8, top: 8, child: HeroCard(controller: c)),
-                                              Positioned(right: 10, top: 10, child: InnBackButton(label: 'Town', onPressed: _home)),
-                                            ],
                                           ],
                                         );
                                       }
@@ -696,6 +693,13 @@ class _MapPainter extends CustomPainter {
         c.drawLine(at + const Offset(26, 10), at + const Offset(28, -14), ink);
         for (final (dx, dy) in const [(20.0, -20.0), (30.0, -24.0), (36.0, -14.0), (24.0, -12.0)]) {
           c.drawCircle(at + Offset(dx, dy), 6, Paint()..color = const Color(0xFFF0A8C0).withValues(alpha: open ? .9 : .35));
+        }
+      case 17: // a cave mouth in a hill, and bats pouring out of it
+        final h = at + const Offset(0, 14);
+        c.drawPath(Path()..moveTo(h.dx - 48, h.dy)..quadraticBezierTo(h.dx - 30, h.dy - 40, h.dx, h.dy - 38)..quadraticBezierTo(h.dx + 32, h.dy - 36, h.dx + 48, h.dy)..close(), fill);
+        c.drawPath(Path()..moveTo(h.dx - 14, h.dy)..quadraticBezierTo(h.dx - 12, h.dy - 22, h.dx, h.dy - 22)..quadraticBezierTo(h.dx + 12, h.dy - 22, h.dx + 14, h.dy)..close(), Paint()..color = const Color(0xFF1A1420).withValues(alpha: open ? .85 : .35));
+        for (final b in [at + const Offset(8, -34), at + const Offset(22, -42), at + const Offset(-6, -46), at + const Offset(34, -30)]) {
+          c.drawPath(Path()..moveTo(b.dx - 6, b.dy)..quadraticBezierTo(b.dx - 3, b.dy - 4, b.dx, b.dy)..quadraticBezierTo(b.dx + 3, b.dy - 4, b.dx + 6, b.dy), ink..strokeWidth = 1.6);
         }
       case 14: // a little island of standing stones, each a different shape
         c.drawOval(Rect.fromCenter(center: at + const Offset(0, 12), width: 80, height: 18), fill);

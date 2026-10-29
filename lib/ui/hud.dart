@@ -518,10 +518,6 @@ class StatusBadges extends StatelessWidget {
       if (state.summons > 0) ('Skeletons ×${state.summons} · ${state.summonTurns} turns', const Color(0xFFC89AFF), 'Your summoned dead strike with you'),
       if (state.wards > 0) ('Ward ×${state.wards}', const Color(0xFF7FB8E8), 'Absorbs the foe\'s next blow'),
       if (state.mirror > 0) ('Mirror ×${state.mirror}', const Color(0xFFCFE8F8), 'You take half; the foe takes the whole blow back'),
-      if (state.inBattle && state.foeAsleep > 0) ('Foe asleep', const Color(0xFFB8A0E8), 'It sleeps through its next blow'),
-      if (state.inBattle && state.foeSlowed > 0) ('Foe slowed · ${state.foeSlowed}', const Color(0xFF6ABF9A), 'Half its blows miss'),
-      if (state.inBattle && state.foeWeakened > 0) ('Foe weakened · ${state.foeWeakened}', const Color(0xFFB8A0D8), 'Its blows land 40% softer'),
-      if (state.inBattle && state.foeExposed > 0) ('Foe exposed · ${state.foeExposed}', const Color(0xFFE0A050), 'Your hits deal 25% more'),
     ];
     return Wrap(
       spacing: 5,

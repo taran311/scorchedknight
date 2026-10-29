@@ -191,6 +191,12 @@ const trophyLooks = <String, Trophy>{
   'bloodBride': Trophy.fang,
   'vampireKnight': Trophy.fang,
   'countess': Trophy.fang,
+  // The Hollowdeep's bats lose fangs too.
+  'cavebat': Trophy.fang,
+  'batkin': Trophy.fang,
+  'batkinCaller': Trophy.fang,
+  'batkinGuard': Trophy.fang,
+  'roostMother': Trophy.fang,
   'werewolf': Trophy.pelt,
   'werewolfStalker': Trophy.pelt,
   'werewolfBrute': Trophy.pelt,
@@ -255,7 +261,7 @@ class ForgedSet {
 
 const forgedSets = <ForgedSet>[
   ForgedSet('ashen', Trophy.ashenSteel, Metal.gold, 'the Ashen Order: its knights, and Sir Malric himself'),
-  ForgedSet('nightblood', Trophy.fang, Metal.iron, 'the vampires of Ravenmoor, who only come out at night'),
+  ForgedSet('nightblood', Trophy.fang, Metal.iron, 'the vampires of Ravenmoor and the bats of the Hollowdeep'),
   ForgedSet('moonfang', Trophy.pelt, Metal.iron, 'the werewolves of the Howling Weald, who only come out at night'),
   ForgedSet('silverleaf', Trophy.silk, Metal.gold, 'the elves of the Silverwood'),
   ForgedSet('deepforge', Trophy.runesteel, Metal.iron, 'the dwarves of Deepforge Hold'),
