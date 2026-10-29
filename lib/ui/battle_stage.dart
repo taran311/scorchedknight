@@ -884,7 +884,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
           _knightClipStart = now;
           // A step in behind the blow (a full charge for a bash), then back to your mark.
           _tween('dash', bash ? 1 : .92, swingHitMs * .75, ease: easeOut);
-          _tween('dash', 0, 340, delay: swingHitMs + 90, ease: easeInOut);
+          _tween('dash', 0, 240, delay: swingHitMs + 40, ease: easeInOut);
         });
         if (bash) {
           // The ground cracks where it lands: dust thrown out both ways, and the screen jolts.
@@ -895,7 +895,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
             _impact(.8);
           });
         }
-        _at(d0 + swingHitMs - 90, () {
+        _at(d0 + swingHitMs - 70, () {
           _trail = (now, bash ? const Color(0xFFFFF2C0) : _bladeColour, bash, r.damage.crit);
           Audio.play(Sfx.swing, power: bash ? 1.3 : 1);
         });

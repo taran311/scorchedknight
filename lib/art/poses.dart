@@ -105,20 +105,20 @@ Pose? sampleClip(Pose base, List<Keyframe> keys, double ms) {
 /// Wind-up, lunge with a step, slash, recover: quick and sharp. The blade connects at
 /// [swingHitMs], a little before a rite's bolt would land.
 const swingClip = <Keyframe>[
-  Keyframe(110, {J.nS: -40, J.nE: 120, J.nW: 70, J.lean: -6, J.nH: 4, J.nK: 14, J.fH: -8, J.fK: 10, J.dx: -6}, easeOut),
-  Keyframe(230, {J.nS: 96, J.nE: 12, J.nW: 58, J.lean: 16, J.nH: 40, J.nK: 22, J.fH: -26, J.fK: 6, J.dx: 190, J.head: 6}, easeIn),
-  Keyframe(310, {J.nS: 92, J.nE: 10, J.nW: 56, J.lean: 14, J.nH: 40, J.nK: 24, J.fH: -26, J.fK: 6, J.dx: 190}),
-  Keyframe(640, {}),
+  Keyframe(70, {J.nS: -40, J.nE: 120, J.nW: 70, J.lean: -6, J.nH: 4, J.nK: 14, J.fH: -8, J.fK: 10, J.dx: -6}, easeOut),
+  Keyframe(150, {J.nS: 96, J.nE: 12, J.nW: 58, J.lean: 16, J.nH: 40, J.nK: 22, J.fH: -26, J.fK: 6, J.dx: 190, J.head: 6}, easeIn),
+  Keyframe(200, {J.nS: 92, J.nE: 10, J.nW: 56, J.lean: 14, J.nH: 40, J.nK: 24, J.fH: -26, J.fK: 6, J.dx: 190}),
+  Keyframe(400, {}),
 ];
-const swingHitMs = 230.0;
+const swingHitMs = 150.0;
 
 /// The stunning blow: the weapon goes up over your head and comes crashing straight down, the
 /// knees bending into it. Lands at [swingHitMs], like the plain swing.
 const crushClip = <Keyframe>[
-  Keyframe(120, {J.nS: 172, J.nE: 40, J.nW: 10, J.fS: 70, J.fE: 60, J.lean: -10, J.head: -6, J.nH: 6, J.nK: 10, J.fH: -6, J.fK: 8, J.dx: 20}, easeOut),
-  Keyframe(230, {J.nS: 62, J.nE: 0, J.nW: 40, J.fS: 40, J.fE: 30, J.lean: 26, J.head: 10, J.nH: 46, J.nK: 40, J.fH: -30, J.fK: 26, J.dx: 180}, easeIn),
-  Keyframe(330, {J.nS: 58, J.nE: 0, J.nW: 42, J.fS: 40, J.fE: 30, J.lean: 24, J.head: 8, J.nH: 46, J.nK: 42, J.fH: -30, J.fK: 28, J.dx: 180}),
-  Keyframe(660, {}),
+  Keyframe(80, {J.nS: 172, J.nE: 40, J.nW: 10, J.fS: 70, J.fE: 60, J.lean: -10, J.head: -6, J.nH: 6, J.nK: 10, J.fH: -6, J.fK: 8, J.dx: 20}, easeOut),
+  Keyframe(150, {J.nS: 62, J.nE: 0, J.nW: 40, J.fS: 40, J.fE: 30, J.lean: 26, J.head: 10, J.nH: 46, J.nK: 40, J.fH: -30, J.fK: 26, J.dx: 180}, easeIn),
+  Keyframe(230, {J.nS: 58, J.nE: 0, J.nW: 42, J.fS: 40, J.fE: 30, J.lean: 24, J.head: 8, J.nH: 46, J.nK: 42, J.fH: -30, J.fK: 28, J.dx: 180}),
+  Keyframe(440, {}),
 ];
 
 const hitClip = <Keyframe>[
