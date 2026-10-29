@@ -1521,7 +1521,9 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   double _last = 0;
   void _tick(Duration elapsed) {
     // The stage keeps its own clock so a long combo can play faster (controller.stageSpeed).
-    final real = elapsed.inMicroseconds / 1000.0, realDt = math.min(50.0, real - _last);
+    // (A slow frame on a phone used to be capped at 50 ms, so when the frame rate dipped the whole
+    // fight went into slow motion. Now the clock keeps real time unless a frame is truly stalled.)
+    final real = elapsed.inMicroseconds / 1000.0, realDt = math.min(150.0, real - _last);
     var dt = realDt * c.stageSpeed;
     _last = real;
     if (_freeze > 0) {
@@ -1803,8 +1805,9 @@ class _ScenePainter extends CustomPainter {
       final flee = fx['flee']!, ko = fx['ko']!, dash = fx['dash']!;
       final kx = _knightX - flee * 560 + dash * _dashReach - fx['kback']! * 22;
       if (dash > .08 && !still) {
-        // Afterimages streaming behind the charge.
-        for (var i = 1; i <= 3; i++) {
+        // Afterimages streaming behind the charge (just one on a phone: each is a whole extra knight
+        // to draw, and three of them dropped frames mid-swing).
+        for (var i = 1; i <= (s._lite ? 1 : 3); i++) {
           drawHumanoid(canvas, hero, kPose, t, DrawOptions(at: Offset(kx - i * 48 * dash, _groundY), scale: _knightScale, alpha: .32 / i * dash, shadow: false), still: true);
         }
       }
