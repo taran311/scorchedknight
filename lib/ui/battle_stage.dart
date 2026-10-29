@@ -879,13 +879,23 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         hitMs = swingHitMs;
         final bash = r.action == BattleAction.skill;
         _at(d0, () {
-          _knightClip = swingClip;
+          // A quick slash, or for the stunning blow, an overhead crush.
+          _knightClip = bash ? crushClip : swingClip;
           _knightClipStart = now;
           // A step in behind the blow (a full charge for a bash), then back to your mark.
           _tween('dash', bash ? 1 : .92, swingHitMs * .75, ease: easeOut);
-          _tween('dash', 0, 460, delay: swingHitMs + 140, ease: easeInOut);
+          _tween('dash', 0, 340, delay: swingHitMs + 90, ease: easeInOut);
         });
-        _at(d0 + swingHitMs - 120, () {
+        if (bash) {
+          // The ground cracks where it lands: dust thrown out both ways, and the screen jolts.
+          _at(d0 + swingHitMs, () {
+            _spark('smoke', const Offset(_foeX - 70, _groundY - 4), 14, dir: -math.pi / 2, spread: 2.8, speed: 4, life: 600, radius: 9, gravity: .05);
+            _spark('spark', const Offset(_foeX - 70, _groundY - 10), 12, dir: -math.pi / 2, spread: 2.2, speed: 6, life: 380, radius: 3.5, gravity: .2);
+            _punch(1);
+            _impact(.8);
+          });
+        }
+        _at(d0 + swingHitMs - 90, () {
           _trail = (now, bash ? const Color(0xFFFFF2C0) : _bladeColour, bash, r.damage.crit);
           Audio.play(Sfx.swing, power: bash ? 1.3 : 1);
         });
