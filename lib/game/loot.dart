@@ -1037,7 +1037,7 @@ class LootTable {
         HeroClass.ranger => ('${tier.name} wyrmhorn bow', 'longbow', <Stat, double>{Stat.damage: 1.25 + .08 * t, Stat.crit: 1.0}, 'Bent from a dragon\'s horn; it never loses its pull.'),
       },
       GearSlot.offhand => switch (heroClass) {
-        HeroClass.knight => ('${tier.name} dragonslayer shield', 'dragonshield', <Stat, double>{Stat.guard: 1.0, Stat.block: .8}, 'A dragon\'s face, glaring out of its own scales. Fire slides off it.'),
+        HeroClass.knight => ('${tier.name} dragonslayer shield', 'dragonshield', <Stat, double>{Stat.guard: 1.0, Stat.block: .8}, 'A dragon\'s head run through, on a field of its own scales. Fire slides off it.'),
         HeroClass.mage => ('${tier.name} wyrm\'s eye', 'orb', <Stat, double>{Stat.burn: 1.0, Stat.wisdom: .8}, 'A dragon\'s eye, set in glass. It still blinks now and then.'),
         HeroClass.ranger => ('${tier.name} wyrmtooth quiver', 'quiver', <Stat, double>{Stat.crit: .9, Stat.damage: .4}, 'Every arrowhead is a dragon\'s tooth.'),
       },

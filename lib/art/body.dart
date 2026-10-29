@@ -1301,45 +1301,76 @@ void drawShield(Canvas c, Offset at, double tiltDeg, ShieldLook s) {
         c.drawCircle(q, 2.2, Paint()..color = s.trim);
       }
     case ShieldKind.dragon:
-      // A dragonslayer's shield: a kite of scale, a dragon's face glaring out of it, horns at the
-      // top corners and teeth along the bottom edge.
-      final p = Path()
-        ..moveTo(-28, -32)
-        ..lineTo(28, -32)
-        ..quadraticBezierTo(32, 8, 0, 48)
-        ..quadraticBezierTo(-32, 8, -28, -32)
+      // A dragonslayer's heater: blackened steel with winged top corners, a panel of the dragon's
+      // own scales, and its head run through by a sword. Dark fields get a gold head instead.
+      Path heater(double sx, double sy, double dy) => Path()
+        ..moveTo(-31 * sx, -38 * sy + dy)
+        ..quadraticBezierTo(-14 * sx, -29 * sy + dy, 0, -33 * sy + dy)
+        ..quadraticBezierTo(14 * sx, -29 * sy + dy, 31 * sx, -38 * sy + dy)
+        ..cubicTo(33 * sx, -4 * sy + dy, 22 * sx, 28 * sy + dy, 0, 50 * sy + dy)
+        ..cubicTo(-22 * sx, 28 * sy + dy, -33 * sx, -4 * sy + dy, -31 * sx, -38 * sy + dy)
         ..close();
-      fillPath(c, p, field, const Offset(-28, -32), const Offset(28, 48), width: 2);
+      final p = heater(1, 1, 0);
+      fillPath(c, p, const [Color(0xFF7A7E88), Color(0xFF383A42), Color(0xFF15161A)], const Offset(-30, -38), const Offset(30, 50), width: 2);
+      final inner = heater(.78, .8, 1.5);
+      fillPath(c, inner, [shade(s.field, .25), s.field, shade(s.field, -.5)], const Offset(-24, -30), const Offset(24, 40), line: false);
       c.save();
-      c.clipPath(p);
-      final scaleEdge = strokePaint(shade(s.field, -.45).withValues(alpha: .7), 1);
-      for (var row = 0; row < 8; row++) {
-        for (var col = 0; col < 6; col++) {
-          final o = Offset(-30 + col * 11.0 + (row.isOdd ? 5.5 : 0), -30 + row * 10.0);
-          c.drawArc(Rect.fromCenter(center: o, width: 11, height: 9), 0, math.pi, false, scaleEdge);
+      c.clipPath(inner);
+      final scaleEdge = strokePaint(shade(s.field, -.55).withValues(alpha: .55), .8);
+      for (var row = 0; row < 10; row++) {
+        for (var col = 0; col < 7; col++) {
+          final o = Offset(-30 + col * 9.0 + (row.isOdd ? 4.5 : 0), -32 + row * 8.0);
+          c.drawArc(Rect.fromCenter(center: o, width: 9, height: 7), 0, math.pi, false, scaleEdge);
         }
       }
+      c.drawRect(const Rect.fromLTRB(-30, -34, 30, -22), Paint()..color = const Color(0x22FFFFFF));
       c.restore();
-      final bone = <Color>[const Color(0xFFF0E8D4), const Color(0xFFC8BC9C), const Color(0xFF5A4E3A)];
-      // The face: a long snout down the middle, brows, eyes and nostrils.
-      final snout = poly(const [Offset(-17, -28), Offset(17, -28), Offset(12, 6), Offset(6, 30), Offset(-6, 30), Offset(-12, 6)]);
-      fillPath(c, snout, [Color.lerp(s.field, const Color(0xFFFFFFFF), .35)!, shade(s.field, -.1), shade(s.field, -.6)], const Offset(-17, 0), const Offset(17, 0), width: 1.8);
-      // A ridge down the snout, and heavy brows over burning eyes.
-      c.drawLine(const Offset(0, -26), const Offset(0, 26), strokePaint(Color.lerp(s.field, const Color(0xFFFFFFFF), .5)!.withValues(alpha: .7), 1.4));
-      for (final side in const [-1.0, 1.0]) {
-        c.drawPath(poly([Offset(side * 3, -20), Offset(side * 22, -27), Offset(side * 19, -15)]), Paint()..color = shade(s.field, -.65));
-        c.drawCircle(Offset(side * 12, -17), 7, Paint()..color = const Color(0xAAFF7A2A)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4));
-        c.drawPath(poly([Offset(side * 6, -16), Offset(side * 18, -21), Offset(side * 16, -14)]), Paint()..color = const Color(0xFFFFC04A));
-        c.drawCircle(Offset(side * 3.5, 24), 2.2, Paint()..color = const Color(0xFF120A08));
-        // Horns from the top corners, swept out.
-        fillPath(c, poly([Offset(side * 20, -32), Offset(side * 38, -50), Offset(side * 27, -30)]), bone, Offset(side * 20, -50), Offset(side * 27, -30), width: 1.2);
+      c.drawPath(inner, strokePaint(s.trim, 1.6));
+      c.drawPath(inner, strokePaint(const Color(0x99000000), .6));
+      const steel = [Color(0xFFF4F6F8), Color(0xFFB8C0CA), Color(0xFF5A626E)];
+      fillPath(c, poly(const [Offset(-2.6, -17), Offset(2.6, -17), Offset(2.2, 30), Offset(0, 36), Offset(-2.2, 30)]), steel, const Offset(-3, 0), const Offset(3, 0), width: 1);
+      // The head in profile, facing out: long snout, open jaws, two horns swept back.
+      final head = Path()
+        ..moveTo(-24, -2)
+        ..quadraticBezierTo(-23, -5, -19, -5)
+        ..quadraticBezierTo(-12, -5, -6, -7)
+        ..lineTo(-1, -12)
+        ..quadraticBezierTo(8, -13, 24, -21)
+        ..quadraticBezierTo(14, -9, 11, -7)
+        ..lineTo(21, -11)
+        ..quadraticBezierTo(15, -3, 12, 0)
+        ..quadraticBezierTo(17, 8, 12, 15)
+        ..quadraticBezierTo(9, 21, 12, 28)
+        ..lineTo(4, 26)
+        ..quadraticBezierTo(2, 18, 4, 11)
+        ..lineTo(-2, 13)
+        ..lineTo(-4, 8.5)
+        ..quadraticBezierTo(-12, 9, -20, 8)
+        ..lineTo(-15, 4.6)
+        ..lineTo(-6, 3.4)
+        ..lineTo(-23, 1)
+        ..close();
+      final dark = s.field.computeLuminance() > .14 ? shade(s.field, -.78) : shade(s.trim, -.05);
+      fillPath(c, head, [shade(dark, .25), dark, shade(dark, -.45)], const Offset(-20, -12), const Offset(18, 22), width: 1.2);
+      for (final q in const [Offset(16, 5), Offset(15.5, 12), Offset(12.5, 19)]) {
+        fillPath(c, poly([q + const Offset(-1, -2.5), q + const Offset(4.5, 0), q + const Offset(-1, 2.5)]), dark, Offset.zero, Offset.zero, width: .8);
       }
-      // Teeth along the jaw at the bottom.
-      for (var i = -2; i <= 2; i++) {
-        final x = i * 4.5;
-        c.drawPath(poly([Offset(x - 2, 30), Offset(x, 37 - i.abs() * 1.5), Offset(x + 2, 30)]), Paint()..color = bone[0]);
+      for (final x in const [-21.0, -17.0, -13.0, -9.0]) {
+        c.drawPath(poly([Offset(x, 1.2), Offset(x + 1.1, 3.8), Offset(x + 2.1, 1.5)]), Paint()..color = const Color(0xFFF0E8D4));
       }
-      c.drawPath(p, strokePaint(s.trim, 2.4));
+      c.drawCircle(const Offset(-4, -5.5), 4, Paint()..color = const Color(0xAAFF7A2A)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5));
+      c.drawPath(poly(const [Offset(-8, -5), Offset(-.5, -8.2), Offset(-2.5, -4.4)]), Paint()..color = const Color(0xFFFFC04A));
+      // The hilt above the head, and the blade again below its jaw: run through.
+      fillPath(c, poly(const [Offset(-12, -19), Offset(12, -19), Offset(10, -15), Offset(-10, -15)]), rampOf(s.trim, .35, .45), const Offset(0, -19), const Offset(0, -15), width: 1);
+      fillPath(c, poly(const [Offset(-1.8, -27), Offset(1.8, -27), Offset(1.8, -19), Offset(-1.8, -19)]), const [Color(0xFF6A4A30), Color(0xFF4A3020), Color(0xFF2A1A10)], const Offset(-2, 0), const Offset(2, 0), width: .8);
+      c.drawCircle(const Offset(0, -28.5), 2.8, Paint()..color = s.trim);
+      c.drawCircle(const Offset(0, -28.5), 2.8, strokePaint(outline, .8));
+      fillPath(c, poly(const [Offset(-2.4, 8), Offset(2.4, 8), Offset(2.2, 30), Offset(0, 36), Offset(-2.2, 30)]), steel, const Offset(-3, 0), const Offset(3, 0), width: 1);
+      for (final q in const [Offset(-26, -30), Offset(26, -30), Offset(-24, 6), Offset(24, 6), Offset(0, 43), Offset(-12, -30.5), Offset(12, -30.5)]) {
+        c.drawCircle(q, 1.6, Paint()..color = const Color(0xFFB0B4BC));
+        c.drawCircle(q, 1.6, strokePaint(outline, .6));
+      }
+      c.drawPath(p, strokePaint(const Color(0x55FFFFFF), .8));
     case ShieldKind.kite:
       final p = Path()
         ..moveTo(-26, -34)
