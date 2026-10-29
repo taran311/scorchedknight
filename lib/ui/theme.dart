@@ -62,6 +62,16 @@ ThemeData buildTheme() {
     colorScheme: const ColorScheme.dark(primary: Palette.amber, secondary: Palette.blood, surface: Palette.stone2, onSurface: Palette.cream),
   );
   return base.copyWith(
+    // A plain quick fade between screens everywhere. (The default zoom transition snapshots and
+    // scales both whole screens every frame, which stutters on phones in the browser.)
+    pageTransitionsTheme: const PageTransitionsTheme(builders: {
+      TargetPlatform.android: _FadeTransitions(),
+      TargetPlatform.iOS: _FadeTransitions(),
+      TargetPlatform.fuchsia: _FadeTransitions(),
+      TargetPlatform.linux: _FadeTransitions(),
+      TargetPlatform.macOS: _FadeTransitions(),
+      TargetPlatform.windows: _FadeTransitions(),
+    }),
     textTheme: GoogleFonts.alegreyaSansTextTheme(base.textTheme),
     inputDecorationTheme: InputDecorationTheme(
       isDense: true,
@@ -87,6 +97,17 @@ ThemeData buildTheme() {
       ),
     ),
   );
+}
+
+/// The new screen fades in over the old one. It stays fully clear for the first part of the
+/// fade, so the screen's first, heaviest frames (laying itself out, recording its pictures) happen
+/// before it's drawn at all, and the visible part of the fade runs smooth.
+class _FadeTransitions extends PageTransitionsBuilder {
+  const _FadeTransitions();
+
+  @override
+  Widget buildTransitions<T>(PageRoute<T> route, BuildContext context, Animation<double> animation, Animation<double> secondaryAnimation, Widget child) =>
+      FadeTransition(opacity: CurvedAnimation(parent: animation, curve: const Interval(.3, 1, curve: Curves.easeOut)), child: child);
 }
 
 /// Bevelled stone: the frame for panels, buttons and chips.

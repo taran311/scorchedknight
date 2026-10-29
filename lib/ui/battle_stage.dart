@@ -173,7 +173,9 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
 
   void _impact(double strength) {
     if (_reduceMotion || strength <= 0) return;
-    _freeze = math.max(_freeze, 40 + 50 * strength);
+    // Only big blows (crits, specials, devastating hits) stop time for a beat: on every plain hit,
+    // the pause landed in the middle of the swing and made it feel like dropped frames.
+    if (strength >= .5) _freeze = math.max(_freeze, 30 + 50 * strength);
     _shake = math.max(_shake, 2 + 6 * strength);
   }
   double _clock = 0;

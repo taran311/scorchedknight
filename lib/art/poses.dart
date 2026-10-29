@@ -60,7 +60,9 @@ Pose walkPose(Stance s, double t, double amount, {bool still = false}) {
 typedef Ease = double Function(double);
 double easeInOut(double p) => p < .5 ? 2 * p * p : 1 - math.pow(-2 * p + 2, 2) / 2;
 double easeOut(double p) => 1 - math.pow(1 - p, 3).toDouble();
-double easeIn(double p) => p * p * p;
+/// Accelerates into the end, hard, but starts already moving: a cubic used to sit still for the
+/// first half and then snap, which read as a stutter in the middle of a swing.
+double easeIn(double p) => p * (.3 + .7 * p);
 
 class Keyframe {
   const Keyframe(this.ms, this.overrides, [this.ease = easeInOut]);
