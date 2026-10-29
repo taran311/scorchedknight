@@ -889,7 +889,9 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
           _knightClipStart = now;
           // Run in to the foe on one smooth curve, arriving just before the blade comes down (the
           // clip raises the sword on the way), then glide back to your mark after the hold.
-          _tween('dash', bash ? crushDash : swingDash, swingHitMs - 60, ease: easeInOut);
+          // (Bigger foes are wider, so you stop shorter: you used to run into a giant's belly.)
+          final reach = ((bash ? crushDash : swingDash) - .28 * (_foeHeight - 160) / _dashReach).clamp(.55, 1.16);
+          _tween('dash', reach, swingHitMs - 60, ease: easeInOut);
           _tween('dash', 0, 380, delay: swingHitMs + 100, ease: easeInOut);
         });
         if (bash) {
@@ -897,8 +899,9 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
           _at(d0 + swingHitMs, () {
             _spark('smoke', const Offset(_foeX - 70, _groundY - 4), 14, dir: -math.pi / 2, spread: 2.8, speed: 4, life: 600, radius: 9, gravity: .05);
             _spark('spark', const Offset(_foeX - 70, _groundY - 10), 12, dir: -math.pi / 2, spread: 2.2, speed: 6, life: 380, radius: 3.5, gravity: .2);
-            _punch(1);
-            _impact(.8);
+            // (A softer punch than a crit's: the full one washed the whole screen white.)
+            _punch(.55);
+            _impact(.6);
           });
         }
         _at(d0 + swingHitMs - 110, () {

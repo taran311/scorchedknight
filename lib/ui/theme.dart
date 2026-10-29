@@ -106,8 +106,18 @@ class _FadeTransitions extends PageTransitionsBuilder {
   const _FadeTransitions();
 
   @override
-  Widget buildTransitions<T>(PageRoute<T> route, BuildContext context, Animation<double> animation, Animation<double> secondaryAnimation, Widget child) =>
-      FadeTransition(opacity: CurvedAnimation(parent: animation, curve: const Interval(.3, 1, curve: Curves.easeOut)), child: child);
+  Widget buildTransitions<T>(PageRoute<T> route, BuildContext context, Animation<double> animation, Animation<double> secondaryAnimation, Widget child) => Stack(
+    fit: StackFit.expand,
+    children: [
+      // The old screen dims to the dark ground first, then the new one fades up out of it, so the
+      // two are never seen through each other (text over text looked like a glitch).
+      FadeTransition(
+        opacity: CurvedAnimation(parent: animation, curve: const Interval(0, .35, curve: Curves.easeOut)),
+        child: const ColoredBox(color: Palette.ground),
+      ),
+      FadeTransition(opacity: CurvedAnimation(parent: animation, curve: const Interval(.35, 1, curve: Curves.easeOut)), child: child),
+    ],
+  );
 }
 
 /// Bevelled stone: the frame for panels, buttons and chips.
