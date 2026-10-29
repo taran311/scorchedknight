@@ -401,6 +401,11 @@ class _QuestCard extends StatelessWidget {
     ),
   );
 
+  Widget _reward(Widget icon, String text) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [icon, const SizedBox(width: 4), Text(text, style: Txt.label(size: 15, color: Palette.cream))],
+  );
+
   @override
   Widget build(BuildContext context) => GestureDetector(
     onTap: onOpen,
@@ -441,20 +446,16 @@ class _QuestCard extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(color: const Color(0x66000000), border: Border.all(color: Palette.amberLo), borderRadius: BorderRadius.circular(3)),
                   child: Wrap(
-                    spacing: 6,
+                    spacing: 12,
                     runSpacing: 4,
                     crossAxisAlignment: WrapCrossAlignment.center,
+                    // Each reward keeps its icon and words together, so a narrow phone wraps
+                    // whole rewards onto the next line, never an icon on its own.
                     children: [
                       Text('REWARD', style: Txt.label(size: 12, color: Palette.amber)),
-                      const SizedBox(width: 4),
-                      const ItemIcon(Item.coins, size: 20),
-                      Text('$innRepairReward gold', style: Txt.label(size: 15, color: Palette.cream)),
-                      const SizedBox(width: 8),
-                      const ItemIcon(Item.potion, size: 20),
-                      Text('$innRepairPotions potions', style: Txt.label(size: 15, color: Palette.cream)),
-                      const SizedBox(width: 8),
-                      const Icon(Icons.local_fire_department, size: 20, color: Color(0xFFFF8A3A)),
-                      Text('Free rest at the inn', style: Txt.label(size: 15, color: Palette.cream)),
+                      _reward(const ItemIcon(Item.coins, size: 20), '$innRepairReward gold'),
+                      _reward(const ItemIcon(Item.potion, size: 20), '$innRepairPotions potions'),
+                      _reward(const Icon(Icons.local_fire_department, size: 20, color: Color(0xFFFF8A3A)), 'Free rests'),
                     ],
                   ),
                 ),

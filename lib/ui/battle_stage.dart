@@ -884,9 +884,12 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
           // A quick slash, or for the stunning blow, an overhead crush.
           _knightClip = bash ? crushClip : swingClip;
           _knightClipStart = now;
-          // A step in behind the blow (a full charge for a bash), then back to your mark.
-          _tween('dash', bash ? 1 : .92, swingHitMs * .75, ease: easeOut);
-          _tween('dash', 0, 320, delay: swingHitMs + 80, ease: easeInOut);
+          // A step in behind the blow (a full charge for a bash), then back to your mark. The step
+          // keeps exactly the swing's own timing (wind-up, then accelerating into the hit, then
+          // easing home with the recovery): when it ran on its own curve, the body raced ahead,
+          // stalled, then lurched again, and the swing felt like it was dropping frames.
+          _tween('dash', bash ? 1 : .92, swingHitMs - 110, delay: 110, ease: easeIn);
+          _tween('dash', 0, 340, delay: swingHitMs + 80, ease: easeInOut);
         });
         if (bash) {
           // The ground cracks where it lands: dust thrown out both ways, and the screen jolts.
