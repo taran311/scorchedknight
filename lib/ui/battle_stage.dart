@@ -1136,8 +1136,9 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
             }
           case Strike.arrow:
             // An archer looses an arrow at you.
-            _tween('lunge', .25, 100, ease: easeOut);
-            _tween('lunge', 0, 260, delay: 140);
+            // (It leans into the shot, so you can see who loosed it.)
+            _tween('lunge', .4, 120, ease: easeOut);
+            _tween('lunge', 0, 300, delay: strikeMs);
             _at(strikeMs - 170, () => _shots.add(_Projectile('arrow', _foeChest + const Offset(-30, -10), to, now, 170, const Color(0x00000000))));
           case Strike.magic:
             // A caster hurls a bolt of dark magic.
@@ -1758,12 +1759,13 @@ class _ScenePainter extends CustomPainter {
       final p = fx['pounce']!, stage = petStages[pet.$1]!.indexOf(pet.$2);
       final home = Offset(_knightX - 60 + (still ? 0 : math.sin(t / 700) * 10), _groundY - 210 + (still ? 0 : math.sin(t / 260) * 6));
       final away = s._foeChest + const Offset(-40, -40);
-      final k2 = math.sin(p * math.pi);
+      final k2 = _outAndBack(p);
       drawFairy(canvas, Offset.lerp(home, away, k2)!, stage, t, still: still);
     } else if (pet != null) {
       // A hound companion at your heel; it dashes to the foe when it bites.
       final p = fx['pounce']!, stage = petStages[pet.$1]!.indexOf(pet.$2);
-      final x = 120 + (_foeX - 230) * math.sin(p * math.pi);
+      // Out to the foe's feet, a moment there for the bite, then back to your heel.
+      final x = 120 + (_foeX - 80 - 120) * _outAndBack(p);
       drawHound(canvas, pet.$1 == Pet.hellhound ? hellhoundLook : wolfLook, Offset(x, _groundY + 4), .7 + stage * .17, t, pounce: p, still: still);
     } else if (ds != null) {
       if (ds.name == 'Egg') {
@@ -2648,4 +2650,13 @@ Look _crossbowLook(Knight k) {
   final l = k.loadout;
   final kit = Loadout(armour: l.armour, weapon: _xbow, helm: l.helm, gloves: l.gloves, boots: l.boots, cape: l.cape, armourEnchant: l.armourEnchant);
   return lookFor(k.heroClass, kit, dye: k.dye, gloves: k.gloves, trinket: k.trinket, female: k.female, soot: sootFor(k.level), shine: shinesAt(k.level));
+}
+
+/// A companion's run at the foe, 0 to 1 and back: out (easing in to land), held there while it
+/// bites or stings (the middle fifth), then home again.
+double _outAndBack(double p) {
+  if (p <= 0 || p >= 1) return 0;
+  if (p < .4) return easeOut(p / .4);
+  if (p <= .6) return 1;
+  return 1 - easeInOut((p - .6) / .4);
 }

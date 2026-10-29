@@ -279,6 +279,10 @@ class _BattleScreenState extends State<BattleScreen> {
                                     Container(
                                       color: const Color(0xFF15110C),
                                       padding: const EdgeInsets.all(5),
+                                      // Room kept for a few rows of the foe's badges (slowed, burning,
+                                      // weak to...), so the fight below doesn't jump up and down as they
+                                      // come and go between turns.
+                                      constraints: const BoxConstraints(minHeight: 96),
                                       // You and the foe side by side, slim, so the fight gets the screen.
                                       child: Row(
                                         crossAxisAlignment: CrossAxisAlignment.start,

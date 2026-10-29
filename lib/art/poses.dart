@@ -119,7 +119,8 @@ const strikeMs = 320.0;
 const swingHitMs = strikeMs;
 
 /// How far the dash carries you toward the foe for a blow (in dash units: 1 is the stage's reach).
-const swingDash = 1.57, crushDash = 1.62;
+/// (It stops a step short of the foe: further, and you ended up standing inside it.)
+const swingDash = 1.12, crushDash = 1.18;
 
 /// The stunning blow: the weapon goes up over your head as you close in, then comes crashing
 /// straight down, the knees bending into it. Lands at [swingHitMs], like the plain swing.
