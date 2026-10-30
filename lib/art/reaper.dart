@@ -148,7 +148,7 @@ void drawReaper(Canvas c, ReaperPose r, double t, {required bool still}) {
   c.drawOval(face, Paint()..color = const Color(0xFF050307));
   // The skull: cranium, cheek and a grinning jaw, lit only from below.
   final skull = p(40 + 7 * lean, -320 + 7 * lean);
-  c.drawCircle(skull, 13 * s, Paint()..shader = ui.Gradient.linear(skull - Offset(0, 13 * s), skull + Offset(0, 13 * s), const [Color(0xFF3A362E), _boneDark, _bone]));
+  c.drawCircle(skull, 13 * s, Paint()..shader = ui.Gradient.linear(skull - Offset(0, 13 * s), skull + Offset(0, 13 * s), const [Color(0xFF3A362E), _boneDark, _bone], const [0, .5, 1]));
   c.drawRRect(
     RRect.fromRectAndRadius(Rect.fromCenter(center: skull + Offset(2 * s, 14 * s), width: 16 * s, height: 9 * s), Radius.circular(3 * s)),
     Paint()..color = _bone,

@@ -1540,6 +1540,9 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
 
   void _playKill(KillResult k) {
     final d0 = _slot(2700);
+    // The HP you get back for the win says where it came from (it used to just appear on the bar
+    // between foes, and looked like healing out of nowhere).
+    if (k.breathed > 0) _at(d0 + 900, () => _mark('+${k.breathed} Catch your breath', _green, const Offset(_knightX + 10, _groundY - 250)));
     _at(d0, () {
       _tween('flash', 1, 80);
       _tween('flash', 0, 300, delay: 80);
@@ -2895,7 +2898,9 @@ class _ScenePainter extends CustomPainter {
       Offset(-w / 2, 0),
     ]);
     canvas.saveLayer(null, Paint()..color = Color.fromRGBO(0, 0, 0, alpha));
-    canvas.drawPath(path, Paint()..shader = ui.Gradient.linear(Offset(0, -h / 2), Offset(0, h / 2), m.colours));
+    // (A gradient with no stops takes exactly two colours: the phone's renderer throws otherwise.)
+    final cs = m.colours.isEmpty ? const [Colors.white, Colors.grey] : (m.colours.length == 2 ? m.colours : [m.colours.first, m.colours.last]);
+    canvas.drawPath(path, Paint()..shader = ui.Gradient.linear(Offset(0, -h / 2), Offset(0, h / 2), cs));
     canvas.drawPath(path, strokePaint(Colors.black.withValues(alpha: .6), 1.5));
     tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
     canvas.restore();

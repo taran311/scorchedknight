@@ -46,7 +46,7 @@ class ChestFind {
 }
 
 class KillResult {
-  const KillResult(this.foeIndex, this.name, this.xp, this.coins, this.levelUps, this.loot, {this.egg = false, this.orkGear, this.entGear, this.runeGear, this.prize, this.foe, this.chest, this.companion, this.opened = const [], this.trophy, this.blueprint, this.boss = false, this.won = false, this.reagents = 0, this.jobFind, this.potion = false, this.relicPart, this.packGold = 0, this.packed = const [], this.junkGold = 0, this.jackpot = 0, this.hoard = const [], this.finds = const []});
+  const KillResult(this.foeIndex, this.name, this.xp, this.coins, this.levelUps, this.loot, {this.egg = false, this.orkGear, this.entGear, this.runeGear, this.prize, this.foe, this.chest, this.companion, this.opened = const [], this.trophy, this.blueprint, this.boss = false, this.won = false, this.reagents = 0, this.jobFind, this.potion = false, this.relicPart, this.packGold = 0, this.packed = const [], this.junkGold = 0, this.jackpot = 0, this.hoard = const [], this.finds = const [], this.breathed = 0});
 
   /// A lucky purse: extra gold on top of the usual (already counted in [coins]).
   final int jackpot;
@@ -62,6 +62,9 @@ class KillResult {
   /// A treasure chest left behind (now and then; a grand one after a boss).
   final ChestFind? chest;
   final int xp, coins, levelUps;
+
+  /// HP you got back catching your breath after the win.
+  final int breathed;
   final GearItem? loot;
 
   /// A dragon egg was found (the Cinderreach's boss).
@@ -2536,9 +2539,11 @@ class GameEngine {
     // Catching your breath after a win: a little back for everyone, and regeneration gear mends
     // you on the spot.
     final regen = heroStats(k).regen + (maxHp(k) * breathShare).round();
+    var breathed = 0;
     if (regen > 0 && k.hp < maxHp(k)) {
       final before = k.hp;
       k.hp = math.min(maxHp(k), k.hp + regen);
+      breathed = k.hp - before;
       _note('You catch your breath and mend ${k.hp - before} HP.', EntryKind.good);
     }
     _endBattle();
@@ -2627,7 +2632,7 @@ class GameEngine {
     }
     if (ups > 0) _note('You reached level ${k.level}. ${shineLine(k.level)}', EntryKind.gold);
     final junkGold = _sellJunk(loot0);
-    return KillResult(i, f.name, r.xp, r.coins + jackpot, ups, jackpot: jackpot, drop, junkGold: junkGold, egg: egg, orkGear: orkPrize, entGear: entPrize, runeGear: rune, prize: prize, foe: f, chest: chest, companion: companion, opened: opened, trophy: trophies > 0 ? '${trophies > 1 ? '$trophies× ' : ''}${trophy!.label}' : null, blueprint: blueprint, boss: f.boss && rare == null, won: won, reagents: reagents, jobFind: jobFind, potion: flask, relicPart: relicPart, packGold: packGold, packed: packed, hoard: hoard, finds: [
+    return KillResult(i, f.name, r.xp, r.coins + jackpot, ups, breathed: breathed, jackpot: jackpot, drop, junkGold: junkGold, egg: egg, orkGear: orkPrize, entGear: entPrize, runeGear: rune, prize: prize, foe: f, chest: chest, companion: companion, opened: opened, trophy: trophies > 0 ? '${trophies > 1 ? '$trophies× ' : ''}${trophy!.label}' : null, blueprint: blueprint, boss: f.boss && rare == null, won: won, reagents: reagents, jobFind: jobFind, potion: flask, relicPart: relicPart, packGold: packGold, packed: packed, hoard: hoard, finds: [
       if (gem != null) ('gem', gem.name),
       if (pearl) ('gem', Gem.pearl.name),
       if (elemental != null) ('core', elemental.name),

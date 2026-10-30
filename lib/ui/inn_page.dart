@@ -17,6 +17,7 @@ import '../art/silhouette.dart';
 import '../art/silhouette_inn.dart';
 import '../art/town_props.dart';
 import '../audio/audio.dart';
+import '../build_info.dart';
 import '../game/catalog.dart';
 import '../game/events.dart';
 import '../game/controller.dart';
@@ -1185,6 +1186,8 @@ class _SettingsWindowState extends State<_SettingsWindow> {
               _CloudSection(controller: c),
               const SizedBox(height: 6),
               TextButton(onPressed: _newHero, child: Text('Start a new hero…', style: Txt.label(size: 13, color: const Color(0xFFE07A5A)))),
+              // Which build this is: to tell at a glance that a phone has the latest.
+              Center(child: Text('Build $buildStamp', style: Txt.onStone(size: 11.5, color: Palette.parch2))),
             ],
           )),
           ),
