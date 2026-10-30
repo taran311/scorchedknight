@@ -307,7 +307,9 @@ class FoeCard extends StatelessWidget {
   /// Its face beside its name and health bar (when it has one to show).
   Widget _withFace(Widget nameAndBar) => face == null
       ? nameAndBar
+      // (Top-aligned, like your card opposite: the faces and the names line up across.)
       : Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Stack(
               clipBehavior: Clip.none,
@@ -376,15 +378,16 @@ class HeroStrip extends StatelessWidget {
         border: Border.all(color: Palette.amberLo, width: 1.5),
         borderRadius: BorderRadius.circular(6),
       ),
-      // Your face beside your name, health and mana.
+      // Your face beside your name, health and mana: laid out just like the foe's card opposite
+      // (same size of face, same place at the top), so the two faces line up across the screen.
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // The level on a little tag at the frame's foot, so the name gets the room.
           Stack(
             clipBehavior: Clip.none,
             children: [
-              HeroPortrait(look: heroLook(k), size: 62, signature: portraitSignature(k), framed: true),
+              HeroPortrait(look: heroLook(k), size: 64, signature: portraitSignature(k), framed: true),
               Positioned(
                 left: -2,
                 bottom: -2,
@@ -396,12 +399,10 @@ class HeroStrip extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 4),
           Expanded(child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
-        // Beside a taller foe card, its rows spread to fill the same height.
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
             children: [
@@ -417,9 +418,9 @@ class HeroStrip extends StatelessWidget {
               children: [
                 for (var i = 0; i < maxMana; i++)
                   Container(
-                    width: 10,
-                    height: 10,
-                    margin: const EdgeInsets.only(right: 4),
+                    width: 9,
+                    height: 9,
+                    margin: const EdgeInsets.only(right: 3),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: i < s.mana ? const Color(0xFF6AC8FF) : const Color(0xFF15202A),
@@ -428,11 +429,7 @@ class HeroStrip extends StatelessWidget {
                   ),
                 const Spacer(),
                 // A hint that the card opens your gear (tap it).
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                  decoration: BoxDecoration(color: Colors.black38, borderRadius: BorderRadius.circular(8), border: Border.all(color: Palette.amberLo)),
-                  child: const Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.backpack_outlined, size: 13, color: Palette.amber), SizedBox(width: 2), Icon(Icons.expand_more, size: 13, color: Palette.amber)]),
-                ),
+                const Icon(Icons.backpack_outlined, size: 15, color: Palette.amber),
               ],
             ),
           ),

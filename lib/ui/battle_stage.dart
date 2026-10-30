@@ -1857,17 +1857,26 @@ class _ScenePainter extends CustomPainter {
     canvas.clipRect(Offset.zero & size);
     // Show the whole 960-wide scene on wide screens; on narrow ones keep the 700-wide strip
     // that holds the knight, dragon and foe.
-    final visibleW = math.min(sceneSize.width, math.max(700.0, sceneSize.height * size.width / size.height));
+    // A tall phone stage zooms in closer (620 wide still holds you, your companion and a big
+    // foe), so the fighters fill it instead of a sky.
+    final tall = size.height > size.width * .8;
+    final visibleW = math.min(sceneSize.width, math.max(tall ? 620.0 : 700.0, sceneSize.height * size.width / size.height));
     // (Centred a touch toward the foe: the big ones are wider than you, and mustn't lose a shoulder.)
-    final left = (482 - visibleW / 2).clamp(0.0, sceneSize.width - visibleW);
+    final left = ((tall ? 470 : 482) - visibleW / 2).clamp(0.0, sceneSize.width - visibleW);
     canvas.scale(size.width / visibleW);
     // Taller than the scene (a stage stretched to fill a phone): drop the scene to the bottom and
     // carry its sky on up above it.
-    final above = math.max(0.0, size.height * visibleW / size.width - sceneSize.height);
+    // Any height to spare goes a little to sky above and more to the ground running on below
+    // (so the fighters stand in the middle of it, not at the foot of a tall empty sky).
+    final spare = math.max(0.0, size.height * visibleW / size.width - sceneSize.height);
+    final above = spare * .4, below = spare - above;
     canvas.translate(-left, above);
     if (above > 0) {
-      final sky = specFor(s._scene).sky;
-      canvas.drawRect(Rect.fromLTWH(left - 2, -above - 2, visibleW + 4, above + 4), Paint()..color = sky.first);
+      final spec = specFor(s._scene);
+      canvas.drawRect(Rect.fromLTWH(left - 2, -above - 2, visibleW + 4, above + 4), Paint()..color = spec.sky.first);
+      final earth = spec.ground.last;
+      final foot = Rect.fromLTWH(left - 2, sceneSize.height - 1, visibleW + 4, below + 4);
+      canvas.drawRect(foot, Paint()..shader = ui.Gradient.linear(foot.topCenter, foot.bottomCenter, [earth, Color.lerp(earth, Colors.black, .55)!]));
     }
     if (s._shake > 0) canvas.translate(math.sin(t * .09) * s._shake, math.cos(t * .13) * s._shake * .5);
     final zoom = fx['zoom']!;
@@ -2538,7 +2547,7 @@ class _ScenePainter extends CustomPainter {
       final spot = s._bubbleBox ??= _place(
         Size(w, h + 14),
         Offset(head.dx - w * .2, head.dy - h / 2 - 14),
-        Rect.fromLTRB(left + 6, -above + 6, left + visibleW - 6, sceneSize.height - 6),
+        Rect.fromLTRB(left + 6, -above + 6, left + visibleW - 6, sceneSize.height + below - 6),
         [
           if (s._banner != null) Rect.fromLTWH(left, 96, visibleW, 76),
           for (final m in s._marks)
@@ -2594,7 +2603,7 @@ class _ScenePainter extends CustomPainter {
       canvas.translate(-fc.dx, -fc.dy);
     }
     final boost = (.62 * visibleW / size.width).clamp(1.0, 1.5).toDouble();
-    final view = Rect.fromLTRB(left + 6, -above + 6, left + visibleW - 6, sceneSize.height - 6);
+    final view = Rect.fromLTRB(left + 6, -above + 6, left + visibleW - 6, sceneSize.height + below - 6);
     final taken = <Rect>[
       for (final m in [...s._marks, ...s._drops])
         if (m.box != null) m.box!,
