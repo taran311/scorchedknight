@@ -1542,7 +1542,11 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     final d0 = _slot(2700);
     // The HP you get back for the win says where it came from (it used to just appear on the bar
     // between foes, and looked like healing out of nowhere).
-    if (k.breathed > 0) _at(d0 + 900, () => _mark('+${k.breathed} Catch your breath', _green, const Offset(_knightX + 10, _groundY - 250)));
+    _at(d0 + 250, () {
+      // The bar rises and the label says why, at the same moment.
+      c.revealHeroHp();
+      if (k.breathed > 0) _mark('+${k.breathed} Catch your breath', _green, const Offset(_knightX + 10, _groundY - 250));
+    });
     _at(d0, () {
       _tween('flash', 1, 80);
       _tween('flash', 0, 300, delay: 80);

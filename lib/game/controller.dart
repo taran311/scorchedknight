@@ -495,7 +495,8 @@ class GameController extends ChangeNotifier {
     logHeldAt = state.journal.lastOrNull;
     _heldHeroHp = state.knight.hp;
     final r = engine.takeTurn(a, aim: aim);
-    if (r.counter == null && !r.knockedOut) _heldHeroHp = null;
+    // (A kill holds the bar too: what the win gives back shows when the kill plays, with its label.)
+    if (r.counter == null && !r.knockedOut && r.kill == null) _heldHeroHp = null;
     // Knocked out: the bar empties as the blow lands, before the Inn patches you up.
     if (r.knockedOut) _koHp = 0;
     lastSwing = r;
@@ -534,6 +535,12 @@ class GameController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Called by the stage as the kill plays: the HP the win gives back shows on the bar now.
+  void revealHeroHp() {
+    _heldHeroHp = null;
+    hpShown.value++;
+  }
+
   /// Called by the stage when a blow lands.
   void revealDamage(int amount) {
     shownFoeHp = (shownFoeHp - amount).clamp(0, shownFoeMax);
@@ -544,7 +551,7 @@ class GameController extends ChangeNotifier {
   void swingFinished(SwingResult r) {
     // A kill keeps the log held until the foe has fallen (killFinished).
     if (r.kill == null) logHeldAt = null;
-    _heldHeroHp = null;
+    if (r.kill == null) _heldHeroHp = null;
     shownSummons = state.summons;
     if (r.kill != null) {
       shownFoeHp = 0;
@@ -566,6 +573,7 @@ class GameController extends ChangeNotifier {
   /// Called by the stage once the defeated foe has fallen.
   void killFinished() {
     busy = false;
+    _heldHeroHp = null;
     logHeldAt = null;
     lastKill = lastSwing?.kill;
     outcome = Outcome.won;
