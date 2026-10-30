@@ -2428,7 +2428,14 @@ class _ScenePainter extends CustomPainter {
     // It's winding up a heavy blow: a pulsing red "!" by its head, so you see it coming.
     if (c.state.foeWindup && !c.busy && fx['dying']! < .05) {
       final pulse = .5 + .5 * math.sin(t / 140);
-      final at = Offset(fx0 + 52, math.max(60.0, _groundY + lift.dy - s._foeHeight * 1.1 - 20));
+      // Over its head, but always inside what's on screen (on a phone's closer view, beside the
+      // head ran off the right-hand edge).
+      // (Above its health bar, and any rare-foe tag over that, not on top of them.)
+      final barTop = _groundY + lift.dy - s._foeHeight * 1.18 - 34;
+      final at = Offset(
+        fx0.clamp(left + 34, left + visibleW - 34).toDouble(),
+        math.max(-above + 34, barTop - (s._foe.aura != null ? 48 : 30)),
+      );
       canvas.drawCircle(at, 20 + 5 * pulse, Paint()..color = const Color(0xFFFF3A2A).withValues(alpha: .25 + .2 * pulse));
       canvas.drawCircle(at, 15, Paint()..color = const Color(0xFFB8261A));
       canvas.drawCircle(at, 15, strokePaint(const Color(0xFFFFD0A0), 2));

@@ -569,7 +569,7 @@ class _BattleScreenState extends State<BattleScreen> {
           })(),
         slot(
           BattleAction.shoot,
-          const Icon(Icons.gps_fixed, size: 38, color: Color(0xFFDDD0B1)),
+          const Icon(Icons.gps_fixed, size: 38, color: Color(0xFFCDE6B0)),
           'Shoot',
           _SlotInfo('Shoot', const Color(0xFFDDD0B1), [
             ('🏹', '~${(swing * crossbowShare(k) * boltEdge * aimBoost(k)).round()} damage', plain),
@@ -580,6 +580,8 @@ class _BattleScreenState extends State<BattleScreen> {
           badge: '~${(swing * crossbowShare(k) * boltEdge * aimBoost(k)).round()}',
           badgeColour: edgeColour(boltEdge),
           glow: boltEdge > 1,
+          // The crossbow's own colour: hunter green (blades red, rites blue).
+          tint: const Color(0xFF263A20),
         ),
         if (_hasPotions)
         slot(
@@ -595,7 +597,8 @@ class _BattleScreenState extends State<BattleScreen> {
           badge: '×${k.potions}',
           // Lights up when you're in trouble, so it's the first thing your eye finds.
           glow: (k.hp < maxHp(k) * .35 || s.heroPoison > 1) && s.potionsDrunk < potionsPerFight,
-          tint: const Color(0xFF3A1A1A),
+          // A healing teal, so the red flask stands out, and it's never mistaken for Attack's red.
+          tint: const Color(0xFF173A38),
         ),
         if (_hasCompanion)
         slot(
@@ -607,6 +610,8 @@ class _BattleScreenState extends State<BattleScreen> {
             if (s.petWait > 0) ('⏳', 'Ready in ${turns(s.petWait)}', soft),
           ]),
           wait: s.petWait,
+          // Your companion's earthy amber, like its paw.
+          tint: const Color(0xFF4A3218),
         ),
         slot(
           BattleAction.flee,
@@ -618,6 +623,8 @@ class _BattleScreenState extends State<BattleScreen> {
             if (s.dungeonFight) ('🚪', 'Back out and bar the door', soft) else if (s.wild != null) ('🎒', 'Drops ${(fightFleeLoss * 100).round()}% of your pack', bad) else ('🏠', 'Back to the inn', soft),
           ]),
           badge: '${(flee * 100).round()}%',
+          // A cool, quiet slate: the way out, not something to draw the eye.
+          tint: const Color(0xFF2C3238),
         ),
       ],
     ];

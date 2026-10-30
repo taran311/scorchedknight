@@ -245,7 +245,7 @@ class _InnPageState extends State<InnPage> with RouteAware {
                             childAspectRatio: 2.6,
                             children: [
                               for (final spot in const [TownSpot.gate, TownSpot.inn, TownSpot.stall, TownSpot.forge, TownSpot.enchanter, TownSpot.tent])
-                                _PlaceButton(icon: _TownSquareState._icons[spot]!, label: labels[spot]!, onTap: taps[spot], hot: spot == TownSpot.gate, ready: (spot == TownSpot.forge && c.engine.forgeReady) || (spot == TownSpot.enchanter && c.engine.gemsWaiting)),
+                                _PlaceButton(icon: _TownSquareState._icons[spot]!, label: labels[spot]!, onTap: taps[spot], hot: spot == TownSpot.gate, accent: _placeAccent[spot], ready: (spot == TownSpot.forge && c.engine.forgeReady) || (spot == TownSpot.enchanter && c.engine.gemsWaiting)),
                             ],
                           ),
                         ],
@@ -1197,12 +1197,26 @@ class _SettingsWindowState extends State<_SettingsWindow> {
   }
 }
 
+/// Each place's colour on its button: the inn's hearth, Mags' green bottles, the forge's embers,
+/// Old Wick's arcane violet, and the cool blue of your tent's canvas at night.
+const _placeAccent = <TownSpot, Color>{
+  TownSpot.inn: Color(0xFFF2A945),
+  TownSpot.stall: Color(0xFF8BD46A),
+  TownSpot.forge: Color(0xFFFF7A3A),
+  TownSpot.enchanter: Color(0xFFB892FF),
+  TownSpot.tent: Color(0xFF7FC0E8),
+};
+
 /// One of the town's places as a big button (on a phone, under the scene).
 class _PlaceButton extends StatelessWidget {
-  const _PlaceButton({required this.icon, required this.label, this.onTap, this.hot = false, this.ready = false});
+  const _PlaceButton({required this.icon, required this.label, this.onTap, this.hot = false, this.ready = false, this.accent});
   final IconData icon;
   final String label;
   final VoidCallback? onTap;
+
+  /// The place's own colour (its icon, an edge of light and a tinted rim on the stone), so each
+  /// is known at a glance; the stone stays the same grey, so the square still looks of a piece.
+  final Color? accent;
 
   /// The main way onward (Set out): lit up.
   final bool hot;
@@ -1220,10 +1234,23 @@ class _PlaceButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(4),
         child: Ink(
           padding: const EdgeInsets.symmetric(horizontal: 10),
-          decoration: stoneDecoration(fill: hot ? Palette.bloodDeep : Palette.stone2),
+          decoration: hot || accent == null
+              ? stoneDecoration(fill: hot ? Palette.bloodDeep : Palette.stone2)
+              : BoxDecoration(
+                  borderRadius: BorderRadius.circular(3),
+                  border: Border.all(color: Color.lerp(Palette.stone0, accent, .45)!, width: 2),
+                  // The stone, with the place's light falling across it from the icon's side.
+                  gradient: LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [Color.lerp(Palette.stone2, accent, .22)!, Color.lerp(Palette.stone2, Colors.black, .06)!],
+                    stops: const [0, .55],
+                  ),
+                  boxShadow: const [BoxShadow(color: Colors.black, offset: Offset(0, 2))],
+                ),
           child: Row(
             children: [
-              Icon(icon, size: 24, color: hot ? const Color(0xFFFFE0C0) : Palette.amber),
+              Icon(icon, size: 24, color: hot ? const Color(0xFFFFE0C0) : (accent ?? Palette.amber), shadows: accent == null || hot ? null : [Shadow(color: accent!.withValues(alpha: .6), blurRadius: 8)]),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(label, maxLines: 2, overflow: TextOverflow.ellipsis, style: Txt.label(size: 14, color: Palette.cream, weight: FontWeight.w800)),
