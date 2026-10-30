@@ -850,7 +850,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         c.revealDamage(-r.regrew);
       });
     }
-    if (r.burned > 0 || r.venomed > 0) {
+    if (r.burned > 0 || r.venomed > 0 || r.bled > 0) {
       // Burning and venom bolts eat at the foe once your blow has landed.
       _at(d0 + end - 520, () {
         if (r.burned > 0) {
@@ -861,7 +861,11 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
           _mark('${r.venomed}', _green, _foeChest + const Offset(30, -40));
           _spark('venom', _foeChest, 8, speed: 1.6, life: 600, radius: 3, gravity: -.01);
         }
-        c.revealDamage(r.burned + r.venomed);
+        if (r.bled > 0) {
+          _mark('${r.bled}', _red, _foeChest + const Offset(-6, -10));
+          _spill(_foeChest + const Offset(-10, 0), .6);
+        }
+        c.revealDamage(r.burned + r.venomed + r.bled);
       });
     }
     if (r.froze) _at(d0 + end - 520, () => _mark('Frozen!', const [Color(0xFF9ADFFF), Color(0xFF2A5A8A)], _foeChest + const Offset(0, -90)));

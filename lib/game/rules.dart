@@ -12,7 +12,7 @@ import 'spells.dart';
 
 /// Everything the hero's class, armour and gear add up to.
 class HeroStats {
-  int damage = 0, poison = 0, burn = 0, frost = 0, smite = 0, lifesteal = 0, vigour = 0, regen = 0, thorns = 0, dragonkin = 0;
+  int damage = 0, poison = 0, burn = 0, frost = 0, bleed = 0, smite = 0, lifesteal = 0, vigour = 0, regen = 0, thorns = 0, dragonkin = 0;
   int crit = 0, guard = 0, fortune = 0, wisdom = 0, dodge = 0, parry = 0, block = 0, leech = 0, wyrmbane = 0; // percentages
   double armour = 0;
 
@@ -21,6 +21,7 @@ class HeroStats {
     Stat.poison => poison,
     Stat.burn => burn,
     Stat.frost => frost,
+    Stat.bleed => bleed,
     Stat.smite => smite,
     Stat.crit => crit,
     Stat.lifesteal => lifesteal,
@@ -48,6 +49,8 @@ class HeroStats {
         burn += v;
       case Stat.frost:
         frost += v;
+      case Stat.bleed:
+        bleed += v;
       case Stat.smite:
         smite += v;
       case Stat.crit:
@@ -277,9 +280,13 @@ FoeReward foeReward(int i, int level, [Knight? k, Rare? rare]) {
 
 /// One attack's damage, split by type so the stage can show each.
 class SwingDamage {
-  const SwingDamage({this.base = 0, this.poison = 0, this.burn = 0, this.frost = 0, this.smite = 0, this.chip = 0, this.heal = 0, this.crit = false, this.special, this.ammo, this.spell, this.leech = false, this.devastating = false, this.glancing = false});
+  const SwingDamage({this.base = 0, this.poison = 0, this.burn = 0, this.frost = 0, this.smite = 0, this.chip = 0, this.heal = 0, this.envenom = 0, this.ignite = 0, this.bleed = 0, this.crit = false, this.special, this.ammo, this.spell, this.leech = false, this.devastating = false, this.glancing = false});
   final int base, poison, burn, frost, smite, chip, heal;
   final bool crit;
+
+  /// What the weapon leaves in the foe rather than dealing at once: venom that grows with every
+  /// hit, fire that burns for turns, a wound that bleeds.
+  final int envenom, ignite, bleed;
 
   /// The special attack this attack unleashed.
   final Special? special;
@@ -342,6 +349,8 @@ SwingDamage swingDamage(GameState state, double roll, {Special? special, AmmoTyp
   // The companion's blow: dragon fire (boosted by dragonkin gear) or a pet's bite.
   final chip = pet != null ? pet.bite + k.level ~/ 6 : (ds == null || ds.chip == 0 ? 0 : ds.chip + k.level ~/ 5 + s.dragonkin);
   final poison = s.poison + (k.poisonFights > 0 ? 4 + k.level ~/ 3 : 0), extra = sp?.element == null ? 0 : 3 * k.level;
+  // Constructs, spirits, the dead and the elementals have no blood to spill.
+  final bloodless = foe.undead || foe.stone || foe.spirit || foe.element != null || foe.look.startsWith('golem');
   // Blessed shots: light against the living, heavy against the unholy; frost shots a smaller chill.
   final unholy = foe.undead || foe.demon || foe.element == 'poison';
   int shotAdds(Stat st) => shot?.stat != st ? 0 : switch (shot!) {
@@ -350,13 +359,17 @@ SwingDamage swingDamage(GameState state, double roll, {Special? special, AmmoTyp
     _ => bonus,
   };
   int ammoAdds(Stat st) => shotAdds(st) + (cast?.element == st ? 3 * k.level : 0);
-  final burn = s.burn + (sp?.element == Stat.burn ? extra : 0) + ammoAdds(Stat.burn) + (pet?.burn ?? 0);
+  final burn = (sp?.element == Stat.burn ? extra : 0) + ammoAdds(Stat.burn) + (pet?.burn ?? 0);
   // An elemental shrugs off its own element and takes double from its opposite.
   int el(Stat st, int v) => foe.element == null ? v : (foe.element == st.name ? 0 : (elementWeakness(foe.element!) == st.name ? v * 2 : v));
   return SwingDamage(
     base: base,
     // Ents shrug off half the poison; spiders all of it.
-    poison: el(Stat.poison, foe.venomous ? 0 : (foe.ent ? (poison + ammoAdds(Stat.poison)) ~/ 2 : poison + ammoAdds(Stat.poison))),
+    poison: el(Stat.poison, foe.venomous ? 0 : (foe.ent ? ammoAdds(Stat.poison) ~/ 2 : ammoAdds(Stat.poison))),
+    // The weapon's own venom, fire and edge go in to work over the turns that follow.
+    envenom: el(Stat.poison, foe.venomous ? 0 : (foe.ent ? poison ~/ 2 : poison)),
+    ignite: el(Stat.burn, foe.demon || foe.look == 'emberKing' ? s.burn ~/ 2 : (foe.ent ? s.burn * 2 : s.burn)),
+    bleed: bloodless ? 0 : s.bleed * (crit ? 2 : 1),
     // Ents burn twice as hard; demons (and the Ember King himself) only half as hard.
     burn: el(Stat.burn, foe.demon || foe.look == 'emberKing' ? burn ~/ 2 : (foe.ent ? burn * 2 : burn)),
     frost: el(Stat.frost, s.frost + (sp?.element == Stat.frost ? extra : 0) + ammoAdds(Stat.frost)),
@@ -383,7 +396,7 @@ SwingDamage swingDamage(GameState state, double roll, {Special? special, AmmoTyp
 /// with its level and continent; bosses and rare foes hit harder.
 int foeAttack(int foeIndex, Rare? rare, int level) {
   final f = encounterType(foeIndex, rare), realm = landTier(realmAt(rare?.base ?? foeIndex));
-  var a = (13 + 5.6 * level) * (1 + .05 * realm);
+  var a = (13 + 5.6 * level + 1.4 * math.max(0, level - 8)) * (1 + .05 * realm);
   // The first few levels go easier on a new hero, while they learn the ropes (and the flat part of
   // the formula would otherwise make Cindervale the hardest land in the game, per foe).
   if (level < 5) a *= .7 + .075 * (level - 1);

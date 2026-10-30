@@ -14,6 +14,7 @@ extension StatLook on Stat {
     Stat.poison => const Color(0xFF8BE05A),
     Stat.burn => const Color(0xFFFF8A3A),
     Stat.frost => const Color(0xFF9ADFFF),
+    Stat.bleed => const Color(0xFFE04A4A),
     Stat.smite => const Color(0xFFFFE27A),
     Stat.crit => const Color(0xFFFFC94A),
     Stat.lifesteal => const Color(0xFFFF6A7A),
@@ -34,9 +35,10 @@ extension StatLook on Stat {
   /// A couple of words after the number: "+8 vs undead", "+13% gold".
   String get short => switch (this) {
     Stat.damage => 'damage',
-    Stat.poison => 'poison',
-    Stat.burn => 'fire',
+    Stat.poison => 'venom',
+    Stat.burn => 'burn',
     Stat.frost => 'frost',
+    Stat.bleed => 'bleed',
     Stat.smite => 'vs undead',
     Stat.crit => 'crit',
     Stat.lifesteal => 'HP per hit',
@@ -82,6 +84,7 @@ class StatGlyph extends StatelessWidget {
           Stat.poison => icon(Icons.science),
           Stat.burn => icon(Icons.local_fire_department),
           Stat.frost => icon(Icons.ac_unit),
+          Stat.bleed => icon(Icons.water_drop),
           Stat.crit => icon(Icons.flare),
           Stat.lifesteal => icon(Icons.favorite),
           Stat.guard => icon(Icons.shield),

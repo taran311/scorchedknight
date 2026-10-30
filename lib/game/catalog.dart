@@ -1271,6 +1271,10 @@ const heroPoisonChance = .35, heroPoisonTurns = 3, heroPoisonShare = .04;
 bool drinksBlood(FoeType f) => const {'vampireSpawn', 'bloodBride', 'vampireKnight', 'countess', 'cavebat'}.contains(f.look);
 const bloodDrink = .5;
 
+/// A venomous weapon's poison grows by this share of its venom with every hit; a serrated
+/// weapon's wound bleeds for [bleedTurns] turns; frost freezes the foe at [frostFreeze] a hit.
+const toxinGrowth = .35, bleedTurns = 2, frostFreeze = .1;
+
 /// The chance a foe (a boss) winds up a heavy blow for its next turn, and how hard it lands.
 const windupChance = .15, windupBoss = .15, heavyBlow = 1.5;
 const jackpotChance = .04;

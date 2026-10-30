@@ -407,6 +407,9 @@ class GameState {
     this.foeBurn = 0,
     this.foeBurnTurns = 0,
     this.foeVenom = 0,
+    this.foeToxin = 0,
+    this.foeBleed = 0,
+    this.foeBleedTurns = 0,
     this.potionsDrunk = 0,
     this.fairyCharge = 0,
     this.fairyNext = 0,
@@ -600,6 +603,10 @@ class GameState {
   /// venom in it (each does its share every turn, for the rest of the fight).
   int foeBurn, foeBurnTurns, foeVenom;
 
+  /// A venomous weapon's poison in the foe (it eats this much a turn, and grows with every hit),
+  /// and a serrated weapon's wound (this much a turn, for so many turns).
+  int foeToxin, foeBleed, foeBleedTurns;
+
   /// Potions drunk this fight (only [potionsPerFight] allowed).
   int potionsDrunk;
 
@@ -712,6 +719,8 @@ class GameState {
       'exposed': foeExposed,
       if (foeBurnTurns > 0) 'burn': [foeBurn, foeBurnTurns],
       if (foeVenom > 0) 'venom': foeVenom,
+      if (foeToxin > 0) 'toxin': foeToxin,
+      if (foeBleedTurns > 0) 'bleed': [foeBleed, foeBleedTurns],
       if (potionsDrunk > 0) 'drunk': potionsDrunk,
       'fairyCharge': fairyCharge,
       'fairyNext': fairyNext,
@@ -831,6 +840,9 @@ class GameState {
       foeBurn: (j['burn'] is List && (j['burn'] as List).length == 2) ? ((j['burn'] as List)[0] as num).toInt() : 0,
       foeBurnTurns: (j['burn'] is List && (j['burn'] as List).length == 2) ? ((j['burn'] as List)[1] as num).toInt() : 0,
       foeVenom: n('venom'),
+      foeToxin: n('toxin'),
+      foeBleed: (j['bleed'] is List && (j['bleed'] as List).length == 2) ? ((j['bleed'] as List)[0] as num).toInt() : 0,
+      foeBleedTurns: (j['bleed'] is List && (j['bleed'] as List).length == 2) ? ((j['bleed'] as List)[1] as num).toInt() : 0,
       potionsDrunk: n('drunk'),
       fairyCharge: n('fairyCharge'),
       fairyNext: n('fairyNext'),

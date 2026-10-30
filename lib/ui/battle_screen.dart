@@ -735,7 +735,9 @@ class _FoeCard extends StatelessWidget {
         if (c.state.inBattle && c.state.foeAsleep > 0) const FoeBadge(label: 'Asleep', colour: Color(0xFFB8A0E8), tip: 'It sleeps through its next blow'),
         if (c.state.inBattle && c.state.foeFrozen) const FoeBadge(label: 'Frozen', colour: Color(0xFF9ADFFF), tip: 'Frozen solid: it misses its next blow'),
         if (c.state.inBattle && c.state.foeBurnTurns > 0) FoeBadge(label: 'Burning ${c.state.foeBurnTurns}', colour: const Color(0xFFFF8A3A), tip: '${c.state.foeBurn} fire a turn · ${c.state.foeBurnTurns} turns left'),
-        if (c.state.inBattle && c.state.foeVenom > 0) FoeBadge(label: 'Venom ×${c.state.foeVenom}', colour: const Color(0xFF8FD36A), tip: 'Each dose eats at it every turn, for the rest of the fight'),
+        if (c.state.inBattle && (c.state.foeVenom > 0 || c.state.foeToxin > 0))
+          FoeBadge(label: c.state.foeToxin > 0 ? 'Venom ${c.state.foeToxin}' : 'Venom ×${c.state.foeVenom}', colour: const Color(0xFF8FD36A), tip: 'Eats at it every turn for the rest of the fight, and grows with every venomous hit'),
+        if (c.state.inBattle && c.state.foeBleedTurns > 0) FoeBadge(label: 'Bleeding ${c.state.foeBleedTurns}', colour: const Color(0xFFE04A4A), tip: '${c.state.foeBleed} a turn · ${c.state.foeBleedTurns} turns left'),
         if (c.state.inBattle && !c.busy) FoeBadge(icons: const [Icon(Icons.flash_on, size: 15, color: Color(0xFFFF8A70))], text: '~${nextBlow(c.state)}', colour: const Color(0xFFE0A090), tip: 'Hits for about ${nextBlow(c.state)}'),
         if (foe.mimic && c.state.lastStyle != null)
           FoeBadge(

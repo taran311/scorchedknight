@@ -429,16 +429,17 @@ String classSpecial(HeroClass c) => switch (c) {
 };
 
 /// Everything gear can do. Per-swing effects only apply to full-strength swings.
-enum Stat { damage, poison, burn, frost, smite, crit, lifesteal, guard, vigour, regen, thorns, fortune, wisdom, dragonkin, dodge, parry, block, leech, wyrmbane }
+enum Stat { damage, poison, burn, frost, bleed, smite, crit, lifesteal, guard, vigour, regen, thorns, fortune, wisdom, dragonkin, dodge, parry, block, leech, wyrmbane }
 
 extension StatInfo on Stat {
   bool get percent => const {Stat.crit, Stat.guard, Stat.fortune, Stat.wisdom, Stat.dodge, Stat.parry, Stat.block, Stat.leech, Stat.wyrmbane}.contains(this);
 
   String describe(int v) => switch (this) {
     Stat.damage => '+$v damage per swing',
-    Stat.poison => '+$v poison per swing',
-    Stat.burn => '+$v fire per swing',
-    Stat.frost => '+$v frost per swing',
+    Stat.poison => 'Venom: +$v a turn more with every hit, till the fight ends',
+    Stat.burn => 'Sets it alight: $v fire a turn for 3 turns',
+    Stat.frost => '+$v frost per swing, and now and then it freezes the foe',
+    Stat.bleed => 'Opens a wound: $v a turn for 2 turns (double on a crit; the bloodless don\'t bleed)',
     Stat.smite => '+$v holy damage to the undead',
     Stat.crit => '+$v% critical hit chance',
     Stat.lifesteal => 'Heal $v HP per swing',
@@ -465,7 +466,7 @@ class GearItem {
     required this.art,
     required this.rarity,
     required this.level,
-    required this.stats,
+    required Map<Stat, int> stats,
     required this.value,
     this.heroClass,
     this.lore,
@@ -473,7 +474,7 @@ class GearItem {
     this.special,
     this.enchant,
     this.gearSet,
-  });
+  }) : stats = tidyStats(slot, rarity, stats);
 
   /// The gear set this piece belongs to (an id in [gearSets]), if any.
   final String? gearSet;
@@ -846,9 +847,6 @@ const Map<HeroClass, Map<GearSlot, List<_Base>>> _bases = {
 const _rings = <_Base>[
   _Base('Band', 'ring', Stat.damage, .5),
   _Base('Signet', 'ring', Stat.crit, .7),
-  _Base('Ember ring', 'ring', Stat.burn, .6),
-  _Base('Frost ring', 'ring', Stat.frost, .6),
-  _Base('Venom ring', 'ring', Stat.poison, .6),
   _Base('Bloodstone ring', 'ring', Stat.lifesteal, .7),
   _Base('Lucky ring', 'ring', Stat.fortune, .8),
   _Base('Sage\'s ring', 'ring', Stat.wisdom, .8),
@@ -876,9 +874,11 @@ const _w = GearSlot.weapon, _o = GearSlot.offhand, _h = GearSlot.helm, _t = Gear
 
 const _affixes = <_Affix>[
   _Affix(Stat.damage, 'Keen', 'of Might', {_w, _t, _o, _gl, _rg}),
-  _Affix(Stat.poison, 'Venomous', 'of Venom', {_w, _o, _t, _rg, _gl}),
-  _Affix(Stat.burn, 'Searing', 'of Embers', {_w, _o, _t, _rg, _gl}),
-  _Affix(Stat.frost, 'Frostbitten', 'of Winter', {_w, _o, _t, _rg, _gl}),
+  // The elements are a weapon's alone, one to a weapon.
+  _Affix(Stat.poison, 'Venomous', 'of Venom', {_w}),
+  _Affix(Stat.burn, 'Searing', 'of Embers', {_w}),
+  _Affix(Stat.frost, 'Frostbitten', 'of Winter', {_w}),
+  _Affix(Stat.bleed, 'Serrated', 'of Rending', {_w}),
   _Affix(Stat.smite, 'Hallowed', 'of Dawn', {_w, _o, _rg}),
   _Affix(Stat.crit, 'Deadly', 'of Precision', {_w, _h, _t, _gl, _rg}),
   _Affix(Stat.lifesteal, 'Thirsting', 'of Renewal', {_w, _t, _gl, _rg}),
@@ -886,17 +886,41 @@ const _affixes = <_Affix>[
   _Affix(Stat.vigour, 'Hale', 'of Vigour', {_h, _o, _t, _bt}),
   _Affix(Stat.regen, 'Soothing', 'of the Hearth', {_h, _t, _bt, _rg}),
   _Affix(Stat.thorns, 'Thorned', 'of Brambles', {_o, _h, _bt}),
-  _Affix(Stat.fortune, 'Gilded', 'of Fortune', {_h, _t, _w, _rg, _bt}),
-  _Affix(Stat.wisdom, 'Sage', 'of Insight', {_h, _t, _rg}),
+  // Gold and XP are for rings and charms.
+  _Affix(Stat.fortune, 'Gilded', 'of Fortune', {_t, _rg}),
+  _Affix(Stat.wisdom, 'Sage', 'of Insight', {_t, _rg}),
   _Affix(Stat.dragonkin, 'Wyrmbound', 'of the Wyrm', {_w, _t, _rg}),
   _Affix(Stat.dodge, 'Nimble', 'of the Fox', {_bt, _gl}),
   _Affix(Stat.parry, 'Duelling', 'of the Duel', {_gl, _rg}),
   _Affix(Stat.block, 'Steadfast', 'of the Wall', {_bt}),
 ];
 
+const _elements = {Stat.poison, Stat.burn, Stat.frost, Stat.bleed};
+
+/// Keeps every piece in its lane: the elements belong on weapons, and gold and XP on rings and
+/// charms. Anything else (old drops, the odd base) turns them into plain damage and health.
+/// Legendaries keep what they're made of.
+Map<Stat, int> tidyStats(GearSlot slot, Rarity rarity, Map<Stat, int> stats) {
+  if (rarity == Rarity.legendary) return stats;
+  final weapon = slot == GearSlot.weapon, jewel = slot == GearSlot.ring || slot == GearSlot.trinket;
+  if ((weapon || !stats.keys.any(_elements.contains)) && (jewel || !stats.keys.any((s) => s == Stat.fortune || s == Stat.wisdom))) return stats;
+  final out = <Stat, int>{};
+  void add(Stat s, int v) => out[s] = (out[s] ?? 0) + v;
+  for (final e in stats.entries) {
+    if (!weapon && _elements.contains(e.key)) {
+      add(Stat.damage, e.value);
+    } else if (!jewel && (e.key == Stat.fortune || e.key == Stat.wisdom)) {
+      add(Stat.vigour, math.max(1, (e.value * .75).round()));
+    } else {
+      add(e.key, e.value);
+    }
+  }
+  return out;
+}
+
 /// What one point of each stat is worth, for comparing items (see GearItem.score).
 double statWeight(Stat s) => switch (s) {
-  Stat.damage || Stat.poison || Stat.burn || Stat.frost => 3.0,
+  Stat.damage || Stat.poison || Stat.burn || Stat.frost || Stat.bleed => 3.0,
   Stat.smite => 1.2,
   Stat.thorns || Stat.regen => .5,
   Stat.crit || Stat.guard => 1.5,
@@ -963,7 +987,7 @@ int _roll(Stat s, int level, double mult, math.Random r) {
 double _base(Stat s, int level) {
   final v = switch (s) {
     Stat.damage => 1.5 + level * .7,
-    Stat.poison || Stat.burn || Stat.frost => 1.5 + level * .45,
+    Stat.poison || Stat.burn || Stat.frost || Stat.bleed => 1.5 + level * .45,
     Stat.smite => 3 + level * .8,
     Stat.crit => 4 + level * .3,
     Stat.lifesteal => 1 + level * .25,
@@ -1853,6 +1877,7 @@ class LootTable {
     final chosen = <_Affix>[];
     for (final a in pool) {
       if (chosen.length >= rarity.index) break;
+      if (_elements.contains(a.stat) && (_elements.contains(base.primary) || chosen.any((c) => _elements.contains(c.stat)))) continue; // one element to a weapon
       if (a.stat == base.primary && chosen.isEmpty && rarity.index < 2 && a.stat != element) continue; // keep names varied
       chosen.add(a);
     }

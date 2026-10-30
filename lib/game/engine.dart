@@ -148,7 +148,7 @@ class SwingResult {
 
   /// Fire and venom (from burning and venom shots) that ate at the foe this turn, and whether a
   /// frost shot froze it out of its next blow.
-  int burned = 0, venomed = 0;
+  int burned = 0, venomed = 0, bled = 0;
   bool froze = false;
 
   /// A special's stun took (the foe misses its next blow), and the health a special cost you.
@@ -1319,6 +1319,9 @@ class GameEngine {
       ..foeExposed = 0
       ..foeBurn = 0
       ..foeBurnTurns = 0
+      ..foeToxin = 0
+      ..foeBleed = 0
+      ..foeBleedTurns = 0
       ..foeVenom = 0
       ..potionsDrunk = 0
       ..fairyCharge = 0
@@ -1341,6 +1344,9 @@ class GameEngine {
       ..dungeonFight = false
       ..foeBurn = 0
       ..foeBurnTurns = 0
+      ..foeToxin = 0
+      ..foeBleed = 0
+      ..foeBleedTurns = 0
       ..foeVenom = 0
       ..heroPoison = 0;
     if (state.inspired > 0) state.inspired--;
@@ -1758,11 +1764,18 @@ class GameEngine {
         ..foeBurnTurns -= 1;
       _note('$foeName burns for ${r.burned}.', EntryKind.damage);
     }
-    if (state.foeVenom > 0 && state.foeHp > 0) {
-      final v = (state.foeVenom * venomTick(k.level) * (foe.ent ? .5 : 1)).round();
+    if ((state.foeVenom > 0 || state.foeToxin > 0) && state.foeHp > 0) {
+      final v = (state.foeVenom * venomTick(k.level) * (foe.ent ? .5 : 1)).round() + state.foeToxin;
       r.venomed = math.min(state.foeHp, v);
       state.foeHp -= r.venomed;
       _note('The venom eats at $foeName for ${r.venomed}.', EntryKind.damage);
+    }
+    if (state.foeBleedTurns > 0 && state.foeHp > 0) {
+      r.bled = math.min(state.foeHp, state.foeBleed);
+      state
+        ..foeHp -= r.bled
+        ..foeBleedTurns -= 1;
+      _note('$foeName bleeds for ${r.bled}.', EntryKind.damage);
     }
   }
 
@@ -1852,6 +1865,29 @@ class GameEngine {
       _ => 'You strike and hit',
     };
     _note('$how $foeName for $hit${d.crit ? ' (critical!)' : ''}${extras.isEmpty ? '' : ', including ${extras.join(', ')}'}.', EntryKind.damage);
+    // What the weapon leaves in the wound: fire that keeps burning, venom that builds, a bleed.
+    if (d.ignite > 0) {
+      if (state.foeBurnTurns == 0) _note('$foeName catches fire.', EntryKind.damage);
+      state
+        ..foeBurn = math.max(state.foeBurnTurns > 0 ? state.foeBurn : 0, d.ignite)
+        ..foeBurnTurns = burnTurns;
+    }
+    if (d.envenom > 0) {
+      state.foeToxin += math.max(1, (d.envenom * toxinGrowth).round());
+      if (state.foeToxin == math.max(1, (d.envenom * toxinGrowth).round())) _note('Venom gets into $foeName.', EntryKind.damage);
+    }
+    if (d.bleed > 0) {
+      if (state.foeBleedTurns == 0) _note('$foeName starts to bleed.', EntryKind.damage);
+      state
+        ..foeBleed = math.max(state.foeBleedTurns > 0 ? state.foeBleed : 0, d.bleed)
+        ..foeBleedTurns = bleedTurns;
+    }
+    // Frost now and then freezes it out of its next blow.
+    if (d.frost > 0 && !state.foeFrozen && state.foeHp > 0 && _rng.nextDouble() < frostFreeze * (foeIn(state).boss ? .5 : 1)) {
+      state.foeFrozen = true;
+      r.froze = true;
+      _note('The cold bites deep: $foeName freezes solid!', EntryKind.good);
+    }
     // The full Tidecaller set: frost drags the foe down like the undertow.
     if (d.frost > 0 && state.foeSlowed == 0 && activeSets(k.gear).any((e) => e.$1.undertow && e.$2 >= 3) && _rng.nextDouble() < undertowChance) {
       state.foeSlowed = 2;

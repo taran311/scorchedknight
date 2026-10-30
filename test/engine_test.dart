@@ -272,10 +272,10 @@ void main() {
       ..rare = Rare(foeIndexes(5).first, Aura.blazing, look: Elemental.ember.look)
       ..foeLevel = 30;
     final d = swingDamage(s, .5, hitRoll: .5);
-    expect(d.burn, 0);
+    expect(d.burn + d.ignite, 0);
     s.rare = Rare(foeIndexes(5).first, Aura.frost, look: Elemental.frost.look);
     final d2 = swingDamage(s, .5, hitRoll: .5);
-    expect(d2.burn, greaterThan(0));
+    expect(d2.burn + d2.ignite, greaterThan(0));
     s.inBattle = false;
     // Three cores make a rune of their element, tier II or better.
     k.coins = 10000;
@@ -285,6 +285,26 @@ void main() {
     expect(roll.tier, greaterThanOrEqualTo(2));
     expect(s.mat(coreKey(Elemental.frost)), 0);
     expect(e.bindCores(Elemental.frost), isNull);
+  });
+
+  test('weapons keep the elements; gold and XP stay on rings and charms; fire burns, venom builds, wounds bleed', () {
+    // An old helm with fire and gold turns into plain damage and health.
+    final helm = GearItem(id: 'h', name: 'Old helm', slot: GearSlot.helm, art: 'helm', rarity: Rarity.rare, level: 5, value: 10, stats: {Stat.burn: 4, Stat.fortune: 12, Stat.vigour: 10});
+    expect(helm.stats.containsKey(Stat.burn), isFalse);
+    expect(helm.stats.containsKey(Stat.fortune), isFalse);
+    expect(helm.stat(Stat.damage), 4);
+    expect(helm.stat(Stat.vigour), 19);
+    // New drops: at most one element, and only on weapons.
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(5));
+    for (var i = 0; i < 300; i++) {
+      final g = e.loot.roll(HeroClass.knight, 20);
+      final els = g.stats.keys.where((st) => const {Stat.poison, Stat.burn, Stat.frost, Stat.bleed}.contains(st)).length;
+      if (g.rarity != Rarity.legendary) {
+        if (g.slot != GearSlot.weapon) expect(els, 0);
+        expect(els, lessThanOrEqualTo(1));
+        if (g.slot != GearSlot.ring && g.slot != GearSlot.trinket) expect(g.stats.containsKey(Stat.fortune) || g.stats.containsKey(Stat.wisdom), isFalse);
+      }
+    }
   });
 
   test('the Faceless brace for whatever way you struck them last', () {
@@ -336,7 +356,7 @@ void main() {
     // Fire stops it.
     k.loadout.weapon?.enchant = const EnchantRoll('flametongue', 3, 40);
     final r2 = e.takeTurn(BattleAction.skill);
-    expect(r2.damage.burn, greaterThan(0));
+    expect(r2.damage.burn + r2.damage.ignite, greaterThan(0));
     expect(r2.regrew, 0);
   });
 
@@ -502,6 +522,8 @@ void main() {
     k.trinket = LootTable(Random(1)).bossTrinket('bloodmoonpelt', 20);
     e.explore();
     s.foeHp = s.foeMax = 1 << 30;
+    // A weak foe, so its blows nudge you under half without knocking you out.
+    s.foeLevel = 1;
     var wolfed = 0, ended = 0;
     for (var i = 0; i < 80 && s.inBattle; i++) {
       // Hover just above half health, so the next blow tips you under.
