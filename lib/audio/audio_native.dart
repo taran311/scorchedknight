@@ -16,7 +16,31 @@ import 'synth.dart';
 /// Bump when a recipe changes, so phones render the new sounds instead of the cached ones.
 const _version = 1;
 
-final _pools = <Sfx, AudioPool>{};
+/// Each sound's players, loaded once and taken in turn. (Not audioplayers' AudioPool: in
+/// low-latency mode it never gets a player back, so every later sound built a new player and
+/// loaded the file again first, which is what made sounds land late on phones.)
+final _pools = <Sfx, _Ring>{};
+
+class _Ring {
+  _Ring(this.players);
+  final List<AudioPlayer> players;
+  int _next = 0;
+
+  void play(double volume) {
+    final p = players[_next];
+    _next = (_next + 1) % players.length;
+    // Fire and forget: the calls reach the phone in order, and nothing here waits on a reply.
+    unawaited(_go(p, volume));
+  }
+
+  static Future<void> _go(AudioPlayer p, double volume) async {
+    try {
+      p.stop().ignore();
+      p.setVolume(volume).ignore();
+      await p.resume();
+    } catch (_) {}
+  }
+}
 
 /// A game's sound effects: don't pause the player's music or podcast, just mix in.
 final _context = AudioContext(
@@ -44,13 +68,20 @@ Future<void> _load() async {
     for (final s in [...Sfx.values.where(_early.contains), ...Sfx.values.where((s) => !_early.contains(s))]) {
       final f = File('${dir.path}/${s.name}.wav');
       if (!await f.exists()) await f.writeAsBytes(renderSfx(s), flush: true);
-      _pools[s] = await AudioPool.create(
-        source: DeviceFileSource(f.path),
-        maxPlayers: _busy.contains(s) ? 4 : 2,
-        audioContext: _context,
+      final players = <AudioPlayer>[];
+      for (var i = 0; i < (_busy.contains(s) ? 4 : 2); i++) {
+        // No position tracking: by default each player asks the phone where it's up to on every
+        // frame while it plays, and these short sounds never report finishing, so a fight piled
+        // up dozens of those calls per frame and the whole game stuttered.
+        final p = AudioPlayer()..positionUpdater = null;
         // Low latency: a blow's sound lands with the blow.
-        playerMode: PlayerMode.lowLatency,
-      );
+        await p.setPlayerMode(PlayerMode.lowLatency);
+        await p.setAudioContext(_context);
+        await p.setReleaseMode(ReleaseMode.stop);
+        await p.setSource(DeviceFileSource(f.path));
+        players.add(p);
+      }
+      _pools[s] = _Ring(players);
       // (A breath between sounds, so the first screen never stutters while they're made.)
       await Future<void>.delayed(Duration.zero);
     }
@@ -66,7 +97,7 @@ void play(Sfx s, double power) {
   if (_muted || _soundVol <= 0) return;
   final pool = _pools[s];
   if (pool == null) return;
-  unawaited(pool.start(volume: (_soundVol * .9 * power.clamp(.3, 2.0)).clamp(0.0, 1.0)).then((_) {}, onError: (Object _) {}));
+  pool.play((_soundVol * .9 * power.clamp(.3, 2.0)).clamp(0.0, 1.0).toDouble());
 }
 
 void music(String? track) {}

@@ -2714,12 +2714,13 @@ class _ScenePainter extends CustomPainter {
       canvas.save();
       canvas.translate(b.center.dx, b.center.dy - 8 * age);
       canvas.scale(boost);
-      canvas.saveLayer(null, Paint()..color = Color.fromRGBO(0, 0, 0, a));
       final pill = RRect.fromRectAndRadius(Rect.fromCenter(center: Offset.zero, width: tp.width + 22, height: tp.height + 6), const Radius.circular(12));
+      final fading = a < 1;
+      if (fading) canvas.saveLayer(pill.outerRect.inflate(4), Paint()..color = Color.fromRGBO(0, 0, 0, a));
       canvas.drawRRect(pill, Paint()..color = Colors.black.withValues(alpha: .62));
       canvas.drawRRect(pill, strokePaint(colour.withValues(alpha: .7), 1.5));
       tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
-      canvas.restore();
+      if (fading) canvas.restore();
       canvas.restore();
     }
     canvas.restore();
@@ -2909,13 +2910,15 @@ class _ScenePainter extends CustomPainter {
       Offset(-w / 2 + w * .12, h / 2),
       Offset(-w / 2, 0),
     ]);
-    canvas.saveLayer(null, Paint()..color = Color.fromRGBO(0, 0, 0, alpha));
+    // Fading needs a layer, but only the label's own patch of screen and only while it fades.
+    final fading = alpha < 1;
+    if (fading) canvas.saveLayer(Rect.fromCenter(center: Offset.zero, width: w + 8, height: h + 8), Paint()..color = Color.fromRGBO(0, 0, 0, alpha));
     // (A gradient with no stops takes exactly two colours: the phone's renderer throws otherwise.)
     final cs = m.colours.isEmpty ? const [Colors.white, Colors.grey] : (m.colours.length == 2 ? m.colours : [m.colours.first, m.colours.last]);
     canvas.drawPath(path, Paint()..shader = ui.Gradient.linear(Offset(0, -h / 2), Offset(0, h / 2), cs));
     canvas.drawPath(path, strokePaint(Colors.black.withValues(alpha: .6), 1.5));
     tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
-    canvas.restore();
+    if (fading) canvas.restore();
     canvas.restore();
   }
 
