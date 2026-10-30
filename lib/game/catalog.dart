@@ -1273,7 +1273,7 @@ const bloodDrink = .5;
 
 /// A venomous weapon's poison grows by this share of its venom with every hit; a serrated
 /// weapon's wound bleeds for [bleedTurns] turns; frost freezes the foe at [frostFreeze] a hit.
-const toxinGrowth = .35, bleedTurns = 2, frostFreeze = .1;
+const toxinGrowth = .35, bleedTurns = 2, frostFreeze = .08;
 
 /// The chance a foe (a boss) winds up a heavy blow for its next turn, and how hard it lands.
 const windupChance = .15, windupBoss = .15, heavyBlow = 1.5;

@@ -1666,6 +1666,9 @@ void drawWeapon(Canvas c, Offset at, double angleDeg, Weapon kind, Look look, {d
   c.translate(at.dx, at.dy);
   // Tomes, orbs and things held in the palm stay upright whatever the wrist does.
   if (!const {Weapon.tome, Weapon.orb, Weapon.chakram, Weapon.throwingknives, Weapon.shuriken, Weapon.fan}.contains(kind)) c.rotate(-angleDeg * deg);
+  // These were drawn with their cutting edge on the wrong side of the haft: in the hand it faced
+  // back at the knight. Mirrored, the axe bit, the halberd's blade and the falchion's belly lead.
+  if (const {Weapon.axe, Weapon.greataxe, Weapon.halberd, Weapon.tomahawk, Weapon.falchion, Weapon.cleaver, Weapon.glaive}.contains(kind)) c.scale(-1, 1);
   final span = _glowSpan(kind);
   // A soft highlight in the weapon's rarity colour (green, blue, purple, orange), under any element.
   if (rarity != null && span != null) {

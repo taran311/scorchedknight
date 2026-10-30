@@ -538,7 +538,7 @@ class GearItem {
 
   factory GearItem.fromJson(Map<String, dynamic> j) => GearItem(
     id: j['id'] as String,
-    name: j['name'] as String,
+    name: j['rarity'] == 'legendary' || j['sp'] != null ? j['name'] as String : shortGearName(j['name'] as String, GearSlot.values.byName(j['slot'] as String)),
     slot: GearSlot.values.byName(j['slot'] as String),
     art: j['art'] as String,
     rarity: Rarity.values.byName(j['rarity'] as String),
@@ -575,6 +575,27 @@ class _Base {
 /// The six material tiers, one per level band (1–3, 4–6, 7–10, 11–15, 16–22, 23+): metal for
 /// blades, maces, crossbows and armour pieces; wood for bows, staves and wands. A better material
 /// means more of the item's main stat (+7% a tier).
+/// A base's name in lower case after a word of flavour ("War axe" → "war axe").
+String _plain(String n) => '${n[0].toLowerCase()}${n.substring(1)}';
+
+const _epicWords = {'Ancient', 'Runed', 'Masterwork', 'Storied'};
+
+/// An old drop's long name cut down the same way as new ones: no "Masterwork", no material when
+/// there's a word of flavour already, no "of Precision" on the end.
+String shortGearName(String name, [GearSlot? slot]) {
+  // A word for a stat the piece no longer has ("Gilded" boots, a "Venomous" shield) goes too.
+  final jewel = slot == GearSlot.ring || slot == GearSlot.trinket, weapon = slot == GearSlot.weapon;
+  final gone = {if (slot != null && !jewel) ...{'Gilded', 'Sage'}, if (slot != null && !weapon) ...{'Venomous', 'Searing', 'Frostbitten', 'Wyrmbound'}};
+  var words = name.split(' ').where((w) => !_epicWords.contains(w) && !gone.contains(w)).toList();
+  if (words.isEmpty) return name;
+  words[0] = '${words[0][0].toUpperCase()}${words[0].substring(1)}';
+  final mats = {for (final m in _metals) m.$1, for (final w in _woods) w.$1};
+  if (words.length > 2 && mats.contains(words[1])) words.removeAt(1);
+  final of = words.indexOf('of');
+  if (of >= 2) words = words.sublist(0, of);
+  return words.join(' ');
+}
+
 const _metals = <(String, int)>[
   ('Bronze', 0xFFC8925A),
   ('Iron', 0xFF9EA4AA),
@@ -889,7 +910,7 @@ const _affixes = <_Affix>[
   // Gold and XP are for rings and charms.
   _Affix(Stat.fortune, 'Gilded', 'of Fortune', {_t, _rg}),
   _Affix(Stat.wisdom, 'Sage', 'of Insight', {_t, _rg}),
-  _Affix(Stat.dragonkin, 'Wyrmbound', 'of the Wyrm', {_w, _t, _rg}),
+  _Affix(Stat.dragonkin, 'Wyrmbound', 'of the Wyrm', {_t, _rg}),
   _Affix(Stat.dodge, 'Nimble', 'of the Fox', {_bt, _gl}),
   _Affix(Stat.parry, 'Duelling', 'of the Duel', {_gl, _rg}),
   _Affix(Stat.block, 'Steadfast', 'of the Wall', {_bt}),
@@ -1886,8 +1907,6 @@ class LootTable {
       stats[a.stat] = (stats[a.stat] ?? 0) + _roll(a.stat, level, .8 * rarity.power * accessory, _r);
     }
     final prefix = chosen.isNotEmpty ? '${chosen[0].prefix} ' : '';
-    final suffix = chosen.length > 1 ? ' ${chosen[1].suffix}' : '';
-    final epic = rarity == Rarity.epic ? _pick(const ['Ancient ', 'Runed ', 'Masterwork ', 'Storied ']) : '';
     final baseName = material == null ? base.name : '${material.$1} ${base.name[0].toLowerCase()}${base.name.substring(1)}';
     // Rarely, an epic or legendary weapon is a bloodleech: it drinks from every wound it makes.
     var bloodleech = false;
@@ -1903,12 +1922,13 @@ class LootTable {
       final sets = gearSets.where((g) => !g.forged && (g.heroClass == null || g.heroClass == heroClass)).toList();
       set = _pick(sets);
     }
-    final low = '${baseName[0].toLowerCase()}${baseName.substring(1)}';
     return GearItem(
       enchant: enchant,
       gearSet: set?.id,
       id: _id(),
-      name: set != null ? '${set.name} $low$suffix' : (bloodleech ? 'Bloodleech $low$suffix' : '$prefix$epic$baseName$suffix'.trim()),
+      // Short names: one word of flavour and what it is ("Keen war axe", "Bloodleech dirk"); the
+      // chips say the rest, and the material shows in its colour.
+      name: set != null ? '${set.name} ${_plain(base.name)}' : (bloodleech ? 'Bloodleech ${_plain(base.name)}' : (prefix.isNotEmpty ? '$prefix${_plain(base.name)}' : baseName)),
       tint: bloodleech ? 0xFFB0302A : material?.$2,
       slot: slot,
       art: base.art,
