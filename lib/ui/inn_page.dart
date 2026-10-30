@@ -18,6 +18,8 @@ import '../art/silhouette_inn.dart';
 import '../art/town_props.dart';
 import '../audio/audio.dart';
 import '../build_info.dart';
+import '../game/loot.dart';
+import '../game/vault.dart';
 import '../game/catalog.dart';
 import '../game/events.dart';
 import '../game/controller.dart';
@@ -252,6 +254,11 @@ class _InnPageState extends State<InnPage> with RouteAware {
                         const SizedBox(height: 10),
                         if (s.inBattle) ...[
                           _ResumeBanner(controller: c, onTap: _resume),
+                          const SizedBox(height: 10),
+                        ],
+                        // Hob's cellar: once you've an Ashen key (or have ever opened it).
+                        if (s.keys > 0 || s.vaultFound.isNotEmpty) ...[
+                          _VaultCard(controller: c),
                           const SizedBox(height: 10),
                         ],
                         if (s.raid != null && !s.inBattle) ...[
@@ -1328,5 +1335,128 @@ class _CloudSection extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+
+/// The Ember Vault in Hob's cellar: your Ashen keys, the six pieces only it holds (the ones you've
+/// found shown, the rest still locked), and the door.
+class _VaultCard extends StatelessWidget {
+  const _VaultCard({required this.controller});
+  final GameController controller;
+
+  static const _ember = Color(0xFFFF9A4A);
+
+  @override
+  Widget build(BuildContext context) {
+    final c = controller, s = c.state, found = s.vaultFound;
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: _ember.withValues(alpha: .7), width: 1.5),
+        gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF3A2216), Color(0xFF1A0E08)]),
+        boxShadow: [BoxShadow(color: _ember.withValues(alpha: .18), blurRadius: 12)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.vpn_key_rounded, color: _ember, size: 26),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('THE EMBER VAULT', style: Txt.label(size: 15, color: _ember, weight: FontWeight.w800)),
+                    Text('Hob\'s cellar · ${s.keys} Ashen ${s.keys == 1 ? 'key' : 'keys'}', style: Txt.onStone(size: 12.5)),
+                  ],
+                ),
+              ),
+              SizedBox(
+                width: 96,
+                child: StoneButton(title: 'Open', compact: true, tone: ButtonTone.blood, onPressed: c.whyNotVault == null ? () => _open(context) : null),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // The collection: six pieces, the found ones lit.
+          Row(
+            children: [
+              for (final p in vaultPieces)
+                Expanded(
+                  child: Tooltip(
+                    message: found.contains(p.name) ? p.name : 'Still in the vault',
+                    child: Container(
+                      height: 30,
+                      margin: const EdgeInsets.symmetric(horizontal: 2),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(3),
+                        color: found.contains(p.name) ? const Color(0xFF4A2A14) : Colors.black38,
+                        border: Border.all(color: found.contains(p.name) ? _ember : const Color(0xFF3A2A1E)),
+                      ),
+                      child: Icon(found.contains(p.name) ? _icon(p.slot) : Icons.lock_outline, size: 16, color: found.contains(p.name) ? _ember : const Color(0xFF5A4636)),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text('${found.length} of ${vaultPieces.length} vault pieces found', textAlign: TextAlign.center, style: Txt.onStone(size: 11.5, color: Palette.parch2)),
+        ],
+      ),
+    );
+  }
+
+  static IconData _icon(GearSlot slot) => switch (slot) {
+    GearSlot.trinket => Icons.brightness_7,
+    GearSlot.boots => Icons.directions_walk,
+    GearSlot.gloves => Icons.back_hand,
+    GearSlot.ring => Icons.radio_button_checked,
+    GearSlot.helm => Icons.military_tech,
+    _ => Icons.auto_awesome,
+  };
+
+  Future<void> _open(BuildContext context) async {
+    final c = controller;
+    final find = c.openVault();
+    if (find == null || !context.mounted) return;
+    Audio.play(find.piece ? Sfx.legendaryDrop : (find.item != null ? Sfx.rareDrop : Sfx.coins));
+    await showDialog<void>(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 380),
+          child: Stone(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.vpn_key_rounded, color: _ember, size: 40),
+                const SizedBox(height: 6),
+                Text(find.piece ? 'A VAULT PIECE!' : 'THE VAULT OPENS', style: Txt.label(size: 20, color: find.piece ? const Color(0xFFFFB04A) : _ember, weight: FontWeight.w900)),
+                const SizedBox(height: 8),
+                Text(
+                  find.piece
+                      ? 'On a velvet cushion, untouched for a hundred years: ${find.item!.name}.'
+                      : find.item != null
+                      ? 'Behind the door: ${find.item!.name} (${find.item!.rarity.label}), and a purse.'
+                      : 'Behind the door: a heap of old coin.',
+                  textAlign: TextAlign.center,
+                  style: Txt.onStone(size: 15),
+                ),
+                const SizedBox(height: 6),
+                Text('+${find.gold} gold', style: Txt.label(size: 15, color: Palette.amber, weight: FontWeight.w800)),
+                const SizedBox(height: 12),
+                StoneButton(title: find.item != null ? 'Look closer' : 'Lovely', tone: ButtonTone.blood, onPressed: () => Navigator.pop(context)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (context.mounted && c.nextLoot != null) await resolvePendingLoot(context, c, title: find.piece ? 'From the Ember Vault' : 'The vault\'s spoils', line: find.item?.lore ?? 'Dusty, but none the worse for it.');
   }
 }

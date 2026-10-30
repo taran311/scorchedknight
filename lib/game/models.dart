@@ -1,8 +1,8 @@
 // Saved game state. Pure Dart; serialised to JSON and kept in the browser.
 
-import 'encounters.dart' show chestEvery;
 import 'dart:math' as math;
 import 'catalog.dart';
+import 'encounters.dart' show chestEvery;
 import 'classes.dart';
 import 'loot.dart';
 
@@ -359,6 +359,8 @@ class GameState {
     this.encounter,
     this.encounterCalm = 0,
     this.chestIn = chestEvery,
+    this.keys = 0,
+    List<String>? vaultFound,
     this.lastRoll,
     this.inspired = 0,
     this.wild,
@@ -429,6 +431,9 @@ class GameState {
     this.charged = false,
     List<JournalEntry>? journal,
     List<GearItem>? pendingLoot,
+    this.dealDay,
+    this.deal,
+    this.dealBought = false,
     this.foesFelled = 0,
     this.raresFelled = 0,
     this.chestsOpened = 0,
@@ -454,6 +459,7 @@ class GameState {
        warded = warded ?? {},
        journal = journal ?? [],
        pendingLoot = pendingLoot ?? [],
+       vaultFound = vaultFound ?? [],
        trophies = trophies ?? {};
 
   Settings settings;
@@ -515,6 +521,10 @@ class GameState {
 
   /// Wins until the next strongbox by the road ([chestEvery]).
   int chestIn;
+
+  /// Ashen keys in hand, for the Ember Vault, and which of its own pieces you've found (by name).
+  int keys;
+  final List<String> vaultFound;
 
   /// What the strongbox's die last came up (for the window to show it landing).
   int? lastRoll;
@@ -640,6 +650,12 @@ class GameState {
 
   /// Drops waiting for "equip or sell". Usually empty; survives closing the app mid-choice.
   List<GearItem> pendingLoot;
+
+  /// Mags' find of the day: the day it's for (days since 1970, local time), the piece, and whether
+  /// you've bought it.
+  int? dealDay;
+  GearItem? deal;
+  bool dealBought;
   int foesFelled, raresFelled, chestsOpened, knockouts, flees;
 
   /// Whether Vharrax has fallen (the story is done; the world keeps going).
@@ -676,6 +692,8 @@ class GameState {
     if (encounter != null) 'encounter': encounter,
     'encounterCalm': encounterCalm,
     'chestIn': chestIn,
+    if (keys > 0) 'keys': keys,
+    if (vaultFound.isNotEmpty) 'vaultFound': vaultFound,
     'inspired': inspired,
     if (wild != null) ...{
       'wild': wild,
@@ -749,6 +767,9 @@ class GameState {
     'special': specialCharge,
     'journal': journal.map((e) => e.toJson()).toList(),
     'pendingLoot': pendingLoot.map((e) => e.toJson()).toList(),
+    if (dealDay != null) 'dealDay': dealDay,
+    if (deal != null) 'deal': deal!.toJson(),
+    if (dealBought) 'dealBought': true,
     'felled': foesFelled,
     'raresFelled': raresFelled,
     'chests': chestsOpened,
@@ -796,6 +817,8 @@ class GameState {
       encounter: j['encounter'] as String?,
       encounterCalm: n('encounterCalm'),
       chestIn: n('chestIn', chestEvery),
+      keys: n('keys'),
+      vaultFound: (j['vaultFound'] as List?)?.cast<String>().toList(),
       inspired: n('inspired'),
       wild: (j['wild'] as num?)?.toInt(),
       wildDepth: n('wildDepth'),
@@ -871,6 +894,9 @@ class GameState {
       charged: j['charged'] == true,
       journal: list('journal', JournalEntry.fromJson),
       pendingLoot: list('pendingLoot', GearItem.fromJson),
+      dealDay: (j['dealDay'] as num?)?.toInt(),
+      deal: j['deal'] is Map ? GearItem.fromJson((j['deal'] as Map).cast<String, dynamic>()) : null,
+      dealBought: j['dealBought'] == true,
       foesFelled: n('felled'),
       raresFelled: n('raresFelled'),
       chestsOpened: n('chests'),

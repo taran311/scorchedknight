@@ -17,6 +17,7 @@ import 'package:scorchedknight/game/models.dart';
 import 'package:scorchedknight/game/mounts.dart';
 import 'package:scorchedknight/game/rules.dart';
 import 'package:scorchedknight/game/tarot.dart';
+import 'package:scorchedknight/game/vault.dart';
 import 'package:scorchedknight/game/wilds.dart';
 import 'package:scorchedknight/game/dungeons.dart';
 
@@ -128,6 +129,78 @@ void main() {
     expect(spare.enchant, isNull);
     expect(k.loadout.weapon!.enchant!.id, 'flametongue');
     expect(e.runedSpares, isEmpty);
+  });
+
+  test('Mags\' find of the day: one piece, the same all day, bought once, new tomorrow', () {
+    var now = DateTime(2026, 10, 30, 21, 0);
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(8), clock: () => now);
+    final s = e.state, k = s.knight;
+    final today = e.dailyDeal;
+    expect(today.special, isNull);
+    now = DateTime(2026, 10, 30, 23, 59);
+    expect(identical(e.dailyDeal, today), isTrue);
+    expect(e.untilNextDeal.inMinutes, 1);
+    k.coins = 0;
+    expect(e.whyNotDeal, 'Not enough gold');
+    k.coins = 100000;
+    final price = e.dealPrice;
+    expect(e.buyDeal(), isTrue);
+    expect(k.coins, 100000 - price);
+    expect(s.pendingLoot.last.id, today.id);
+    expect(e.buyDeal(), isFalse);
+    // It saves.
+    final back = GameState.fromJson(jsonDecode(jsonEncode(s.toJson())) as Map<String, dynamic>);
+    expect(back.deal!.id, today.id);
+    expect(back.dealBought, isTrue);
+    now = DateTime(2026, 10, 31, 0, 1);
+    expect(e.dailyDeal.id, isNot(today.id));
+    expect(e.whyNotDeal, isNull);
+  });
+
+  test('Ashen keys drop now and then, and the Ember Vault gives out all six of its pieces in time', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight)..innRepaired = true, random: Random(11));
+    final s = e.state, k = s.knight;
+    // Keys turn up from ordinary fights.
+    for (var i = 0; i < 300 && s.keys == 0; i++) {
+      k.hp = maxHp(k);
+      e.explore();
+      fightOut(e);
+      s.encounter = null;
+      s.pendingLoot.clear();
+    }
+    expect(s.keys, greaterThan(0));
+    expect(GameState.fromJson(jsonDecode(jsonEncode(s.toJson())) as Map<String, dynamic>).keys, s.keys);
+    // No key, no door.
+    s.keys = 0;
+    expect(e.whyNotVault, isNotNull);
+    expect(e.openVault(), isNull);
+    // Plenty of keys: every piece, each found once before any repeats.
+    s.keys = 400;
+    k.level = 30;
+    var kinds = <String>{};
+    for (var i = 0; i < 400 && s.vaultFound.length < vaultPieces.length; i++) {
+      final f = e.openVault()!;
+      expect(f.gold, greaterThan(0));
+      kinds.add(f.piece ? 'piece' : (f.item != null ? 'gear' : 'gold'));
+      if (f.piece) expect(vaultPieceNamed(f.item!.name), isNotNull);
+      s.pendingLoot.clear();
+    }
+    expect(s.vaultFound.toSet(), {for (final p in vaultPieces) p.name});
+    expect(kinds, {'piece', 'gear', 'gold'});
+    final back = GameState.fromJson(jsonDecode(jsonEncode(s.toJson())) as Map<String, dynamic>);
+    expect(back.vaultFound.length, vaultPieces.length);
+  });
+
+  test('a vault piece is strong, but never stronger than a legendary of its level', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(2));
+    for (final p in vaultPieces) {
+      var piece = 0.0, legend = 0.0;
+      for (var i = 0; i < 40; i++) {
+        piece += e.loot.vaultPiece(p, 40).score;
+        legend += e.loot.roll(HeroClass.knight, 40, odds: const [0, 0, 0, 0, 1], only: p.slot).score;
+      }
+      expect(piece, lessThanOrEqualTo(legend * 1.05), reason: p.name);
+    }
   });
 
   test('every continent has foes, a boss and a level', () {
@@ -689,7 +762,9 @@ void main() {
   });
 
   test('a knight wins most early fights in Cindervale', () {
-    for (final seed in [3, 4, 5]) {
+    // (Over 20 knights, not three: the odd unlucky run is fine, a hard start for everyone isn't.)
+    var total = 0;
+    for (var seed = 0; seed < 20; seed++) {
       final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight)..innRepaired = true, random: Random(seed));
       var wins = 0;
       for (var i = 0; i < 10; i++) {
@@ -701,8 +776,10 @@ void main() {
           e.sellLoot(g.id);
         }
       }
-      expect(wins, greaterThanOrEqualTo(8), reason: 'seed $seed');
+      expect(wins, greaterThanOrEqualTo(6), reason: 'seed $seed');
+      total += wins;
     }
+    expect(total / 20, greaterThanOrEqualTo(8));
   });
 
   test('skills, potions and commands are only offered when they can be used', () {

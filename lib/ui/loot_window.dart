@@ -18,23 +18,23 @@ import 'theme.dart';
 /// Shows each waiting drop in turn until none are left (or the screen goes away).
 bool _resolving = false;
 
-Future<void> resolvePendingLoot(BuildContext context, GameController c, {String? title}) async {
+Future<void> resolvePendingLoot(BuildContext context, GameController c, {String? title, String? line}) async {
   if (_resolving) return; // one spoils window at a time
   _resolving = true;
   try {
-    await _resolve(context, c, title);
+    await _resolve(context, c, title, line);
   } finally {
     _resolving = false;
   }
 }
 
-Future<void> _resolve(BuildContext context, GameController c, String? title) async {
+Future<void> _resolve(BuildContext context, GameController c, String? title, String? line) async {
   while (context.mounted && c.nextLoot != null) {
     final item = c.nextLoot!;
     final choice = await showDialog<String>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => _LootWindow(controller: c, item: item, title: title),
+      builder: (_) => _LootWindow(controller: c, item: item, title: title, line: line),
     );
     switch (choice) {
       case null:
@@ -129,10 +129,13 @@ class _HaloPainter extends CustomPainter {
 }
 
 class _LootWindow extends StatefulWidget {
-  const _LootWindow({required this.controller, required this.item, this.title});
+  const _LootWindow({required this.controller, required this.item, this.title, this.line});
   final GameController controller;
   final GearItem item;
   final String? title;
+
+  /// The line under the title (how it turned up), when it didn't come off a foe.
+  final String? line;
 
   @override
   State<_LootWindow> createState() => _LootWindowState();
@@ -172,7 +175,7 @@ class _LootWindowState extends State<_LootWindow> {
                   Text(title ?? 'Spoils of victory', textAlign: TextAlign.center, style: Txt.label(size: 18, color: Palette.amber, weight: FontWeight.w800)),
                   const SizedBox(height: 2),
                   Text(
-                    _foundLine(item),
+                    widget.line ?? _foundLine(item),
                     textAlign: TextAlign.center,
                     style: Txt.onStone(size: 13.5, color: item.rarity == Rarity.legendary ? col : Palette.parch2),
                   ),

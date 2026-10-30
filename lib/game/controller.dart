@@ -17,6 +17,7 @@ import 'models.dart';
 import 'events.dart';
 import 'rules.dart' show Trait;
 import 'tarot.dart';
+import 'vault.dart';
 import 'wilds.dart';
 import 'dungeons.dart';
 
@@ -740,6 +741,23 @@ class GameController extends ChangeNotifier {
     final r = engine.bindCores(el);
     _changed();
     return r;
+  }
+
+  String? get whyNotVault => engine.whyNotVault;
+  VaultFind? openVault() {
+    final out = engine.openVault();
+    _changed();
+    return out;
+  }
+
+  GearItem get dailyDeal => engine.dailyDeal;
+  int get dealPrice => engine.dealPrice;
+  Duration get untilNextDeal => engine.untilNextDeal;
+  String? get whyNotDeal => engine.whyNotDeal;
+  bool buyDeal() {
+    final ok = engine.buyDeal();
+    _changed();
+    return ok;
   }
 
   List<GearItem> get runedSpares => engine.runedSpares;

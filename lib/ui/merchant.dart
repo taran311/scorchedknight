@@ -85,9 +85,14 @@ class _Shop {
     return CostButton(
       label: '$price gold',
       onTap: k.coins >= price
-          ? () {
+          ? () async {
               c.purchase(id);
               Audio.play(Sfx.coins);
+              // A box or pouch opens there and then: see what was inside, and wear it or keep it.
+              // (It used to slip into your pending loot, so it looked like you'd paid for nothing.)
+              if ((id == 'ringbox' || id == 'bonecarver') && c.nextLoot != null && context.mounted) {
+                await resolvePendingLoot(context, c, title: 'The box opens', line: c.nextLoot!.rarity.index >= Rarity.epic.index ? 'Mags whistles. "Well! Lucky you."' : 'Mags peers in. "Not bad, dear."');
+              }
             }
           : null,
     );
@@ -182,7 +187,32 @@ class MerchantWares extends StatelessWidget {
         x.gold(),
         x.heading('Supplies'),
         x.ware(const ItemIcon(Item.potion), 'Health potion', 'Heals ${potionHeal(k)} HP · belt ${k.potions}/$potionBelt · $potionsPerFight a fight', x.buy('potion')),
-        x.ware(const Icon(Icons.diamond_outlined, color: Color(0xFF9ADFFF), size: 26), 'Jeweller\'s box', 'A mystery ring, uncommon to legendary', x.buy('ringbox')),
+        // Mags' find of the day: one piece, seen before you buy, new every day.
+        Builder(
+          builder: (context) {
+            final g = c.dailyDeal, sold = c.whyNotDeal == 'Sold out: back tomorrow';
+            final left = c.untilNextDeal, hours = left.inHours, mins = left.inMinutes % 60;
+            final when = hours > 0 ? '${hours}h ${mins}m' : '${mins}m';
+            final stats = [for (final e in g.stats.entries.take(3)) e.key.describe(e.value)].join(' · ');
+            return x.ware(
+              Opacity(opacity: sold ? .4 : 1, child: GearIcon(item: g, size: 30, heroClass: k.heroClass, dye: k.dye)),
+              sold ? 'Today\'s find · sold' : 'Today\'s find: ${g.name}',
+              sold ? 'Mags has something new in $when' : '${g.rarity.label} ${g.slot.label.toLowerCase()} · $stats · new find in $when',
+              sold
+                  ? Text('Sold', style: Txt.label(size: 13, color: _Shop.ok))
+                  : CostButton(
+                      label: '${c.dealPrice} gold',
+                      onTap: c.whyNotDeal == null
+                          ? () async {
+                              c.buyDeal();
+                              Audio.play(g.rarity.index >= Rarity.epic.index ? Sfx.epicDrop : Sfx.coins);
+                              if (c.nextLoot != null && context.mounted) await resolvePendingLoot(context, c, title: 'Mags\' find of the day', line: 'She wraps it in a bit of sacking. "Mind how you go."');
+                            }
+                          : null,
+                    ),
+            );
+          },
+        ),
         x.heading('Mags\' brews · from the reagents your foes drop'),
         for (final b in Brew.values)
           if (b.land <= c.state.unlocked || c.state.reagents[b.land] > 0)
@@ -739,7 +769,7 @@ Future<void> showMerchantWindow(BuildContext context, GameController c) => _show
   context,
   c,
   title: 'Mags\' Stall',
-  line: '"Bring me what your foes drop, dear, and I\'ll brew you something. Potions, rings, a crossbow if you\'ve the arms for it."',
+  line: '"Bring me what your foes drop, dear, and I\'ll brew you something. Potions, a crossbow if you\'ve the arms for it, and whatever turned up in my cart today."',
   icon: Icons.storefront,
   colour: Palette.amber,
   wares: () => MerchantWares(controller: c),

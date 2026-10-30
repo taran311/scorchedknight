@@ -1591,6 +1591,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       if (k.relicPart != null) _drops.add(_Mark('${k.relicPart}!', const [Color(0xFFFFB04A)], Offset.zero, now + 720));
       if (k.egg) _drops.add(_Mark('A dragon egg!', const [], Offset.zero, now + 900));
       if (k.chest != null) _drops.add(_Mark('${k.chest!.tier.label}!', const [], Offset.zero, now + 1080));
+      if (k.key) _drops.add(_Mark('Ashen key!', const [Color(0xFFFF9A4A)], Offset.zero, now + 1170));
       if (k.levelUps > 0) _drops.add(_Mark('Level up!', const [Color(0xFF9BE27A)], Offset.zero, now + 1260));
     });
     if (k.levelUps > 0) {

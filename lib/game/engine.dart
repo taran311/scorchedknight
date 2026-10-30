@@ -16,6 +16,7 @@ import 'models.dart';
 import 'mounts.dart';
 import 'spells.dart';
 import 'tarot.dart';
+import 'vault.dart';
 import 'events.dart';
 import 'encounters.dart';
 import 'rules.dart';
@@ -46,7 +47,7 @@ class ChestFind {
 }
 
 class KillResult {
-  const KillResult(this.foeIndex, this.name, this.xp, this.coins, this.levelUps, this.loot, {this.egg = false, this.orkGear, this.entGear, this.runeGear, this.prize, this.foe, this.chest, this.companion, this.opened = const [], this.trophy, this.blueprint, this.boss = false, this.won = false, this.reagents = 0, this.jobFind, this.potion = false, this.relicPart, this.packGold = 0, this.packed = const [], this.junkGold = 0, this.jackpot = 0, this.hoard = const [], this.finds = const [], this.breathed = 0});
+  const KillResult(this.foeIndex, this.name, this.xp, this.coins, this.levelUps, this.loot, {this.egg = false, this.orkGear, this.entGear, this.runeGear, this.prize, this.foe, this.chest, this.companion, this.opened = const [], this.trophy, this.blueprint, this.boss = false, this.won = false, this.reagents = 0, this.jobFind, this.potion = false, this.relicPart, this.packGold = 0, this.packed = const [], this.junkGold = 0, this.jackpot = 0, this.hoard = const [], this.finds = const [], this.breathed = 0, this.key = false});
 
   /// A lucky purse: extra gold on top of the usual (already counted in [coins]).
   final int jackpot;
@@ -65,6 +66,9 @@ class KillResult {
 
   /// HP you got back catching your breath after the win.
   final int breathed;
+
+  /// It left an Ashen key, for the Ember Vault.
+  final bool key;
   final GearItem? loot;
 
   /// A dragon egg was found (the Cinderreach's boss).
@@ -2488,6 +2492,13 @@ class GameEngine {
       }
     }
     final chest = f.boss || _rng.nextDouble() < (single ? rareChestChance : chestChance) ? openChest(rare: single ? rare : null, grand: f.boss) : null;
+    // Now and then an Ashen key for the Ember Vault: likelier the tougher the foe was.
+    final over = state.foeLevel - k.level;
+    final key = _rng.nextDouble() < (f.boss ? keyChanceBoss : keyChance[over >= 6 ? 2 : (over >= 3 ? 1 : 0)]);
+    if (key) {
+      state.keys++;
+      _note('Among the spoils: an Ashen key, still warm. Hob\'s cellar has a door it would fit.', EntryKind.gold);
+    }
     // In the wilds: everything this fight was worth goes into the pack, gold with the depth bonus.
     var packGold = 0, packed = <GearItem>[];
     if (wild) {
@@ -2632,7 +2643,7 @@ class GameEngine {
     }
     if (ups > 0) _note('You reached level ${k.level}. ${shineLine(k.level)}', EntryKind.gold);
     final junkGold = _sellJunk(loot0);
-    return KillResult(i, f.name, r.xp, r.coins + jackpot, ups, breathed: breathed, jackpot: jackpot, drop, junkGold: junkGold, egg: egg, orkGear: orkPrize, entGear: entPrize, runeGear: rune, prize: prize, foe: f, chest: chest, companion: companion, opened: opened, trophy: trophies > 0 ? '${trophies > 1 ? '$trophies× ' : ''}${trophy!.label}' : null, blueprint: blueprint, boss: f.boss && rare == null, won: won, reagents: reagents, jobFind: jobFind, potion: flask, relicPart: relicPart, packGold: packGold, packed: packed, hoard: hoard, finds: [
+    return KillResult(i, f.name, r.xp, r.coins + jackpot, ups, breathed: breathed, key: key, jackpot: jackpot, drop, junkGold: junkGold, egg: egg, orkGear: orkPrize, entGear: entPrize, runeGear: rune, prize: prize, foe: f, chest: chest, companion: companion, opened: opened, trophy: trophies > 0 ? '${trophies > 1 ? '$trophies× ' : ''}${trophy!.label}' : null, blueprint: blueprint, boss: f.boss && rare == null, won: won, reagents: reagents, jobFind: jobFind, potion: flask, relicPart: relicPart, packGold: packGold, packed: packed, hoard: hoard, finds: [
       if (gem != null) ('gem', gem.name),
       if (pearl) ('gem', Gem.pearl.name),
       if (elemental != null) ('core', elemental.name),
@@ -3186,6 +3197,109 @@ class GameEngine {
         }
     }
     _note('You buy $what for $price gold.', EntryKind.gold);
+    return true;
+  }
+
+  // ---------------- the Ember Vault ----------------
+
+  String? get whyNotVault {
+    if (state.inBattle || state.wild != null) return 'You\'re a long way from Hob\'s cellar';
+    if (state.keys <= 0) return 'You need an Ashen key';
+    return null;
+  }
+
+  /// Turns an Ashen key in the Ember Vault's door: one of its own pieces (one you haven't found,
+  /// while there are any), or good gear and gold, or gold alone. Gear goes to your spoils.
+  VaultFind? openVault() {
+    if (whyNotVault != null) return null;
+    final s = state, k = s.knight;
+    s.keys--;
+    final gold = (25 * k.level + 40) * (1 + heroStats(k).fortune / 100) * (.8 + _rng.nextDouble() * .4);
+    final roll = _rng.nextDouble();
+    VaultFind find;
+    if (roll < vaultPieceChance) {
+      final unfound = [for (final p in vaultPieces) if (!s.vaultFound.contains(p.name)) p];
+      final pool = unfound.isEmpty ? vaultPieces : unfound;
+      final piece = pool[_rng.nextInt(pool.length)];
+      final g = loot.vaultPiece(piece, k.level);
+      if (!s.vaultFound.contains(piece.name)) s.vaultFound.add(piece.name);
+      find = VaultFind((gold * .5).round(), g, piece: true);
+    } else if (roll < vaultPieceChance + vaultGearChance) {
+      find = VaultFind((gold * .6).round(), loot.roll(k.heroClass, k.level, wielding: k.loadout.weapon, odds: const [0, 0, 60, 35, 5]));
+    } else {
+      find = VaultFind((gold * 1.6).round(), null);
+    }
+    k.coins += find.gold;
+    if (find.item != null) s.pendingLoot.add(find.item!);
+    _note(
+      find.piece
+          ? 'The vault door groans open. On a velvet cushion, untouched for a hundred years: ${find.item!.name}! (+${find.gold} gold)'
+          : find.item != null
+          ? 'The vault door groans open: ${find.item!.name} (${find.item!.rarity.label}) and a purse. (+${find.gold} gold)'
+          : 'The vault door groans open on a heap of old coin. (+${find.gold} gold)',
+      EntryKind.gold,
+    );
+    return find;
+  }
+
+  // ---------------- Mags' find of the day ----------------
+
+  /// Today, as days since 1970 (by the player's own clock: a new find every midnight).
+  int get _today {
+    final n = clock();
+    return DateTime.utc(n.year, n.month, n.day).millisecondsSinceEpoch ~/ Duration.millisecondsPerDay;
+  }
+
+  /// Mags' find of the day: one piece of gear, seen before you buy it, new every day. Anything
+  /// from a dud to (rarely) a legendary, but never a relic or a quest weapon.
+  GearItem get dailyDeal {
+    final s = state, k = s.knight;
+    if (s.dealDay != _today || s.deal == null) {
+      GearItem g;
+      var tries = 0;
+      do {
+        g = loot.roll(k.heroClass, k.level, wielding: k.loadout.weapon, odds: const [12, 44, 30, 12, 2]);
+      } while (g.special != null && ++tries < 20);
+      s
+        ..dealDay = _today
+        ..deal = g
+        ..dealBought = false;
+    }
+    return s.deal!;
+  }
+
+  /// What Mags wants for today's find: by its rarity, at the level it was found.
+  int get dealPrice {
+    final g = dailyDeal;
+    final base = 50 + 10 * g.level;
+    return switch (g.rarity) {
+      Rarity.common => base ~/ 2,
+      Rarity.uncommon => base,
+      Rarity.rare => base * 2,
+      Rarity.epic => base * 4,
+      Rarity.legendary => base * 9,
+    };
+  }
+
+  /// Time until a new find.
+  Duration get untilNextDeal {
+    final n = clock();
+    return DateTime(n.year, n.month, n.day + 1).difference(n);
+  }
+
+  String? get whyNotDeal {
+    if (state.dealBought && state.dealDay == _today) return 'Sold out: back tomorrow';
+    if (state.knight.coins < dealPrice) return 'Not enough gold';
+    return null;
+  }
+
+  bool buyDeal() {
+    if (whyNotDeal != null) return false;
+    final g = dailyDeal, price = dealPrice;
+    state.knight.coins -= price;
+    state.dealBought = true;
+    state.pendingLoot.add(g);
+    _note('You buy Mags\' find of the day: ${g.name} (${g.rarity.label}) for $price gold.', EntryKind.gold);
     return true;
   }
 

@@ -5,6 +5,7 @@ import 'dart:math' as math;
 
 import 'classes.dart';
 import 'enchants.dart';
+import 'vault.dart';
 
 export 'enchants.dart';
 
@@ -1190,6 +1191,19 @@ class LootTable {
 
   /// Dragonbone jewellery of [tier]: a ring (crit and damage) or a fang amulet (vigour and guard),
   /// carved from a dragon's bones with a gem of its colour, and striking dragons harder.
+  /// One of the Ember Vault's own pieces ([vaultPieces]), at [level].
+  GearItem vaultPiece(VaultPiece p, int level) => GearItem(
+    id: _id(),
+    name: p.name,
+    slot: p.slot,
+    art: p.art,
+    rarity: Rarity.legendary,
+    level: level,
+    lore: p.lore,
+    value: _value(level, Rarity.legendary, p.slot),
+    stats: {for (final e in p.stats.entries) e.key: _roll(e.key, level, e.value, _r)},
+  );
+
   GearItem dragonboneJewel(int level, WyrmTier tier, {required bool ring, Rarity? rarity}) {
     final t = tier.tier;
     final r = rarity ??
