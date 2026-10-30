@@ -63,6 +63,21 @@
       });
     }
   </script>
+  <script>
+    // Phones have 3x (or more) screens, and the browser draws every frame of the fight in full
+    // at that density: three times the pixels in each direction, nine times the work, for detail
+    // you can't see at arm's length. Capped at 2x, the game draws less than half the pixels and
+    // keeps up with the animations. (?dpr=3 on the address overrides it, to compare.)
+    (function () {
+      var real = window.devicePixelRatio || 1;
+      var asked = parseFloat(new URLSearchParams(location.search).get('dpr'));
+      var cap = asked > 0 ? asked : Math.min(real, 2);
+      if (cap === real) return;
+      try {
+        Object.defineProperty(window, 'devicePixelRatio', { get: function () { return cap; }, configurable: true });
+      } catch (e) {}
+    })();
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

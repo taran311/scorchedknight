@@ -1,0 +1,56 @@
+name: Deploy to scorchedknight.com
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - run: flutter --version
+      - run: flutter pub get
+
+      - name: Build web
+        run: flutter build web --release --wasm --base-href /
+
+      - name: Stamp this build
+        run: |
+          sed -i 's#"main.dart.js"#"main.dart.js?v=${{ github.sha }}"#' build/web/flutter_bootstrap.js
+          sed -i 's#src="flutter_bootstrap.js"#src="flutter_bootstrap.js?v=${{ github.sha }}"#' build/web/index.html
+
+      - name: Check the build
+        run: |
+          grep -q '<base href="/">' build/web/index.html || { echo "::error::wrong base href"; exit 1; }
+          test -f build/web/CNAME || { echo "::error::web/CNAME missing"; exit 1; }
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
