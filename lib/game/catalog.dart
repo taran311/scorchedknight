@@ -1259,10 +1259,9 @@ const batGearChance = .05, batGearChanceBoss = .3;
 const frostGearChance = .05, frostGearChanceBoss = .3;
 
 /// Lucky moments, rolled every time they could happen. An opening: a free second blow (this share
-/// of the first) on an attack. A second wind: after a hit lands, you get this share of your health
-/// back. A jackpot: a foe's purse is three times as fat.
+/// of the first) on an attack. A jackpot: a foe's purse is three times as fat. (Your health only
+/// ever comes back from things you chose: potions, brews, rest, lifesteal, your gear.)
 const openingChance = .06, openingShare = .5;
-const secondWindChance = .05, secondWindHeal = .12;
 
 /// Foes whose blows can poison you: [heroPoisonTurns] turns of [heroPoisonShare] of your HP
 /// each, at [heroPoisonChance] a landed blow. A health potion cures it.

@@ -1306,15 +1306,6 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
             }
         }
         c.revealCounter();
-        if (r.secondWind > 0) {
-          // A lucky moment: a second wind.
-          _at(380, () {
-            _banner = ('Second Wind!', const Color(0xFF9BE27A), now);
-            _mark('+${r.secondWind}', _green, const Offset(_knightX + 10, _groundY - 270));
-            _spark('mend', const Offset(_knightX, _groundY - 120), 18, lift: 2.5, speed: 2.5, life: 900, gravity: -.02);
-            Audio.play(Sfx.rareDrop);
-          });
-        }
         if (r.knockedOut || r.cheatedDeath) _playReaper(spared: r.cheatedDeath);
         if (r.wolfed) _playWolf(true);
         if (r.thorns > 0) {
@@ -1904,9 +1895,36 @@ class _ScenePainter extends CustomPainter {
       canvas.drawCircle(m.pos, m.radius * (ground.moteStyle.falls ? 1.4 : 1), mote..color = ground.mote.withValues(alpha: a));
     }
 
+    // When you fall: the world goes cold and dark, and the Reaper rises behind you.
+    final reaperIn = fx['reaper']!;
+    final reaper = reaperIn > .01 ? _reaperPose(s, t, still) : null;
+    final gloom = fx['gloom']!;
+    // While that plays, the figures are drawn straight onto the screen in plain colour, not
+    // recorded and laid down as a backlit silhouette: on Android the silhouette's layers vanished
+    // you and the foe for the whole of the Reaper's visit (fine in the browser).
+    final dying = reaper != null || gloom > .005;
+    if (dying) {
+      final world = Rect.fromLTWH(left - 2, -above - 2, visibleW + 4, sceneSize.height + above + below + 4);
+      canvas.drawRect(world, Paint()..color = const Color(0xFF060A12).withValues(alpha: .42 * gloom));
+      canvas.drawRect(
+        world,
+        Paint()..shader = ui.Gradient.radial(const Offset(_knightX, _groundY - 150), 520, [const Color(0x00000000), const Color(0xFF02040A).withValues(alpha: .5 * gloom)], const [.35, 1]),
+      );
+      if (reaper != null) {
+        // A cold, ghostly light behind the Reaper, so its dark shape stands out against the gloom.
+        final glowAt = reaper.p(0, -220);
+        canvas.drawOval(
+          Rect.fromCenter(center: glowAt, width: 330 * reaper.scale, height: 480 * reaper.scale),
+          Paint()..shader = ui.Gradient.radial(glowAt, 220 * reaper.scale, [reaperGlow.withValues(alpha: .34 * reaperIn), reaperGlow.withValues(alpha: .1 * reaperIn), const Color(0x00000000)], const [0, .55, 1]),
+        );
+        // He rises up out of the mist (no fading layer: just more of him as he comes).
+        drawReaper(canvas, reaper, t, still: still);
+      }
+    }
+
     // Every figure is drawn into a picture first, then laid down as a backlit silhouette.
-    final outer = canvas, figures = ui.PictureRecorder();
-    canvas = Canvas(figures, _figureBounds);
+    final outer = canvas, figures = dying ? null : ui.PictureRecorder();
+    if (figures != null) canvas = Canvas(figures, _figureBounds);
 
     final arriving = s._arrival != null && t < s._arrival!;
     final ds = dragonStage(k), pet = arriving ? null : petStage(k);
@@ -1940,11 +1958,6 @@ class _ScenePainter extends CustomPainter {
       }
     }
 
-    // The Reaper, behind you, when you fall. (Drawn on its own after the figures are recorded,
-    // not inside them: a fading layer nested in the figures' picture made Android's renderer drop
-    // the whole picture, you and the foe with it, for as long as he was there.)
-    final reaperIn = fx['reaper']!;
-    final reaper = reaperIn > .01 ? _reaperPose(s, t, still) : null;
 
     // As the wolf (the Bloodmoon Pelt), you're all fur and claws until it passes.
     final blade = fx['blade']!;
@@ -2269,35 +2282,14 @@ class _ScenePainter extends CustomPainter {
     }
 
     canvas = outer;
-    final figurePic = figures.endRecording();
-    // Death: the world goes cold and dark around you. (Under the figures, not over them: you, the
-    // foe and the Reaper stay in plain sight, where before they sank into the dark.)
-    final gloom = fx['gloom']!;
-    if (gloom > .005) {
-      final world = Rect.fromLTWH(left - 2, -above - 2, visibleW + 4, sceneSize.height + above + below + 4);
-      canvas.drawRect(world, Paint()..color = const Color(0xFF060A12).withValues(alpha: .42 * gloom));
-      canvas.drawRect(
-        world,
-        Paint()..shader = ui.Gradient.radial(const Offset(_knightX, _groundY - 150), 520, [const Color(0x00000000), const Color(0xFF02040A).withValues(alpha: .5 * gloom)], const [.35, 1]),
-      );
-    }
-    // (Not disposed: on the web the frame is drawn later, and still needs it.)
-    if (reaper != null) {
-      // A cold, ghostly light behind the Reaper, so its dark shape stands out against the gloom.
-      final glowAt = reaper.p(0, -220);
-      canvas.drawOval(
-        Rect.fromCenter(center: glowAt, width: 330 * reaper.scale, height: 480 * reaper.scale),
-        Paint()..shader = ui.Gradient.radial(glowAt, 220 * reaper.scale, [reaperGlow.withValues(alpha: .34 * reaperIn), reaperGlow.withValues(alpha: .1 * reaperIn), const Color(0x00000000)], const [0, .55, 1]),
-      );
-      // Then the Reaper himself, behind the figures laid down next.
-      if (reaperIn < .99) canvas.saveLayer(_figureBounds, Paint()..color = Color.fromRGBO(0, 0, 0, reaperIn));
-      drawReaper(canvas, reaper, t, still: still);
-      if (reaperIn < .99) canvas.restore();
-    }
-    if (_perf.contains('r')) {
-      canvas.drawPicture(figurePic);
-    } else if (!_perf.contains('f')) {
-      silhouettePicture(canvas, figurePic, _figureBounds, rim: reaper != null ? Color.lerp(rimFor(ground), reaperGlow, reaperIn * .7)! : rimFor(ground), lite: s._lite || _perf.contains('h'));
+    if (figures != null) {
+      final figurePic = figures.endRecording();
+      // (Not disposed: on the web the frame is drawn later, and still needs it.)
+      if (_perf.contains('r')) {
+        canvas.drawPicture(figurePic);
+      } else if (!_perf.contains('f')) {
+        silhouettePicture(canvas, figurePic, _figureBounds, rim: rimFor(ground), lite: s._lite || _perf.contains('h'));
+      }
     }
 
     // Lightning from the sky (Stormcall), bats pouring over the foe (Night Swarm) and the dice of

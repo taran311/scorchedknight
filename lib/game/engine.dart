@@ -160,8 +160,8 @@ class SwingResult {
   bool specialStun = false;
   int selfHurt = 0;
 
-  /// Lucky moments: an opening for a free extra blow, and a second wind after a hit.
-  int opening = 0, secondWind = 0;
+  /// A lucky moment: an opening for a free extra blow.
+  int opening = 0;
 
   /// A shapeshifter took a new shape this turn (what it became).
   String? shifted;
@@ -2160,13 +2160,6 @@ class GameEngine {
       final how = blocked ? (hurt == 0 ? 'You block it completely.' : 'You block most of it: $hurt gets through.') : (heavy ? 'A heavy blow: $hurt!' : 'It hits you for $hurt.');
       _note('$foeName strikes. $how${thorns > 0 ? ' Your thorns bite for $thorns.' : ''}${r.reflected > 0 ? ' Your mirror hurls ${r.reflected} back!' : ''}', hurt > 0 ? EntryKind.damage : EntryKind.plain);
       if (thorns > 0 || r.reflected > 0) r.kill = _checkKill();
-      // A lucky moment: now and then a hit that lands puts fight back in you instead.
-      if (r.kill == null && hurt > 0 && k.hp > 0 && _rng.nextDouble() < secondWindChance) {
-        final before = k.hp;
-        k.hp = math.max(k.hp, math.min(maxHp(k), k.hp + (maxHp(k) * secondWindHeal).round()));
-        r.secondWind = k.hp - before;
-        if (r.secondWind > 0) _note('Second wind! You shake it off and recover ${r.secondWind} HP.', EntryKind.good);
-      }
       if (r.kill == null && k.hp <= 0) {
         if (brewOn(k, Brew.reaperbane)) {
           // Reaper's Bane: he comes for you, and his scythe goes right through you.

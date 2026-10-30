@@ -223,7 +223,7 @@ class _PaperDoll extends StatelessWidget {
       if (h.smite > 0) (const Icon(Icons.wb_sunny, size: 20, color: Color(0xFFFFE6A0)), '+${h.smite}', 'Holy damage against the undead and demons'),
       if (chip > 0) (const Icon(Icons.local_fire_department, size: 20, color: Color(0xFFF4955F)), '+$chip', 'Dragon fire per attack'),
       if (h.lifesteal > 0) (const Icon(Icons.bloodtype, size: 20, color: Color(0xFFC23A30)), '+${h.lifesteal}', 'Life steal: heal per attack'),
-      (const Icon(Icons.healing, size: 20, color: Color(0xFF9BE27A)), '+${h.regen + (maxHp(k) * breathShare).round()}', 'Second wind: HP back after each win'),
+      (const Icon(Icons.healing, size: 20, color: Color(0xFF9BE27A)), '+${h.regen + (maxHp(k) * breathShare).round()}', 'Catch your breath: HP back after each win'),
       if (h.thorns > 0) (const Icon(Icons.grass, size: 20, color: Color(0xFF9BE27A)), '${h.thorns}', 'Thorns: damage back when hurt'),
       if (h.fortune > 0) (const ItemIcon(Item.coins, size: 20), '+${h.fortune}%', 'Fortune: more gold'),
       if (h.wisdom > 0) (const Icon(Icons.menu_book, size: 20, color: Palette.parch), '+${h.wisdom}%', 'Wisdom: more XP'),
