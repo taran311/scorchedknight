@@ -383,6 +383,13 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     switch (e) {
       case SwingEvent(:final result):
         _playSwing(result);
+        if (result.poisonTick > 0) {
+          // Poison in your veins, at the end of the turn.
+          _at(math.max(0, _queueFree - now - 300), () {
+            _mark('−${result.poisonTick} poison', _green, const Offset(_knightX - 20, _groundY - 330));
+            _spark('mend', const Offset(_knightX, _groundY - 140), 8, lift: 1.2, speed: 1.4, life: 650, radius: 4, gravity: -.01);
+          });
+        }
         if (result.hazard > 0) {
           // The land itself bites, at the end of the turn.
           final hz = continents[realmAt(c.state.rare?.base ?? c.state.foe)];
@@ -1242,7 +1249,17 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
             _tween('kflash', 0, 450, delay: 90);
             if (_gore) _spark('gore', const Offset(_knightX + 30, _groundY - 150), 8, dir: math.pi, spread: 1.4, speed: 2.8, life: 900, radius: 3.2, lift: 1.5, gravity: .3);
             Audio.play(Sfx.hurt, power: counter > maxHp(c.state.knight) * .2 ? 1.3 : 1);
-            _mark('-$counter', _red, at);
+            _mark(r.heavy ? 'Heavy! -$counter' : '-$counter', _red, at);
+            if (r.heavy) _punch(.6);
+            if (r.poisoned) _at(260, () => _mark('Poisoned!', _green, at + const Offset(0, -40)));
+            if (r.drank > 0) {
+              // The vampire drinks: your blood, its health.
+              _at(220, () {
+                _spill(_foeChest + const Offset(-10, -40), .5);
+                _mark('+${r.drank}', _red, _foeChest + const Offset(20, -70));
+                c.revealDamage(-r.drank);
+              });
+            }
         }
         c.revealCounter();
         if (r.secondWind > 0) {
@@ -1375,6 +1392,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       case BattleAction.potion:
         _at(d0 + 100, () {
           _mark('+${r.potion}', _green, const Offset(_knightX + 10, _groundY - 250));
+          if (r.cured) _at(240, () => _mark('Cured!', _green, const Offset(_knightX + 10, _groundY - 290)));
           Audio.play(Sfx.potion);
           _spark('mend', const Offset(_knightX, _groundY - 140), 18, lift: 2.5, speed: 2.5, life: 900, gravity: -.02);
         });
@@ -1888,7 +1906,14 @@ class _ScenePainter extends CustomPainter {
           flip: flee > .15,
           // Reaped from behind, you pitch forward onto your face.
           rotation: fx['gloom']! > 0 ? ko * 80 : -ko * 82,
-          tint: fx['kflash']! > .02 ? hurtFilter(fx['kflash']!) : null,
+          tint: () {
+            // Low on health, the knight himself throbs red too (steady, not throbbing, with reduced
+            // motion), as well as the edges of the scene.
+            final frac = c.shownHeroHp / math.max(1, maxHp(c.state.knight));
+            final low = c.state.inBattle && frac < .3 && ko < .05 ? (.3 - frac) / .3 * (still ? .35 : .2 + .25 * (.5 + .5 * math.sin(t / 260))) : 0.0;
+            final red = math.max(fx['kflash']!, low);
+            return red > .02 ? hurtFilter(red) : null;
+          }(),
         ),
         still: still,
       );
@@ -2235,6 +2260,17 @@ class _ScenePainter extends CustomPainter {
       }
     }
 
+    // It's winding up a heavy blow: a pulsing red "!" by its head, so you see it coming.
+    if (c.state.foeWindup && !c.busy && fx['dying']! < .05) {
+      final pulse = .5 + .5 * math.sin(t / 140);
+      final at = Offset(fx0 + 52, math.max(60.0, _groundY + lift.dy - s._foeHeight * 1.1 - 20));
+      canvas.drawCircle(at, 20 + 5 * pulse, Paint()..color = const Color(0xFFFF3A2A).withValues(alpha: .25 + .2 * pulse));
+      canvas.drawCircle(at, 15, Paint()..color = const Color(0xFFB8261A));
+      canvas.drawCircle(at, 15, strokePaint(const Color(0xFFFFD0A0), 2));
+      final tp = _laidOut('windup', () => TextPainter(text: TextSpan(text: '!', style: Txt.label(size: 22, color: Colors.white, weight: FontWeight.w900)), textDirection: TextDirection.ltr)..layout());
+      tp.paint(canvas, at - Offset(tp.width / 2, tp.height / 2));
+    }
+
     final beam = s._beam;
     if (beam != null) {
       final age = (t - beam.$2) / 2200;
@@ -2366,8 +2402,8 @@ class _ScenePainter extends CustomPainter {
 
     // Low on health: the edges of the world pulse red.
     final hpFrac = c.shownHeroHp / math.max(1, maxHp(k));
-    if (c.state.inBattle && hpFrac < .3 && !still) {
-      final pulse = .5 + .5 * math.sin(t / 260), a = (.3 - hpFrac) / .3 * .45 * (.6 + .4 * pulse);
+    if (c.state.inBattle && hpFrac < .3) {
+      final pulse = still ? .5 : .5 + .5 * math.sin(t / 260), a = (.3 - hpFrac) / .3 * .45 * (.6 + .4 * pulse);
       canvas.drawRect(Offset.zero & sceneSize, Paint()..shader = ui.Gradient.radial(const Offset(480, 270), 560, [const Color(0x00000000), const Color(0x00000000), const Color(0xFFB0201A).withValues(alpha: a)], const [0, .55, 1]));
     }
 

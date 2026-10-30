@@ -457,6 +457,9 @@ double blockLeak(Knight k) => _hasShield(k) ? .3 : .45;
 /// The riposte after a parry: half an attack.
 int riposte(Knight k) => (fullSwing(k) * .5).round();
 
+/// What its next blow will do: [counterDamage], heavier if it's winding up.
+int nextBlow(GameState s) => (counterDamage(s) * (s.foeWindup ? heavyBlow : 1)).round();
+
 /// The foe's blow after armour and guard (at least 1).
 int counterDamage(GameState s) {
   final k = s.knight;

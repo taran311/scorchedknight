@@ -202,6 +202,16 @@ class SwingResult {
   /// The knight's Shield Bash left the foe dazed (it skips its blow).
   bool stunned = false;
 
+  /// The foe's blow this turn was a heavy one it wound up; and it's winding up another.
+  bool heavy = false, windup = false;
+
+  /// Its blow poisoned you; poison it did to you this turn; HP it drank from you.
+  bool poisoned = false;
+  int poisonTick = 0, drank = 0;
+
+  /// A potion cured your poison.
+  bool cured = false;
+
   /// HP the land's hazard took this turn (no ward).
   int hazard = 0;
 
@@ -1301,6 +1311,8 @@ class GameEngine {
       ..wards = 0
       ..mirror = 0
       ..foeFrozen = false
+      ..foeWindup = false
+      ..heroPoison = 0
       ..foeAsleep = 0
       ..foeSlowed = 0
       ..foeWeakened = 0
@@ -1329,7 +1341,8 @@ class GameEngine {
       ..dungeonFight = false
       ..foeBurn = 0
       ..foeBurnTurns = 0
-      ..foeVenom = 0;
+      ..foeVenom = 0
+      ..heroPoison = 0;
     if (state.inspired > 0) state.inspired--;
     state.pint = false;
     if (state.raidFight) {
@@ -1545,6 +1558,10 @@ class GameEngine {
         final before = k.hp;
         k.hp = math.min(maxHp(k), k.hp + potionHeal(k));
         r.potion = k.hp - before;
+        if (state.heroPoison > 0) {
+          state.heroPoison = 0;
+          r.cured = true;
+        }
         _note('You drink a health potion and recover ${r.potion} HP. It tastes of smoke, like everything.', EntryKind.good);
       case BattleAction.flee:
         if (_rng.nextDouble() < fleeChance(k, foe, state.fleeTries)) {
@@ -1617,6 +1634,13 @@ class GameEngine {
     if (r.kill == null) {
       _maybeShift(r);
       _foeTurn(r, bash);
+      // Now and then it rears back for a heavy blow next turn: you see it coming, so Bash it,
+      // freeze it, hex it, or brace with a potion.
+      if (r.kill == null && state.inBattle && state.foeHp > 0 && _rng.nextDouble() < (foe.boss ? windupBoss : windupChance)) {
+        state.foeWindup = true;
+        r.windup = true;
+        _note('$foeName rears back for a heavy blow!', EntryKind.damage);
+      }
     }
     // The land itself: unwarded, its hazard hurts you every turn (but never knocks you out).
     final land = realmAt(state.rare?.base ?? state.foe);
@@ -1626,6 +1650,15 @@ class GameEngine {
       k.hp = math.max(1, k.hp - hurt);
       r.hazard = before - k.hp;
       if (r.hazard > 0) _note('${continents[land].hazard}: −${r.hazard} HP. ${continents[land].hazardText}; Old Wick could craft a ${continents[land].ward}.', EntryKind.damage);
+    }
+    // Poison in you: it eats at you every turn till it runs out or a potion cures it (it never
+    // knocks you out on its own).
+    if (state.inBattle && k.hp > 0 && state.heroPoison > 0 && !r.poisoned) {
+      final before = k.hp;
+      k.hp = math.max(1, k.hp - math.max(1, (maxHp(k) * heroPoisonShare).round()));
+      r.poisonTick = before - k.hp;
+      state.heroPoison--;
+      if (r.poisonTick > 0) _note('Poison: −${r.poisonTick} HP.', EntryKind.damage);
     }
     // Lizardfolk: wounds close between blows, unless fire touched them this turn.
     if (state.inBattle && foe.regrows && r.damage.burn == 0 && r.burned == 0 && state.foeHp < state.foeMax) {
@@ -1921,6 +1954,9 @@ class GameEngine {
   void _foeTurn(SwingResult r, bool bashed) {
     final k = state.knight, foe = foeIn(state), foeName = foe.name;
     final pet = petStage(k);
+    // A heavy blow it wound up last turn: spent now, landed or not.
+    final heavy = state.foeWindup;
+    state.foeWindup = false;
     void spared(Guard g, String text) {
       r
         ..counter = 0
@@ -1985,7 +2021,8 @@ class GameEngine {
       r.kill = _checkKill();
     } else {
       final blocked = _rng.nextDouble() < block;
-      final full = counterDamage(state);
+      final full = (counterDamage(state) * (heavy ? heavyBlow : 1)).round();
+      r.heavy = heavy;
       var hurt = blocked ? (full * blockLeak(k)).round() : full;
       if (state.mirror > 0) {
         // Mirror Ward: you take half; the foe takes the whole blow back.
@@ -2012,12 +2049,24 @@ class GameEngine {
       r
         ..counter = hurt
         ..guard = blocked ? Guard.block : Guard.hit;
+      // Vampires drink from the wound; spiders and plague leave poison in it.
+      if (hurt > 0 && drinksBlood(foe) && state.foeHp < state.foeMax) {
+        final before = state.foeHp;
+        state.foeHp = math.min(state.foeMax, state.foeHp + (hurt * bloodDrink).round());
+        r.drank = state.foeHp - before;
+        if (r.drank > 0) _note('$foeName drinks from the wound (+${r.drank}).', EntryKind.damage);
+      }
+      if (hurt > 0 && k.hp > 0 && poisons(foe) && _rng.nextDouble() < heroPoisonChance) {
+        state.heroPoison = heroPoisonTurns;
+        r.poisoned = true;
+        _note('You\'re poisoned! A potion would cure it.', EntryKind.damage);
+      }
       final thorns = hurt > 0 ? heroStats(k).thorns : 0;
       if (thorns > 0) {
         state.foeHp -= thorns;
         r.thorns = thorns;
       }
-      final how = blocked ? (hurt == 0 ? 'You block it completely.' : 'You block most of it: $hurt gets through.') : 'It hits you for $hurt.';
+      final how = blocked ? (hurt == 0 ? 'You block it completely.' : 'You block most of it: $hurt gets through.') : (heavy ? 'A heavy blow: $hurt!' : 'It hits you for $hurt.');
       _note('$foeName strikes. $how${thorns > 0 ? ' Your thorns bite for $thorns.' : ''}${r.reflected > 0 ? ' Your mirror hurls ${r.reflected} back!' : ''}', hurt > 0 ? EntryKind.damage : EntryKind.plain);
       if (thorns > 0 || r.reflected > 0) r.kill = _checkKill();
       // A lucky moment: now and then a hit that lands puts fight back in you instead.

@@ -398,6 +398,8 @@ class GameState {
     this.wards = 0,
     this.mirror = 0,
     this.foeFrozen = false,
+    this.foeWindup = false,
+    this.heroPoison = 0,
     this.foeAsleep = 0,
     this.foeSlowed = 0,
     this.foeWeakened = 0,
@@ -584,6 +586,12 @@ class GameState {
   int mana, summons, summonTurns, wards, mirror;
   bool foeFrozen;
 
+  /// The foe is winding up a heavy blow for its next turn (a Bash, a freeze or a hex stops it).
+  bool foeWindup;
+
+  /// Turns of poison left in you (a spider's bite, a plague cloud); a health potion cures it.
+  int heroPoison;
+
   /// Blows the foe will sleep through, and hexes on it in turns left: slowed (half its blows
   /// miss), weakened (hits 40% softer) and exposed (your hits deal 25% more).
   int foeAsleep, foeSlowed, foeWeakened, foeExposed;
@@ -696,6 +704,8 @@ class GameState {
       'wards': wards,
       'mirror': mirror,
       'frozen': foeFrozen,
+      'windup': foeWindup,
+      if (heroPoison > 0) 'hpoison': heroPoison,
       'asleep': foeAsleep,
       'slowed': foeSlowed,
       'weakened': foeWeakened,
@@ -812,6 +822,8 @@ class GameState {
       wards: n('wards'),
       mirror: n('mirror'),
       foeFrozen: j['frozen'] == true,
+      foeWindup: j['windup'] == true,
+      heroPoison: n('hpoison'),
       foeAsleep: n('asleep'),
       foeSlowed: n('slowed'),
       foeWeakened: n('weakened'),

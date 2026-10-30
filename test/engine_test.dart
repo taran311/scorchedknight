@@ -977,7 +977,7 @@ void main() {
     k.loadout.weapon = GearItem(id: 'dice', name: 'Test dice blade', slot: GearSlot.weapon, art: 'longsword', rarity: Rarity.legendary, level: 10, heroClass: HeroClass.knight, special: 'fatesroll', value: 1, stats: const {Stat.damage: 20});
     expect(e.travel(0), isTrue);
     var lucky = 0, unlucky = 0, bitten = 0;
-    for (var f = 0; f < 40; f++) {
+    for (var f = 0; f < 160; f++) {
       e.explore();
       if (!s.inBattle) continue;
       s.foeHp = s.foeMax = 100000;

@@ -44,12 +44,14 @@ bool riteReady(GameEngine e) {
 
 BattleAction choose(GameEngine e, String style) {
   final k = e.state.knight, mh = maxHp(k), f = encounterType(e.state.foe, e.state.rare), aloft = f.aloft, kind = f.kind;
-  if (k.hp < mh * .35 && e.whyNot(BattleAction.potion) == null) return BattleAction.potion;
+  if ((k.hp < mh * .35 || (e.state.heroPoison > 1 && k.hp < mh * .6)) && e.whyNot(BattleAction.potion) == null) return BattleAction.potion;
   if (style == 'blade') return e.whyNot(BattleAction.skill) == null ? BattleAction.skill : BattleAction.attack;
   // A player who reads the foe's card: lean into its weakness, avoid what it shrugs off.
   final bladeOk = !aloft && (kind.resists != AttackStyle.blade || crossbowShare(k) * triangle(kind, AttackStyle.bolt) < resistance * bashMult);
   if (kind.weakTo == AttackStyle.rite && style != 'nocast' && riteReady(e)) return BattleAction.cast;
   if (e.whyNot(BattleAction.skill) == null && bladeOk) return BattleAction.skill;
+  // A heavy blow coming and no Bash ready: a potion now if it would hurt.
+  if (e.state.foeWindup && k.hp < mh * .6 && e.whyNot(BattleAction.potion) == null) return BattleAction.potion;
   if (style != 'nocast' && riteReady(e) && kind.resists != AttackStyle.rite) return BattleAction.cast;
   if (e.whyNot(BattleAction.pet) == null) return BattleAction.pet;
   // Blade or bolt, whichever lands harder on this foe.

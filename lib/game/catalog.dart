@@ -1261,6 +1261,18 @@ const frostGearChance = .05, frostGearChanceBoss = .3;
 /// back. A jackpot: a foe's purse is three times as fat.
 const openingChance = .06, openingShare = .5;
 const secondWindChance = .05, secondWindHeal = .12;
+
+/// Foes whose blows can poison you: [heroPoisonTurns] turns of [heroPoisonShare] of your HP
+/// each, at [heroPoisonChance] a landed blow. A health potion cures it.
+bool poisons(FoeType f) => f.look == 'spider' || f.look == 'plague' || f.look == 'blightEnt' || f.look == 'lizardSkirmisher' || f.look == 'mossDragon';
+const heroPoisonChance = .35, heroPoisonTurns = 3, heroPoisonShare = .04;
+
+/// Foes that drink your blood: they heal [bloodDrink] of every blow that lands on you.
+bool drinksBlood(FoeType f) => const {'vampireSpawn', 'bloodBride', 'vampireKnight', 'countess', 'cavebat'}.contains(f.look);
+const bloodDrink = .5;
+
+/// The chance a foe (a boss) winds up a heavy blow for its next turn, and how hard it lands.
+const windupChance = .15, windupBoss = .15, heavyBlow = 1.5;
 const jackpotChance = .04;
 
 /// Elemental arms (see LootTable.elementArms): the chance a fire or frost elemental leaves its

@@ -395,10 +395,13 @@ class _BattleScreenState extends State<BattleScreen> {
     // Hover cards are a few one-liners, an emoji each: the numbers that matter, nothing more.
     (String, String, Color) edgeLine(double e, String what) => e > 1 ? ('🎯', 'Weak to $what ${pct(e)}', good) : ('🛡️', 'Resists $what ${pct(e)}', bad);
     String turns(int n) => '$n turn${n == 1 ? '' : 's'}';
+    // Every damaging move's corner shows the same thing: about how much it'll hit for, green when
+    // the foe's weak to it, red when it shrugs it off.
+    Color edgeColour(double e) => e > 1 ? good : (e < 1 ? bad : Palette.amber);
     final swing = fullSwing(k);
     final bash = skillName(k) == 'Shield Bash';
     var key = 0;
-    Widget slot(BattleAction a, Widget icon, String name, _SlotInfo info, {String? badge, Widget? badgeArt, String? figure, int wait = 0, bool glow = false, Color tint = const Color(0xFF3B3327), String? rite}) {
+    Widget slot(BattleAction a, Widget icon, String name, _SlotInfo info, {String? badge, Color badgeColour = Palette.amber, Widget? badgeArt, String? figure, int wait = 0, bool glow = false, Color tint = const Color(0xFF3B3327), String? rite}) {
       final why = rite != null ? c.whyNotRite(rite) : c.whyNot(a);
       key++;
       final mine = key, phone = isPhone(context);
@@ -417,6 +420,7 @@ class _BattleScreenState extends State<BattleScreen> {
             icon: icon,
             name: name,
             badge: badge,
+            badgeColour: badgeColour,
             badgeArt: badgeArt,
             figure: figure,
             info: info.blocked(ready ? why : null),
@@ -458,7 +462,7 @@ class _BattleScreenState extends State<BattleScreen> {
         SpellKind.reflect => 'Mirror ${sp.wards}',
         SpellKind.summon => '+${sp.summons} ${sp.summons == 1 ? 'ally' : 'allies'}',
         SpellKind.heal => 'Heal ${(sp.mend * 100).round()}%',
-        _ => '×${mult.toStringAsFixed(1)}',
+        _ => '~${(swing * mult * arcana).round()}',
       };
       final lines = <(String, String, Color)>[
         if (hits) ('⚔️', '~${(swing * mult * arcana).round()} damage', plain),
@@ -507,7 +511,8 @@ class _BattleScreenState extends State<BattleScreen> {
             if (triangle(kind, AttackStyle.blade) != 1) edgeLine(triangle(kind, AttackStyle.blade), 'blades'),
             if (special != null) ('⚡', '${(specialChanceAt(s.specialCharge) * 100).round()}% chance of ${special.name}', soft),
           ]),
-          badge: bladeEdge != 1 ? pct(bladeEdge) : '$swing',
+          badge: '~${(swing * bladeEdge * mightBoost(k)).round()}',
+          badgeColour: edgeColour(bladeEdge),
           glow: bladeEdge > 1,
           tint: const Color(0xFF5A1A14),
         ),
@@ -521,7 +526,8 @@ class _BattleScreenState extends State<BattleScreen> {
             if (bladeEdge != 1) edgeLine(bladeEdge, 'blades'),
             ('⏳', s.skillWait > 0 ? 'Ready in ${turns(s.skillWait)}' : 'Cooldown ${turns(skillCooldown)}', soft),
           ]),
-          badge: '×$bashMult',
+          badge: '~${(swing * bashMult * bladeEdge * mightBoost(k)).round()}',
+          badgeColour: edgeColour(bladeEdge),
           wait: s.skillWait,
           glow: s.skillWait == 0,
           tint: const Color(0xFF5A4318),
@@ -551,8 +557,8 @@ class _BattleScreenState extends State<BattleScreen> {
             if (aloft) ('🦅', 'Easy shot in the air ${pct(aloftShot)}', good),
             if (triangle(kind, AttackStyle.bolt) != 1) edgeLine(triangle(kind, AttackStyle.bolt), 'bolts'),
           ]),
-          // Its damage, like Attack's (a percentage read as "weaker than attacking").
-          badge: boltEdge != 1 ? pct(boltEdge) : '${(swing * crossbowShare(k) * aimBoost(k)).round()}',
+          badge: '~${(swing * crossbowShare(k) * boltEdge * aimBoost(k)).round()}',
+          badgeColour: edgeColour(boltEdge),
           glow: boltEdge > 1,
         ),
         if (_hasPotions)
@@ -568,7 +574,7 @@ class _BattleScreenState extends State<BattleScreen> {
           ]),
           badge: '×${k.potions}',
           // Lights up when you're in trouble, so it's the first thing your eye finds.
-          glow: k.hp < maxHp(k) * .35 && s.potionsDrunk < potionsPerFight,
+          glow: (k.hp < maxHp(k) * .35 || s.heroPoison > 1) && s.potionsDrunk < potionsPerFight,
           tint: const Color(0xFF3A1A1A),
         ),
         if (_hasCompanion)
@@ -703,6 +709,9 @@ class _FoeCard extends StatelessWidget {
       maxHp: c.shownFoeMax,
       level: c.state.foeLevel,
       tags: [
+        // Winding up a heavy blow: first, where you can't miss it.
+        if (c.state.inBattle && c.state.foeWindup && !c.busy)
+          const FoeBadge(label: 'HEAVY ×$heavyBlow', colour: Color(0xFFFF5A4A), solid: true, tip: 'Winding up a heavy blow. Bash, freeze or hex it to stop it.'),
         if (aura != null) FoeBadge(label: foe.pack ? 'PACK' : (foe.named ? 'RARE BOSS' : 'RARE'), colour: colour, solid: true, tip: aura.label),
         if (foe.boss && aura == null) const FoeBadge(label: 'BOSS', colour: Palette.amber, solid: true),
         if (foe.kind != FoeKind.none) FoeBadge(
@@ -713,6 +722,8 @@ class _FoeCard extends StatelessWidget {
             tip: '${foe.kind.label}: weak to ${styleName(foe.kind.weakTo!)}, shrugs off ${styleName(foe.kind.resists!)}',
           ),
         if (aura != null && !foe.pack && !foe.named) _perkBadge(aura),
+        if (poisons(foe)) const FoeBadge(icons: [Icon(Icons.science, size: 14, color: Color(0xFF8FD36A))], text: 'Poisons', wordy: true, colour: Color(0xFF8FD36A), tip: 'Its blows can poison you. A health potion cures it.'),
+        if (drinksBlood(foe)) const FoeBadge(icons: [Icon(Icons.water_drop, size: 14, color: Color(0xFFE0505A))], text: 'Drinks blood', wordy: true, colour: Color(0xFFE0505A), tip: 'Heals half of every blow that lands on you. Weaken it, slow it, or kill it fast.'),
       ],
       badges: [
         if (weak.isNotEmpty) FoeBadge(label: 'Weak', icons: [for (final w in weak) _wayIcon(w)], colour: const Color(0xFF9BE27A), tip: 'Weak to ${weak.join(', ')}'),
@@ -725,7 +736,7 @@ class _FoeCard extends StatelessWidget {
         if (c.state.inBattle && c.state.foeFrozen) const FoeBadge(label: 'Frozen', colour: Color(0xFF9ADFFF), tip: 'Frozen solid: it misses its next blow'),
         if (c.state.inBattle && c.state.foeBurnTurns > 0) FoeBadge(label: 'Burning ${c.state.foeBurnTurns}', colour: const Color(0xFFFF8A3A), tip: '${c.state.foeBurn} fire a turn · ${c.state.foeBurnTurns} turns left'),
         if (c.state.inBattle && c.state.foeVenom > 0) FoeBadge(label: 'Venom ×${c.state.foeVenom}', colour: const Color(0xFF8FD36A), tip: 'Each dose eats at it every turn, for the rest of the fight'),
-        if (c.state.inBattle && !c.busy) FoeBadge(icons: const [Icon(Icons.flash_on, size: 15, color: Color(0xFFFF8A70))], text: '~${counterDamage(c.state)}', colour: const Color(0xFFE0A090), tip: 'Hits for about ${counterDamage(c.state)}'),
+        if (c.state.inBattle && !c.busy) FoeBadge(icons: const [Icon(Icons.flash_on, size: 15, color: Color(0xFFFF8A70))], text: '~${nextBlow(c.state)}', colour: const Color(0xFFE0A090), tip: 'Hits for about ${nextBlow(c.state)}'),
         if (foe.mimic && c.state.lastStyle != null)
           FoeBadge(
             label: 'Braced',
@@ -778,7 +789,7 @@ class _FoeCard extends StatelessWidget {
 
 /// One slot on the hotbar.
 class _SkillSlot extends StatefulWidget {
-  const _SkillSlot({required this.hotkey, required this.icon, required this.name, required this.info, this.badge, this.badgeArt, this.figure, this.wait = 0, this.glow = false, this.tint = const Color(0xFF3B3327), this.onTap, this.picked = false, this.onPick});
+  const _SkillSlot({required this.hotkey, required this.icon, required this.name, required this.info, this.badge, this.badgeColour = Palette.amber, this.badgeArt, this.figure, this.wait = 0, this.glow = false, this.tint = const Color(0xFF3B3327), this.onTap, this.picked = false, this.onPick});
   final int hotkey;
 
   /// On a phone: this move is picked (its card shows above the moves; another tap uses it), and
@@ -788,6 +799,7 @@ class _SkillSlot extends StatefulWidget {
   final Widget icon;
   final String name;
   final String? badge;
+  final Color badgeColour;
   final Widget? badgeArt;
 
   /// The move's key effect, under its symbol (a rite's "×2.3" or "Slow 4t").
@@ -869,8 +881,8 @@ class _SkillSlotState extends State<_SkillSlot> {
                   ),
                 ),
               ),
-              // The number key.
-              Positioned(left: 4, top: 3, child: Text('${w.hotkey}', style: Txt.label(size: 11, color: Palette.parch2))),
+              // The number key (not on a phone: no keys there).
+              if (!isPhone(context)) Positioned(left: 4, top: 3, child: Text('${w.hotkey}', style: Txt.label(size: 11, color: Palette.parch2))),
               // One key figure.
               if (w.badge != null || w.badgeArt != null)
                 Positioned(
@@ -879,7 +891,7 @@ class _SkillSlotState extends State<_SkillSlot> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                     decoration: BoxDecoration(color: const Color(0xCC0E0B08), borderRadius: BorderRadius.circular(3)),
-                    child: w.badgeArt ?? Text(w.badge!, style: Txt.label(size: 11, color: Palette.amber)),
+                    child: w.badgeArt ?? Text(w.badge!, style: Txt.label(size: 11.5, color: w.badgeColour, weight: FontWeight.w800)),
                   ),
                 ),
               // Cooling down: a dark veil and the turns left.
