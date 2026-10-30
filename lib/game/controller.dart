@@ -742,6 +742,15 @@ class GameController extends ChangeNotifier {
     return r;
   }
 
+  List<GearItem> get runedSpares => engine.runedSpares;
+  int get runeMoveCost => engine.runeMoveCost;
+  String? whyNotMoveRune(GearItem from) => engine.whyNotMoveRune(from);
+  bool moveRune(GearItem from) {
+    final ok = engine.moveRune(from);
+    _changed();
+    return ok;
+  }
+
   void applyEnchant(EnchantSlot slot, EnchantRoll roll) {
     engine.applyEnchant(slot, roll);
     _changed();

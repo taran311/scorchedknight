@@ -439,6 +439,25 @@ class EnchanterWares extends StatelessWidget {
               );
             },
           ),
+        // A rune on an old weapon isn't lost when you trade up: Old Wick moves it across.
+        if (k.loadout.weapon != null && c.runedSpares.isNotEmpty) ...[
+          x.heading('Move a rune · ${c.runeMoveCost} gold'),
+          for (final g in c.runedSpares)
+            x.ware(
+              const Icon(Icons.swap_horiz, color: Color(0xFFB89AE0), size: 26),
+              '${g.enchant!.title} from your ${g.name}',
+              'Onto your ${k.loadout.weapon!.name}${k.loadout.weapon!.enchant == null ? '' : ', replacing ${k.loadout.weapon!.enchant!.title}'} · ${g.enchant!.describe}',
+              CostButton(
+                label: 'Move',
+                onTap: c.whyNotMoveRune(g) == null
+                    ? () {
+                        c.moveRune(g);
+                        Audio.play(Sfx.castHoly);
+                      }
+                    : null,
+              ),
+            ),
+        ],
         if (Elemental.values.any((el) => s.mat(coreKey(el)) > 0)) ...[
           x.heading('Elemental cores · $coresPerRune make a weapon rune'),
           for (final el in Elemental.values)

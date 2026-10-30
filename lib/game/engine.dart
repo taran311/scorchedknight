@@ -3432,6 +3432,36 @@ class GameEngine {
     return choices;
   }
 
+  /// Weapons in your chest with a rune worth moving onto the one in your hand.
+  List<GearItem> get runedSpares {
+    final k = state.knight, held = k.loadout.weapon;
+    return [for (final g in k.stash) if (g.slot == GearSlot.weapon && g.enchant != null && !identical(g, held)) g];
+  }
+
+  /// What Old Wick charges to lift a rune off one weapon and set it in another (half a new one).
+  int get runeMoveCost => enchantCost(state.knight.level) ~/ 2;
+
+  /// Why a rune can't be moved off [from] right now (null if it can).
+  String? whyNotMoveRune(GearItem from) {
+    final k = state.knight;
+    if (k.loadout.weapon == null) return 'Hold a weapon first';
+    if (from.enchant == null) return 'No rune on it';
+    if (k.coins < runeMoveCost) return 'Not enough gold';
+    return null;
+  }
+
+  /// Old Wick lifts the rune off [from] (left plain, in your chest) and sets it in the weapon in
+  /// your hand, replacing any rune it had. A rune keeps its tier and strength.
+  bool moveRune(GearItem from) {
+    if (whyNotMoveRune(from) != null) return false;
+    final k = state.knight, to = k.loadout.weapon!, rune = from.enchant!;
+    k.coins -= runeMoveCost;
+    from.enchant = null;
+    to.enchant = rune;
+    _note('Old Wick lifts ${rune.title} off your ${from.name} and sets it in your ${to.name} ($runeMoveCost gold).', EntryKind.gold);
+    return true;
+  }
+
   void applyEnchant(EnchantSlot slot, EnchantRoll roll) {
     final kit = state.knight.loadout;
     if (slot == EnchantSlot.weapon) {

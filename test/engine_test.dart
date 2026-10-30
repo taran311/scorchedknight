@@ -10,6 +10,7 @@ import 'package:scorchedknight/game/brews.dart';
 import 'package:scorchedknight/game/classes.dart';
 import 'package:scorchedknight/game/crafting.dart';
 import 'package:scorchedknight/game/encounters.dart';
+import 'package:scorchedknight/game/enchants.dart';
 import 'package:scorchedknight/game/engine.dart';
 import 'package:scorchedknight/game/loot.dart';
 import 'package:scorchedknight/game/models.dart';
@@ -106,6 +107,27 @@ void main() {
       }
     }
     expect(kinds, {'ambush', 'gold', 'gear'});
+  });
+
+  test('Old Wick moves a rune off a stashed weapon onto the one in your hand, for a fee', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(5));
+    final k = e.state.knight;
+    for (var i = 0; i < 200; i++) {
+      final g = e.loot.roll(k.heroClass, k.level, odds: const [0, 0, 100, 0, 0]);
+      if (g.slot == GearSlot.weapon) {
+        k.stash.add(g..enchant = const EnchantRoll('flametongue', 2, 9));
+        break;
+      }
+    }
+    final spare = e.runedSpares.single;
+    k.coins = 0;
+    expect(e.whyNotMoveRune(spare), 'Not enough gold');
+    k.coins = 1000;
+    expect(e.moveRune(spare), isTrue);
+    expect(k.coins, 1000 - e.runeMoveCost);
+    expect(spare.enchant, isNull);
+    expect(k.loadout.weapon!.enchant!.id, 'flametongue');
+    expect(e.runedSpares, isEmpty);
   });
 
   test('every continent has foes, a boss and a level', () {
