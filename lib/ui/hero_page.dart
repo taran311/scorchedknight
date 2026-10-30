@@ -577,7 +577,7 @@ class _Satchel extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           if (k.stash.isEmpty)
-            Text('Empty. Gear you take off, or keep from your spoils, waits here.', style: Txt.onStone(size: 13))
+            Text('Empty', style: Txt.onStone(size: 13))
           else
             Wrap(
               spacing: 6,
@@ -607,9 +607,8 @@ class _Satchel extends StatelessWidget {
             ),
           const Divider(color: Palette.stone3, height: 22),
           group('Belt', belt, ''),
-          group('For the forge and the tower', craft, 'Nothing yet. Golems carry ore and gems, and some foes leave trophies.'),
+          group('For the forge and the tower', craft, 'Nothing yet'),
           if (gathered.isNotEmpty) group('Gathered', gathered, ''),
-          Text('Hover (or tap and hold) anything to see what it\'s for. Tap a spare dye to wear it.', style: Txt.onStone(size: 12.5)),
         ],
       ),
     );
@@ -930,8 +929,7 @@ class _Companions extends StatelessWidget {
         children: [
           Text('Companions', style: Txt.label(size: 15, color: Palette.amber)),
           const SizedBox(height: 4),
-          Text('One companion fights beside you at a time, and it grows with the XP you earn. In a fight, Command sends it in: hounds pounce, a fairy casts a charm, a dragon breathes fire.', style: Txt.onStone(size: 12.5)),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           ...rows,
         ],
       ),
@@ -1019,8 +1017,6 @@ class _Home extends StatelessWidget {
                     style: Txt.onStone(size: 13, color: s.bossesDown.contains(next.after) ? const Color(0xFF9BE27A) : const Color(0xFFE88A70)),
                   ),
                 ],
-                const SizedBox(height: 4),
-                Text('Timber comes from foes in Cindervale and the Thornwild; iron from Cindervale and the Grimtusk Badlands.', style: Txt.onStone(size: 12.5)),
                 const SizedBox(height: 10),
                 StoneButton(
                   title: 'Build the ${next.name.toLowerCase()}',
@@ -1060,7 +1056,6 @@ class _Home extends StatelessWidget {
                       ],
                     ),
                   ),
-                Text('Pieces you\'re not wearing wait in your chest; Wear it swaps the set\'s pieces on and puts what they replace in the chest.', style: Txt.onStone(size: 12.5)),
               ],
             ),
           ),
@@ -1128,7 +1123,7 @@ class _Training extends StatelessWidget {
                 ],
               ),
             ),
-          Text('A point every level. Lean into one way of fighting, or keep all three sharp.', style: Txt.onStone(size: 12)),
+          Text('+1 point every level', style: Txt.onStone(size: 12)),
         ],
       ),
     );

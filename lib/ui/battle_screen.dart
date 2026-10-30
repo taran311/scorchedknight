@@ -1107,7 +1107,7 @@ class _CommandDeck extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   // Newest at the bottom, older lines fading up the log.
                   children: [
-                    if (recent.isEmpty) Text(phone ? 'Tap a move to use it. Hold one to see what it does.' : 'Pick your move (or press its number key).', style: Txt.onStone(size: 14.5)),
+                    if (recent.isEmpty && c.state.knight.level < 3) Text(phone ? 'Tap a move to use it. Hold one to see what it does.' : 'Pick your move (or press its number key).', style: Txt.onStone(size: 14.5)),
                     // A phone gives each line two rows rather than cut it off mid-word.
                     for (final (i, e) in recent.indexed)
                       Opacity(
@@ -1343,7 +1343,7 @@ class _AimBarState extends State<_AimBar> with SingleTickerProviderStateMixin {
             children: [
               const Icon(Icons.gps_fixed, size: 18, color: Color(0xFFFFD98A)),
               const SizedBox(width: 6),
-              Expanded(child: Text('Take aim! Tap (or Space) with the dial in the gold', style: Txt.label(size: 13, color: Palette.cream))),
+              Expanded(child: Text('Tap when the dial is in the gold', style: Txt.label(size: 13, color: Palette.cream))),
               TextButton(onPressed: widget.onCancel, child: Text('Cancel', style: Txt.label(size: 12, color: Palette.parch2))),
             ],
           ),

@@ -394,10 +394,10 @@ class _Rules extends StatelessWidget {
         children: [
           Text('How the wilds work', style: Txt.inkLabel(size: 16)),
           const SizedBox(height: 6),
-          line(Icons.help_outline, 'Every step is a surprise: foes, chests, thieves, traps, campfires, pedlars, hoards. Your HP doesn\'t come back on its own.'),
-          line(Icons.backpack, 'Gold and gear go in your pack, not your purse. The deeper you go, the tougher the foes and the better the finds.'),
-          line(Icons.signpost, 'A waystone every $waystoneEvery steps: head home from one and you keep your whole pack.'),
-          line(Icons.directions_run, 'Run for it between waystones and you drop about ${(fleeLoss * 100).round()}% of it. Run from a fight and ${(fightFleeLoss * 100).round()}% spills out. Get knocked out and scavengers take ${(koLoss * 100).round()}%.'),
+          line(Icons.help_outline, 'Every step is a surprise. No healing on the way.'),
+          line(Icons.backpack, 'Loot goes in your pack. Deeper: tougher, richer.'),
+          line(Icons.signpost, 'Waystone every $waystoneEvery steps: leave there, keep it all.'),
+          line(Icons.directions_run, 'Leave early −${(fleeLoss * 100).round()}% · flee a fight −${(fightFleeLoss * 100).round()}% · knocked out −${(koLoss * 100).round()}%'),
         ],
       ),
     );

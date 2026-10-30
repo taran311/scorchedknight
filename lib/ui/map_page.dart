@@ -190,7 +190,7 @@ class _MapPageState extends State<MapPage> {
                   ],
                 ),
                 const SizedBox(height: 6),
-                Text('In ${l.name} you lose ${(hazardShare * 100).round()}% of your HP every turn you fight. Old Wick\'s ${l.ward} stops it.', style: Txt.onStone(size: 14.5, color: Palette.cream)),
+                Text('−${(hazardShare * 100).round()}% HP every turn. The ${l.ward} stops it.', style: Txt.onStone(size: 14.5, color: Palette.cream)),
                 const SizedBox(height: 8),
                 Row(
                   children: [
@@ -198,7 +198,7 @@ class _MapPageState extends State<MapPage> {
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        '$reagentsForWard $reagent (you have $have) and ${wardPrice(land)} gold${have < reagentsForWard ? '. $reagent drops from foes in ${continents[land - 1].name}.' : ''}',
+                        '$have/$reagentsForWard $reagent${have < reagentsForWard ? ' (from ${continents[land - 1].name})' : ''} · ${wardPrice(land)} gold',
                         style: Txt.onStone(size: 13.5, color: have >= reagentsForWard ? const Color(0xFF9BE27A) : Palette.parch2),
                       ),
                     ),
@@ -334,7 +334,7 @@ class _MapPageState extends State<MapPage> {
                                     },
                                   ),
                                 ),
-                                if (isPhone(context))
+                                if (isPhone(context) && s.knight.level < 3)
                                   Padding(
                                     padding: const EdgeInsets.only(top: 4),
                                     child: Text('Drag the map to look around; pinch to zoom.', textAlign: TextAlign.center, style: Txt.label(size: 12, color: Palette.parch2)),
@@ -603,8 +603,6 @@ class _WildPanel extends StatelessWidget {
             Text(w.name, style: Txt.label(size: 22, color: col, weight: FontWeight.w800)),
             Text(open ? w.blurb : 'Opens when ${continents[w.opensAfter].boss.name} falls.',
                 maxLines: 2, overflow: TextOverflow.ellipsis, style: Txt.onStone(size: 15, color: open ? Palette.parch2 : Palette.cream)),
-            const SizedBox(height: 4),
-            Text('Off the road: encounter after encounter, better gear the deeper you dare.', style: Txt.label(size: 13, color: Palette.parch)),
           ],
         ),
         StoneButton(title: open ? (here ? 'Back in' : 'Head in') : 'Locked', caption: here ? 'Step ${c.state.wildDepth}' : null, tone: ButtonTone.blood, onPressed: open ? onGo : null),

@@ -181,7 +181,7 @@ class MerchantWares extends StatelessWidget {
         x.gold(),
         x.heading('Supplies'),
         x.ware(const ItemIcon(Item.potion), 'Health potion', 'Heals ${potionHeal(k)} HP · belt ${k.potions}/$potionBelt · $potionsPerFight a fight', x.buy('potion')),
-        x.ware(const Icon(Icons.diamond_outlined, color: Color(0xFF9ADFFF), size: 26), 'Jeweller\'s box', 'A mystery ring: uncommon to epic, now and then legendary', x.buy('ringbox')),
+        x.ware(const Icon(Icons.diamond_outlined, color: Color(0xFF9ADFFF), size: 26), 'Jeweller\'s box', 'A mystery ring, uncommon to legendary', x.buy('ringbox')),
         x.heading('Mags\' brews · from the reagents your foes drop'),
         for (final b in Brew.values)
           if (b.land <= c.state.unlocked || c.state.reagents[b.land] > 0)
@@ -213,14 +213,14 @@ class MerchantWares extends StatelessWidget {
           const Icon(Icons.gps_fixed, color: Color(0xFFC8A070), size: 26),
           k.crossbow + 1 < crossbows.length ? crossbows[k.crossbow + 1].$1 : crossbows.last.$1,
           k.crossbow + 1 < crossbows.length
-              ? 'Shots hit for about ${(fullSwing(k) * crossbows[k.crossbow + 1].$2 * aimBoost(k)).round()} (yours now: ${(fullSwing(k) * crossbowShare(k) * aimBoost(k)).round()}), and ×$aloftShot against foes in the air'
-              : 'The best crossbow there is. You have it.',
+              ? 'Shots ~${(fullSwing(k) * crossbows[k.crossbow + 1].$2 * aimBoost(k)).round()} (now ~${(fullSwing(k) * crossbowShare(k) * aimBoost(k)).round()}) · ×$aloftShot vs flyers'
+              : 'The best there is',
           x.buy('crossbow'),
         ),
         if (upgrades.isNotEmpty) ...[
           x.heading('${k.heroClass.label} armour'),
-          for (final t in bought) x.ware(armourIcon(t), t.name, 'Damage taken −${(t.reduction * 100).round()}% (yours: −${(armourTierById(k.armour).reduction * 100).round()}%)', x.buy(t.id)),
-          if (bought.length < upgrades.length) Text('Anything better than this is forged at $smithName\'s, from golems\' ore.', style: Txt.onStone(size: 12.5)),
+          for (final t in bought) x.ware(armourIcon(t), t.name, '−${(t.reduction * 100).round()}% damage (now −${(armourTierById(k.armour).reduction * 100).round()}%)', x.buy(t.id)),
+          if (bought.length < upgrades.length) Text('Better armour: forged at $smithName\'s', style: Txt.onStone(size: 12.5)),
         ],
         x.heading('Dyes · ${switch (k.heroClass) {
           HeroClass.knight => 'cape, tabard, plume and shield',
@@ -252,8 +252,6 @@ class MerchantWares extends StatelessWidget {
         ),
         x.heading('Stable'),
         for (final m in mounts.where((m) => !m.dropOnly)) x.ware(MountIcon(m.id), m.name, m.desc, x.buy('mount:${m.id}')),
-        const SizedBox(height: 4),
-        Text('Weapons, armour pieces, rings and trinkets come from the spoils of victory. Companions come from each land\'s boss.', style: Txt.onStone(size: 12.5)),
       ],
     );
   }
@@ -274,7 +272,7 @@ class ForgeWares extends StatelessWidget {
       children: [
         x.gold(),
         x.heading('Your ore and bars'),
-        if (anyOre || Trophy.values.any((t) => s.mat(trophyKey(t)) > 0)) x.stock(gems: false, trophies: true) else Text('Nothing yet. Golems carry ore: iron in the Gloomfen and beyond, gold in the Badlands and the Sunken Sands, obsidian in the Cinderreach. Maces and hammers break them best.', style: Txt.onStone(size: 12.5)),
+        if (anyOre || Trophy.values.any((t) => s.mat(trophyKey(t)) > 0)) x.stock(gems: false, trophies: true) else Text('None yet: golems carry ore', style: Txt.onStone(size: 12.5)),
         const SizedBox(height: 4),
         for (final m in Metal.values)
           if (s.mat(oreKey(m)) > 0)
@@ -293,7 +291,7 @@ class ForgeWares extends StatelessWidget {
               ),
             ),
         x.heading('${k.heroClass.label} armour'),
-        if (forged.isEmpty) Text('You wear the best $smithName can make. Only bosses and blueprints do better now.', style: Txt.onStone(size: 12.5)),
+        if (forged.isEmpty) Text('You wear the best $smithName makes', style: Txt.onStone(size: 12.5)),
         for (final t in forged)
           x.ware(
             armourIcon(t),
@@ -322,7 +320,7 @@ class ForgeWares extends StatelessWidget {
           x.ware(
             GearIcon(item: w, size: 30, heroClass: k.heroClass, dye: k.dye),
             'Temper ${w.name}',
-            'Rework it from level ${w.level} up to ${k.level}: every stat grows to match (runes and specials stay)',
+            'Lv ${w.level} → ${k.level}, runes and specials kept',
             CostButton(
               label: 'Temper',
               onTap: c.whyNotTemper() == null
@@ -340,7 +338,7 @@ class ForgeWares extends StatelessWidget {
             ),
           )
         else
-          Text('Wield an epic or legendary weapon that\'s fallen $temperMinGap or more levels behind you, and $smithName will rework it up to your level: iron bars for epics, gold bars for legendaries.', style: Txt.onStone(size: 12.5)),
+          Text('Rework an old epic or legendary weapon up to your level', style: Txt.onStone(size: 12.5)),
         // Set pieces, from the blueprints the Ashen Order, the vampires and the werewolves carry.
         for (final f in forgedSets)
           if (s.mat(trophyKey(f.trophy)) > 0 || setPieceSlots.any((slot) => s.mat(blueprintKey(f.id, slot)) > 0)) ...[
@@ -352,7 +350,7 @@ class ForgeWares extends StatelessWidget {
                 x.ware(
                   MatIcon.blueprint(size: 28),
                   '${gearSetById(f.id)!.name} ${pieceNoun(slot)}',
-                  'Epic, forged at your level (forge it again later for a stronger one)',
+                  'Epic, at your level',
                   CostButton(
                     label: 'Forge',
                     onTap: c.whyNotForgePiece(f.id, slot) == null
@@ -388,7 +386,7 @@ class ForgeWares extends StatelessWidget {
             x.ware(
               const Icon(Icons.hardware, color: Color(0xFFFFB04A), size: 26),
               'Forge ${e.key == 2 && k.heroClass == HeroClass.ranger ? 'Briarsong' : e.value.name}',
-              '${[for (var i = 0; i < e.value.parts.length; i++) '${hasRelicPart(s.relicParts, e.key, i) ? '✓' : '·'} ${e.value.parts[i].name}${hasRelicPart(s.relicParts, e.key, i) ? '' : ': ${e.value.parts[i].where}'}'].join('  ')} · level ${e.value.minLevel}+',
+              '${[for (var i = 0; i < e.value.parts.length; i++) '${hasRelicPart(s.relicParts, e.key, i) ? '✓' : '·'} ${e.value.parts[i].name}'].join('  ')} · Lv ${e.value.minLevel}+',
               CostButton(
                 label: '${e.value.gold} gold',
                 onTap: c.whyNotForge(e.key) == null
@@ -441,13 +439,13 @@ class EnchanterWares extends StatelessWidget {
             },
           ),
         if (Elemental.values.any((el) => s.mat(coreKey(el)) > 0)) ...[
-          x.heading('Elemental cores · $coresPerRune bind a rune of their element on your weapon'),
+          x.heading('Elemental cores · $coresPerRune make a weapon rune'),
           for (final el in Elemental.values)
             if (s.mat(coreKey(el)) > 0)
               x.ware(
                 MatIcon.core(Color(el.argb), size: 28),
                 'Bind ${el.core.toLowerCase()}s',
-                '${enchantmentById(el.rune)!.name} on your weapon: tier II, sometimes III · ${enchantCost(k.level)} gold',
+                '${enchantmentById(el.rune)!.name} rune, tier II+ · ${enchantCost(k.level)} gold',
                 CostButton(
                   label: 'Bind',
                   onTap: c.whyNotBind(el) == null ? () => enchantFlow(context, c, EnchantSlot.weapon, core: el) : null,
@@ -455,7 +453,7 @@ class EnchanterWares extends StatelessWidget {
                 extra: x.have(MatIcon.core(Color(el.argb), size: 16), s.mat(coreKey(el)), coresPerRune),
               ),
         ],
-        x.heading('Special bolts · a gem makes $ammoBundle, one per shot'),
+        x.heading('Special bolts · 1 gem = $ammoBundle'),
         for (final a in AmmoType.values)
           x.ware(
             Container(
@@ -493,7 +491,7 @@ class EnchanterWares extends StatelessWidget {
               x.ware(
                 Icon(Icons.shield_moon, color: s.warded.contains(i) ? _Shop.ok : const Color(0xFF9ADFFF), size: 26),
                 continents[i].ward!,
-                'Stops ${continents[i].hazard!.toLowerCase()} in ${continents[i].name}. Made from $reagentsForWard ${continents[i - 1].reagent} (you have ${s.reagents[i - 1]}) and ${fmt(wardPrice(i))} gold',
+                'Stops ${continents[i].hazard!.toLowerCase()} in ${continents[i].name} · ${s.reagents[i - 1]}/$reagentsForWard ${continents[i - 1].reagent} · ${fmt(wardPrice(i))} gold',
                 s.warded.contains(i) ? Text('Warded', style: Txt.label(size: 13, color: _Shop.ok)) : CostButton(label: 'Craft', onTap: c.whyNotWard(i) == null ? () => c.craftWard(i) : null),
               ),
         ],

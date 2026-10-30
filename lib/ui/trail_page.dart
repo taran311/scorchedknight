@@ -272,7 +272,7 @@ class _NextStop extends StatelessWidget {
     final note = switch (step) {
       TrailStep.stop when job => s.timber < timberNeeded ? 'Soot Goblins, dragging Hob\'s timber' : 'Goblin Warbosses, sitting on Hob\'s iron',
       TrailStep.stop => 'Something waits here. Win to press on.',
-      TrailStep.lair => l.boss.night && s.day ? '${l.boss.name} only comes out at night. Fight on here till dark (or come back after).' : '${l.boss.name} is waiting.',
+      TrailStep.lair => l.boss.night && s.day ? '${l.boss.name} comes out at night. Fight on till dark.' : '${l.boss.name} is waiting.',
       TrailStep.patrol => 'Foes still prowl. Good for gold, gear and ${isSideLand(land) ? '${l.reagent.toLowerCase()}s' : l.reagent}.',
     };
     return MouseRegion(
@@ -389,7 +389,7 @@ class _GearUp extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('Too tough for now?', style: Txt.label(size: 17, color: Palette.amber)),
-              Text('This trail keeps knocking you flat. Better gear waits in ${area.name}, and the deeper you dare, the better it gets. Come back stronger.', style: Txt.onStone(size: 14.5, color: Palette.cream)),
+              Text('Better gear waits in ${area.name}.', style: Txt.onStone(size: 14.5, color: Palette.cream)),
             ],
           ),
         ),
