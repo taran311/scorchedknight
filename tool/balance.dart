@@ -130,8 +130,9 @@ void run(String style, int seed, Stats st, {void Function(GameEngine e, int land
     for (final g in Gem.values) {
       while (e.fletch(g)) {}
     }
+    // (Stops when Mags won't sell: mid-fight, say, after a strongbox ambush.)
     while (k.potions < 4 && k.coins > e.priceOf('potion') * 3) {
-      e.purchase('potion');
+      if (!e.purchase('potion')) break;
     }
     if (!k.gloves && k.coins > 200) e.purchase('gloves');
     if (k.coins > e.priceOf('crossbow') * 1.5) e.purchase('crossbow');

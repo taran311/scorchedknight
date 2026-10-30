@@ -882,6 +882,10 @@ class _SkillSlotState extends State<_SkillSlot> {
   @override
   Widget build(BuildContext context) {
     final w = widget, on = w.onTap != null;
+    // Can't be used right now (no mana, not ready): the tile drains to a dark grey and its symbol
+    // to greyscale, so a live move's colour is what the eye finds. (Only fading the symbol left
+    // the tile's own colour lit, and a dead rite looked nearly as ready as Attack.)
+    final tint = on ? w.tint : Color.lerp(w.tint, const Color(0xFF16130F), .82)!;
     final slot = AnimatedScale(
       scale: _down && on ? .92 : (_hover && on ? 1.05 : 1),
       duration: const Duration(milliseconds: 90),
@@ -891,8 +895,8 @@ class _SkillSlotState extends State<_SkillSlot> {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(6),
-            gradient: RadialGradient(center: const Alignment(0, -.3), radius: 1, colors: [Color.lerp(w.tint, Colors.white, _hover && on ? .16 : .08)!, Color.lerp(w.tint, Colors.black, .55)!]),
-            border: Border.all(color: w.picked ? const Color(0xFFFFF0C8) : (w.glow ? Palette.amber : (on ? const Color(0xFF8A6A3A) : const Color(0xFF3A3026))), width: w.picked ? 3 : (w.glow ? 2 : 1.5)),
+            gradient: RadialGradient(center: const Alignment(0, -.3), radius: 1, colors: [Color.lerp(tint, Colors.white, _hover && on ? .16 : (on ? .08 : .03))!, Color.lerp(tint, Colors.black, .55)!]),
+            border: Border.all(color: w.picked ? const Color(0xFFFFF0C8) : (w.glow ? Palette.amber : (on ? const Color(0xFF8A6A3A) : const Color(0xFF2A241C))), width: w.picked ? 3 : (w.glow ? 2 : 1.5)),
             boxShadow: [
               const BoxShadow(color: Colors.black, offset: Offset(0, 2), blurRadius: 3),
               if (w.glow) BoxShadow(color: Palette.amber.withValues(alpha: .45), blurRadius: 10),
@@ -903,7 +907,11 @@ class _SkillSlotState extends State<_SkillSlot> {
               // The symbol and the name under it.
               Positioned.fill(
                 child: Opacity(
-                  opacity: on ? 1 : .38,
+                  opacity: on ? 1 : .42,
+                  child: ColorFiltered(
+                  colorFilter: on
+                      ? const ColorFilter.mode(Colors.transparent, BlendMode.dst)
+                      : const ColorFilter.matrix([.33, .59, .11, 0, 0, .33, .59, .11, 0, 0, .33, .59, .11, 0, 0, 0, 0, 0, 1, 0]),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -919,6 +927,7 @@ class _SkillSlotState extends State<_SkillSlot> {
                       ),
                       const SizedBox(height: 4),
                     ],
+                  ),
                   ),
                 ),
               ),
