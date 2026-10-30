@@ -151,6 +151,9 @@ class SwingResult {
   /// HP the lizardfolk regrew at the end of the turn, and HP your Sunscale set regrew.
   int regrew = 0, regrown = 0;
 
+  /// Where [regrown] and [mended] came from, in a word for the stage ("Mending", "Horse"...).
+  String regrownFrom = '', mendedFrom = '';
+
   /// Fire and venom (from burning and venom shots) that ate at the foe this turn, and whether a
   /// frost shot froze it out of its next blow.
   int burned = 0, venomed = 0, bled = 0;
@@ -1519,6 +1522,7 @@ class GameEngine {
       final before = k.hp;
       k.hp = math.min(maxHp(k), k.hp + (maxHp(k) * mount.mend).round());
       r.mended += k.hp - before;
+      r.mendedFrom = mount.name;
     }
   }
 
@@ -1726,12 +1730,14 @@ class GameEngine {
       final before = k.hp;
       k.hp = math.min(maxHp(k), k.hp + math.max(1, (maxHp(k) * mendingBrew).round()));
       r.regrown += k.hp - before;
+      r.regrownFrom = 'Mending';
     }
     // The full Sunscale set: under half health, you regrow too.
     if (state.inBattle && k.hp > 0 && k.hp < maxHp(k) / 2 && activeSets(k.gear).any((e) => e.$1.regrowth && e.$2 >= 3)) {
       final before = k.hp;
       k.hp = math.min(maxHp(k), k.hp + (maxHp(k) * regrowthHeal).round());
       r.regrown += k.hp - before;
+      r.regrownFrom = r.regrownFrom.isEmpty ? 'Sunscale' : '${r.regrownFrom} + Sunscale';
     }
     // The wolf goes back in when its time is up.
     if (state.wolfTurns > 0 && !r.wolfed && striking) {
@@ -1883,6 +1889,7 @@ class GameEngine {
           final before = k.hp;
           k.hp = math.min(maxHp(k), k.hp + (maxHp(k) * cast.mend).round());
           r.mended += k.hp - before;
+          r.mendedFrom = 'Mend';
           _note('Golden light mends ${k.hp - before} HP.', EntryKind.good);
         case SpellKind.sleep:
           final big = foeIn(state).boss;
@@ -2128,6 +2135,7 @@ class GameEngine {
         final before = k.hp;
         k.hp = math.min(maxHp(k), k.hp + (maxHp(k) * forgeheartHeal).round());
         r.mended += k.hp - before;
+        r.mendedFrom = 'Forgeheart';
       }
       if (k.loadout.cape?.special == 'rally' && !state.rallied && k.hp < maxHp(k) * .3) {
         // Rally: the Bannerlord's cloak won't let you fall back.
@@ -2135,6 +2143,7 @@ class GameEngine {
         final before = k.hp;
         k.hp = math.min(maxHp(k), k.hp + (maxHp(k) * .25).round());
         r.mended += k.hp - before;
+        r.mendedFrom = 'Rally';
         _note('You rally beneath your banner and recover ${k.hp - before} HP!', EntryKind.good);
       }
       r
