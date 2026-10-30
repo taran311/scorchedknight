@@ -898,10 +898,9 @@ const _affixes = <_Affix>[
 const _elements = {Stat.poison, Stat.burn, Stat.frost, Stat.bleed};
 
 /// Keeps every piece in its lane: the elements belong on weapons, and gold and XP on rings and
-/// charms. Anything else (old drops, the odd base) turns them into plain damage and health.
-/// Legendaries keep what they're made of.
+/// charms. Anything else (old drops, the odd base, a legendary ring) turns them into plain damage
+/// and health. (An imbued armour set's bonus is the one exception: that's the set, not a piece.)
 Map<Stat, int> tidyStats(GearSlot slot, Rarity rarity, Map<Stat, int> stats) {
-  if (rarity == Rarity.legendary) return stats;
   final weapon = slot == GearSlot.weapon, jewel = slot == GearSlot.ring || slot == GearSlot.trinket;
   if ((weapon || !stats.keys.any(_elements.contains)) && (jewel || !stats.keys.any((s) => s == Stat.fortune || s == Stat.wisdom))) return stats;
   final out = <Stat, int>{};

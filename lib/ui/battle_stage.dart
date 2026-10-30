@@ -386,7 +386,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         if (result.poisonTick > 0) {
           // Poison in your veins, at the end of the turn.
           _at(math.max(0, _queueFree - now - 300), () {
-            _mark('−${result.poisonTick} poison', _green, const Offset(_knightX - 20, _groundY - 330));
+            _mark('−${result.poisonTick}', _green, const Offset(_knightX - 20, _groundY - 330));
             _spark('mend', const Offset(_knightX, _groundY - 140), 8, lift: 1.2, speed: 1.4, life: 650, radius: 4, gravity: -.01);
           });
         }
@@ -850,24 +850,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         c.revealDamage(-r.regrew);
       });
     }
-    if (r.burned > 0 || r.venomed > 0 || r.bled > 0) {
-      // Burning and venom bolts eat at the foe once your blow has landed.
-      _at(d0 + end - 520, () {
-        if (r.burned > 0) {
-          _mark('${r.burned}', _orange, _foeChest + const Offset(-36, -70));
-          _spark('fire', _foeChest + const Offset(0, -20), 6, dir: -math.pi / 2, spread: 1, speed: 2, life: 500, radius: 6, gravity: -.02);
-        }
-        if (r.venomed > 0) {
-          _mark('${r.venomed}', _green, _foeChest + const Offset(30, -40));
-          _spark('venom', _foeChest, 8, speed: 1.6, life: 600, radius: 3, gravity: -.01);
-        }
-        if (r.bled > 0) {
-          _mark('${r.bled}', _red, _foeChest + const Offset(-6, -10));
-          _spill(_foeChest + const Offset(-10, 0), .6);
-        }
-        c.revealDamage(r.burned + r.venomed + r.bled);
-      });
-    }
+    _playLingering(r, d0 + end - 520);
     if (r.froze) _at(d0 + end - 520, () => _mark('Frozen!', const [Color(0xFF9ADFFF), Color(0xFF2A5A8A)], _foeChest + const Offset(0, -90)));
     if (r.regrown > 0) _at(d0 + end - 300, () => _mark('+${r.regrown}', _green, const Offset(_knightX + 10, _groundY - 250)));
     final k = c.state.knight, look = heroLook(k);
@@ -1005,14 +988,17 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       _tween('flash', 1, 50);
       _tween('flash', 0, 300, delay: 50);
       _spark('spark', chest + const Offset(-40, 0), dmg.crit ? 22 : 14, dir: 0, spread: 2.4, speed: dmg.crit ? 6.5 : 5, life: 420, radius: 4.5);
+      // One number for the whole blow: its fire, frost, venom and holy light are in it, shown by
+      // the sparks that follow, not by numbers of their own.
+      final whole = dmg.base + dmg.effects;
       _mark(
         dmg.devastating
-            ? 'DEVASTATING ${dmg.base}'
+            ? 'DEVASTATING $whole'
             : dmg.crit
-            ? 'CRIT ${dmg.base}'
+            ? 'CRIT $whole'
             : dmg.glancing
-            ? 'Graze ${dmg.base}'
-            : '${dmg.base}',
+            ? 'Graze $whole'
+            : '$whole',
         dmg.crit ? _crit : (dmg.glancing ? _grey : _red),
         chest + const Offset(-6, -30),
       );
@@ -1044,7 +1030,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       final bashed = r.action == BattleAction.skill;
       _burst(chest + const Offset(-20, 0), dmg.crit ? const Color(0xFFFFD45A) : (r.damage.spell != null ? Color(r.damage.spell!.argb) : const Color(0xFFFFF0D0)), dmg.devastating ? 2.2 : (dmg.crit || bashed ? 1.5 : (dmg.glancing ? .6 : 1)));
       if (dmg.crit || bashed || r.damage.special != null) _punch(dmg.devastating ? 1 : .6);
-      c.revealDamage(dmg.base);
+      c.revealDamage(whole);
       // Nearly beaten: now and then it has second thoughts.
       if (!_hurtSaid && c.shownFoeMax > 0 && c.shownFoeHp > 0 && c.shownFoeHp < c.shownFoeMax * .35) {
         _hurtSaid = true;
@@ -1058,12 +1044,8 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         (dmg.frost, _frost, 'rime'),
         (dmg.smite, _holy, 'holy'),
       ].where((e) => e.$1 > 0).toList();
-      for (final (i, (n, colours, kind)) in effects.indexed) {
-        _at(160.0 * (i + 1), () {
-          _spark(kind, chest + const Offset(-20, 20), 9, lift: 2, speed: 2.2, life: 650, radius: 3.4, gravity: kind == 'ember' ? -.04 : .05);
-          _mark('$n', colours, chest + Offset(34.0 - (i % 2) * 70, 8.0 + i * 30));
-          c.revealDamage(n);
-        });
+      for (final (i, (_, _, kind)) in effects.indexed) {
+        _at(120.0 * (i + 1), () => _spark(kind, chest + const Offset(-20, 20), 9, lift: 2, speed: 2.2, life: 650, radius: 3.4, gravity: kind == 'ember' ? -.04 : .05));
       }
       if (r.healed > 0 && dmg.leech) {
         // Bloodleech: a crimson stream from the wound back to you.
@@ -1124,15 +1106,15 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       _at(d0 + swingHitMs + hitOffset + 780, () => fx['pounce'] = 0);
     } else if (pet != null) {
       // The hound sprints across, bites, and lopes back.
-      _at(d0 + swingHitMs + hitOffset + 60, () => _tween('pounce', 1, 760, ease: (p) => p));
-      _at(d0 + swingHitMs + hitOffset + 440, () {
+      _at(d0 + swingHitMs + hitOffset + 60, () => _tween('pounce', 1, 1000, ease: (p) => p));
+      _at(d0 + swingHitMs + hitOffset + 540, () {
         _spark(pet.$1 == Pet.hellhound ? 'fire' : 'blood', _foeChest + const Offset(-30, 40), 8, speed: 3, life: 500, radius: pet.$1 == Pet.hellhound ? 8 : 3);
         _mark('${r.damage.chip}', pet.$1 == Pet.hellhound ? _orange : _red, _foeChest + const Offset(26, 32));
         _tween('flash', .6, 50);
         _tween('flash', 0, 250, delay: 50);
         c.revealDamage(r.damage.chip);
       });
-      _at(d0 + swingHitMs + hitOffset + 840, () => fx['pounce'] = 0);
+      _at(d0 + swingHitMs + hitOffset + 1080, () => fx['pounce'] = 0);
     }
     _playCounter(r, d0 + counterAt);
     _at(d0 + end + (r.reflected > 0 ? 240 : 0), () => c.swingFinished(r));
@@ -1376,6 +1358,23 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   static const _reaperAt = Offset(_knightX - 52, _groundY - 62);
 
   /// A turn without an attack: a potion, the companion's command, or trying to flee.
+  /// Fire, venom and wounds eating at the foe at the end of the turn, whatever you did with it
+  /// (a swing, a potion, a command): the foe is still burning, poisoned or bleeding.
+  void _playLingering(SwingResult r, double at) {
+    final total = r.burned + r.venomed + r.bled;
+    if (total <= 0) return;
+    _at(at, () {
+      // One number for all of it, in the colour of whatever's doing the most; each still shows
+      // itself in its sparks (flames, a green cloud, blood).
+      final top = [(r.burned, _orange), (r.venomed, _green), (r.bled, _red)].reduce((a, b) => b.$1 > a.$1 ? b : a).$2;
+      _mark('$total', top, _foeChest + const Offset(-20, -60));
+      if (r.burned > 0) _spark('fire', _foeChest + const Offset(0, -20), 6, dir: -math.pi / 2, spread: 1, speed: 2, life: 500, radius: 6, gravity: -.02);
+      if (r.venomed > 0) _spark('venom', _foeChest, 8, speed: 1.6, life: 600, radius: 3, gravity: -.01);
+      if (r.bled > 0) _spill(_foeChest + const Offset(-10, 0), .6);
+      c.revealDamage(total);
+    });
+  }
+
   void _playOther(SwingResult r) {
     if (r.fled) {
       // Off you go, coat-tails smoking.
@@ -1412,6 +1411,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       case BattleAction.attack || BattleAction.skill || BattleAction.cast || BattleAction.shoot:
         break;
     }
+    _playLingering(r, d0 + act - 120);
     if (r.counter != null) _playCounter(r, d0 + act);
     _at(d0 + act + tail + 300, () => c.swingFinished(r));
   }
@@ -1437,9 +1437,9 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     if (pet != null) {
       _at(d0, () {
         _banner = ('Pounce!', pet.$1 == Pet.hellhound ? const Color(0xFFFF8A3A) : const Color(0xFFE8E2D0), now);
-        _tween('pounce', 1, 760, ease: (p) => p);
+        _tween('pounce', 1, 1000, ease: (p) => p);
       });
-      _at(d0 + 380, () {
+      _at(d0 + 480, () {
         _foeClip = hitClip;
         _foeClipStart = now;
         _tween('flash', 1, 50);
@@ -1449,7 +1449,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         _impact(.45);
         c.revealDamage(r.charmHit);
       });
-      _at(d0 + 780, () => fx['pounce'] = 0);
+      _at(d0 + 1020, () => fx['pounce'] = 0);
       return;
     }
     if (ds != null) {
@@ -1845,8 +1845,9 @@ class _ScenePainter extends CustomPainter {
     } else if (pet != null) {
       // A hound companion at your heel; it dashes to the foe when it bites.
       final p = fx['pounce']!, stage = petStages[pet.$1]!.indexOf(pet.$2);
-      // Out to the foe's feet, a moment there for the bite, then back to your heel.
-      final x = 120 + (_foeX - 80 - 120) * _outAndBack(p);
+      // Out to the foe's feet, a moment there for the bite, then back to your heel. (Its heel
+      // spot sits inside the strip a phone shows: further left, it was off the edge of the screen.)
+      final x = 165 + (_foeX - 80 - 165) * _outAndBack(p);
       drawHound(canvas, pet.$1 == Pet.hellhound ? hellhoundLook : wolfLook, Offset(x, _groundY + 4), .7 + stage * .17, t, pounce: p, still: still);
     } else if (ds != null) {
       if (ds.name == 'Egg') {

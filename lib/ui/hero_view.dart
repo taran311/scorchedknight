@@ -256,7 +256,7 @@ class GearDetails extends StatelessWidget {
           InfoChip(icon: Icon(Icons.back_hand, size: sz, color: Palette.parch2), text: 'Two-handed', dense: dense)
         else
           InfoChip(icon: ItemIcon(Item.shield, size: sz), text: want.map((w) => w.label[0].toUpperCase() + w.label.substring(1)).join(' / '), dense: dense),
-        if (sweepingWeapons.contains(g.art)) InfoChip(icon: Icon(Icons.waves, size: sz, color: Palette.amber), text: 'Sweeps packs +50%', colour: Palette.amber, dense: dense),
+        if (sweepingWeapons.contains(g.art)) Tooltip(message: 'A big swing hits the whole pack (wolf packs, war bands): +50% damage against them', child: InfoChip(icon: Icon(Icons.waves, size: sz, color: Palette.amber), text: '+50% vs packs', colour: Palette.amber, dense: dense)),
         if (want.contains(OffhandKind.parrying) && lightBlades.contains(g.art) || want.contains(OffhandKind.wand) || want.contains(OffhandKind.sidearm))
           InfoChip(icon: Icon(Icons.call_split, size: sz, color: Palette.parch2), text: 'Can dual wield', dense: dense),
       ];

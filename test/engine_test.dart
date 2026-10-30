@@ -299,11 +299,9 @@ void main() {
     for (var i = 0; i < 300; i++) {
       final g = e.loot.roll(HeroClass.knight, 20);
       final els = g.stats.keys.where((st) => const {Stat.poison, Stat.burn, Stat.frost, Stat.bleed}.contains(st)).length;
-      if (g.rarity != Rarity.legendary) {
-        if (g.slot != GearSlot.weapon) expect(els, 0);
-        expect(els, lessThanOrEqualTo(1));
-        if (g.slot != GearSlot.ring && g.slot != GearSlot.trinket) expect(g.stats.containsKey(Stat.fortune) || g.stats.containsKey(Stat.wisdom), isFalse);
-      }
+      if (g.slot != GearSlot.weapon) expect(els, 0);
+      if (g.rarity != Rarity.legendary) expect(els, lessThanOrEqualTo(1));
+      if (g.slot != GearSlot.ring && g.slot != GearSlot.trinket) expect(g.stats.containsKey(Stat.fortune) || g.stats.containsKey(Stat.wisdom), isFalse);
     }
   });
 

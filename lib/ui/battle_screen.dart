@@ -10,7 +10,8 @@ import 'package:flutter/services.dart';
 import '../audio/audio.dart';
 import '../game/catalog.dart';
 import '../game/controller.dart';
-import '../game/crafting.dart' show smithName;
+import '../game/ammo.dart';
+import '../game/crafting.dart' show smithName, coresPerRune, Gem, GemInfo, Elemental, ElementalInfo, Metal, MetalInfo;
 import '../game/engine.dart';
 import '../game/loot.dart' show specialChanceAt, Stat, RarityInfo, GearSlotLabel;
 import '../game/models.dart';
@@ -22,6 +23,7 @@ import 'battle_stage.dart';
 import 'hud.dart';
 import 'journal_panel.dart' show fmt;
 import 'loot_window.dart';
+import 'material_icons.dart';
 import 'encounter_window.dart';
 import 'gear_glance.dart';
 import 'item_icons.dart';
@@ -1213,7 +1215,16 @@ class _Result extends StatelessWidget {
             if (k.reagents > 0) _Spoil(const Icon(Icons.local_florist, size: 17, color: Color(0xFFE0A0D0)), '+${k.reagents} ${continents[s.continent].reagent}', const Color(0xFFE0A0D0), tip: 'For Old Wick\'s wards (${s.reagents[s.continent]} now)'),
             if (chest != null) _Spoil(const Icon(Icons.inventory_2, size: 17, color: _gold), chest.tier.label, _gold),
             for (final g in [...?chest?.items, if (k.wild) ...k.packed]) _Spoil(const Icon(Icons.shield_outlined, size: 17), g.name, Color(g.rarity.argb), tip: '${g.rarity.label} ${g.slot.label.toLowerCase()}'),
-            if (chest?.ammo != null) _Spoil(const Icon(Icons.north_east, size: 17, color: Palette.cream), chest!.ammo!, Palette.cream),
+            // Bolts: a find worth noticing (they load themselves onto your crossbow).
+            if (chest?.ammo != null) _Spoil(const Icon(Icons.north_east, size: 17, color: Color(0xFFFFB86A)), '+${chest!.ammo!}', const Color(0xFFFFB86A), big: true, tip: 'Special bolts for your crossbow: one per Shoot'),
+            // What it was carrying for the crafters.
+            for (final (kind, name) in k.finds)
+              switch (kind) {
+                'gem' => _Spoil(MatIcon.gem(Gem.values.byName(name), size: 18), Gem.values.byName(name).label, Color(Gem.values.byName(name).argb), big: true, tip: 'Old Wick grinds it into ${Gem.values.byName(name).ammo.label(Missile.bolt).toLowerCase()}'),
+                'core' => _Spoil(MatIcon(MatShape.gem, Color(Elemental.values.byName(name).argb), size: 18), Elemental.values.byName(name).core, Color(Elemental.values.byName(name).argb), tip: 'Old Wick binds $coresPerRune into a rune'),
+                'ore' => _Spoil(MatIcon.ore(Metal.values.byName(name), size: 18), Metal.values.byName(name).ore, Color(Metal.values.byName(name).argb), tip: '$smithName smelts it into bars'),
+                _ => const _Spoil(Icon(Icons.description, size: 17, color: Color(0xFFB8A0FF)), 'Enchanting scroll', Color(0xFFB8A0FF), tip: 'A free rune at the enchanter'),
+              },
             if (k.companion != null) _Spoil(const Icon(Icons.pets, size: 17, color: _green), 'New companion!', _green, big: true, tip: k.companion),
             if (k.prize != null) _Spoil(const Icon(Icons.diamond, size: 17, color: Color(0xFFFFB04A)), k.prize!.name, Color(k.prize!.rarity.argb), big: true),
             for (final l in k.opened) _Spoil(const Icon(Icons.map, size: 17, color: _gold), isSideLand(l) ? 'Found: ${continents[l].name}' : 'Open: ${continents[l].name}', _gold, big: true),
