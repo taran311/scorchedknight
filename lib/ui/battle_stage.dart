@@ -1860,9 +1860,11 @@ class _ScenePainter extends CustomPainter {
     // A tall phone stage zooms in closer (620 wide still holds you, your companion and a big
     // foe), so the fighters fill it instead of a sky.
     final tall = size.height > size.width * .8;
-    final visibleW = math.min(sceneSize.width, math.max(tall ? 620.0 : 700.0, sceneSize.height * size.width / size.height));
+    // (When you fall, the camera eases back out so the Reaper behind you fits in.)
+    final pullBack = tall ? s.fx['gloom']!.clamp(0.0, 1.0) : 0.0;
+    final visibleW = math.min(sceneSize.width, math.max(tall ? 620.0 + 160 * pullBack : 700.0, sceneSize.height * size.width / size.height));
     // (Centred a touch toward the foe: the big ones are wider than you, and mustn't lose a shoulder.)
-    final left = ((tall ? 470 : 482) - visibleW / 2).clamp(0.0, sceneSize.width - visibleW);
+    final left = ((tall ? 470 - 40 * pullBack : 482) - visibleW / 2).clamp(0.0, sceneSize.width - visibleW);
     canvas.scale(size.width / visibleW);
     // Taller than the scene (a stage stretched to fill a phone): drop the scene to the bottom and
     // carry its sky on up above it.
@@ -1938,14 +1940,11 @@ class _ScenePainter extends CustomPainter {
       }
     }
 
-    // The Reaper, behind you, when you fall.
+    // The Reaper, behind you, when you fall. (Drawn on its own after the figures are recorded,
+    // not inside them: a fading layer nested in the figures' picture made Android's renderer drop
+    // the whole picture, you and the foe with it, for as long as he was there.)
     final reaperIn = fx['reaper']!;
     final reaper = reaperIn > .01 ? _reaperPose(s, t, still) : null;
-    if (reaper != null) {
-      canvas.saveLayer(_figureBounds, Paint()..color = Color.fromRGBO(0, 0, 0, reaperIn));
-      drawReaper(canvas, reaper, t, still: still);
-      canvas.restore();
-    }
 
     // As the wolf (the Bloodmoon Pelt), you're all fur and claws until it passes.
     final blade = fx['blade']!;
@@ -2271,6 +2270,17 @@ class _ScenePainter extends CustomPainter {
 
     canvas = outer;
     final figurePic = figures.endRecording();
+    // Death: the world goes cold and dark around you. (Under the figures, not over them: you, the
+    // foe and the Reaper stay in plain sight, where before they sank into the dark.)
+    final gloom = fx['gloom']!;
+    if (gloom > .005) {
+      final world = Rect.fromLTWH(left - 2, -above - 2, visibleW + 4, sceneSize.height + above + below + 4);
+      canvas.drawRect(world, Paint()..color = const Color(0xFF060A12).withValues(alpha: .42 * gloom));
+      canvas.drawRect(
+        world,
+        Paint()..shader = ui.Gradient.radial(const Offset(_knightX, _groundY - 150), 520, [const Color(0x00000000), const Color(0xFF02040A).withValues(alpha: .5 * gloom)], const [.35, 1]),
+      );
+    }
     // (Not disposed: on the web the frame is drawn later, and still needs it.)
     if (reaper != null) {
       // A cold, ghostly light behind the Reaper, so its dark shape stands out against the gloom.
@@ -2279,6 +2289,10 @@ class _ScenePainter extends CustomPainter {
         Rect.fromCenter(center: glowAt, width: 330 * reaper.scale, height: 480 * reaper.scale),
         Paint()..shader = ui.Gradient.radial(glowAt, 220 * reaper.scale, [reaperGlow.withValues(alpha: .34 * reaperIn), reaperGlow.withValues(alpha: .1 * reaperIn), const Color(0x00000000)], const [0, .55, 1]),
       );
+      // Then the Reaper himself, behind the figures laid down next.
+      if (reaperIn < .99) canvas.saveLayer(_figureBounds, Paint()..color = Color.fromRGBO(0, 0, 0, reaperIn));
+      drawReaper(canvas, reaper, t, still: still);
+      if (reaperIn < .99) canvas.restore();
     }
     if (_perf.contains('r')) {
       canvas.drawPicture(figurePic);
@@ -2572,15 +2586,6 @@ class _ScenePainter extends CustomPainter {
       s._bubbleBox = null;
     }
 
-    // Death: the world goes cold and dark, and what shines on the Reaper shines through it.
-    final gloom = fx['gloom']!;
-    if (gloom > .005) {
-      canvas.drawRect(Offset.zero & sceneSize, Paint()..color = const Color(0xFF060A12).withValues(alpha: .42 * gloom));
-      canvas.drawRect(
-        Offset.zero & sceneSize,
-        Paint()..shader = ui.Gradient.radial(const Offset(_knightX, _groundY - 150), 520, [const Color(0x00000000), const Color(0xFF02040A).withValues(alpha: .6 * gloom)], const [.25, 1]),
-      );
-    }
     if (reaper != null) drawReaperGlow(canvas, reaper, reaperIn, fx['scar']!, t, still: still);
     final soul = fx['soul']!;
     if (soul > 0 && soul < 1) {

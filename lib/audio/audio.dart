@@ -1,11 +1,11 @@
 // Sound for Scorched Knight: synthesised sound effects (no files needed) and music tracks played
-// from web/music/. Both are web-only: anywhere else (tests, other platforms) they quietly do
-// nothing. Browsers only allow sound after the player has clicked or pressed a key, so the app
+// from web/music/. In the browser they're built live with Web Audio (audio_web.dart); in the app
+// the same recipes are rendered to little WAV files and played natively (audio_native.dart). Browsers only allow sound after the player has clicked or pressed a key, so the app
 // calls [Audio.unlock] on the first one.
 
 import 'package:flutter/widgets.dart';
 
-import 'audio_stub.dart' if (dart.library.js_interop) 'audio_web.dart' as impl;
+import 'audio_stub.dart' if (dart.library.js_interop) 'audio_web.dart' if (dart.library.io) 'audio_native.dart' as impl;
 
 /// Every sound effect the game makes.
 enum Sfx {
