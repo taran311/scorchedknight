@@ -6,6 +6,7 @@
 
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
@@ -14,7 +15,7 @@ import 'audio.dart';
 import 'synth.dart';
 
 /// Bump when a recipe changes, so phones render the new sounds instead of the cached ones.
-const _version = 1;
+const _version = 2;
 
 /// Each sound's players, loaded once and taken in turn. (Not audioplayers' AudioPool: in
 /// low-latency mode it never gets a player back, so every later sound built a new player and
@@ -66,22 +67,29 @@ Future<void> _load() async {
     await dir.create(recursive: true);
     // The everyday sounds first, so a fight has its blows straight away.
     for (final s in [...Sfx.values.where(_early.contains), ...Sfx.values.where((s) => !_early.contains(s))]) {
-      final f = File('${dir.path}/${s.name}.wav');
-      if (!await f.exists()) await f.writeAsBytes(renderSfx(s), flush: true);
       final players = <AudioPlayer>[];
+      Uint8List? wav;
       for (var i = 0; i < (_busy.contains(s) ? 4 : 2); i++) {
+        // Each player its own copy of the file: players sharing one file share a single loaded
+        // sound on Android, and some of them were left without it (a blow with no sound).
+        final f = File('${dir.path}/${s.name}_$i.wav');
+        if (!await f.exists()) await f.writeAsBytes(wav ??= renderSfx(s), flush: true);
         // No position tracking: by default each player asks the phone where it's up to on every
         // frame while it plays, and these short sounds never report finishing, so a fight piled
         // up dozens of those calls per frame and the whole game stuttered.
-        final p = AudioPlayer()..positionUpdater = null;
-        // Low latency: a blow's sound lands with the blow.
-        await p.setPlayerMode(PlayerMode.lowLatency);
-        await p.setAudioContext(_context);
-        await p.setReleaseMode(ReleaseMode.stop);
-        await p.setSource(DeviceFileSource(f.path));
-        players.add(p);
+        try {
+          final p = AudioPlayer()..positionUpdater = null;
+          // Low latency: a blow's sound lands with the blow.
+          await p.setPlayerMode(PlayerMode.lowLatency);
+          await p.setAudioContext(_context);
+          await p.setReleaseMode(ReleaseMode.stop);
+          await p.setSource(DeviceFileSource(f.path));
+          players.add(p);
+        } catch (_) {
+          // One player that won't load shouldn't silence the rest.
+        }
       }
-      _pools[s] = _Ring(players);
+      if (players.isNotEmpty) _pools[s] = _Ring(players);
       // (A breath between sounds, so the first screen never stutters while they're made.)
       await Future<void>.delayed(Duration.zero);
     }
@@ -90,8 +98,8 @@ Future<void> _load() async {
   }
 }
 
-const _early = {Sfx.click, Sfx.swing, Sfx.hit, Sfx.hurt, Sfx.miss, Sfx.coins};
-const _busy = {Sfx.swing, Sfx.hit, Sfx.hurt, Sfx.click, Sfx.coins, Sfx.miss};
+const _early = {Sfx.click, Sfx.swing, Sfx.hit, Sfx.hurt, Sfx.miss, Sfx.crit, Sfx.bash, Sfx.boneHit, Sfx.stoneHit, Sfx.coins};
+const _busy = {Sfx.swing, Sfx.hit, Sfx.hurt, Sfx.click, Sfx.coins, Sfx.miss, Sfx.crit, Sfx.bash, Sfx.boneHit, Sfx.stoneHit, Sfx.block, Sfx.clang};
 
 void play(Sfx s, double power) {
   if (_muted || _soundVol <= 0) return;

@@ -16,10 +16,12 @@ import '../game/ammo.dart';
 import '../game/brews.dart';
 import '../game/catalog.dart';
 import '../game/controller.dart';
+import '../game/encounters.dart' show inspiredBoost;
 import '../game/loot.dart' show specialChanceAt;
 import '../game/models.dart';
 import '../game/rules.dart';
 import '../game/spells.dart';
+import '../game/tarot.dart' show chariotHp;
 import 'item_icons.dart';
 import 'journal_panel.dart' show fmt;
 import 'frames.dart';
@@ -433,12 +435,78 @@ class HeroStrip extends StatelessWidget {
               ],
             ),
           ),
+          // What you're carrying into the next few fights: brews, cards, songs.
+          if (HeroBuffs.of(s).isNotEmpty) Padding(padding: const EdgeInsets.only(top: 5), child: HeroBuffs(state: s)),
         ],
       )),
         ],
       ),
     );
   }
+}
+
+/// Your lasting boons as little icon chips (an icon in its colour, the fights it has left), for
+/// the fight card: Mags' brews, the poisoned blade, Strength or the bard's song, the Chariot.
+/// A tap says what each one is.
+class HeroBuffs extends StatelessWidget {
+  const HeroBuffs({super.key, required this.state});
+  final GameState state;
+
+  /// (icon, colour, fights left (null: until spent), what it is).
+  static List<(IconData, Color, int?, String)> of(GameState s) {
+    final k = s.knight;
+    String more(int n) => '$n more ${n == 1 ? 'fight' : 'fights'}';
+    return [
+      for (final (b, left) in activeBrews(k))
+        (
+          switch (b) {
+            Brew.healing => Icons.healing_rounded,
+            Brew.might => Icons.fitness_center_rounded,
+            Brew.arcane => Icons.auto_awesome_rounded,
+            Brew.hawkeye => Icons.my_location_rounded,
+            Brew.barkskin => Icons.shield_rounded,
+            Brew.wisp => Icons.water_drop_rounded,
+            Brew.reaperbane => Icons.health_and_safety_rounded,
+          },
+          Color(b.argb),
+          b == Brew.reaperbane ? null : left,
+          b == Brew.reaperbane ? '${b.label}: ${b.desc}' : '${b.label}: ${b.desc.replaceAll(' for $brewFights fights', '')} (${more(left)})',
+        ),
+      if (k.chariotFights > 0) (Icons.favorite_rounded, const Color(0xFFFF8FA8), k.chariotFights, 'The Chariot: +${(chariotHp * 100).round()}% most health (${more(k.chariotFights)})'),
+      if (s.inspired > 0) (Icons.bolt_rounded, const Color(0xFFFFD24A), s.inspired, 'Inspired: you hit ${((inspiredBoost - 1) * 100).round()}% harder (${more(s.inspired)})'),
+      if (k.poisonFights > 0) (Icons.science_rounded, const Color(0xFF9BE27A), k.poisonFights, 'Poisoned blade: poison on every attack (${more(k.poisonFights)})'),
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) => Wrap(
+    spacing: 3,
+    runSpacing: 3,
+    children: [
+      for (final (icon, colour, left, tip) in of(state))
+        Tooltip(
+          message: tip,
+          triggerMode: TooltipTriggerMode.tap,
+          showDuration: const Duration(seconds: 3),
+          child: Container(
+            height: 18,
+            padding: EdgeInsets.only(left: 3, right: left == null ? 3 : 4),
+            decoration: BoxDecoration(
+              color: colour.withValues(alpha: .16),
+              borderRadius: BorderRadius.circular(9),
+              border: Border.all(color: colour.withValues(alpha: .75)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 12, color: colour),
+                if (left != null) Padding(padding: const EdgeInsets.only(left: 2), child: Text('$left', style: Txt.label(size: 10.5, color: Palette.cream, weight: FontWeight.w800).copyWith(height: 1))),
+              ],
+            ),
+          ),
+        ),
+    ],
+  );
 }
 
 /// A small badge on the foe card: an optional word, then icons or a figure, edged in [colour].
@@ -618,8 +686,11 @@ class _LevelBadge extends StatelessWidget {
 
 /// Small badges for status effects, poison, the dragon and Peaceful mode.
 class StatusBadges extends StatelessWidget {
-  const StatusBadges({super.key, required this.state});
+  const StatusBadges({super.key, required this.state, this.boons = true});
   final GameState state;
+
+  /// Brews and the poisoned blade too (off where the hero card already shows them).
+  final bool boons;
 
   @override
   Widget build(BuildContext context) {
@@ -631,7 +702,8 @@ class StatusBadges extends StatelessWidget {
           Color(move.argb),
           'Special attack: ${move.desc}. A chance on every attack, a little higher each time it doesn\'t fire.',
         ),
-      if (k.poisonFights > 0) ('Poisoned blade · ${k.poisonFights}', const Color(0xFF9BE27A), 'Poison on every attack for ${k.poisonFights} more ${k.poisonFights == 1 ? 'fight' : 'fights'}'),
+      if (boons && k.poisonFights > 0) ('Poisoned blade · ${k.poisonFights}', const Color(0xFF9BE27A), 'Poison on every attack for ${k.poisonFights} more ${k.poisonFights == 1 ? 'fight' : 'fights'}'),
+      if (boons)
       for (final (b, left) in activeBrews(k))
         (
           b == Brew.reaperbane ? b.badge : '${b.badge} · $left',

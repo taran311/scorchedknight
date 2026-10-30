@@ -319,7 +319,7 @@ class _BattleScreenState extends State<BattleScreen> {
                                     children: [
                                       BattleStage(controller: c, aspectRatio: aspect, fill: fill),
                                       if (phone)
-                                        Positioned(left: 6, top: 6, child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 260), child: StatusBadges(state: s))),
+                                        Positioned(left: 6, top: 6, child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 260), child: StatusBadges(state: s, boons: false))),
                                       // You top-left, the foe top-right, like facing cards.
                                       if (!phone)
                                       Positioned(
