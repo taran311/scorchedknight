@@ -20,6 +20,7 @@ import '../game/spells.dart';
 import '../game/wilds.dart';
 import '../game/dungeons.dart' show dungeonRooms;
 import 'battle_stage.dart';
+import 'frames.dart';
 import 'hud.dart';
 import 'journal_panel.dart' show fmt;
 import 'loot_window.dart';
@@ -73,7 +74,9 @@ class _BattleScreenState extends State<BattleScreen> {
   bool _pickedReady = false;
 
   /// Where this fight's journal lines begin, so the panel shows only this fight.
-  int _journalFrom = 0;
+  /// The last log entry from before this fight (the log is capped, so a position in it moves as
+  /// old entries drop off the front: this fight's lines are the ones after this entry).
+  JournalEntry? _journalFrom;
   final _focus = FocusNode();
 
   @override
@@ -90,7 +93,7 @@ class _BattleScreenState extends State<BattleScreen> {
 
   void _begin(BattleStart how) {
     _spoilsShown = false;
-    _journalFrom = c.state.journal.length;
+    _journalFrom = c.state.journal.lastOrNull;
     switch (how) {
       case BattleStart.explore:
         c.explore();
@@ -126,6 +129,11 @@ class _BattleScreenState extends State<BattleScreen> {
     if (mounted && c.state.encounter != null) {
       await Future<void>.delayed(const Duration(milliseconds: 500));
       if (mounted) await showEncounter(context, c);
+      // Ambushed out of a strongbox: a new fight on this screen.
+      if (mounted && c.state.inBattle) {
+        _spoilsShown = false;
+        _journalFrom = c.state.journal.lastOrNull;
+      }
     }
     if (mounted) setState(() {});
   }
@@ -226,7 +234,8 @@ class _BattleScreenState extends State<BattleScreen> {
         // Mid-turn, the log waits for the stage: it stops where the turn began.
         final held = c.logHeldAt == null ? -1 : s.journal.indexOf(c.logHeldAt!);
         final upTo = c.busy && c.logHeldAt != null && held >= 0 ? held + 1 : s.journal.length;
-        final lines = upTo > _journalFrom ? s.journal.sublist(_journalFrom, upTo) : const <JournalEntry>[];
+        final from = _journalFrom == null ? 0 : s.journal.indexOf(_journalFrom!) + 1;
+        final lines = upTo > from ? s.journal.sublist(from, upTo) : const <JournalEntry>[];
         final over = c.outcome != null;
         if (!c.busy && _queued != null) {
           final go = _queued!;
@@ -274,6 +283,9 @@ class _BattleScreenState extends State<BattleScreen> {
                           // A tall phone: the fight fills the screen, the moves sit at the bottom where your
                           // thumb is, and the space between becomes the battle log.
                           final fill = phone && box.maxHeight >= 640;
+                          // On a tall phone: the two cards (with faces) at the top, square moves under
+                          // your thumb at the bottom, one tappable log line above them, and the fight
+                          // gets everything in between.
                           final frame = Stone(
                             padding: const EdgeInsets.all(3),
                             child: ClipRRect(
@@ -289,8 +301,9 @@ class _BattleScreenState extends State<BattleScreen> {
                                       color: const Color(0xFF15110C),
                                       padding: const EdgeInsets.all(5),
                                       // You and the foe side by side, slim, so the fight gets the screen.
-                                      child: Row(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                      // (The two cards stand the same height, side by side.)
+                                      child: IntrinsicHeight(child: Row(
+                                        crossAxisAlignment: CrossAxisAlignment.stretch,
                                         children: [
                                           // Tap your card: everything you're wearing, and what it adds up to.
                                           Expanded(flex: 5, child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => showGearGlance(context, c), child: HeroStrip(controller: c))),
@@ -298,13 +311,13 @@ class _BattleScreenState extends State<BattleScreen> {
                                           // Tap theirs: everything about it, in full.
                                           Expanded(flex: 6, child: _FoeCard(controller: c, foe: foe, fill: true)),
                                         ],
-                                      ),
+                                      )),
                                     ),
                                   _stageIn(
                                     fill,
                                     Stack(
                                     children: [
-                                      BattleStage(controller: c, aspectRatio: aspect),
+                                      BattleStage(controller: c, aspectRatio: aspect, fill: fill),
                                       if (phone)
                                         Positioned(left: 6, top: 6, child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 260), child: StatusBadges(state: s))),
                                       // You top-left, the foe top-right, like facing cards.
@@ -354,7 +367,8 @@ class _BattleScreenState extends State<BattleScreen> {
                             ),
                           );
                           if (fill) {
-                            return Padding(padding: const EdgeInsets.fromLTRB(4, 6, 4, 10), child: frame);
+                            // (Clear of the phone's own navigation bar at the bottom.)
+                            return Padding(padding: EdgeInsets.fromLTRB(4, 6, 4, 10 + MediaQuery.paddingOf(context).bottom), child: frame);
                           }
                           return Center(
                             child: SingleChildScrollView(
@@ -377,10 +391,11 @@ class _BattleScreenState extends State<BattleScreen> {
   }
 
   /// The command deck stretched to fill what's left of a tall phone screen, or as it is.
-  Widget _deckIn(bool fill, Widget deck) => fill ? Expanded(child: deck) : deck;
+  Widget _deckIn(bool fill, Widget deck) => deck;
 
   /// The stage keeps its shape on every screen (the log takes a tall phone's spare height).
-  Widget _stageIn(bool fill, Widget stage) => stage;
+  // (On a tall phone the fight takes whatever the cards above and the square moves below leave.)
+  Widget _stageIn(bool fill, Widget stage) => fill ? Expanded(child: stage) : stage;
 
   /// Your moves as a hotbar of skill slots: a big symbol, a short name, the number key in the
   /// corner and one key figure (damage, mana, potions left). Cooldowns darken the slot and count
@@ -708,6 +723,9 @@ class _FoeCard extends StatelessWidget {
     final hazard = c.state.inBattle && c.state.hazardIn(realm);
     final card = FoeCard(
       fill: fill,
+      face: fill ? TypePortrait(type: foe, tier: foeMenace(c.state)) : null,
+      // Only a boss gets its land's frame.
+      frame: foe.boss || foe.named ? frameForLand(c.state.continent) : null,
       name: foe.name,
       colour: colour,
       hp: c.shownFoeHp,
@@ -719,6 +737,15 @@ class _FoeCard extends StatelessWidget {
           const FoeBadge(label: 'HEAVY ×$heavyBlow', colour: Color(0xFFFF5A4A), solid: true, tip: 'Winding up a heavy blow. Bash, freeze or hex it to stop it.'),
         if (aura != null) FoeBadge(label: foe.pack ? 'PACK' : (foe.named ? 'RARE BOSS' : 'RARE'), colour: colour, solid: true, tip: aura.label),
         if (foe.boss && aura == null) const FoeBadge(label: 'BOSS', colour: Palette.amber, solid: true),
+        // A foe well above you: say so (the stage shows it too, bigger and darker).
+        if (foeMenace(c.state) case final m when m > 0)
+          FoeBadge(
+            icons: [for (var i = 0; i < m; i++) const Icon(Icons.dangerous, size: 14, color: Color(0xFFFF6A5A))],
+            text: m > 1 ? 'Deadly' : 'Tough',
+            wordy: true,
+            colour: const Color(0xFFFF6A5A),
+            tip: '${c.state.foeLevel - c.state.knight.level} levels above you: it hits harder and takes longer to fell',
+          ),
         if (foe.kind != FoeKind.none) FoeBadge(
             icons: [Icon(kindIcon(foe.kind), size: 14, color: kindColour(foe.kind))],
             text: foe.kind.label,
@@ -943,7 +970,10 @@ class _SkillSlotState extends State<_SkillSlot> {
             onLongPressEnd: (_) => _card.hide(),
             // On a phone a tap uses the move at once; a move that can't be used shows why instead.
             onTap: w.onTap ?? w.onPick,
-            child: ConstrainedBox(constraints: const BoxConstraints(maxHeight: 104), child: slot),
+            // On a phone the moves are square tiles (no taller than 120); elsewhere a row of slots.
+            child: isPhone(context)
+                ? LayoutBuilder(builder: (context, box) => SizedBox(height: math.min(box.maxWidth * (MediaQuery.sizeOf(context).height >= 820 ? 1.12 : 1), 120), child: slot))
+                : ConstrainedBox(constraints: const BoxConstraints(maxHeight: 104), child: slot),
           ),
         ),
       ),
@@ -1085,7 +1115,10 @@ class _CommandDeck extends StatelessWidget {
             _ => 'Steel meets steel…',
           }
         : 'Turn ${c.state.turn + 1} · your move';
-    final keep = fill ? 8 : 2;
+    // The log is a line or two at most; tap it for the whole fight.
+    // (A tall phone shows two, a shorter one just the newest.)
+    final roomy = fill && MediaQuery.sizeOf(context).height >= 820;
+    final keep = fill && !roomy ? 1 : 2;
     final recent = lines.length <= keep ? lines : lines.sublist(lines.length - keep);
     Color tone(EntryKind k) => switch (k) {
       EntryKind.damage => const Color(0xFFE88A70),
@@ -1103,7 +1136,13 @@ class _CommandDeck extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (result != null) ...[
-            if (fill) Expanded(child: SingleChildScrollView(child: RepaintBoundary(child: _Result(controller: c, onDark: true)))) else _Result(controller: c, onDark: true),
+            if (fill)
+              ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .45),
+                child: SingleChildScrollView(child: RepaintBoundary(child: _Result(controller: c, onDark: true))),
+              )
+            else
+              _Result(controller: c, onDark: true),
             const SizedBox(height: 8),
             Row(children: result!),
           ] else ...[
@@ -1131,19 +1170,23 @@ class _CommandDeck extends StatelessWidget {
                     for (final (i, e) in recent.indexed)
                       Opacity(
                         opacity: fill ? (.45 + .55 * (i + 1) / recent.length) : 1,
-                        child: Text(e.text, maxLines: phone ? 2 : 1, overflow: TextOverflow.ellipsis, style: Txt.onStone(size: phone ? 13.5 : 14.5, color: tone(e.kind))),
+                        child: Text(e.text, maxLines: phone && !roomy ? 2 : 1, overflow: TextOverflow.ellipsis, style: Txt.onStone(size: phone ? 13.5 : 14.5, color: tone(e.kind))),
                       ),
                   ],
                 );
                 if (fill) {
-                  // The log takes the room between the banner and the moves, newest line nearest them.
-                  return Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  // A slim strip: the turn banner and the newest line beside it. Tap it for the
+                  // whole fight so far. (The screen goes to the fight and the moves.)
+                  return GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => _showLog(context, lines, tone),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         banner,
-                        const SizedBox(height: 5),
-                        Expanded(child: ClipRect(child: Align(alignment: Alignment.bottomLeft, child: SingleChildScrollView(reverse: true, child: RepaintBoundary(child: said))))),
+                        const SizedBox(width: 8),
+                        Expanded(child: SizedBox(height: roomy ? 40 : 36, child: Align(alignment: Alignment.centerLeft, child: said))),
+                        const Icon(Icons.expand_less, size: 20, color: Palette.parch2),
                       ],
                     ),
                   );
@@ -1155,33 +1198,72 @@ class _CommandDeck extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             if (detail != null) ...[detail!, const SizedBox(height: 8)],
-            AnimatedOpacity(
-              opacity: yourMove ? 1 : .45,
-              duration: const Duration(milliseconds: 160),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 760),
-                  // On a phone, the moves wrap into rows of four so each is a good thumb's width.
-                  child: isPhone(context) && (moves?.length ?? 0) > 4
-                      ? Column(
-                          children: [
-                            // Even rows (six moves: three and three), so no row ends in a gap.
-                            for (final (i, n) in [for (var i = 0, per = (moves!.length / ((moves!.length + 3) ~/ 4)).ceil(); i < moves!.length; i += per) (i, per)]) ...[
-                              if (i > 0) const SizedBox(height: 6),
-                              Row(children: [...moves!.sublist(i, math.min(i + n, moves!.length)), for (var j = moves!.length; j < i + n; j++) const Expanded(child: SizedBox())]),
-                            ],
-                          ],
-                        )
-                      : Row(children: moves ?? const []),
-                ),
-              ),
-            ),
+            _moves(context, yourMove, grow: fill),
           ],
         ],
       ),
     );
   }
+
+  Widget _moves(BuildContext context, bool yourMove, {bool grow = false}) {
+    final m = moves ?? const <Widget>[];
+    Widget row(List<Widget> cells) => Row(children: cells);
+    return AnimatedOpacity(
+      opacity: yourMove ? 1 : .45,
+      duration: const Duration(milliseconds: 160),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 760),
+          // On a phone, the moves wrap into rows of four so each is a good thumb's width.
+          child: isPhone(context) && m.length > 4
+              ? Column(
+                  children: [
+                    // Even rows (six moves: three and three), so no row ends in a gap.
+                    for (final (i, n) in [for (var i = 0, per = (m.length / ((m.length + 3) ~/ 4)).ceil(); i < m.length; i += per) (i, per)]) ...[
+                      if (i > 0) SizedBox(height: grow ? 10 : 6),
+                      row([...m.sublist(i, math.min(i + n, m.length)), for (var j = m.length; j < i + n; j++) const Expanded(child: SizedBox())]),
+                    ],
+                  ],
+                )
+              : row(m),
+        ),
+      ),
+    );
+  }
 }
+
+/// The whole fight's log, in a sheet from the bottom (from the slim log strip on a phone).
+void _showLog(BuildContext context, List<JournalEntry> lines, Color Function(EntryKind) tone) => showModalBottomSheet<void>(
+  context: context,
+  backgroundColor: Colors.transparent,
+  isScrollControlled: true,
+  constraints: BoxConstraints(maxWidth: 560, maxHeight: MediaQuery.sizeOf(context).height * .6),
+  builder: (context) => Container(
+    decoration: BoxDecoration(
+      color: const Color(0xFF1A1510),
+      border: Border.all(color: Palette.amberLo, width: 1.5),
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+    ),
+    padding: EdgeInsets.fromLTRB(14, 8, 14, 12 + MediaQuery.paddingOf(context).bottom),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Palette.stone3, borderRadius: BorderRadius.circular(2)))),
+        const SizedBox(height: 8),
+        Text('THIS FIGHT', style: Txt.label(size: 12, color: Palette.amber)),
+        const SizedBox(height: 6),
+        Flexible(
+          child: ListView(
+            shrinkWrap: true,
+            reverse: true,
+            children: [for (final e in lines.reversed) Padding(padding: const EdgeInsets.only(bottom: 4), child: Text(e.text, style: Txt.onStone(size: 14, color: tone(e.kind))))],
+          ),
+        ),
+      ],
+    ),
+  ),
+);
 
 /// How the fight ended.
 class _Result extends StatelessWidget {

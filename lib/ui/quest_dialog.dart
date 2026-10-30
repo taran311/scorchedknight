@@ -14,6 +14,7 @@ import '../game/catalog.dart';
 import '../game/controller.dart';
 import '../game/rules.dart';
 import 'item_icons.dart';
+import 'tarot_card.dart';
 import 'theme.dart';
 
 /// Hob, as drawn everywhere: in the scene, the portrait and the speech bubble.
@@ -166,7 +167,7 @@ Future<void> visitInn(BuildContext context, GameController c, {VoidCallback? onH
   while (context.mounted) {
     // Hurt, or it's dark out: a bed for the night, and you wake to the morning.
     final hurt = k.hp < maxHp(k), rest = (hurt || !s.day) && !s.inBattle && c.whyNotRest == null;
-    final pintNo = c.whyNotPint;
+    final readNo = c.whyNotReading;
     final pick = await showDialog<Object>(
       context: context,
       barrierColor: Colors.black54,
@@ -181,15 +182,16 @@ Future<void> visitInn(BuildContext context, GameController c, {VoidCallback? onH
         accept: rest ? (s.day ? 'Rest by the fire' : 'Sleep till morning') : 'Cheers, Hob',
         decline: rest ? 'Not now' : null,
         acceptTone: rest ? ButtonTone.blood : ButtonTone.stone,
-        // Already poured one: no point offering a greyed-out second.
-        extra: poured ? null : 'Have a pint',
-        extraCaption: pintNo ?? '${c.pintPrice} gold',
-        extraOn: pintNo == null,
+        // Old Corva by the hearth turns a card (one a fight: no greyed-out second offer).
+        extra: poured ? null : 'Old Corva\'s cards',
+        extraCaption: readNo ?? '${c.readingPrice} gold',
+        extraOn: readNo == null,
       ),
     );
     if (pick == 'extra') {
-      Audio.play(Sfx.coins);
-      line = c.havePint();
+      if (!context.mounted) return;
+      await showTarotReading(context, c);
+      line = 'Hob grins. "Corva\'s cards never lie, ${s.settings.name}. Well. Hardly ever."';
       poured = true;
       continue;
     }

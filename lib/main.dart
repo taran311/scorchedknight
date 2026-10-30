@@ -15,6 +15,8 @@ import 'services/cloud.dart';
 import 'game/controller.dart';
 import 'ui/armoury.dart';
 import 'ui/bestiary.dart';
+import 'ui/frames.dart';
+import 'ui/tarot_card.dart';
 import 'ui/lands_preview.dart';
 import 'ui/class_picker.dart';
 import 'ui/inn_page.dart';
@@ -154,6 +156,8 @@ class _ScorchedKnightAppState extends State<ScorchedKnightApp> {
         if (Uri.base.queryParameters.containsKey('armoury')) return const ArmouryPreview();
         if (Uri.base.queryParameters.containsKey('lands')) return const LandsPreview();
         if (Uri.base.queryParameters.containsKey('bestiary')) return const BestiaryPreview();
+        if (Uri.base.queryParameters.containsKey('frames')) return const FramesPreview();
+        if (Uri.base.queryParameters.containsKey('tarot')) return const TarotPreview();
         final cloud = CloudSave.instance;
         if (!_game.loaded || (cloud.available && !cloud.authKnown)) return const Scaffold(body: Center(child: CircularProgressIndicator(color: Palette.amber)));
         // Cloud saves on: sign in (or choose to play without an account) first.

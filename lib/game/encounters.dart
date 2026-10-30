@@ -24,9 +24,9 @@ const encounters = <Encounter>[
   ),
   Encounter(
     'chest',
-    'A chest in the road',
-    'A treasure chest sits alone in the middle of the road. No owner, no tracks, no reason. It is very, very suspiciously alone.',
-    ('Open it', 'Walk on by'),
+    'A strongbox by the road',
+    'An iron-bound strongbox sits by the road, a battered bone die chained to its lock. Someone has scratched into the lid: ROLL FOR IT.',
+    ('Roll the die', 'Walk on by'),
   ),
   Encounter(
     'shrine',
@@ -53,6 +53,14 @@ Encounter? encounterById(String? id) => encounters.where((e) => e.id == id).firs
 /// The chance of a wandering encounter after a win on the trail, and the wins that must pass
 /// between two of them.
 const encounterChance = .08, encounterCalm = 5;
+
+/// A strongbox turns up by the road every this many wins (the die decides what's in it).
+const chestEvery = 10;
+
+/// What the strongbox's die does: at or under [chestAmbush] it was bait, and you're ambushed by
+/// foes this many levels above you ([chestAmbushLevels]); from [chestGear] up there's gear in it;
+/// a natural 20 is the jackpot.
+const chestAmbush = 5, chestGear = 14, chestAmbushLevels = 3;
 
 /// Fights a paid-for bard's song keeps you inspired for, and how much harder you hit meanwhile.
 const inspiredFights = 3, inspiredBoost = 1.1;

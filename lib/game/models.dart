@@ -1,5 +1,6 @@
 // Saved game state. Pure Dart; serialised to JSON and kept in the browser.
 
+import 'encounters.dart' show chestEvery;
 import 'dart:math' as math;
 import 'catalog.dart';
 import 'classes.dart';
@@ -145,6 +146,7 @@ class Knight {
     List<String>? ownedDyes,
     this.potions = 0,
     this.poisonFights = 0,
+    this.chariotFights = 0,
     Map<String, int>? brews,
     this.dragonXp,
     Map<String, int>? ammo,
@@ -192,6 +194,9 @@ class Knight {
 
   /// Fights left with weapon poison on the blade.
   int poisonFights;
+
+  /// Fights left with the Chariot card's extra health (see [chariotHp]).
+  int chariotFights;
 
   /// Mags' brews you've drunk, by id, and the fights each has left (Reaper's Bane: 1 until spent).
   final Map<String, int> brews;
@@ -254,6 +259,7 @@ class Knight {
     'ownedDyes': ownedDyes,
     'potions': potions,
     if (poisonFights > 0) 'poison': poisonFights,
+    if (chariotFights > 0) 'chariot': chariotFights,
     if (brews.isNotEmpty) 'brews': brews,
     'dragonXp': dragonXp,
     'ammo': ammo,
@@ -294,6 +300,7 @@ class Knight {
       ownedDyes: (j['ownedDyes'] as List?)?.cast<String>(),
       potions: pots - extra,
       poisonFights: (j['poison'] as num?)?.toInt() ?? 0,
+      chariotFights: (j['chariot'] as num?)?.toInt() ?? 0,
       brews: {for (final e in ((j['brews'] as Map?) ?? const {}).entries) if (e.value is num) e.key as String: (e.value as num).toInt()},
       dragonXp: (j['dragonXp'] as num?)?.toInt(),
       ammo: _ammo(j['ammo']),
@@ -351,6 +358,8 @@ class GameState {
     this.seasonSeen = '',
     this.encounter,
     this.encounterCalm = 0,
+    this.chestIn = chestEvery,
+    this.lastRoll,
     this.inspired = 0,
     this.wild,
     this.wildDepth = 0,
@@ -504,6 +513,12 @@ class GameState {
   String? encounter;
   int encounterCalm, inspired;
 
+  /// Wins until the next strongbox by the road ([chestEvery]).
+  int chestIn;
+
+  /// What the strongbox's die last came up (for the window to show it landing).
+  int? lastRoll;
+
   /// A trip into the wilds: the area (an index into wildAreas, null when you're not out there),
   /// how many steps in, the gold and gear in your pack (not yours until you get it home), a step
   /// waiting on your choice (a WildEvent name), whether the fight under way is a wild one, whether
@@ -525,7 +540,8 @@ class GameState {
   bool dungeonKey, dungeonFight;
   final Set<String> dungeonsDone;
 
-  /// Had a pint at the Soot & Kettle since the last fight (one is plenty).
+  /// Had Old Corva read a card at the Soot & Kettle since the last fight (one a fight). (Saved
+  /// as 'pint', from when it was a pint of stout.)
   bool pint;
 
   /// Times you've beaten Sir Malric the Ashen (at [malricLands].length he's gone for good).
@@ -659,6 +675,7 @@ class GameState {
     'seasonSeen': seasonSeen,
     if (encounter != null) 'encounter': encounter,
     'encounterCalm': encounterCalm,
+    'chestIn': chestIn,
     'inspired': inspired,
     if (wild != null) ...{
       'wild': wild,
@@ -778,6 +795,7 @@ class GameState {
       seasonSeen: j['seasonSeen'] as String? ?? '',
       encounter: j['encounter'] as String?,
       encounterCalm: n('encounterCalm'),
+      chestIn: n('chestIn', chestEvery),
       inspired: n('inspired'),
       wild: (j['wild'] as num?)?.toInt(),
       wildDepth: n('wildDepth'),

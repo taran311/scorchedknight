@@ -9,11 +9,13 @@ import 'package:scorchedknight/game/ammo.dart';
 import 'package:scorchedknight/game/brews.dart';
 import 'package:scorchedknight/game/classes.dart';
 import 'package:scorchedknight/game/crafting.dart';
+import 'package:scorchedknight/game/encounters.dart';
 import 'package:scorchedknight/game/engine.dart';
 import 'package:scorchedknight/game/loot.dart';
 import 'package:scorchedknight/game/models.dart';
 import 'package:scorchedknight/game/mounts.dart';
 import 'package:scorchedknight/game/rules.dart';
+import 'package:scorchedknight/game/tarot.dart';
 import 'package:scorchedknight/game/wilds.dart';
 import 'package:scorchedknight/game/dungeons.dart';
 
@@ -45,6 +47,65 @@ void main() {
     expect(sootFor(1), 1.0);
     expect(sootFor(30), 0.0);
     expect(shinesAt(30), isTrue);
+  });
+
+  test('no foe is both weak to and resistant to the same thing', () {
+    final rares = [for (final a in Aura.values) for (var i = 0; i < foes.length; i++) Rare(i, a).type];
+    for (final f in [...foes, ...rares]) {
+      final (weak, shrug) = foeEdges(f);
+      expect(weak.toSet().intersection(shrug.toSet()), isEmpty, reason: f.name);
+    }
+  });
+
+  test('a foe well above you is tough, then deadly; a boss never counts', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(2));
+    e.explore();
+    final s = e.state;
+    s.foeLevel = s.knight.level;
+    expect(foeMenace(s), 0);
+    s.foeLevel = s.knight.level + 3;
+    expect(foeMenace(s), foeIn(s).boss ? 0 : 1);
+    s.foeLevel = s.knight.level + 6;
+    expect(foeMenace(s), foeIn(s).boss ? 0 : 2);
+  });
+
+  test('a strongbox turns up every $chestEvery wins, and its die decides: ambush, gold or gear', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight)..innRepaired = true, random: Random(4));
+    final s = e.state;
+    var seen = 0;
+    for (var i = 0; i < 200 && s.wins[0] < chestEvery * 2; i++) {
+      s.knight.hp = maxHp(s.knight);
+      e.explore();
+      fightOut(e);
+      if (s.encounter == 'chest') {
+        seen++;
+        s.encounter = null;
+      } else {
+        s.encounter = null;
+      }
+    }
+    expect(seen, 2);
+    // Roll it many times: every kind of outcome comes up, and an ambush is a real fight.
+    final kinds = <String>{};
+    for (var i = 0; i < 300 && kinds.length < 3; i++) {
+      if (s.inBattle) fightOut(e);
+      s.pendingLoot.clear();
+      s.encounter = 'chest';
+      final loot0 = s.pendingLoot.length;
+      e.resolveEncounter(0);
+      final roll = s.lastRoll!;
+      if (roll <= chestAmbush) {
+        expect(s.inBattle, isTrue);
+        expect(s.foeLevel, greaterThanOrEqualTo(s.knight.level + chestAmbushLevels));
+        kinds.add('ambush');
+      } else if (roll >= chestGear) {
+        expect(s.pendingLoot.length, loot0 + 1);
+        kinds.add('gear');
+      } else {
+        kinds.add('gold');
+      }
+    }
+    expect(kinds, {'ambush', 'gold', 'gear'});
   });
 
   test('every continent has foes, a boss and a level', () {
@@ -1106,21 +1167,53 @@ void main() {
     expect(GameState.fromJson(jsonDecode(jsonEncode(e.state.toJson())) as Map<String, dynamic>).knight.stash.single.id, weapon.id);
   });
 
-  test('a pint at the Soot & Kettle: costs ${GameEngine.pintPrice} gold, one per fight, and saves', () {
+  test('Old Corva\'s cards: paid for, one a fight, every card comes true, and it saves', () {
     final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight)..innRepaired = true, random: Random(3));
     final s = e.state, k = s.knight;
     k.coins = 50;
-    expect(e.whyNotPint, isNull);
-    expect(e.havePint(), isNotEmpty);
+    expect(e.whyNotReading, isNull);
+    final price = readingPrice(k.level);
+    final drawn = e.drawCard();
+    expect(drawn, isNotNull);
     expect(s.pint, isTrue);
-    expect(e.whyNotPint, isNotNull);
-    expect(e.havePint(), isEmpty);
+    expect(e.whyNotReading, isNotNull);
+    expect(e.drawCard(), isNull);
     expect(GameState.fromJson(s.toJson()).pint, isTrue);
     e.explore();
     fightOut(e);
     expect(s.pint, isFalse);
-    k.coins = 1;
-    expect(e.whyNotPint, 'Not enough gold');
+    k.coins = 0;
+    expect(e.whyNotReading, 'Not enough gold');
+    // Every card turns up in time, and none breaks anything.
+    final seen = <Tarot>{};
+    for (var i = 0; i < 400 && seen.length < Tarot.values.length; i++) {
+      s.pint = false;
+      s.encounter = null;
+      k.brews.clear();
+      k.potions = 0;
+      k.coins = 1000;
+      seen.add(e.drawCard()!.$1);
+    }
+    expect(seen, Tarot.values.toSet());
+    expect(price, greaterThan(0));
+  });
+
+  test('the Chariot raises your health for a few fights, then it ebbs', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight)..innRepaired = true, random: Random(1));
+    final k = e.state.knight, base = maxHp(k);
+    k.chariotFights = tarotFights;
+    expect(maxHp(k), base + (base * chariotHp).round());
+    expect(Knight.fromJson(k.toJson()).chariotFights, tarotFights);
+    for (var i = 0; i < tarotFights; i++) {
+      e.explore();
+      fightOut(e);
+      k.hp = maxHp(k);
+    }
+    expect(k.chariotFights, 0);
+    // (You may have levelled up meanwhile: the Chariot's share is what's gone.)
+    final after = maxHp(k);
+    k.chariotFights = 1;
+    expect(maxHp(k), greaterThan(after));
   });
 
   group('the wilds', () {

@@ -28,6 +28,7 @@ import 'cadence.dart';
 import 'battle_screen.dart';
 import 'hero_page.dart';
 import 'class_picker.dart' show HeroOrHeroine;
+import 'frames.dart';
 import 'hud.dart';
 import 'item_icons.dart';
 import 'journal_panel.dart';
@@ -249,12 +250,7 @@ class _InnPageState extends State<InnPage> with RouteAware {
                         ],
                         const SizedBox(height: 10),
                         if (s.inBattle) ...[
-                          _Banner(
-                            icon: Icons.sports_martial_arts,
-                            text: '${encounterType(s.foe, s.rare).name} · ${fmt(s.foeHp)} HP left',
-                            button: 'Fight',
-                            onTap: _resume,
-                          ),
+                          _ResumeBanner(controller: c, onTap: _resume),
                           const SizedBox(height: 10),
                         ],
                         if (s.raid != null && !s.inBattle) ...[
@@ -319,6 +315,55 @@ class _Banner extends StatelessWidget {
       ],
     ),
   );
+}
+
+/// A fight left open: the foe's face, its health, and the way back in.
+class _ResumeBanner extends StatelessWidget {
+  const _ResumeBanner({required this.controller, required this.onTap});
+  final GameController controller;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = controller.state, foe = encounterType(s.foe, s.rare);
+    final colour = foe.aura != null ? Color(foe.aura!.argb) : (foe.boss ? Palette.amber : Palette.cream);
+    return GestureDetector(
+      onTap: onTap,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: const Color(0xFFC04A30), width: 2),
+            gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF4A2418), Color(0xFF1E0E0A)]),
+            boxShadow: [const BoxShadow(color: Colors.black, offset: Offset(0, 2)), BoxShadow(color: const Color(0xFFC04A30).withValues(alpha: .35), blurRadius: 12)],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Row(
+              children: [
+                FoeFace(frame: foe.boss || foe.named ? frameForLand(s.continent) : null, size: 76, colour: colour, child: TypePortrait(type: foe, tier: foeMenace(s))),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('CARRY ON WHERE YOU LEFT OFF', style: Txt.label(size: 11.5, color: const Color(0xFFFF9A7A))),
+                      Text(foe.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.label(size: 16, color: colour, weight: FontWeight.w800)),
+                      const SizedBox(height: 4),
+                      Bar(value: s.foeHp, max: s.foeMax, height: 12, colours: const [Color(0xFF7FCB5A), Color(0xFF2F6A1F)], label: '${fmt(s.foeHp)} / ${fmt(s.foeMax)}'),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                SizedBox(width: 84, child: StoneButton(title: 'Fight', compact: true, tone: ButtonTone.blood, onPressed: onTap)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// Hob has a job going: his portrait, a "!" and a button to go and talk to him.

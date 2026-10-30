@@ -16,6 +16,7 @@ import 'loot.dart';
 import 'models.dart';
 import 'events.dart';
 import 'rules.dart' show Trait;
+import 'tarot.dart';
 import 'wilds.dart';
 import 'dungeons.dart';
 
@@ -366,6 +367,11 @@ class GameController extends ChangeNotifier {
   /// Plays out the waiting wandering encounter.
   String resolveEncounter(int choice) {
     final out = engine.resolveEncounter(choice);
+    // The strongbox was bait: straight into the fight it sprang.
+    if (state.inBattle) {
+      _arrive(say: 'Ambush!');
+      return out;
+    }
     _changed();
     return out;
   }
@@ -409,7 +415,7 @@ class GameController extends ChangeNotifier {
     return true;
   }
 
-  void _arrive({bool boss = false}) {
+  void _arrive({bool boss = false, String? say}) {
     outcome = null;
     lastKill = null;
     lastSwing = null;
@@ -420,7 +426,8 @@ class GameController extends ChangeNotifier {
     _emit(
       EnterEvent(
         f,
-        boss
+        say ??
+            (boss
             ? f.name
             : f.pack
             ? 'A ${f.name.toLowerCase()} attacks!'
@@ -428,7 +435,7 @@ class GameController extends ChangeNotifier {
             ? '${f.name} appears!'
             : f.rare
             ? 'A rare foe appears!'
-            : null,
+            : null),
       ),
     );
     _openingCharge();
@@ -583,10 +590,10 @@ class GameController extends ChangeNotifier {
   }
 
   String? get whyNotRest => engine.whyNotRest;
-  String? get whyNotPint => engine.whyNotPint;
-  int get pintPrice => GameEngine.pintPrice;
-  String havePint() {
-    final out = engine.havePint();
+  String? get whyNotReading => engine.whyNotReading;
+  int get readingPrice => engine.readingCost;
+  (Tarot, String)? drawCard() {
+    final out = engine.drawCard();
     _changed();
     return out;
   }

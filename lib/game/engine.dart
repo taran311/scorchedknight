@@ -15,6 +15,7 @@ import 'loot.dart';
 import 'models.dart';
 import 'mounts.dart';
 import 'spells.dart';
+import 'tarot.dart';
 import 'events.dart';
 import 'encounters.dart';
 import 'rules.dart';
@@ -1188,12 +1189,19 @@ class GameEngine {
   void _maybeEncounter() {
     final s = state;
     if (s.encounter != null || !s.innRepaired) return;
+    // Every so many wins, a strongbox: something to look forward to.
+    if (--s.chestIn <= 0) {
+      s.chestIn = chestEvery;
+      s.encounter = 'chest';
+      return;
+    }
     if (s.encounterCalm > 0) {
       s.encounterCalm--;
       return;
     }
     if (_rng.nextDouble() < encounterChance) {
-      s.encounter = encounters[_rng.nextInt(encounters.length)].id;
+      final pool = [for (final e in encounters) if (e.id != 'chest') e];
+      s.encounter = pool[_rng.nextInt(pool.length)].id;
       s.encounterCalm = encounterCalm;
     }
   }
@@ -1231,16 +1239,31 @@ class GameEngine {
       case ('bard', _):
         out = 'The bard writes a song about you anyway. It rhymes "knight" with "fright" and "sooty" with "not a beauty". Rude.';
       case ('chest', 0):
-        if (_rng.nextDouble() < .7) {
-          final gold = 20 * k.level + 20;
+        final roll = 1 + _rng.nextInt(20);
+        state.lastRoll = roll;
+        if (roll <= chestAmbush) {
+          // Bait: the box is empty, and whoever left it steps out of the trees.
+          final here = foeIndexes(state.continent);
+          final f = here[_rng.nextInt(here.length)];
+          out = 'You roll a $roll. The lid swings up on nothing but straw, and ${withArticle(foeAt(f).name).toLowerCase()} steps out of the trees. It was bait. Ambush!';
+          _note(out, EntryKind.damage);
+          _begin(f, null, above: chestAmbushLevels);
+          return out;
+        } else if (roll < chestGear) {
+          final gold = 15 * k.level + 20;
           k.coins += gold;
-          out = 'Gold! Real gold! It was just a chest after all. (+$gold gold)';
+          final flask = _rng.nextBool();
+          if (flask) _givePotions();
+          out = 'You roll a $roll. The lock clicks open: a fat purse${flask ? ' and a healing potion' : ''}. (+$gold gold${flask ? ', +1 potion' : ''})';
         } else {
-          final bite = math.min(k.hp - 1, (mh * .15).round());
-          k.hp -= bite;
-          final gold = 8 * k.level;
+          final jackpot = roll == 20;
+          final g = loot.roll(k.heroClass, k.level, wielding: k.loadout.weapon, odds: jackpot ? const [0, 0, 0, 65, 35] : const [0, 0, 60, 34, 6]);
+          state.pendingLoot.add(g);
+          final gold = jackpot ? 40 * k.level + 60 : 8 * k.level;
           k.coins += gold;
-          out = 'The chest bites you. Of course it does. You wrestle a few coins out of its teeth anyway. (−$bite HP, +$gold gold)';
+          out = jackpot
+              ? 'A natural 20! The box all but bursts open: ${g.name} (${g.rarity.label}), on a bed of gold. (+$gold gold)'
+              : 'You roll a $roll. Under the straw, wrapped in oilcloth: ${g.name} (${g.rarity.label}). (+$gold gold)';
         }
       case ('chest', _):
         out = 'As you walk past, the chest sighs and grows a little pair of legs and toddles off into the trees. Wise.';
@@ -1375,6 +1398,10 @@ class GameEngine {
       ..shifts = 0;
     final k = state.knight;
     if (k.poisonFights > 0) k.poisonFights--;
+    if (k.chariotFights > 0 && --k.chariotFights == 0) {
+      k.hp = math.min(k.hp, maxHp(k));
+      _note('The Chariot\'s strength leaves you.');
+    }
     // Brews wear off a fight at a time (Reaper's Bane waits until it's needed).
     for (final b in Brew.values) {
       if (b == Brew.reaperbane || !brewOn(k, b)) continue;
@@ -1822,7 +1849,8 @@ class GameEngine {
     final now = foeIn(state);
     r.shifted = foeAt(state.form!).name;
     _note('${me.name} ripples like hot air, folds in on itself, and stands up as ${withArticle(foeAt(state.form!).name)}! It fights like one now.', EntryKind.gold);
-    if (now.kind != FoeKind.none) _note('(${now.kind.label}: it shrugs off ${now.kind.resists!.name}s and fears ${now.kind.weakTo!.name}s.)');
+    final (weak, shrug) = foeEdges(now);
+    if (weak.isNotEmpty || shrug.isNotEmpty) _note('(${[if (weak.isNotEmpty) 'Weak to ${weak.join(', ')}', if (shrug.isNotEmpty) 'shrugs off ${shrug.join(', ')}'].join('; ')}.)');
   }
 
   /// Your attack (or skill): the blow, its effects and any spell.
@@ -2736,106 +2764,86 @@ class GameEngine {
     return true;
   }
 
-  /// A pint of Hob's Ashen Stout.
-  static const pintPrice = 2;
+  /// What Old Corva charges to turn a card, at your level.
+  int get readingCost => readingPrice(state.knight.level);
 
-  /// Why you can't have a pint right now (null if you can).
-  String? get whyNotPint {
-    if (!state.innRepaired) return 'The taps are buried under the rubble';
-    if (state.inBattle || state.wild != null) return 'You\'re a long way from the bar';
-    if (state.pint) return 'One\'s plenty till your next fight';
-    if (state.knight.coins < pintPrice) return 'Not enough gold';
+  /// Why Old Corva won't read for you right now (null if she will).
+  String? get whyNotReading {
+    if (!state.innRepaired) return 'Her stool is buried under the rubble';
+    if (state.inBattle || state.wild != null) return 'You\'re a long way from the hearth';
+    if (state.pint) return 'One card till your next fight';
+    if (state.knight.coins < readingCost) return 'Not enough gold';
     return null;
   }
 
-  /// A pint by the fire at the Soot & Kettle, and whatever comes of it. Returns what happened.
-  String havePint() {
-    if (whyNotPint != null) return '';
-    final s = state, k = s.knight, mh = maxHp(k);
-    k.coins -= pintPrice;
+  /// Old Corva turns a card by the hearth at the Soot & Kettle, and it comes true. Returns the
+  /// card and what it did (null if she won't read for you).
+  (Tarot, String)? drawCard() {
+    if (whyNotReading != null) return null;
+    final s = state, k = s.knight;
+    k.coins -= readingCost;
+    // (Saved as 'pint': one reading a fight, as there used to be one pint.)
     s.pint = true;
-    final roll = <String, double>{
-      'tip': 26,
-      'courage': 14,
-      'stew': 14,
-      'wrestle': 12,
-      'toast': 10,
-      'hiccups': 10,
-      'tale': s.encounter == null ? 8 : 0,
-      'dice': 6,
-      'flask': 3,
-      'scroll': 2,
+    // Cards that can't come true right now are out of the deck.
+    final deck = {
+      for (final t in Tarot.values)
+        if (!(t == Tarot.fool && s.encounter != null) && !(t == Tarot.death && brewOn(k, Brew.reaperbane)) && !(t == Tarot.empress && k.potions >= potionBelt)) t: t.weight,
     };
-    var r = _rng.nextDouble() * roll.values.fold(0.0, (a, b) => a + b);
-    var pick = roll.keys.first;
-    for (final e in roll.entries) {
+    var r = _rng.nextDouble() * deck.values.fold(0.0, (a, b) => a + b);
+    var card = deck.keys.first;
+    for (final e in deck.entries) {
       r -= e.value;
       if (r < 0) {
-        pick = e.key;
+        card = e.key;
         break;
       }
     }
     String out;
-    switch (pick) {
-      case 'tip':
-        final boss = foeAt(bossIndex(s.continent)), weak = boss.kind.weakTo;
-        int? wild;
-        for (var a = wildAreas.length - 1; a >= 0 && wild == null; a--) {
-          if (wildOpen(a)) wild = a;
-        }
-        final tips = [
-          if (weak != null && !s.bossesDown.contains(s.continent))
-            'An old soldier at the bar leans over. "${boss.name}? Faced it once. Hates ${_styleWord(weak)}. Remember that." (A tip, free with the ale.)',
-          if (wild != null) 'A trapper by the hearth swears the deeper you go in the ${wildAreas[wild].name}, the richer the pickings, "if you know when to turn back". (Venture deeper for better loot; head home at a waystone to keep it all.)',
-          'A tinker rattles on about the triangle: "Blades for archers, rites for anything in plate, bolts for the robe-and-staff lot." (Hit a foe\'s weakness for +${((weakness - 1) * 100).round()}%.)',
-          'A pedlar mutters that fleeing gets easier every time you try. "They tire of chasing, see." (Each failed flee raises your next chance.)',
-        ];
-        out = tips[_rng.nextInt(tips.length)];
-      case 'courage':
-        s.inspired = math.max(s.inspired, 1);
-        out = 'The stout goes straight to your sword arm. Liquid courage! (Your next fight, you hit ${((inspiredBoost - 1) * 100).round()}% harder.)';
-      case 'stew':
+    switch (card) {
+      case Tarot.sun:
+        final xp = 6 * k.level + 6, ups = _grantXp(xp);
+        out = 'Light on the road ahead. +$xp XP${ups > 0 ? ', level up!' : ''}';
+      case Tarot.wheel:
+        final gold = 6 + 3 * k.level;
+        k.coins += gold;
+        out = 'Fortune turns your way. +$gold gold';
+      case Tarot.strength:
+        s.inspired = math.max(s.inspired, tarotFights);
+        out = 'Your arm will not tire. You hit ${((inspiredBoost - 1) * 100).round()}% harder for your next $tarotFights fights';
+      case Tarot.chariot:
+        final before = maxHp(k);
+        k.chariotFights = tarotFights;
+        k.hp += maxHp(k) - before;
+        out = 'Onward, unbroken. +${maxHp(k) - before} most health for your next $tarotFights fights';
+      case Tarot.star:
         final before = k.hp;
-        k.hp = math.min(mh, k.hp + math.max(10, (mh * .2).round()));
-        out = k.hp > before
-            ? 'Hob slides a bowl of lentil and smoked-mushroom stew down the bar with your pint. "You look like you need it." (+${k.hp - before} HP)'
-            : 'Hob slides a bowl of lentil and smoked-mushroom stew down the bar with your pint. You weren\'t hungry, but you finish it anyway.';
-      case 'wrestle':
-        if (_rng.nextDouble() < .55) {
-          final gold = 4 + 2 * k.level;
-          k.coins += gold;
-          out = 'Big Brannoc the smith bets you can\'t beat him at arm-wrestling. You can. The bar roars. (+$gold gold)';
-        } else {
-          out = 'Big Brannoc the smith slams your arm to the table to a roar from the bar. He buys you a consolation pint. It\'s free, but your pride isn\'t.';
-        }
-      case 'toast':
-        final xp = 4 * k.level + 4;
-        final ups = _grantXp(xp);
-        out = 'Someone stands on a chair: "To ${s.settings.name}, who ${s.foesFelled > 0 ? 'felled ${s.foesFelled} ${s.foesFelled == 1 ? 'beast' : 'beasts'} for this town' : 'is going to save us all'}!" The whole room drinks to you. (+$xp XP${ups > 0 ? ', level up!' : ''})';
-      case 'tale':
-        s.encounter = encounters[_rng.nextInt(encounters.length)].id;
-        out = 'A cloaked stranger tells you of something odd out on the road. "You\'ll know it when you see it." (Something will be waiting after your next win.)';
-      case 'dice':
-        if (_rng.nextBool()) {
-          final gold = 3 + k.level;
-          k.coins += gold;
-          out = 'Mags challenges you to a round of knucklebones and loses, loudly. "Rigged!" (+$gold gold)';
-        } else {
-          final gold = math.min(k.coins, 2 + k.level ~/ 2);
-          k.coins -= gold;
-          out = 'Mags challenges you to a round of knucklebones and wins. She bites every coin. (−$gold gold)';
-        }
-      case 'flask':
+        k.hp = maxHp(k);
+        s.heroPoison = 0;
+        out = k.hp > before ? 'Hope, and healing. Back to full health (+${k.hp - before} HP)' : 'Hope, and healing. You already feel whole';
+      case Tarot.empress:
         _givePotions();
-        out = 'Under your stool, someone\'s left a flask of red. Hob shrugs. "Finders keepers." (+1 potion)';
-      case 'scroll':
+        out = 'Plenty. A healing potion, pressed into your hand';
+      case Tarot.hermit:
+        final boss = foeAt(bossIndex(s.continent)), weak = boss.kind.weakTo;
+        out = weak != null && !s.bossesDown.contains(s.continent)
+            ? 'The lantern shows the way. ${boss.name} fears ${_styleWord(weak)}'
+            : 'The lantern shows the way. Strike where a foe is weak: +${((weakness - 1) * 100).round()}%';
+      case Tarot.fool:
+        s.encounter = encounters[_rng.nextInt(encounters.length)].id;
+        out = 'A new road opens. Something odd waits after your next win';
+      case Tarot.magician:
         k.scrolls++;
-        out = 'A tipsy wizard scribbles something on a napkin and presses it into your hand. It glows. (+1 scroll of enchanting: a free rune at Old Wick\'s tower)';
-      default:
-        out = 'You get the hiccups. Every single hiccup, Hob\'s dog barks. The whole bar joins in. Worth two gold, honestly.';
+        out = 'Power in your hands. +1 scroll of enchanting (a free rune at Old Wick\'s tower)';
+      case Tarot.death:
+        k.brews[Brew.reaperbane.name] = 1;
+        out = 'Not your ending. The next blow that would fell you leaves you standing';
+      case Tarot.tower:
+        final gold = math.min(k.coins, 3 + k.level);
+        k.coins -= gold;
+        out = gold > 0 ? 'Ruin. A purse-string snaps on the way home. −$gold gold' : 'Ruin, but you\'ve nothing left to lose';
     }
-    _note('A pint at the Soot & Kettle. $out', EntryKind.plain);
-    return out;
+    _note('Old Corva turns ${card.title}. $out.', card.ill ? EntryKind.damage : EntryKind.good);
+    return (card, '$out.');
   }
 
   static String _styleWord(AttackStyle st) => switch (st) {

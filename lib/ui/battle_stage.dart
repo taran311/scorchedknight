@@ -102,7 +102,14 @@ class _Mark {
   final List<Color> colours;
   final Offset pos;
   final double start;
+
+  /// Where it was put on screen when it first showed (clear of every other label, inside the
+  /// part of the scene you can see), kept so it never jumps about once it's there.
+  Rect? box;
 }
+
+/// How long a damage number or word stays up (ms): long enough to read.
+const _markMs = 1500.0;
 
 class _BattleStageState extends State<BattleStage> with SingleTickerProviderStateMixin {
   late final Ticker _ticker;
@@ -123,6 +130,10 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   /// What the foe is saying, in a speech bubble: (the line, when it was said, how long it shows).
   (String, double, double)? _bubble;
 
+  /// Where the speech bubble was put (so damage numbers keep clear of it).
+  Rect? _bubbleBox;
+  bool _bubbleByBanner = false;
+
   /// Whether the foe has already wobbled ("I've made a terrible mistake") this fight.
   bool _hurtSaid = false;
 
@@ -131,6 +142,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   void _say(List<String> lines, {double chance = 1, double hold = 2800}) {
     if (lines.isEmpty || _rng.nextDouble() > chance) return;
     _bubble = (lines[_rng.nextInt(lines.length)], now, hold);
+    _bubbleBox = null;
   }
 
   /// Splashes left on the ground by what a foe bleeds: (where, size, colour, when).
@@ -350,12 +362,37 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   DragonLook get _dragonLook => dragonLookOf(_foe);
   /// The Thousandfold, until it shifts, wears your own face (in shadow).
   bool get _isYou => _foe.look == 'thousandfold';
-  Look get _foeLook => _isYou ? heroLook(c.state.knight) : foeLookOf(_foe);
+
+  /// How much tougher than an even match the foe is ([foeMenace]), held through its death.
+  int _menace = 0;
+  int get _menaceNow {
+    if (c.state.inBattle) _menace = foeMenace(c.state);
+    return _menace;
+  }
+
+  /// Tougher foes stand taller.
+  double get _menaceScale => const [1.0, 1.1, 1.18][_menaceNow];
+  Look get _foeLook {
+    if (_isYou) return heroLook(c.state.knight);
+    final base = foeLookOf(_foe), tier = _menaceNow;
+    if (tier == 0) return base;
+    // A foe well above you is drawn as a veteran of it (made once per foe and tier).
+    if (!identical(_veteranOf, base) || _veteranTier != tier) {
+      _veteranOf = base;
+      _veteranTier = tier;
+      _veteran = base.veteran(tier);
+    }
+    return _veteran!;
+  }
+
+  Look? _veteranOf, _veteran;
+  int _veteranTier = 0;
   static const _dragonScale = .78;
   static const _chestAt = Offset((_knightX + _foeX) / 2 + 40, _groundY + 6);
   double get _foeScale => _isDragon ? _dragonScale : _foeLook.scale * 1.1;
   bool get _isBeast => isBeastLook(_foe.look);
-  double get _foeHeight => _isBeast ? beastHeight(_foe.look) * (_foe.aura != null ? 1.06 : 1) : _isKraken ? seaHeight(_foe.look) * _krakenScale * .9 : _isHound ? 92 * _houndScale * .95 : _isDragon ? dragonHeight * _dragonScale * _dragonLook.scale * .8 : builds[_foeLook.build]!.height * _foeScale * .95;
+  double get _foeHeight => _menaceScale * _foeHeightPlain;
+  double get _foeHeightPlain => _isBeast ? beastHeight(_foe.look) * (_foe.aura != null ? 1.06 : 1) : _isKraken ? seaHeight(_foe.look) * _krakenScale * .9 : _isHound ? 92 * _houndScale * .95 : _isDragon ? dragonHeight * _dragonScale * _dragonLook.scale * .8 : builds[_foeLook.build]!.height * _foeScale * .95;
   Offset get _foeChest => Offset(_foeX, _groundY - _foeHeight * .62) + _foeLift;
 
   /// Foes that are aloft hover above the ground (bobbing gently), and dive at you to strike.
@@ -1693,7 +1730,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         );
       }
     }
-    _marks.removeWhere((m) => t - m.start > 1050);
+    _marks.removeWhere((m) => t - m.start > _markMs + 50);
     _shots.removeWhere((p) => t - p.start > p.duration);
     _drops.removeWhere((m) => t - m.start > 1700);
     // The stage draws at about 60 frames a second, in whole screen refreshes so the rhythm stays
@@ -1821,7 +1858,8 @@ class _ScenePainter extends CustomPainter {
     // Show the whole 960-wide scene on wide screens; on narrow ones keep the 700-wide strip
     // that holds the knight, dragon and foe.
     final visibleW = math.min(sceneSize.width, math.max(700.0, sceneSize.height * size.width / size.height));
-    final left = (465 - visibleW / 2).clamp(0.0, sceneSize.width - visibleW);
+    // (Centred a touch toward the foe: the big ones are wider than you, and mustn't lose a shoulder.)
+    final left = (482 - visibleW / 2).clamp(0.0, sceneSize.width - visibleW);
     canvas.scale(size.width / visibleW);
     // Taller than the scene (a stage stretched to fill a phone): drop the scene to the bottom and
     // carry its sky on up above it.
@@ -2053,6 +2091,36 @@ class _ScenePainter extends CustomPainter {
         canvas.restore();
       }
     }
+    final menace = s._menaceNow;
+    if (menace > 0 && fx['alpha']! > 0) {
+      // A tougher foe: a blood-dark glow at its feet and smoke curling up round it (thicker, with
+      // embers, for a deadly one).
+      final a = fx['alpha']! * (1 - fx['dying']!), pulse = still ? .85 : .75 + .25 * math.sin(t / 420);
+      final fh = s._foeHeight, cx = fx0 + (s._isDragon ? 30 : 0);
+      final glow = menace > 1 ? const Color(0xFFB0101A) : const Color(0xFF7A1A2A);
+      canvas.drawOval(Rect.fromCenter(center: Offset(cx, fy + 2), width: fh * (menace > 1 ? 1.1 : .9), height: 22), Paint()..color = glow.withValues(alpha: .55 * pulse * a)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8));
+      final c0 = Offset(cx, fy - fh * .45);
+      canvas.drawCircle(c0, fh * .8, Paint()..shader = ui.Gradient.radial(c0, fh * .8, [glow.withValues(alpha: (menace > 1 ? .3 : .18) * pulse * a), glow.withValues(alpha: 0)]));
+      final wisps = menace > 1 ? 9 : 6;
+      for (var i = 0; i < wisps; i++) {
+        final ph = still ? i / wisps : ((t / 1700) + i / wisps) % 1;
+        final x = cx + (i - (wisps - 1) / 2) * fh * .14 + math.sin(t / 500 + i * 1.7) * 8 * (still ? 0 : 1);
+        final y = fy - ph * fh * 1.05;
+        final r = (5 + 11 * (1 - ph)) * (menace > 1 ? 1.2 : 1);
+        canvas.drawCircle(Offset(x, y), r, Paint()..color = const Color(0xFF1A0608).withValues(alpha: .4 * (1 - ph) * a)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5));
+        if (menace > 1 && i.isEven) canvas.drawCircle(Offset(x + 6, y - 4), 1.8, Paint()..color = const Color(0xFFFF5A2A).withValues(alpha: (1 - ph) * a));
+      }
+    }
+    // (Tougher foes are drawn bigger, about their feet, and in a darker, bloodier hue.)
+    canvas.save();
+    canvas.translate(fx0, fy);
+    canvas.scale(s._menaceScale);
+    canvas.translate(-fx0, -fy);
+    final dread = menace == 0
+        ? null
+        : ColorFilter.matrix(menace > 1
+              ? const [.86, 0, 0, 0, 20, 0, .6, 0, 0, 0, 0, 0, .62, 0, 0, 0, 0, 0, 1, 0]
+              : const [.94, 0, 0, 0, 10, 0, .78, 0, 0, 0, 0, 0, .78, 0, 0, 0, 0, 0, 1, 0]);
     if (s._isBeast) {
       var hit = 0.0;
       if (s._foeClip != null) {
@@ -2063,7 +2131,7 @@ class _ScenePainter extends CustomPainter {
           hit = math.sin(math.min(1, p * 4) * math.pi / 2) * (1 - p);
         }
       }
-      drawBeastFoe(canvas, s._foe.look, Offset(fx0 + 10, fy), t, hit: hit, dying: fx['dying']!, alpha: fx['alpha']!, tint: fx['flash']! > .02 ? flashFilter(fx['flash']!) : null, still: still, rider: s._foe.look.startsWith('centaur') ? s._foeLook : null);
+      drawBeastFoe(canvas, s._foe.look, Offset(fx0 + 10, fy), t, hit: hit, dying: fx['dying']!, alpha: fx['alpha']!, tint: fx['flash']! > .02 ? flashFilter(fx['flash']!) : dread, still: still, rider: s._foe.look.startsWith('centaur') ? s._foeLook : null);
     } else if (s._isKraken) {
       var hit = 0.0;
       if (s._foeClip != null) {
@@ -2074,7 +2142,7 @@ class _ScenePainter extends CustomPainter {
           hit = math.sin(math.min(1, p * 4) * math.pi / 2) * (1 - p);
         }
       }
-      drawSeaBeast(canvas, s._foe.look, Offset(fx0 + 20, fy), _BattleStageState._krakenScale, t, hit: hit, dying: fx['dying']!, alpha: fx['alpha']!, tint: fx['flash']! > .02 ? flashFilter(fx['flash']!) : null, still: still);
+      drawSeaBeast(canvas, s._foe.look, Offset(fx0 + 20, fy), _BattleStageState._krakenScale, t, hit: hit, dying: fx['dying']!, alpha: fx['alpha']!, tint: fx['flash']! > .02 ? flashFilter(fx['flash']!) : dread, still: still);
     } else if (s._isHound) {
       // A great hound, facing the hero; it rears back when struck and topples when it falls.
       var hit = 0.0;
@@ -2091,7 +2159,7 @@ class _ScenePainter extends CustomPainter {
       canvas.translate(at.dx, at.dy);
       canvas.scale(-1, 1);
       canvas.rotate(-fx['dying']! * .9);
-      final flash = fx['flash']! > .02 ? flashFilter(fx['flash']!) : null;
+      final flash = fx['flash']! > .02 ? flashFilter(fx['flash']!) : dread;
       final layered = fx['alpha']! < 1 || flash != null;
       if (layered) canvas.saveLayer(null, Paint()..color = Color.fromRGBO(0, 0, 0, fx['alpha']!)..colorFilter = flash);
       drawHound(canvas, demonHoundLook, Offset.zero, _BattleStageState._houndScale, t, still: still);
@@ -2117,7 +2185,7 @@ class _ScenePainter extends CustomPainter {
         alpha: fx['alpha']!,
         hit: hit,
         dying: fx['dying']!,
-        tint: fx['flash']! > .02 ? flashFilter(fx['flash']!) : null,
+        tint: fx['flash']! > .02 ? flashFilter(fx['flash']!) : dread,
         still: still,
       );
     } else {
@@ -2137,11 +2205,12 @@ class _ScenePainter extends CustomPainter {
         flip: true,
         alpha: fx['alpha']!,
         rotation: -fx['dying']! * 78,
-        tint: fx['flash']! > .02 ? flashFilter(fx['flash']!) : (s._isYou ? _BattleStageState._shadowYou : null),
+        tint: fx['flash']! > .02 ? flashFilter(fx['flash']!) : (s._isYou ? _BattleStageState._shadowYou : dread),
       ),
       still: still,
     );
     }
+    canvas.restore();
 
     // ---- The legendary specials that come for the foe in person ----
     final deadrun = fx['deadrun']!;
@@ -2462,7 +2531,21 @@ class _ScenePainter extends CustomPainter {
         textAlign: TextAlign.center,
       )..layout(maxWidth: 250));
       final w = tp.width + 26, h = tp.height + 16;
-      final box = Rect.fromLTWH((head.dx - w * .7).clamp(12.0, 948 - w), math.max(12.0, head.dy - h - 14), w, h);
+      // Over its head, but inside what's on screen and clear of the banner and any number.
+      // (Placed again if a banner comes or goes, so it never sits under one.)
+      if (s._bubbleByBanner != (s._banner != null)) s._bubbleBox = null;
+      s._bubbleByBanner = s._banner != null;
+      final spot = s._bubbleBox ??= _place(
+        Size(w, h + 14),
+        Offset(head.dx - w * .2, head.dy - h / 2 - 14),
+        Rect.fromLTRB(left + 6, -above + 6, left + visibleW - 6, sceneSize.height - 6),
+        [
+          if (s._banner != null) Rect.fromLTWH(left, 96, visibleW, 76),
+          for (final m in s._marks)
+            if (m.box != null) m.box!,
+        ],
+      );
+      final box = Rect.fromLTWH(spot.left, spot.top, w, h);
       final tipX = head.dx.clamp(box.left + 18, box.right - 18);
       final shape = Path()
         ..addRRect(RRect.fromRectAndRadius(box, const Radius.circular(12)))
@@ -2476,6 +2559,8 @@ class _ScenePainter extends CustomPainter {
       canvas.drawPath(shape, strokePaint(const Color(0xFF3A2614), 2.2));
       tp.paint(canvas, box.topLeft + const Offset(13, 8));
       canvas.restore();
+    } else {
+      s._bubbleBox = null;
     }
 
     // Death: the world goes cold and dark, and what shines on the Reaper shines through it.
@@ -2498,8 +2583,33 @@ class _ScenePainter extends CustomPainter {
     final screen = fx['screen']!;
     if (screen > .005) canvas.drawRect(Offset.zero & sceneSize, Paint()..color = const Color(0xFFFFF6E0).withValues(alpha: screen));
 
+    // Every label (damage, words, what dropped) gets its own spot: inside what's on screen, and
+    // never over another, stepping up (or down) out of the way of any already there. On a phone,
+    // where the scene is drawn small, they're drawn bigger so they stay readable.
+    // (Out of the camera's punch-in, so the labels stay where they were put, inside the screen.)
+    if (zoom > .001) {
+      final fc = s._foeChest;
+      canvas.translate(fc.dx, fc.dy);
+      canvas.scale(1 / (1 + .07 * zoom));
+      canvas.translate(-fc.dx, -fc.dy);
+    }
+    final boost = (.62 * visibleW / size.width).clamp(1.0, 1.5).toDouble();
+    final view = Rect.fromLTRB(left + 6, -above + 6, left + visibleW - 6, sceneSize.height - 6);
+    final taken = <Rect>[
+      for (final m in [...s._marks, ...s._drops])
+        if (m.box != null) m.box!,
+      if (s._banner != null) Rect.fromLTWH(left, 96, visibleW, 76),
+      if (s._bubbleBox != null) s._bubbleBox!,
+    ];
     for (final m in s._marks) {
-      _tag(canvas, m, (t - m.start) / 1000, left, left + visibleW);
+      final age = (t - m.start) / _markMs;
+      if (age < 0 || age > 1) continue;
+      if (m.box == null) {
+        final tp = _laidOut('m:${m.text}', () => _markText(m.text));
+        m.box = _place(Size(math.max(54.0, tp.width + 22) * boost * 1.12, 38 * boost * 1.12), m.pos, view, taken);
+        taken.add(m.box!);
+      }
+      _tag(canvas, m, age, boost);
     }
     final banner = s._banner;
     if (banner != null) {
@@ -2532,18 +2642,29 @@ class _ScenePainter extends CustomPainter {
         tp.paint(canvas, spot - Offset(tp.width / 2, tp.height / 2));
       }
     }
-    for (final (i, d) in s._drops.indexed) {
+    for (final d in s._drops) {
       final age = (t - d.start) / 1600;
-      if (age < 0) continue;
-      final y = 540 * (.62 - .38 * age) - i * 4.0;
-      final a = age < .15 ? age / .15 : 1 - math.max(0.0, (age - .5) / .5);
-      _text(
-        canvas,
-        d.text,
-        Offset(left + visibleW - 24, y),
-        Txt.label(size: 26, color: (d.colours.isEmpty ? Palette.amber : d.colours.first).withValues(alpha: a.clamp(0.0, 1.0).toDouble())),
-        alignRight: true,
-      );
+      if (age < 0 || age > 1) continue;
+      final a = (age < .12 ? age / .12 : 1 - math.max(0.0, (age - .7) / .3)).clamp(0.0, 1.0).toDouble();
+      final colour = d.colours.isEmpty ? Palette.amber : d.colours.first;
+      final tp = _laidOut('d:${d.text}:${colour.toARGB32()}', () => TextPainter(text: TextSpan(text: d.text, style: Txt.label(size: 26, color: colour, weight: FontWeight.w900)), textDirection: TextDirection.ltr)..layout());
+      if (d.box == null) {
+        // Rewards stack up the right-hand side, under the foe's head height.
+        final w = (tp.width + 24) * boost, h = (tp.height + 8) * boost;
+        d.box = _place(Size(w, h), Offset(left + visibleW - 16 - w / 2, 300), view, taken, upFirst: true);
+        taken.add(d.box!);
+      }
+      final b = d.box!;
+      canvas.save();
+      canvas.translate(b.center.dx, b.center.dy - 8 * age);
+      canvas.scale(boost);
+      canvas.saveLayer(null, Paint()..color = Color.fromRGBO(0, 0, 0, a));
+      final pill = RRect.fromRectAndRadius(Rect.fromCenter(center: Offset.zero, width: tp.width + 22, height: tp.height + 6), const Radius.circular(12));
+      canvas.drawRRect(pill, Paint()..color = Colors.black.withValues(alpha: .62));
+      canvas.drawRRect(pill, strokePaint(colour.withValues(alpha: .7), 1.5));
+      tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
+      canvas.restore();
+      canvas.restore();
     }
     canvas.restore();
     if (watch != null) s._paintMs = watch.elapsedMicroseconds / 1000;
@@ -2676,32 +2797,53 @@ class _ScenePainter extends CustomPainter {
     );
   }
 
-  /// A damage number or word, kept inside the strip of the scene that's on screen ([minX] to
-  /// [maxX]): on a phone, tags by a big foe's chest used to run off the right-hand edge.
-  void _tag(Canvas canvas, _Mark m, double age, double minX, double maxX) {
+  static TextPainter _markText(String text) => TextPainter(
+    text: TextSpan(text: text, style: Txt.label(size: 30, color: Colors.white, weight: FontWeight.w800)),
+    textDirection: TextDirection.ltr,
+  )..layout();
+
+  /// A free spot of [size] for a label that wants to sit at [want]: inside [view], and clear of
+  /// every rect in [taken], trying a step up, then down, then further out each way.
+  static Rect _place(Size size, Offset want, Rect view, List<Rect> taken, {bool upFirst = false}) {
+    final x = want.dx.clamp(view.left + size.width / 2, math.max(view.left + size.width / 2, view.right - size.width / 2)).toDouble();
+    final y0 = want.dy.clamp(view.top + size.height / 2, math.max(view.top + size.height / 2, view.bottom - size.height / 2)).toDouble();
+    final step = size.height + 6;
+    Rect at(double y) => Rect.fromCenter(center: Offset(x, y), width: size.width, height: size.height);
+    bool inside(Rect r) => r.top >= view.top - .5 && r.bottom <= view.bottom + .5;
+    bool clear(Rect r) => !taken.any((o) => o.overlaps(r.inflate(3)));
+    for (var i = 0; i < 24; i++) {
+      // 0, -1, +1, -2, +2... (or all the way up first, for the rewards column).
+      final k = upFirst ? (i < 12 ? -i : i - 11) : (i.isOdd ? -(i + 1) ~/ 2 : i ~/ 2);
+      final r = at(y0 + k * step);
+      if (inside(r) && clear(r)) return r;
+    }
+    // Nowhere free (a flood of labels): beside the busiest one rather than on top of it.
+    for (final dx in [-1.0, 1.0]) {
+      final r = at(y0).shift(Offset(dx * (size.width + 6), 0));
+      if (r.left >= view.left && r.right <= view.right && clear(r)) return r;
+    }
+    return at(y0);
+  }
+
+  /// A damage number or word in the spot it was given ([_Mark.box]), popping in and fading out.
+  void _tag(Canvas canvas, _Mark m, double age, double boost) {
     if (age < 0 || age > 1) return;
-    final scale = age < .12
-        ? .6 + age / .12 * .52
-        : age < .22
-        ? 1.12 - (age - .12) / .1 * .12
+    final scale = boost *
+        (age < .08
+            ? .6 + age / .08 * .52
+            : age < .16
+            ? 1.12 - (age - .08) / .08 * .12
+            : 1.0);
+    final alpha = age < .08
+        ? age / .08
+        : age > .8
+        ? 1 - (age - .8) / .2
         : 1.0;
-    final alpha = age < .12
-        ? age / .12
-        : age > .75
-        ? 1 - (age - .75) / .25
-        : 1.0;
-    final rise = age > .75 ? (age - .75) / .25 * 22 : 0.0;
-    final tp = _laidOut('m:${m.text}', () => TextPainter(
-      text: TextSpan(
-        text: m.text,
-        style: Txt.label(size: 30, color: Colors.white, weight: FontWeight.w800),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout());
+    final rise = age > .8 ? (age - .8) / .2 * 6 : 0.0;
+    final tp = _laidOut('m:${m.text}', () => _markText(m.text));
     final w = math.max(54.0, tp.width + 22), h = 38.0;
-    final x = m.pos.dx.clamp(math.min(minX + w * .56 + 6, (minX + maxX) / 2), math.max(maxX - w * .56 - 6, (minX + maxX) / 2)).toDouble();
     canvas.save();
-    canvas.translate(x, math.max(m.pos.dy, h * .6) - rise);
+    canvas.translate(m.box!.center.dx, m.box!.center.dy - rise);
     canvas.scale(scale);
     final path = poly([
       Offset(-w / 2 + w * .12, -h / 2),
@@ -2761,14 +2903,6 @@ class _ScenePainter extends CustomPainter {
     canvas.drawRect(Rect.fromLTWH(at.dx - 4, at.dy - 30, 8, 9), Paint()..color = band);
     canvas.drawRect(Rect.fromLTWH(at.dx - 4, at.dy - 30, 8, 9), strokePaint(outline, 1));
     canvas.restore();
-  }
-
-  void _text(Canvas canvas, String text, Offset at, TextStyle style, {bool alignRight = false}) {
-    final tp = TextPainter(
-      text: TextSpan(text: text, style: style),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    tp.paint(canvas, Offset(alignRight ? at.dx - tp.width : at.dx, at.dy));
   }
 
   /// The Reaper rises into place as it appears, and bobs while it hovers.

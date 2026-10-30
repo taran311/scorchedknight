@@ -22,6 +22,7 @@ import '../game/rules.dart';
 import '../game/spells.dart';
 import 'item_icons.dart';
 import 'journal_panel.dart' show fmt;
+import 'frames.dart';
 import 'theme.dart';
 
 /// Your character in the corner of the game window: portrait and level, HP and XP bars, potions
@@ -61,7 +62,7 @@ class HeroCard extends StatelessWidget {
           Stack(
             clipBehavior: Clip.none,
             children: [
-              HeroPortrait(look: heroLook(k), size: compact ? 48 : 66, signature: portraitSignature(k)),
+              HeroPortrait(look: heroLook(k), size: compact ? 62 : 84, signature: portraitSignature(k), framed: true),
               Positioned(right: -6, bottom: -6, child: _LevelBadge(level: k.level, size: 28)),
             ],
           ),
@@ -158,15 +159,27 @@ class Bar extends StatelessWidget {
 
 /// A head-and-shoulders portrait of any figure, in a round frame lit like the fire behind them.
 class HeroPortrait extends StatelessWidget {
-  const HeroPortrait({super.key, required this.look, this.size = 64, this.signature});
+  const HeroPortrait({super.key, required this.look, this.size = 64, this.signature, this.framed = false});
   final Look look;
   final double size;
+
+  /// In the knight's gold frame ([size] is then the frame's, the face a little smaller).
+  final bool framed;
 
   /// What the portrait shows, as a string (gear, dye, level): when it hasn't changed, the portrait
   /// isn't redrawn, however often the page around it rebuilds.
   final String? signature;
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) => framed
+      ? OrnateFrame(
+          kind: FrameKind.knight,
+          size: size,
+          child: DecoratedBox(
+            decoration: const BoxDecoration(gradient: RadialGradient(center: Alignment(.3, -.2), colors: [Color(0xFF8A4A22), Color(0xFF2A160C)])),
+            child: RepaintBoundary(child: CustomPaint(painter: _PortraitPainter(look, signature))),
+          ),
+        )
+      : Container(
     width: size,
     height: size,
     decoration: BoxDecoration(
@@ -205,7 +218,10 @@ class _PortraitPainter extends CustomPainter {
 /// The foe's card, opposite yours: name and level, an HP bar, and what to watch for as little
 /// game badges (rank, kind, loot perk; what it's weak to and shrugs off; how hard it hits).
 class FoeCard extends StatelessWidget {
-  const FoeCard({super.key, required this.name, required this.colour, required this.hp, required this.maxHp, required this.level, this.tags = const [], this.badges = const [], this.fill = false});
+  const FoeCard({super.key, required this.name, required this.colour, required this.hp, required this.maxHp, required this.level, this.tags = const [], this.badges = const [], this.fill = false, this.face, this.frame});
+
+  /// Its face, at the left of the card (on a phone's battle screen).
+  final Widget? face;
 
   /// On a phone: fills the space it's given (beside your own card) instead of its usual width,
   /// with its tags and badges run together to keep it short.
@@ -213,6 +229,9 @@ class FoeCard extends StatelessWidget {
   final String name;
   final Color colour;
   final int hp, maxHp, level;
+
+  /// The frame round [face] (a boss's, in the style of its land), or null for a plain ring.
+  final FrameKind? frame;
 
   /// What it is: rank, kind, loot perk.
   final List<Widget> tags;
@@ -236,10 +255,12 @@ class FoeCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          _withFace(Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
           Row(
             children: [
               Expanded(child: Text(name, overflow: TextOverflow.ellipsis, style: Txt.label(size: fill ? 13.5 : 15, color: colour, weight: FontWeight.w800))),
-              Container(
+              // (With a face, the level sits on the face instead, so the name gets the room.)
+              if (face == null) Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                 decoration: BoxDecoration(color: Colors.black38, borderRadius: BorderRadius.circular(10), border: Border.all(color: Palette.parch.withValues(alpha: .4))),
                 child: Text('Lv $level', style: Txt.label(size: 12, color: Palette.parch, weight: FontWeight.w800)),
@@ -250,7 +271,18 @@ class FoeCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Bar(value: hp, max: maxHp, height: 14, colours: const [Color(0xFF7FCB5A), Color(0xFF2F6A1F)], label: '${fmt(hp)} / ${fmt(maxHp)}'),
-          if (fill)
+          ])),
+          if (fill && MediaQuery.sizeOf(context).height >= 700)
+            // A tall phone has room: the badges in full (words and all), in two rows that are
+            // always there, so the card never changes height as they come and go. More than fits
+            // are in the sheet a tap on the card opens.
+            Container(
+              height: 48,
+              margin: const EdgeInsets.only(top: 4),
+              alignment: Alignment.topLeft,
+              child: ClipRect(child: RepaintBoundary(child: Wrap(spacing: 3, runSpacing: 4, clipBehavior: Clip.hardEdge, children: [...tags, ...badges]))),
+            )
+          else if (fill)
             // One row that scrolls sideways, never a second line, and there even when empty: the
             // card (and the fight under it) keeps the same height whatever comes and goes.
             Container(
@@ -270,6 +302,59 @@ class FoeCard extends StatelessWidget {
       ),
     );
     return scale == 1 || fill ? card : Transform.scale(scale: scale, alignment: Alignment.topRight, child: card);
+  }
+
+  /// Its face beside its name and health bar (when it has one to show).
+  Widget _withFace(Widget nameAndBar) => face == null
+      ? nameAndBar
+      : Row(
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                FoeFace(frame: frame, size: 64, colour: colour, child: face!),
+                Positioned(
+                  left: -2,
+                  bottom: -2,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(color: const Color(0xFF2A1612), borderRadius: BorderRadius.circular(8), border: Border.all(color: colour.withValues(alpha: .8))),
+                    child: Text('Lv $level', style: Txt.label(size: 10.5, color: Palette.parch, weight: FontWeight.w800)),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(width: 4),
+            Expanded(child: nameAndBar),
+          ],
+        );
+}
+
+/// A foe's face: in its land's ornate frame for a boss ([frame]), or a plain dark ring for the
+/// rest, so the bosses stand out.
+class FoeFace extends StatelessWidget {
+  const FoeFace({super.key, required this.frame, required this.size, required this.colour, required this.child});
+  final FrameKind? frame;
+  final double size;
+  final Color colour;
+  final Widget child;
+  @override
+  Widget build(BuildContext context) {
+    const backdrop = BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF8A8F96), Color(0xFF4E535A)]));
+    if (frame != null) return OrnateFrame(kind: frame!, size: size, child: DecoratedBox(decoration: backdrop, child: child));
+    final d = size * .74;
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Center(
+        child: Container(
+          width: d,
+          height: d,
+          decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Color.lerp(colour, Colors.black, .35)!, width: 2), boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 4)]),
+          child: ClipOval(child: DecoratedBox(decoration: backdrop, child: child)),
+        ),
+      ),
+    );
   }
 }
 
@@ -291,18 +376,36 @@ class HeroStrip extends StatelessWidget {
         border: Border.all(color: Palette.amberLo, width: 1.5),
         borderRadius: BorderRadius.circular(6),
       ),
-      child: Column(
+      // Your face beside your name, health and mana.
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // The level on a little tag at the frame's foot, so the name gets the room.
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              HeroPortrait(look: heroLook(k), size: 62, signature: portraitSignature(k), framed: true),
+              Positioned(
+                left: -2,
+                bottom: -2,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  decoration: BoxDecoration(color: const Color(0xFF2A1A0C), borderRadius: BorderRadius.circular(8), border: Border.all(color: Palette.amberLo)),
+                  child: Text('Lv ${k.level}', style: Txt.label(size: 10.5, color: Palette.amber, weight: FontWeight.w800)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 6),
+          Expanded(child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
+        // Beside a taller foe card, its rows spread to fill the same height.
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
             children: [
               Expanded(child: Text(s.settings.name, overflow: TextOverflow.ellipsis, style: Txt.label(size: 13.5, color: Palette.cream, weight: FontWeight.w800))),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                decoration: BoxDecoration(color: Colors.black38, borderRadius: BorderRadius.circular(10), border: Border.all(color: Palette.amberLo)),
-                child: Text('Lv ${k.level}', style: Txt.label(size: 12, color: Palette.amber, weight: FontWeight.w800)),
-              ),
             ],
           ),
           const SizedBox(height: 4),
@@ -333,6 +436,8 @@ class HeroStrip extends StatelessWidget {
               ],
             ),
           ),
+        ],
+      )),
         ],
       ),
     );
@@ -595,14 +700,17 @@ class FoePortrait extends StatelessWidget {
 
 /// A still picture of any foe type (rare variants and World Bosses included).
 class TypePortrait extends StatelessWidget {
-  const TypePortrait({super.key, required this.type});
+  const TypePortrait({super.key, required this.type, this.tier = 0});
   final FoeType type;
+
+  /// How far above you it is ([foeMenace]): a tougher one is drawn as a veteran.
+  final int tier;
   @override
   Widget build(BuildContext context) {
     if (type.hound) return CustomPaint(painter: _HoundPortrait());
     if (type.dragon) return CustomPaint(painter: _DragonPortrait(dragonLookOf(type)));
     if (isSeaLook(type.look) || isBeastLook(type.look)) return CustomPaint(painter: _BeastPortrait(type));
-    return CustomPaint(painter: _FoePainter(foeLookOf(type)));
+    return CustomPaint(painter: _FoePainter(foeLookOf(type), tier));
   }
 }
 
@@ -703,12 +811,13 @@ class LookPortrait extends StatelessWidget {
   const LookPortrait({super.key, required this.look});
   final Look look;
   @override
-  Widget build(BuildContext context) => CustomPaint(painter: _FoePainter(look));
+  Widget build(BuildContext context) => CustomPaint(painter: _FoePainter(look, 0));
 }
 
 class _FoePainter extends CustomPainter {
-  _FoePainter(this.look);
-  final Look look;
+  _FoePainter(this.base, this.tier) : look = base.veteran(tier);
+  final Look base, look;
+  final int tier;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -728,7 +837,7 @@ class _FoePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_FoePainter old) => old.look != look;
+  bool shouldRepaint(_FoePainter old) => !identical(old.base, base) || old.tier != tier;
 }
 
 /// Scorched Knight's crest: a shield with a flame on it.
@@ -796,28 +905,6 @@ IconData kindIcon(FoeKind k) => switch (k) {
   FoeKind.none => Icons.circle,
 };
 
-/// What a foe is weak to, in a few words for its card: the combat triangle and its own nature.
-List<String> weakTo(FoeType f) => [
-  if (f.kind != FoeKind.none) styleName(f.kind.weakTo!),
-  if (f.aloft && f.kind.weakTo != AttackStyle.bolt) 'the crossbow',
-  if ((f.stone || f.spirit) && f.kind.weakTo != AttackStyle.rite) 'rites',
-  if (f.stone) 'hammers and maces',
-  if (f.ent || f.regrows) 'fire',
-  if (f.undead || f.demon || f.element == 'poison') 'holy fire',
-  if (f.evasive && f.kind.weakTo != AttackStyle.rite) 'rites',
-  if (f.element == 'burn') 'frost',
-  if (f.element == 'frost') 'fire',
-];
-
-/// What it shrugs off.
-List<String> shrugsOff(FoeType f) => [
-  if (f.kind != FoeKind.none) styleName(f.kind.resists!),
-  if ((f.aloft || f.stone || f.spirit) && f.kind.resists != AttackStyle.blade) 'blades',
-  if (f.spirit && f.kind.resists != AttackStyle.bolt) 'bolts',
-  if (f.venomous || f.ent) 'poison',
-  if (f.demon || f.element == 'burn') 'fire',
-  if (f.element == 'frost') 'frost',
-  if (f.element == 'poison') 'poison',
-  if (f.ironhide) 'critical hits',
-  if (f.evasive && f.kind.resists != AttackStyle.blade) 'blades',
-];
+/// What a foe is weak to, and what it shrugs off, for its card (see [foeEdges]).
+List<String> weakTo(FoeType f) => foeEdges(f).$1;
+List<String> shrugsOff(FoeType f) => foeEdges(f).$2;

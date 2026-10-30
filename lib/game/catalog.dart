@@ -6,6 +6,8 @@
 // looking for work. Each continent is recovering in its own odd way; cross them all and you
 // reach the Ember Throne.
 
+import 'dart:math' as math;
+
 import 'crafting.dart';
 
 /// How a foe hits you: up close, with arrows, with magic, or with fire.
@@ -1487,3 +1489,55 @@ const places = <Place>[
 ];
 
 Place? placeById(String? id) => places.where((p) => p.id == id).firstOrNull;
+
+/// How hard each of your ways of fighting really lands on [f], all its traits together: the
+/// triangle, flying (blades can't reach it well, bolts pluck it down), stone and spirit (only rites
+/// bite cleanly) and the elves' dodging. Above 1 it's weak to it; below, it shrugs it off.
+double styleEdgeOn(FoeType f, AttackStyle s) {
+  var e = triangle(f.kind, s);
+  if (f.aloft) e *= s == AttackStyle.blade ? aloftMelee : (s == AttackStyle.bolt ? aloftShot : 1);
+  if (s != AttackStyle.rite && (f.stone || f.spirit)) e *= .6;
+  if (s != AttackStyle.rite && f.evasive) e *= 1 - evasiveMiss;
+  return e;
+}
+
+/// How [f] takes each kind of elemental harm ('burn', 'frost', 'poison', 'smite'), as the damage
+/// rules work it out: above 1 weak, below 1 resistant (0: immune).
+double elementEdgeOn(FoeType f, String st) {
+  var e = switch (st) {
+    'burn' => f.demon || f.look == 'emberKing' ? .5 : (f.ent ? 2.0 : 1.0),
+    'poison' => f.venomous ? 0.0 : (f.ent ? .5 : 1.0),
+    // Ordinary holy fire only burns the unholy (so they're weak to it), and spirits twice over.
+    'smite' => (f.undead || f.demon || f.element == 'poison' ? 1.5 : 1.0) * (f.spirit ? 2 : 1),
+    _ => 1.0,
+  };
+  if (f.element != null) e = f.element == st ? 0 : (elementWeakness(f.element!) == st ? e * 2 : e);
+  return e;
+}
+
+/// The words for [AttackStyle]s on a foe's card.
+const styleWords = {AttackStyle.blade: 'blades', AttackStyle.rite: 'rites', AttackStyle.bolt: 'the crossbow'};
+
+/// What [f] is weak to and what it shrugs off, in a few words each for its card. Never the same
+/// thing in both: each is worked out once, from how the blows really land.
+(List<String>, List<String>) foeEdges(FoeType f) {
+  final weak = <String>[], shrug = <String>[];
+  void sort(String what, double e) {
+    if (e > 1.01) weak.add(what);
+    if (e < .99) shrug.add(what);
+  }
+
+  for (final s in AttackStyle.values) {
+    sort(styleWords[s]!, styleEdgeOn(f, s));
+  }
+  // Stone cracks under a hammer, whatever blades do.
+  if (f.stone) weak.add('hammers and maces');
+  final burn = elementEdgeOn(f, 'burn');
+  // What regrows is stopped by fire, unless fire can't touch it.
+  sort('fire', f.regrows && burn >= 1 ? math.max(burn, 1.5) : burn);
+  sort('holy fire', elementEdgeOn(f, 'smite'));
+  sort('poison', elementEdgeOn(f, 'poison'));
+  sort('frost', elementEdgeOn(f, 'frost'));
+  if (f.ironhide) shrug.add('critical hits');
+  return (weak, shrug);
+}

@@ -58,6 +58,8 @@ class _TrailPageState extends State<TrailPage> {
     if (!mounted) return;
     if (exit != BattleExit.inn && c.state.encounter != null) await showEncounter(context, c);
     if (!mounted) return;
+    // A strongbox that turned out to be bait: into the ambush.
+    if (c.state.inBattle) return _go();
     // Knocked out: you wake up back at the inn.
     if (exit == BattleExit.inn) Navigator.of(context).popUntil((r) => r.isFirst);
   }

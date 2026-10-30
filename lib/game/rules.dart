@@ -9,6 +9,7 @@ import 'classes.dart';
 import 'loot.dart';
 import 'models.dart';
 import 'spells.dart';
+import 'tarot.dart';
 
 /// Everything the hero's class, armour and gear add up to.
 class HeroStats {
@@ -134,7 +135,11 @@ int twoHandBonus(GearItem? w) {
   return ((w.stats[Stat.damage] ?? 0) * share).round();
 }
 
-int maxHp(Knight k) => 100 + 5 * (k.level - 1) + heroStats(k).vigour + vigourHp * trained(k, Trait.vigour);
+int maxHp(Knight k) {
+  final base = 100 + 5 * (k.level - 1) + heroStats(k).vigour + vigourHp * trained(k, Trait.vigour);
+  // The Chariot card: more for a few fights.
+  return k.chariotFights > 0 ? base + (base * chariotHp).round() : base;
+}
 
 // ---------------- training: your build ----------------
 
@@ -239,6 +244,14 @@ const turnsPerFoe = 5.8, bossTurns = 3.0;
 
 /// The foe in front of you now: its kind, and any shape a shapeshifter has taken.
 FoeType foeIn(GameState s) => formed(encounterType(s.foe, s.rare), s.form);
+
+/// How much more dangerous the foe in front of you is than an even match: 0 an even one, 1
+/// tough (3+ levels above you), 2 deadly (6+). Bosses are their own thing, not counted here.
+int foeMenace(GameState s) {
+  if (!s.inBattle || foeIn(s).boss) return 0;
+  final over = s.foeLevel - s.knight.level;
+  return over >= 6 ? 2 : (over >= 3 ? 1 : 0);
+}
 
 /// A foe's HP, fixed when the fight starts.
 int spawnHp(int foeIndex, int level, [Rare? rare]) {
