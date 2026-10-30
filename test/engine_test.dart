@@ -305,6 +305,19 @@ void main() {
     }
   });
 
+  test('mounted, the fight opens with a free charge, then it\'s on foot', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(9));
+    final s = e.state, k = s.knight;
+    k.mount = mounts.first.id;
+    e.explore();
+    s.foeHp = s.foeMax = 100000;
+    final r = e.openingCharge()!;
+    expect(r.chargeHit, greaterThan(0));
+    expect(s.foeHp, 100000 - r.chargeHit);
+    expect(e.openingCharge(), isNull);
+    expect(e.takeTurn(BattleAction.attack).chargeHit, 0);
+  });
+
   test('the Faceless brace for whatever way you struck them last', () {
     final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(41));
     final s = e.state, k = s.knight..level = 36;
@@ -712,14 +725,15 @@ void main() {
     expect(back.mat(oreKey(Metal.iron)), 1);
   });
 
-  test('Mags brews from reagents: healing draughts for the belt, the rest drunk for a few fights', () {
+  test('Mags brews from reagents, drunk for a few fights (the mending draught heals every turn)', () {
     final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(7));
     final s = e.state, k = s.knight..coins = 1000;
     expect(e.brew(Brew.might), isFalse); // no Ashbloom yet
-    s.reagents[0] = 4;
-    final potions = k.potions;
+    s.reagents[0] = 2;
     expect(e.brew(Brew.healing), isTrue);
-    expect(k.potions, potions + healingDraughts);
+    expect(brewOn(k, Brew.healing), isTrue);
+    expect(e.brew(Brew.might), isFalse); // the Ashbloom went on the mending draught
+    s.reagents[0] = 2;
     expect(e.brew(Brew.might), isTrue);
     expect(brewOn(k, Brew.might), isTrue);
     expect(s.reagents[0], 0);
@@ -731,6 +745,16 @@ void main() {
       }
     }
     expect(brewOn(k, Brew.might), isFalse);
+    // The mending draught gives HP back every turn while it lasts.
+    k.brews[Brew.healing.name] = 2;
+    e.explore();
+    s.foeHp = s.foeMax = 100000;
+    k.hp = maxHp(k) ~/ 2;
+    final r = e.takeTurn(BattleAction.attack);
+    expect(r.regrown, greaterThan(0));
+    while (s.inBattle) {
+      e.takeTurn(BattleAction.flee);
+    }
     // Reaper's Bane keeps you standing once.
     s.reagents[4] = 3;
     expect(e.brew(Brew.reaperbane), isTrue);

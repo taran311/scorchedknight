@@ -1,6 +1,6 @@
 // Mags' apothecary: brews made from the reagents your foes drop (the same herbs, salts and glowing
-// things the wards are made from), for a little gold. Most are drunk there and then and last your
-// next few fights; the healing draught fills your potion belt instead, for drinking mid-fight.
+// things the wards are made from), for a little gold. Each is drunk there and then and lasts your
+// next few fights. (The mending draught heals a little every turn: not a potion in a bottle.)
 // Pure Dart.
 
 import 'catalog.dart';
@@ -18,12 +18,12 @@ const mightBrew = 1.15, arcaneBrew = 1.2, hawkeyeBrew = 1.2, barkskinBrew = .85,
 /// (once, then it's spent).
 const reaperbaneHp = .3;
 
-/// Healing draughts a brew makes.
-const healingDraughts = 2;
+/// The mending draught: a share of your HP back at the end of every turn in a fight.
+const mendingBrew = .04;
 
 extension BrewInfo on Brew {
   String get label => switch (this) {
-    Brew.healing => 'Healing draughts',
+    Brew.healing => 'Mending draught',
     Brew.might => 'Draught of Might',
     Brew.arcane => 'Arcane draught',
     Brew.hawkeye => 'Hawkeye draught',
@@ -34,7 +34,7 @@ extension BrewInfo on Brew {
 
   /// What it does, in a line.
   String get desc => switch (this) {
-    Brew.healing => '$healingDraughts health potions for your belt, to drink mid-fight',
+    Brew.healing => 'Recover ${(mendingBrew * 100).round()}% HP every turn in a fight, for $brewFights fights',
     Brew.might => 'Weapon blows hit +${((mightBrew - 1) * 100).round()}% for $brewFights fights',
     Brew.arcane => 'Rites hit +${((arcaneBrew - 1) * 100).round()}% for $brewFights fights',
     Brew.hawkeye => 'Crossbow shots hit +${((hawkeyeBrew - 1) * 100).round()}% for $brewFights fights',
@@ -45,7 +45,7 @@ extension BrewInfo on Brew {
 
   /// Short, for a status badge.
   String get badge => switch (this) {
-    Brew.healing => 'Healing',
+    Brew.healing => 'Mending',
     Brew.might => 'Might',
     Brew.arcane => 'Arcane',
     Brew.hawkeye => 'Hawkeye',
@@ -80,8 +80,8 @@ extension BrewInfo on Brew {
   /// Mags' fee at [level].
   int fee(int level) => (this == Brew.reaperbane ? 30 : 6) + 2 * level;
 
-  /// Drunk on the spot and lasting [brewFights] fights (everything but the healing draughts).
-  bool get lasting => this != Brew.healing;
+  /// Drunk on the spot and lasting [brewFights] fights (all of them now).
+  bool get lasting => true;
 }
 
 Brew? brewById(String id) => Brew.values.where((b) => b.name == id).firstOrNull;

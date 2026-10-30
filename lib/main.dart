@@ -7,6 +7,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart' show timeDilation;
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'audio/audio.dart';
 import 'services/cloud.dart';
@@ -37,9 +38,27 @@ Future<void> main() async {
     systemNavigationBarColor: Color(0xFF14110D),
     systemNavigationBarIconBrightness: Brightness.light,
   ));
-  // Cloud saves, if this build has Firebase set up (otherwise this quietly does nothing).
-  await CloudSave.instance.init();
+  // Cloud saves, if this build has Firebase set up (otherwise this quietly does nothing); and
+  // every face of the game's fonts, fetched before the first frame. (They used to load as they
+  // were first needed: the title flashed up in a plain font, and the first bold banner or damage
+  // number of a session made the text around it jump as its face arrived mid-fight.)
+  await Future.wait([CloudSave.instance.init(), _fonts()]);
   runApp(const ScorchedKnightApp());
+}
+
+Future<void> _fonts() async {
+  try {
+    for (final w in const [FontWeight.w400, FontWeight.w600, FontWeight.w700, FontWeight.w800, FontWeight.w900]) {
+      GoogleFonts.alegreyaSansSc(fontWeight: w);
+      GoogleFonts.alegreyaSans(fontWeight: w);
+    }
+    GoogleFonts.alegreyaSans(fontStyle: FontStyle.italic);
+    GoogleFonts.alegreyaSans(fontStyle: FontStyle.italic, fontWeight: FontWeight.w700);
+    GoogleFonts.cinzel(fontWeight: FontWeight.w900);
+    GoogleFonts.cinzel(fontWeight: FontWeight.w700);
+    // A slow connection doesn't hold the game up for long: anything still on its way arrives late.
+    await GoogleFonts.pendingFonts().timeout(const Duration(seconds: 5));
+  } catch (_) {}
 }
 
 class ScorchedKnightApp extends StatefulWidget {

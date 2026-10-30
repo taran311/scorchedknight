@@ -192,6 +192,22 @@ class _TrailPageState extends State<TrailPage> {
                           ),
                         ),
                         const SizedBox(height: 10),
+                        // No ward for this land's hazard: say so every time, right here, so a fight
+                        // never takes the HP by surprise.
+                        if (s.hazardIn(land)) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                            decoration: BoxDecoration(color: const Color(0x33E0A070), borderRadius: BorderRadius.circular(4), border: Border.all(color: const Color(0xFFE0A070))),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.warning_amber, color: Color(0xFFE0A070), size: 20),
+                                const SizedBox(width: 8),
+                                Expanded(child: Text('${l.hazard}: −${(hazardShare * 100).round()}% HP a turn. Old Wick\'s ${l.ward} stops it.', style: Txt.label(size: 13.5, color: const Color(0xFFFFD0A0)))),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                        ],
                         if (c.wildHint(land) case final a?) ...[
                           _GearUp(
                             area: wildAreas[a],

@@ -223,7 +223,10 @@ class _BattleScreenState extends State<BattleScreen> {
       listenable: c,
       builder: (context, _) {
         final s = c.state, foe = c.shownFoeType, land = continents[realmAt(c.shownRare?.base ?? c.shownFoe)];
-        final lines = s.journal.length > _journalFrom ? s.journal.sublist(_journalFrom) : const <JournalEntry>[];
+        // Mid-turn, the log waits for the stage: it stops where the turn began.
+        final held = c.logHeldAt == null ? -1 : s.journal.indexOf(c.logHeldAt!);
+        final upTo = c.busy && c.logHeldAt != null && held >= 0 ? held + 1 : s.journal.length;
+        final lines = upTo > _journalFrom ? s.journal.sublist(_journalFrom, upTo) : const <JournalEntry>[];
         final over = c.outcome != null;
         if (!c.busy && _queued != null) {
           final go = _queued!;

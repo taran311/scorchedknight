@@ -5,7 +5,10 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../art/body.dart';
 import '../art/looks.dart';
+import '../art/poses.dart';
+import '../art/rig.dart';
 import '../game/classes.dart';
 import '../game/loot.dart';
 import '../game/models.dart';
@@ -66,8 +69,32 @@ class ArmouryPreview extends StatelessWidget {
     );
   }
 
+  /// ?armoury&weapons: every weapon in the knight's hand, plainly lit (not a silhouette), at
+  /// rest and (with &ms=320) at the moment the swing lands, to check which way each one faces.
+  Widget _allWeapons() {
+    final ms = double.tryParse(Uri.base.queryParameters['ms'] ?? '');
+    final arts = [for (final w in Weapon.values) if (w != Weapon.none) w.name];
+    return Scaffold(
+      backgroundColor: const Color(0xFF6A5E52),
+      body: GridView.count(
+        crossAxisCount: int.tryParse(Uri.base.queryParameters['cols'] ?? '') ?? 8,
+        childAspectRatio: .8,
+        children: [
+          for (final a in arts)
+            Column(
+              children: [
+                Expanded(child: CustomPaint(size: Size.infinite, painter: _Holding(a, ms))),
+                Text(a, style: Txt.label(size: 11, color: Palette.cream)),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (Uri.base.queryParameters.containsKey('weapons')) return _allWeapons();
     if (Uri.base.queryParameters.containsKey('new')) return _newKit();
     final tiers = [for (final t in tiersFor(HeroClass.knight)) if (!t.dropOnly) t];
     final relic = LootTable(math.Random(1)).relicWeapon(0, 10, HeroClass.knight);
@@ -105,4 +132,29 @@ class ArmouryPreview extends StatelessWidget {
       ),
     );
   }
+}
+
+class _Holding extends CustomPainter {
+  _Holding(this.art, this.ms);
+  final String art;
+  final double? ms;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final item = GearItem(id: art, name: art, slot: GearSlot.weapon, art: art, rarity: Rarity.epic, level: 20, heroClass: HeroClass.knight, value: 0, stats: const {});
+    final l = Loadout.starter(HeroClass.knight)
+      ..armour = 'plate'
+      ..weapon = item;
+    final look = lookFor(HeroClass.knight, l);
+    final b = builds[look.build]!;
+    final idle = idlePose(look.stance, 0, still: true);
+    final pose = ms == null ? idle : (sampleClip(idle, swingClip, ms!) ?? idle);
+    canvas.save();
+    canvas.clipRect(Offset.zero & size);
+    drawHumanoid(canvas, look, pose, 0, DrawOptions(at: Offset(size.width * .42, size.height * .92), scale: size.height * .62 / b.height), still: true);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_Holding old) => false;
 }

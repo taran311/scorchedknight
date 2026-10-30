@@ -34,6 +34,12 @@ class EnterEvent extends StageEvent {
   final String? banner;
 }
 
+/// Mounted: the free charge that opens the fight, once the foe has walked in.
+class ChargeEvent extends StageEvent {
+  ChargeEvent(this.result);
+  final SwingResult result;
+}
+
 /// A new adventure started: the stage drops any animation still playing.
 class ResetEvent extends StageEvent {}
 
@@ -425,13 +431,35 @@ class GameController extends ChangeNotifier {
             : null,
       ),
     );
+    _openingCharge();
     notifyListeners();
+  }
+
+  /// Mounted: ride the foe down as it arrives (the stage plays it after the entrance, and your
+  /// turn waits for it).
+  bool _charging = false;
+  void _openingCharge() {
+    final before = state.journal.lastOrNull;
+    final r = engine.openingCharge();
+    if (r == null) return;
+    logHeldAt = before;
+    _charging = true;
+    lastSwing = r;
+    _save();
+    _emit(ChargeEvent(r));
   }
 
   /// Called by the stage once the foe has walked in.
   void foeArrived() {
+    if (_charging) return;
     busy = false;
     notifyListeners();
+  }
+
+  /// Called by the stage when the opening charge has played.
+  void chargeFinished(SwingResult r) {
+    _charging = false;
+    swingFinished(r);
   }
 
   /// A fight left open when the app closed: show it as it was, ready for your turn.
@@ -441,10 +469,15 @@ class GameController extends ChangeNotifier {
     // It walks back on (the stage calls foeArrived when it's in place).
     busy = true;
     _emit(EnterEvent(shownFoeType, null));
+    _openingCharge();
     notifyListeners();
   }
 
   // ---- a turn ----
+
+  /// While a turn plays out, the battle log stops at this entry: what happened shows once the
+  /// stage has shown it, not before (it used to tell you the foe's blow before it was thrown).
+  JournalEntry? logHeldAt;
 
   String? whyNot(BattleAction a) => engine.whyNot(a);
 
@@ -452,6 +485,7 @@ class GameController extends ChangeNotifier {
   void act(BattleAction a, {double aim = 1}) {
     if (busy || !state.inBattle || whyNot(a) != null) return;
     busy = true;
+    logHeldAt = state.journal.lastOrNull;
     _heldHeroHp = state.knight.hp;
     final r = engine.takeTurn(a, aim: aim);
     if (r.counter == null && !r.knockedOut) _heldHeroHp = null;
@@ -501,6 +535,8 @@ class GameController extends ChangeNotifier {
 
   /// Called by the stage when the turn's animation ends.
   void swingFinished(SwingResult r) {
+    // A kill keeps the log held until the foe has fallen (killFinished).
+    if (r.kill == null) logHeldAt = null;
     _heldHeroHp = null;
     shownSummons = state.summons;
     if (r.kill != null) {
@@ -523,6 +559,7 @@ class GameController extends ChangeNotifier {
   /// Called by the stage once the defeated foe has fallen.
   void killFinished() {
     busy = false;
+    logHeldAt = null;
     lastKill = lastSwing?.kill;
     outcome = Outcome.won;
     notifyListeners();

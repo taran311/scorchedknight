@@ -400,6 +400,10 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         }
       case KillEvent(:final kill):
         _playKill(kill);
+      case ChargeEvent(:final result):
+        // Mounted: you ride it down as it squares up, then swing down off the saddle to fight.
+        final d0 = _playCharge(result);
+        _at(d0 + 1260, () => c.chargeFinished(result));
       case EnterEvent(:final foe, :final banner):
         // The entrance: the foe charges in from the right with its name up, skids to a stop in a
         // puff of dust, and squares up. Your turn opens as it lands, so the wait IS the entrance.
@@ -777,7 +781,8 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     _tween('zoom', 0, 380, delay: 90);
   }
 
-  void _playCharge(SwingResult r) {
+  /// The mounted charge; returns when its timeline starts.
+  double _playCharge(SwingResult r) {
     final d0 = _slot(1250), m = r.mount!;
     _at(d0, () {
       _riding = m;
@@ -800,6 +805,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       fx['charge'] = 0;
       _riding = null;
     });
+    return d0;
   }
 
   void _playSwing(SwingResult r) {
@@ -824,8 +830,12 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     final nEffects = [r.damage.poison, r.damage.burn, r.damage.frost, r.damage.smite].where((n) => n > 0).length;
     final dragonFire = (r.dragon != null && r.dragon!.name != 'Egg') || r.pet != null;
     // The foe's turn comes once your blow, its effects and any dragon fire have landed.
-    final counterAt = math.max(hitAt + 160 * nEffects + 440, dragonFire ? hitAt + 760.0 : 0.0);
-    final end = [950.0, hitAt + 160 * nEffects + 60, if (dragonFire) hitAt + 580, if (r.counter != null) counterAt + 760, if (r.knockedOut || r.cheatedDeath) counterAt + strikeMs + _reapMs].reduce(math.max);
+    // Everyone takes their turn at it in order: your blow, then the hound's bite, then the
+    // summoned dead. The foe answers once the last of them has landed.
+    final hound = r.pet != null && r.pet!.$1 != Pet.fairy;
+    final houndAt = hitAt + 250, bonesAt = hitAt + (hound ? 800 : 120);
+    final counterAt = [hitAt + 160 * nEffects + 440, if (dragonFire) hitAt + 760.0, if (hound) houndAt + 820, if (r.summonHit > 0) bonesAt + swingHitMs + 300].reduce(math.max);
+    final end = [950.0, hitAt + 160 * nEffects + 60, if (dragonFire) hitAt + 580, if (hound) houndAt + 1060, if (r.summonHit > 0) bonesAt + swingHitMs + 420, if (r.counter != null) counterAt + 760, if (r.knockedOut || r.cheatedDeath) counterAt + strikeMs + _reapMs].reduce(math.max);
     // Mounted: the day's first strike opens with a charge, played before the blow.
     if (r.chargeHit > 0 && r.mount != null) _playCharge(r);
     final d0 = _slot(end);
@@ -866,13 +876,13 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       });
     }
     if (r.summonHit > 0) {
-      // The summoned dead rush in after your blow, slash, and fall back.
-      _at(d0 + hitAt + 120, () {
+      // The summoned dead rush in after your blow (and the hound's), slash, and fall back.
+      _at(d0 + bonesAt, () {
         _bonesAt = now;
         _tween('bones', 1, 260, ease: easeOut);
         _tween('bones', 0, 380, delay: 620);
       });
-      _at(d0 + hitAt + 120 + swingHitMs, () {
+      _at(d0 + bonesAt + swingHitMs, () {
         _spark('curse', _foeChest + const Offset(-30, 30), 8, speed: 3, life: 450, radius: 3);
         _mark('${r.summonHit}', const [Color(0xFFC89AFF), Color(0xFF5A2E7A)], _foeChest + const Offset(-60, 60));
         c.revealDamage(r.summonHit);
@@ -1082,7 +1092,10 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     final pet = r.pet;
     if (pet != null && pet.$1 == Pet.fairy) {
       // The fairy darts to the foe, stings, and flits back; now and then it weaves a charm.
-      _at(d0 + swingHitMs + hitOffset + 60, () => _tween('pounce', 1, 700, ease: (p) => p));
+      _at(d0 + swingHitMs + hitOffset + 60, () {
+        fx['pounce'] = 0;
+        _tween('pounce', 1, 700, ease: (p) => p);
+      });
       _at(d0 + swingHitMs + hitOffset + 380, () {
         _spark('fae', _foeChest + const Offset(-10, -30), 14, speed: 2.5, life: 700, radius: 3, lift: 1.2, gravity: -.01);
         _mark('${r.damage.chip}', _holy, _foeChest + const Offset(26, 32));
@@ -1105,16 +1118,21 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       }
       _at(d0 + swingHitMs + hitOffset + 780, () => fx['pounce'] = 0);
     } else if (pet != null) {
-      // The hound sprints across, bites, and lopes back.
-      _at(d0 + swingHitMs + hitOffset + 60, () => _tween('pounce', 1, 1000, ease: (p) => p));
-      _at(d0 + swingHitMs + hitOffset + 540, () {
+      // Once your blow has landed, the hound sprints across, bites, and lopes back. (It starts
+      // from 0 every time: a slow frame on a phone could leave it parked at the end of its last
+      // run, and then it never left your heel again.)
+      _at(d0 + houndAt, () {
+        fx['pounce'] = 0;
+        _tween('pounce', 1, 1000, ease: (p) => p);
+      });
+      _at(d0 + houndAt + 480, () {
         _spark(pet.$1 == Pet.hellhound ? 'fire' : 'blood', _foeChest + const Offset(-30, 40), 8, speed: 3, life: 500, radius: pet.$1 == Pet.hellhound ? 8 : 3);
         _mark('${r.damage.chip}', pet.$1 == Pet.hellhound ? _orange : _red, _foeChest + const Offset(26, 32));
         _tween('flash', .6, 50);
         _tween('flash', 0, 250, delay: 50);
         c.revealDamage(r.damage.chip);
       });
-      _at(d0 + swingHitMs + hitOffset + 1080, () => fx['pounce'] = 0);
+      _at(d0 + houndAt + 1060, () => fx['pounce'] = 0);
     }
     _playCounter(r, d0 + counterAt);
     _at(d0 + end + (r.reflected > 0 ? 240 : 0), () => c.swingFinished(r));
@@ -1144,7 +1162,10 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
             // (It leans into the shot, so you can see who loosed it.)
             _tween('lunge', .4, 120, ease: easeOut);
             _tween('lunge', 0, 300, delay: strikeMs);
-            _at(strikeMs - 170, () => _shots.add(_Projectile('arrow', _foeChest + const Offset(-30, -10), to, now, 170, const Color(0x00000000))));
+            // (A bandit with a dagger throws knives, spinning; bows and spears loose an arrow or a
+            // javelin.)
+            final knives = foeLooks[_foe.look]?.weapon == Weapon.dagger;
+            _at(strikeMs - 170, () => _shots.add(_Projectile(knives ? 'knife' : 'arrow', _foeChest + const Offset(-30, -10), to, now, 170, const Color(0x00000000))));
           case Strike.magic:
             // A caster hurls a bolt of dark magic.
             _spark('curse', _foeChest + const Offset(-30, -30), 8, speed: 2, life: 400, radius: 3, gravity: 0);
@@ -1412,6 +1433,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         break;
     }
     _playLingering(r, d0 + act - 120);
+    if (r.regrown > 0) _at(d0 + act + tail + 120, () => _mark('+${r.regrown}', _green, const Offset(_knightX + 10, _groundY - 250)));
     if (r.counter != null) _playCounter(r, d0 + act);
     _at(d0 + act + tail + 300, () => c.swingFinished(r));
   }
@@ -1420,7 +1442,10 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   void _playCommand(SwingResult r, double d0) {
     final pet = r.pet, ds = r.dragon;
     if (pet != null && pet.$1 == Pet.fairy) {
-      _at(d0, () => _tween('pounce', 1, 700, ease: (p) => p));
+      _at(d0, () {
+        fx['pounce'] = 0;
+        _tween('pounce', 1, 700, ease: (p) => p);
+      });
       _at(d0 + 320, () {
         _spark('fae', _foeChest + const Offset(-10, -30), 22, speed: 3, life: 800, radius: 3.4, lift: 1.4, gravity: -.01);
         final charm = r.charm;
@@ -1437,6 +1462,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     if (pet != null) {
       _at(d0, () {
         _banner = ('Pounce!', pet.$1 == Pet.hellhound ? const Color(0xFFFF8A3A) : const Color(0xFFE8E2D0), now);
+        fx['pounce'] = 0;
         _tween('pounce', 1, 1000, ease: (p) => p);
       });
       _at(d0 + 480, () {
@@ -1838,7 +1864,7 @@ class _ScenePainter extends CustomPainter {
     if (pet != null && pet.$1 == Pet.fairy) {
       // A fairy hovering at your shoulder; it darts to the foe when it strikes.
       final p = fx['pounce']!, stage = petStages[pet.$1]!.indexOf(pet.$2);
-      final home = Offset(_knightX - 60 + (still ? 0 : math.sin(t / 700) * 10), _groundY - 210 + (still ? 0 : math.sin(t / 260) * 6));
+      final home = Offset(_knightX - 60 - fx['flee']! * 520 + (still ? 0 : math.sin(t / 700) * 10), _groundY - 210 + (still ? 0 : math.sin(t / 260) * 6));
       final away = s._foeChest + const Offset(-40, -40);
       final k2 = _outAndBack(p);
       drawFairy(canvas, Offset.lerp(home, away, k2)!, stage, t, still: still);
@@ -1847,8 +1873,16 @@ class _ScenePainter extends CustomPainter {
       final p = fx['pounce']!, stage = petStages[pet.$1]!.indexOf(pet.$2);
       // Out to the foe's feet, a moment there for the bite, then back to your heel. (Its heel
       // spot sits inside the strip a phone shows: further left, it was off the edge of the screen.)
-      final x = 165 + (_foeX - 80 - 165) * _outAndBack(p);
-      drawHound(canvas, pet.$1 == Pet.hellhound ? hellhoundLook : wolfLook, Offset(x, _groundY + 4), .7 + stage * .17, t, pounce: p, still: still);
+      // When you run, it runs with you (it used to stay behind, alone with the foe).
+      final run = fx['flee']!;
+      final x = 195 + (_foeX - 80 - 195) * _outAndBack(p) - run * 520;
+      if (run > .15) {
+        canvas.save();
+        canvas.translate(2 * x, 0);
+        canvas.scale(-1, 1);
+      }
+      drawHound(canvas, pet.$1 == Pet.hellhound ? hellhoundLook : wolfLook, Offset(x, _groundY + 4), .7 + stage * .17, t, pounce: run > .15 ? .02 + (t / 900) % .1 : p, still: still);
+      if (run > .15) canvas.restore();
     } else if (ds != null) {
       if (ds.name == 'Egg') {
         drawEgg(canvas, const Offset(128, _groundY - 2));
@@ -2465,7 +2499,7 @@ class _ScenePainter extends CustomPainter {
     if (screen > .005) canvas.drawRect(Offset.zero & sceneSize, Paint()..color = const Color(0xFFFFF6E0).withValues(alpha: screen));
 
     for (final m in s._marks) {
-      _tag(canvas, m, (t - m.start) / 1000);
+      _tag(canvas, m, (t - m.start) / 1000, left, left + visibleW);
     }
     final banner = s._banner;
     if (banner != null) {
@@ -2642,7 +2676,9 @@ class _ScenePainter extends CustomPainter {
     );
   }
 
-  void _tag(Canvas canvas, _Mark m, double age) {
+  /// A damage number or word, kept inside the strip of the scene that's on screen ([minX] to
+  /// [maxX]): on a phone, tags by a big foe's chest used to run off the right-hand edge.
+  void _tag(Canvas canvas, _Mark m, double age, double minX, double maxX) {
     if (age < 0 || age > 1) return;
     final scale = age < .12
         ? .6 + age / .12 * .52
@@ -2663,8 +2699,9 @@ class _ScenePainter extends CustomPainter {
       textDirection: TextDirection.ltr,
     )..layout());
     final w = math.max(54.0, tp.width + 22), h = 38.0;
+    final x = m.pos.dx.clamp(math.min(minX + w * .56 + 6, (minX + maxX) / 2), math.max(maxX - w * .56 - 6, (minX + maxX) / 2)).toDouble();
     canvas.save();
-    canvas.translate(m.pos.dx, m.pos.dy - rise);
+    canvas.translate(x, math.max(m.pos.dy, h * .6) - rise);
     canvas.scale(scale);
     final path = poly([
       Offset(-w / 2 + w * .12, -h / 2),

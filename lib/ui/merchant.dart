@@ -73,7 +73,8 @@ class _Shop {
     mainAxisSize: MainAxisSize.min,
     children: [
       icon,
-      Text(need == null ? ' $n' : ' $n/$need', style: Txt.label(size: 13, color: need == null ? Palette.cream : (n >= need ? ok : short))),
+      // Gold reads as a price ("46"), not as "5000/46"; materials as have/need ("0/2").
+      Text(need == null ? ' $n' : (icon is ItemIcon && icon.item == Item.coins ? ' $need' : ' $n/$need'), style: Txt.label(size: 13, color: need == null ? Palette.cream : (n >= need ? ok : short))),
     ],
   );
 

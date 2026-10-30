@@ -121,8 +121,7 @@ void inTown(GameEngine e, Run run) {
   }
   // Mags' brews from what's left.
   for (final b in Brew.values) {
-    if (b == Brew.healing && k.potions >= 4) continue;
-    if (b != Brew.healing && brewOn(k, b)) continue;
+    if (brewOn(k, b)) continue;
     if (e.brew(b)) run.seen.add('brew:${b.name}');
   }
   // Dunstan: smelt everything, forge the best armour the bars allow.

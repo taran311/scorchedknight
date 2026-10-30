@@ -44,7 +44,7 @@ class _HeroPageState extends State<HeroPage> {
     final tabs = <(_Tab, IconData, String)>[
       (_Tab.gear, Icons.shield, unspentPoints(k) > 0 ? 'Gear · +${unspentPoints(k)}' : 'Gear'),
       (_Tab.rites, Icons.local_fire_department, 'Rites'),
-      if (hasFriends) (_Tab.companions, Icons.pets, 'Companions'),
+      if (hasFriends) (_Tab.companions, Icons.pets, 'Allies'),
       (_Tab.satchel, Icons.backpack, 'Satchel'),
       (_Tab.home, Icons.cottage, 'Home'),
       (_Tab.journey, Icons.map, 'Journey'),

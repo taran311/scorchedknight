@@ -585,7 +585,7 @@ const _epicWords = {'Ancient', 'Runed', 'Masterwork', 'Storied'};
 String shortGearName(String name, [GearSlot? slot]) {
   // A word for a stat the piece no longer has ("Gilded" boots, a "Venomous" shield) goes too.
   final jewel = slot == GearSlot.ring || slot == GearSlot.trinket, weapon = slot == GearSlot.weapon;
-  final gone = {if (slot != null && !jewel) ...{'Gilded', 'Sage'}, if (slot != null && !weapon) ...{'Venomous', 'Searing', 'Frostbitten', 'Wyrmbound'}};
+  final gone = {if (slot != null && !jewel) ...{'Gilded', 'Sage'}, if (slot != null && !weapon) ...{'Venomous', 'Searing', 'Frostbitten'}};
   var words = name.split(' ').where((w) => !_epicWords.contains(w) && !gone.contains(w)).toList();
   if (words.isEmpty) return name;
   words[0] = '${words[0][0].toUpperCase()}${words[0].substring(1)}';

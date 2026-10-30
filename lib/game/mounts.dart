@@ -25,12 +25,12 @@ class Mount {
 }
 
 const mounts = <Mount>[
-  Mount('pony', 'Sturdy pony', 'Small, stubborn and surprisingly brave. Opens every fight with a free charge: +30% on your first blow', .3, price: 180),
-  Mount('warhorse', 'Warhorse', 'A barded destrier trained for the lists. Opens every fight with a free charge: +50% on your first blow', .5, price: 700),
-  Mount('unicorn', 'Unicorn', 'Tamed in the Thornwild, very politely. Opens every fight with a free charge: +55% on your first blow, and its horn mends 8% of your health', .55, mend: .08),
-  Mount('nightmare', 'Nightmare', 'A ghostly black horse from the Bone Colossus\'s ribcage. It snorts embers. Opens every fight with a free charge: +60% on your first blow, and the foe burns', .6, burn: true),
-  Mount('wyvern', 'Tamed wyvern', 'It swoops rather than gallops, and it bites. Opens every fight with a free charge: +65% on your first blow', .65, flying: true),
-  Mount('griffin', 'Griffin', 'Raised from a chick won in the Skyreach Aeries. It dives out of the sun with its talons out. Opens every fight with a free charge: +70% on your first blow', .7, flying: true),
+  Mount('pony', 'Sturdy pony', 'Small, stubborn and surprisingly brave. Opens every fight by riding the foe down: a free charge worth 30% of a blow', .3, price: 180),
+  Mount('warhorse', 'Warhorse', 'A barded destrier trained for the lists. Opens every fight by riding the foe down: a free charge worth 50% of a blow', .5, price: 700),
+  Mount('unicorn', 'Unicorn', 'Tamed in the Thornwild, very politely. Opens every fight by riding the foe down: a free charge worth 55% of a blow, and its horn mends 8% of your health', .55, mend: .08),
+  Mount('nightmare', 'Nightmare', 'A ghostly black horse from the Bone Colossus\'s ribcage. It snorts embers. Opens every fight by riding the foe down: a free charge worth 60% of a blow, and the foe burns', .6, burn: true),
+  Mount('wyvern', 'Tamed wyvern', 'It swoops rather than gallops, and it bites. Opens every fight by riding the foe down: a free charge worth 65% of a blow', .65, flying: true),
+  Mount('griffin', 'Griffin', 'Raised from a chick won in the Skyreach Aeries. It dives out of the sun with its talons out. Opens every fight by riding the foe down: a free charge worth 70% of a blow', .7, flying: true),
 ];
 
 Mount? mountById(String? id) => mounts.where((m) => m.id == id).firstOrNull;

@@ -23,8 +23,39 @@ import 'theme.dart';
 class BestiaryPreview extends StatelessWidget {
   const BestiaryPreview({super.key});
 
+  /// ?bestiary&check: every foe whose art and the way it attacks disagree (a bow but a melee
+  /// lunge, a caster with a sword...), as a list.
+  Widget _check() {
+    final out = <String>[];
+    final seen = <String>{};
+    for (final (i, land) in continents.indexed) {
+      for (final f in [...land.foes, land.boss]) {
+        if (!seen.add('${f.look}|${f.name}')) continue;
+        final look = foeLooks[f.look];
+        if (look == null) continue;
+        final w = look.weapon;
+        final shoots = w.isBow || w.isThrown || w.isGun || w == Weapon.crossbow || w == Weapon.handcrossbow;
+        final casts = w.isStaff || const {Weapon.wand, Weapon.orb, Weapon.tome, Weapon.sceptre, Weapon.crystalstaff}.contains(w);
+        final issues = <String>[
+          if (shoots && f.strike != Strike.arrow) 'holds a ${w.name} but attacks ${f.strike.name}',
+          if (f.strike == Strike.arrow && !shoots) 'shoots arrows holding ${w.name}',
+          if (f.strike == Strike.magic && !casts && w != Weapon.none) 'casts holding ${w.name}',
+          if (f.kind == FoeKind.ranged && f.strike != Strike.arrow) 'archer kind, ${f.strike.name} attack',
+          if (f.kind == FoeKind.caster && f.strike != Strike.magic && f.strike != Strike.fire) 'caster kind, ${f.strike.name} attack',
+          if (casts && f.strike == Strike.melee && f.kind != FoeKind.caster) 'staff/wand but melee (${f.kind.name})',
+        ];
+        if (issues.isNotEmpty) out.add('$i ${land.name} · ${f.name} [${f.look}]: ${issues.join('; ')}');
+      }
+    }
+    return Scaffold(
+      backgroundColor: const Color(0xFF15100C),
+      body: ListView(padding: const EdgeInsets.all(12), children: [for (final l in out.isEmpty ? ['All consistent'] : out) SelectableText(l, style: const TextStyle(color: Colors.white, fontSize: 13))]),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (Uri.base.queryParameters.containsKey('check')) return _check();
     final entries = <(String, void Function(Canvas, Size))>[];
     // The knight in every armour, hero and heroine.
     for (final female in Uri.base.queryParameters.containsKey('foes') ? const <bool>[] : [false, true]) {

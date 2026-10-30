@@ -185,9 +185,7 @@ void run(String style, int seed, Stats st, {void Function(GameEngine e, int land
           if (e.brew(b)) brewed[b] = (brewed[b] ?? 0) + 1;
         }
       }
-      while (k.potions < 4 && e.brew(Brew.healing)) {
-        brewed[Brew.healing] = (brewed[Brew.healing] ?? 0) + 1;
-      }
+      if (!brewOn(k, Brew.healing) && e.brew(Brew.healing)) brewed[Brew.healing] = (brewed[Brew.healing] ?? 0) + 1;
     }
     var c = s.unlocked;
     while (c > 0 && e.whyNotTravel(c) != null) {

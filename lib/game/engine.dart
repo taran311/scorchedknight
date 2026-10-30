@@ -1467,6 +1467,34 @@ class GameEngine {
   }
 
   /// Takes your turn, then (if it's still standing and you're still here) the foe's.
+  /// Mounted, a fight opens with a free charge as the foe arrives: you ride it down, then get
+  /// off and fight on foot. Null with no mount (or once it's been made this fight).
+  SwingResult? openingCharge() {
+    if (!state.inBattle || state.charged || mountById(state.knight.mount) == null) return null;
+    final r = SwingResult(BattleAction.attack, const SwingDamage(), true, state.knight.heroClass);
+    _charge(r);
+    r.kill = _checkKill();
+    return r;
+  }
+
+  void _charge(SwingResult r) {
+    final k = state.knight, mount = mountById(k.mount), foe = foeIn(state), foeName = foe.name;
+    if (state.charged || mount == null) return;
+    state.charged = true;
+    var hit = (fullSwing(k) * mount.charge).round();
+    if (mount.burn) hit += (foe.demon ? 1 : 2) * k.level;
+    state.foeHp -= hit;
+    r
+      ..chargeHit = hit
+      ..mount = mount;
+    _note(mount.flying ? 'Your ${mount.name.toLowerCase()} swoops down on $foeName for $hit!' : 'You charge on your ${mount.name.toLowerCase()} and run $foeName down for $hit!', EntryKind.damage);
+    if (mount.mend > 0) {
+      final before = k.hp;
+      k.hp = math.min(maxHp(k), k.hp + (maxHp(k) * mount.mend).round());
+      r.mended += k.hp - before;
+    }
+  }
+
   SwingResult takeTurn(BattleAction action, {double aim = 1}) {
     assert(state.inBattle);
     final k = state.knight, foe = foeIn(state), foeName = foe.name;
@@ -1543,23 +1571,8 @@ class GameEngine {
     final r = SwingResult(action, d, miss || dodged || !striking, k.heroClass, aim: shooting ? aim : 1, edge: reach * edge * _quirk(foe, melee, shooting, casting, cast));
     if (bash) state.skillWait = skillCooldown + 1;
 
-    // The mount's opening charge, on your first attack of the fight.
-    final mount = mountById(k.mount);
-    if (striking && !state.charged && mount != null) {
-      state.charged = true;
-      var hit = (fullSwing(k) * mount.charge).round();
-      if (mount.burn) hit += (foe.demon ? 1 : 2) * k.level;
-      state.foeHp -= hit;
-      r
-        ..chargeHit = hit
-        ..mount = mount;
-      _note(mount.flying ? 'Your ${mount.name.toLowerCase()} swoops down on $foeName for $hit!' : 'You charge on your ${mount.name.toLowerCase()} and run $foeName down for $hit!', EntryKind.damage);
-      if (mount.mend > 0) {
-        final before = k.hp;
-        k.hp = math.min(maxHp(k), k.hp + (maxHp(k) * mount.mend).round());
-        r.mended += k.hp - before;
-      }
-    }
+    // The mount's opening charge, if it didn't already come as the foe arrived.
+    if (striking) _charge(r);
 
     switch (action) {
       case BattleAction.potion:
@@ -1623,6 +1636,8 @@ class GameEngine {
         r.offhandHit = o;
         _note('Your off-hand ${k.loadout.activeOffhand!.name.toLowerCase()} strikes for $o.', EntryKind.damage);
       }
+      // Your companion goes in next, then the summoned dead (the order the fight plays them).
+      _bite(r);
       // Summoned skeletons strike with you until their time is up.
       if (state.summons > 0) {
         final hit = state.summons * summonHit(k.level);
@@ -1637,7 +1652,6 @@ class GameEngine {
           _note('Your summoned dead crumble back into the earth.');
         }
       }
-      _bite(r);
     }
     _burnAndVenom(r, foe, foeName);
     r.kill = _checkKill();
@@ -1659,7 +1673,10 @@ class GameEngine {
       final before = k.hp;
       k.hp = math.max(1, k.hp - hurt);
       r.hazard = before - k.hp;
-      if (r.hazard > 0) _note('${continents[land].hazard}: −${r.hazard} HP. ${continents[land].hazardText}; Old Wick could craft a ${continents[land].ward}.', EntryKind.damage);
+      // The why (and the cure) once a fight; after that, just the bite.
+      if (r.hazard > 0) {
+        _note(state.turn <= 1 ? '${continents[land].hazard}: −${r.hazard} HP. ${continents[land].hazardText}; Old Wick could craft a ${continents[land].ward}.' : '${continents[land].hazard}: −${r.hazard} HP.', EntryKind.damage);
+      }
     }
     // Poison in you: it eats at you every turn till it runs out or a potion cures it (it never
     // knocks you out on its own).
@@ -1677,11 +1694,17 @@ class GameEngine {
       r.regrew = state.foeHp - before;
       _note('$foeName\'s wounds close over (+${r.regrew}). Fire would stop that.');
     }
+    // A mending draught: a little HP back every turn, while it lasts.
+    if (state.inBattle && k.hp > 0 && k.hp < maxHp(k) && brewOn(k, Brew.healing)) {
+      final before = k.hp;
+      k.hp = math.min(maxHp(k), k.hp + math.max(1, (maxHp(k) * mendingBrew).round()));
+      r.regrown += k.hp - before;
+    }
     // The full Sunscale set: under half health, you regrow too.
     if (state.inBattle && k.hp > 0 && k.hp < maxHp(k) / 2 && activeSets(k.gear).any((e) => e.$1.regrowth && e.$2 >= 3)) {
       final before = k.hp;
       k.hp = math.min(maxHp(k), k.hp + (maxHp(k) * regrowthHeal).round());
-      r.regrown = k.hp - before;
+      r.regrown += k.hp - before;
     }
     // The wolf goes back in when its time is up.
     if (state.wolfTurns > 0 && !r.wolfed && striking) {
@@ -3359,10 +3382,7 @@ class GameEngine {
     final k = state.knight, fee = b.fee(k.level);
     state.reagents[b.land] -= b.reagents;
     k.coins -= fee;
-    if (b == Brew.healing) {
-      _givePotions(healingDraughts);
-      _note('Mags boils ${b.reagents} ${b.ingredient} down into $healingDraughts health potions ($fee gold).', EntryKind.gold);
-    } else {
+    {
       k.brews[b.name] = b == Brew.reaperbane ? 1 : brewFights;
       _note(b == Brew.reaperbane
           ? 'Mags grinds the tomb salt, mutters something over it and makes you drink it all. It tastes of dust and coins. Reaper\'s Bane: the next blow that would fell you won\'t ($fee gold).'
