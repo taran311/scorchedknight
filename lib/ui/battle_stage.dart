@@ -130,6 +130,15 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   /// What the foe is saying, in a speech bubble: (the line, when it was said, how long it shows).
   (String, double, double)? _bubble;
 
+  /// The last thing that went wrong drawing the fight (or in one of its animation steps), shown in
+  /// small red print over the stage so it can be read off a phone. Null when all is well.
+  String? _faultText;
+  void _fault(String where, Object e, StackTrace st) {
+    final lines = st.toString().split('\n').where((l) => l.contains('package:scorchedknight')).take(3).map((l) => l.replaceAll(RegExp(r'^#\d+\s+'), '').replaceAll('package:scorchedknight/', '')).join(' | ');
+    _faultText = '$where: $e  @ $lines';
+    debugPrint('[stage fault] $_faultText');
+  }
+
   /// Where the speech bubble was put (so damage numbers keep clear of it).
   Rect? _bubbleBox;
   bool _bubbleByBanner = false;
@@ -1649,7 +1658,12 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     final due = _schedule.where((s) => s.$1 <= t).toList();
     _schedule.removeWhere((s) => s.$1 <= t);
     for (final s in due) {
-      s.$2();
+      try {
+        s.$2();
+      } catch (e, st) {
+        // One step of an animation failing must never stall the rest (and says what it was).
+        _fault('step', e, st);
+      }
     }
     for (final w in List.of(_tweens)) {
       if (t < w.start || !_tweens.contains(w)) continue;
@@ -1841,6 +1855,27 @@ class _ScenePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    final depth = canvas.getSaveCount();
+    try {
+      _paint(canvas, size);
+    } catch (e, st) {
+      // Something in the frame failed: put the canvas back as it was and say what, rather than
+      // leave half a picture (on Android, that left the Reaper on screen and the fighters gone).
+      canvas.restoreToCount(depth);
+      s._fault('paint', e, st);
+    }
+    final fault = s._faultText;
+    if (fault != null) {
+      final tp = TextPainter(
+        text: TextSpan(text: fault, style: const TextStyle(color: Color(0xFFFF6A5A), fontSize: 10, backgroundColor: Color(0xCC000000))),
+        textDirection: TextDirection.ltr,
+        maxLines: 6,
+      )..layout(maxWidth: size.width - 8);
+      tp.paint(canvas, const Offset(4, 4));
+    }
+  }
+
+  void _paint(Canvas canvas, Size size) {
     final watch = _perf.contains('t') || tracing ? (Stopwatch()..start()) : null;
     final t = s.now, c = s.c, still = s._reduceMotion, fx = s.fx;
     final k = c.state.knight;
