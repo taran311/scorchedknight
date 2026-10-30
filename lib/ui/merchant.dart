@@ -704,7 +704,7 @@ Future<void> _showShop(BuildContext context, GameController c, {required String 
             ),
             Flexible(
               child: SingleChildScrollView(
-                child: ListenableBuilder(listenable: c, builder: (context, _) => wares()),
+                child: RepaintBoundary(child: ListenableBuilder(listenable: c, builder: (context, _) => wares())),
               ),
             ),
             const SizedBox(height: 10),

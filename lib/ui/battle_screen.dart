@@ -54,6 +54,10 @@ class _BattleScreenState extends State<BattleScreen> {
   /// A fight in a dungeon room: afterwards it's back to the doors.
   late final bool _dungeon = widget.start == BattleStart.dungeon || c.state.dungeonFight;
 
+  /// On the land's Heroic trail (picked up again from a saved fight too, or stepped onto from a
+  /// patrol once the boss is down).
+  late bool _heroic = widget.start == BattleStart.heroic || c.state.heroicFight;
+
   /// The crossbow's timing bar is up, waiting for you to loose the bolt.
   bool _aiming = false;
 
@@ -205,7 +209,7 @@ class _BattleScreenState extends State<BattleScreen> {
   /// On to the next stop on the trail (or into the lair, once it's open).
   void _fightOn() {
     c.leaveBattle();
-    if (widget.start == BattleStart.heroic) return _begin(BattleStart.heroic);
+    if (_heroic) return _begin(BattleStart.heroic);
     _begin(trailStep(c.state, c.state.continent) == TrailStep.lair ? BattleStart.boss : BattleStart.explore);
   }
 
@@ -351,7 +355,7 @@ class _BattleScreenState extends State<BattleScreen> {
                             child: SingleChildScrollView(
                               // A phone gives the fight every pixel of width it can.
                               padding: phone ? const EdgeInsets.fromLTRB(4, 6, 4, 10) : const EdgeInsets.fromLTRB(12, 12, 12, 16),
-                              child: ConstrainedBox(constraints: BoxConstraints(maxWidth: w + 6), child: frame),
+                              child: RepaintBoundary(child: ConstrainedBox(constraints: BoxConstraints(maxWidth: w + 6), child: frame)),
                             ),
                           );
                         },
@@ -632,8 +636,27 @@ class _BattleScreenState extends State<BattleScreen> {
     }
     // On a Heroic trail, onward means the next elite (or the risen boss).
     final land = c.state.continent, risen = (c.state.heroicWins[land] ?? 0) >= heroicStops;
-    final onward = widget.start == BattleStart.heroic ? (risen ? 'Face ${continents[land].boss.name}, Risen' : 'Onward · Heroic') : trailAction(c.state, land);
+    final onward = _heroic ? (risen ? 'Face ${continents[land].boss.name}, Risen' : 'Onward · Heroic') : trailAction(c.state, land);
     switch (o) {
+      // The lair has fallen (or you're patrolling a land whose lair has): onward is the Heroic
+      // trail's elites, or home to rest up first.
+      case Outcome.won when !_heroic && !waiting && trailStep(c.state, land) == TrailStep.patrol && c.heroicOpen(land):
+        return [
+          Expanded(
+            flex: 3,
+            child: StoneButton(
+              title: risen ? 'Face ${continents[land].boss.name}, Risen' : 'Heroic trail',
+              caption: risen ? null : 'Elite foes · stop ${(c.state.heroicWins[land] ?? 0) + 1} of $heroicStops',
+              tone: ButtonTone.blood,
+              onPressed: () {
+                _heroic = true;
+                _fightOn();
+              },
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(flex: 2, child: StoneButton(title: 'Rest in town', onPressed: () => _close(BattleExit.inn))),
+        ];
       case Outcome.won:
         return [
           Expanded(
@@ -1061,7 +1084,7 @@ class _CommandDeck extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (result != null) ...[
-            if (fill) Expanded(child: SingleChildScrollView(child: _Result(controller: c, onDark: true))) else _Result(controller: c, onDark: true),
+            if (fill) Expanded(child: SingleChildScrollView(child: RepaintBoundary(child: _Result(controller: c, onDark: true)))) else _Result(controller: c, onDark: true),
             const SizedBox(height: 8),
             Row(children: result!),
           ] else ...[
@@ -1101,7 +1124,7 @@ class _CommandDeck extends StatelessWidget {
                       children: [
                         banner,
                         const SizedBox(height: 5),
-                        Expanded(child: ClipRect(child: Align(alignment: Alignment.bottomLeft, child: SingleChildScrollView(reverse: true, child: said)))),
+                        Expanded(child: ClipRect(child: Align(alignment: Alignment.bottomLeft, child: SingleChildScrollView(reverse: true, child: RepaintBoundary(child: said))))),
                       ],
                     ),
                   );

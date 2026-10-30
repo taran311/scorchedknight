@@ -67,7 +67,7 @@ class _ClassPickerScreenState extends State<ClassPickerScreen> {
           child: LayoutBuilder(
             builder: (context, viewport) => SingleChildScrollView(
               padding: EdgeInsets.fromLTRB(phone ? 12 : 16, phone ? 10 : 24, phone ? 12 : 16, phone ? 10 : 24),
-              child: ConstrainedBox(
+              child: RepaintBoundary(child: ConstrainedBox(
                 constraints: BoxConstraints(minHeight: viewport.maxHeight - (phone ? 20 : 48)),
                 child: Center(
                   child: ConstrainedBox(
@@ -149,7 +149,7 @@ class _ClassPickerScreenState extends State<ClassPickerScreen> {
                     ),
                   ),
                 ),
-              ),
+              )),
             ),
           ),
         ),

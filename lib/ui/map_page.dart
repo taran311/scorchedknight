@@ -83,7 +83,9 @@ class _PhoneMapState extends State<_PhoneMap> {
           constrained: false,
           minScale: 1,
           maxScale: 3,
-          child: SizedBox(width: w, height: h, child: widget.builder(w)),
+          // Its own layer: panning used to redraw the whole map (every land, label and fog patch)
+          // on every frame of the drag.
+          child: RepaintBoundary(child: SizedBox(width: w, height: h, child: widget.builder(w))),
         ),
       );
     },
@@ -263,7 +265,7 @@ class _MapPageState extends State<MapPage> {
                     Expanded(
                       child: SingleChildScrollView(
                         padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
-                        child: Center(
+                        child: RepaintBoundary(child: Center(
                           child: ConstrainedBox(
                             constraints: BoxConstraints(maxWidth: fitWidth(context, aspect: 1000 / _mapH, below: 200)),
                             child: Column(
@@ -291,6 +293,7 @@ class _MapPageState extends State<MapPage> {
                                           children: [
                                             Positioned.fill(
                                               child: CustomPaint(
+                                                isComplex: true,
                                                 painter: _MapPainter(
                                                   open: [for (var i = 0; i < continents.length; i++) c.whyNotTravel(i) == null],
                                                   selected: _wildPick == null && _placePick == null && _dungeonPick == null ? _pick : -1,
@@ -345,7 +348,7 @@ class _MapPageState extends State<MapPage> {
                               ],
                             ),
                           ),
-                        ),
+                        )),
                       ),
                     ),
                   ],
@@ -554,11 +557,11 @@ class _PlaceFound extends StatelessWidget {
             const SizedBox(height: 10),
             Flexible(
               child: SingleChildScrollView(
-                child: Container(
+                child: RepaintBoundary(child: Container(
                   padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                   decoration: parchmentDecoration(),
                   child: Text(text, style: Txt.body(size: 16.5)),
-                ),
+                )),
               ),
             ),
             const SizedBox(height: 12),

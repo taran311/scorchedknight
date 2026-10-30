@@ -83,7 +83,7 @@ class _TrailPageState extends State<TrailPage> {
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
-                child: Center(
+                child: RepaintBoundary(child: Center(
                   child: ConstrainedBox(
                     constraints: BoxConstraints(maxWidth: fitWidth(context, aspect: 1000 / 530, below: 330)),
                     child: Column(
@@ -199,17 +199,20 @@ class _TrailPageState extends State<TrailPage> {
                           ),
                           const SizedBox(height: 10),
                         ],
-                        _NextStop(controller: c, land: land, onGo: _go),
+                        // Once the lair has fallen, the Heroic trail is the way on: it goes first,
+                        // and patrolling shrinks to a slim row under it.
                         if (c.heroicOpen(land)) ...[
-                          const SizedBox(height: 10),
                           _Heroic(controller: c, land: land, onGo: _goHeroic),
-                        ],
+                          const SizedBox(height: 10),
+                          _Patrol(controller: c, land: land, onGo: _go),
+                        ] else
+                          _NextStop(controller: c, land: land, onGo: _go),
                         const SizedBox(height: 10),
                         _Lurking(controller: c, land: land),
                       ],
                     ),
                   ),
-                ),
+                )),
               ),
             ),
           ],
@@ -322,6 +325,45 @@ class _NextStop extends StatelessWidget {
           const _GoBadge(),
         ],
       ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Patrolling a land whose lair has fallen: one slim row (the Heroic trail above is the way on).
+class _Patrol extends StatelessWidget {
+  const _Patrol({required this.controller, required this.land, required this.onGo});
+  final GameController controller;
+  final int land;
+  final VoidCallback onGo;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = continents[land];
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onGo,
+        child: Stone(
+          padding: const EdgeInsets.fromLTRB(12, 8, 10, 8),
+          child: Row(
+            children: [
+              const Icon(Icons.flag, color: Palette.amber, size: 26),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Patrol ${l.name}', style: Txt.label(size: 17, color: Palette.cream, weight: FontWeight.w800)),
+                    Text('Gold, gear and ${isSideLand(land) ? '${l.reagent.toLowerCase()}s' : l.reagent}', style: Txt.onStone(size: 13.5)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              const _GoBadge(),
+            ],
+          ),
         ),
       ),
     );
@@ -465,7 +507,7 @@ class _RelicReward extends StatelessWidget {
                     children: [
                       TextSpan(text: 'REWARD  ', style: Txt.label(size: 11.5, color: gold)),
                       TextSpan(text: name, style: Txt.label(size: 15, color: Palette.cream, weight: FontWeight.w800)),
-                      TextSpan(text: forged ? '  · forged' : '  · a relic weapon', style: Txt.label(size: 12, color: forged ? green : Palette.parch2)),
+                      TextSpan(text: forged ? '  · forged' : '  · relic · Lv ${relic.minLevel}+', style: Txt.label(size: 12, color: forged ? green : Palette.parch2)),
                     ],
                   ),
                 ),
@@ -520,12 +562,14 @@ class _RelicReward extends StatelessWidget {
                         children: [
                           const Icon(Icons.place, size: 15, color: gold),
                           const SizedBox(width: 4),
-                          Expanded(child: Text('Here: ${parts[i].name}, held by ${parts[i].where}.', style: Txt.label(size: 12.5, color: gold))),
+                          Expanded(child: Text('Held by ${parts[i].where}', style: Txt.label(size: 12.5, color: gold))),
                         ],
                       ),
                     ],
-                  const SizedBox(height: 4),
-                  Text(all ? 'All parts found: take them to Dunstan\'s forge (level ${relic.minLevel}+).' : 'Each part is its own quest somewhere in the world (press and hold a part to see where). Dunstan forges it at level ${relic.minLevel}+.', style: Txt.onStone(size: 12.5, color: all ? green : Palette.parch2)),
+                  if (all) ...[
+                    const SizedBox(height: 4),
+                    Text('All found: to Dunstan\'s forge!', style: Txt.label(size: 12.5, color: green)),
+                  ],
                 ],
               ],
             ),

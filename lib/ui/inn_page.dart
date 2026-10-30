@@ -197,7 +197,7 @@ class _InnPageState extends State<InnPage> with RouteAware {
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
-                child: Center(
+                child: RepaintBoundary(child: Center(
                   child: ConstrainedBox(
                     constraints: BoxConstraints(maxWidth: fitWidth(context, aspect: 2, below: 230, chrome: 130)),
                     child: Column(
@@ -290,7 +290,7 @@ class _InnPageState extends State<InnPage> with RouteAware {
                       ],
                     ),
                   ),
-                ),
+                )),
               ),
             ),
           ],
@@ -978,7 +978,7 @@ class _StoryWindow extends StatelessWidget {
       child: Stone(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
         child: SingleChildScrollView(
-          child: Column(
+          child: RepaintBoundary(child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -1011,7 +1011,7 @@ class _StoryWindow extends StatelessWidget {
               const SizedBox(height: 12),
               StoneButton(title: 'Pull up a stool', tone: ButtonTone.blood, onPressed: () => Navigator.of(context).pop()),
             ],
-          ),
+          )),
         ),
       ),
     ),
@@ -1094,7 +1094,7 @@ class _SettingsWindowState extends State<_SettingsWindow> {
         child: Stone(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
           child: SingleChildScrollView(
-            child: Column(
+            child: RepaintBoundary(child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -1141,7 +1141,7 @@ class _SettingsWindowState extends State<_SettingsWindow> {
               const SizedBox(height: 6),
               TextButton(onPressed: _newHero, child: Text('Start a new hero…', style: Txt.label(size: 13, color: const Color(0xFFE07A5A)))),
             ],
-          ),
+          )),
           ),
         ),
       ),

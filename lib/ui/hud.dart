@@ -259,7 +259,7 @@ class FoeCard extends StatelessWidget {
               alignment: Alignment.centerLeft,
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
-                child: SlimBadges(child: Row(children: [for (final (i, w) in [...tags, ...badges].indexed) Padding(padding: EdgeInsets.only(left: i == 0 ? 0 : 3), child: w)])),
+                child: RepaintBoundary(child: SlimBadges(child: Row(children: [for (final (i, w) in [...tags, ...badges].indexed) Padding(padding: EdgeInsets.only(left: i == 0 ? 0 : 3), child: w)]))),
               ),
             )
           else ...[

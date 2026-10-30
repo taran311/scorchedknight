@@ -143,7 +143,7 @@ class _WildsPageState extends State<WildsPage> {
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
-                  child: Center(
+                  child: RepaintBoundary(child: Center(
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 760),
                       child: Column(
@@ -155,7 +155,7 @@ class _WildsPageState extends State<WildsPage> {
                         ],
                       ),
                     ),
-                  ),
+                  )),
                 ),
               ),
             ],

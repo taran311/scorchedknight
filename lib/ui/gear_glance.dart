@@ -46,7 +46,7 @@ class _GearGlance extends StatelessWidget {
       ),
       padding: EdgeInsets.fromLTRB(12, 8, 12, 12 + MediaQuery.paddingOf(context).bottom),
       child: SingleChildScrollView(
-        child: Column(
+        child: RepaintBoundary(child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -72,7 +72,7 @@ class _GearGlance extends StatelessWidget {
             for (final (label, g) in gear)
               if (g != null) _Piece(label: label, item: g, heroClass: k.heroClass, dye: k.dye),
           ],
-        ),
+        )),
       ),
     );
   }
@@ -140,7 +140,7 @@ Future<void> showFoeGlance(BuildContext context, {required String name, required
     ),
     padding: EdgeInsets.fromLTRB(12, 8, 12, 12 + MediaQuery.paddingOf(context).bottom),
     child: SingleChildScrollView(
-      child: Column(
+      child: RepaintBoundary(child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -159,7 +159,7 @@ Future<void> showFoeGlance(BuildContext context, {required String name, required
               ),
             ),
         ],
-      ),
+      )),
     ),
   ),
 );

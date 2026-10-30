@@ -52,7 +52,7 @@ class _HeroPageState extends State<HeroPage> {
     final tab = tabs.any((t) => t.$1 == _tab) ? _tab : _Tab.gear;
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
-      child: Center(
+      child: RepaintBoundary(child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 820),
           child: Column(
@@ -99,7 +99,7 @@ class _HeroPageState extends State<HeroPage> {
             ],
           ),
         ),
-      ),
+      )),
     );
   }
 }
@@ -415,7 +415,7 @@ class _SlotSheetState extends State<_SlotSheet> {
           child: Stone(
             padding: const EdgeInsets.all(14),
             child: SingleChildScrollView(
-              child: Column(
+              child: RepaintBoundary(child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -500,7 +500,7 @@ class _SlotSheetState extends State<_SlotSheet> {
                     ],
                   ],
                 ],
-              ),
+              )),
             ),
           ),
         ),

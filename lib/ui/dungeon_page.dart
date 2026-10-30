@@ -93,7 +93,7 @@ class _DungeonPageState extends State<DungeonPage> {
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
-                  child: Center(
+                  child: RepaintBoundary(child: Center(
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 760),
                       child: Column(
@@ -184,7 +184,7 @@ class _DungeonPageState extends State<DungeonPage> {
                         ],
                       ),
                     ),
-                  ),
+                  )),
                 ),
               ),
             ],

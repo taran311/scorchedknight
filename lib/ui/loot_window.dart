@@ -165,7 +165,7 @@ class _LootWindowState extends State<_LootWindow> {
           child: Stone(
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
             child: SingleChildScrollView(
-              child: Column(
+              child: RepaintBoundary(child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -269,7 +269,7 @@ class _LootWindowState extends State<_LootWindow> {
                     ],
                   ),
                 ],
-              ),
+              )),
             ),
           ),
         ),

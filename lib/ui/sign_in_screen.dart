@@ -49,7 +49,7 @@ class _SignInScreenState extends State<SignInScreen> {
                 final short = viewport.maxHeight < 760;
                 return SingleChildScrollView(
                 padding: EdgeInsets.fromLTRB(20, short ? 8 : 24, 20, short ? 8 : 24),
-                child: ConstrainedBox(
+                child: RepaintBoundary(child: ConstrainedBox(
                   constraints: BoxConstraints(minHeight: viewport.maxHeight - (short ? 16 : 48)),
                   child: Center(
                     child: ConstrainedBox(
@@ -91,7 +91,7 @@ class _SignInScreenState extends State<SignInScreen> {
                       ),
                     ),
                   ),
-                ),
+                )),
               );
               },
             ),
