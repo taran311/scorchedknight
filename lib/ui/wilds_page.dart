@@ -176,7 +176,7 @@ class _WildsPageState extends State<WildsPage> {
         const SizedBox(height: 2),
         Text('Off the road, no story, no rules. Just you and whatever\'s out there.', style: Txt.onStone(size: 15)),
         const SizedBox(height: 10),
-        const _Rules(),
+        _Rules(open: s.wildBest.values.every((b) => b == 0)),
         const SizedBox(height: 10),
         for (var i = 0; i < wildAreas.length; i++) ...[
           _AreaCard(
@@ -229,13 +229,25 @@ class _WildsPageState extends State<WildsPage> {
                       Icon(at && e == null ? Icons.shield : Icons.signpost, size: 18, color: at && e == null ? const Color(0xFF9FE07A) : Palette.parch2),
                       const SizedBox(width: 6),
                       Expanded(
-                        child: Text(
-                          at && e == null ? 'Safe to head home: you\'ll keep everything.' : 'Next waystone: step $next (${next - d} to go)',
-                          overflow: TextOverflow.ellipsis,
-                          style: Txt.label(size: 14, color: at && e == null ? const Color(0xFFBFF0A0) : Palette.parch),
+                        child: Tooltip(
+                          message: at && e == null ? 'At a waystone: head home now and keep everything' : 'Next waystone at step $next',
+                          child: Text(
+                            at && e == null ? 'Safe' : 'Waystone in ${next - d}',
+                            overflow: TextOverflow.ellipsis,
+                            style: Txt.label(size: 14, color: at && e == null ? const Color(0xFFBFF0A0) : Palette.parch),
+                          ),
                         ),
                       ),
-                      Text('Foes +${wildLevels(d, a)} lv · gold ×${wildGold(d).toStringAsFixed(2)}', style: Txt.label(size: 13, color: Palette.amber)),
+                      // How much harder the foes are here, and how much more gold they carry.
+                      Tooltip(
+                        message: 'Foes here are ${wildLevels(d, a)} levels above you',
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.trending_up, size: 16, color: Color(0xFFE88A70)), Text(' +${wildLevels(d, a)}', style: Txt.label(size: 14, color: const Color(0xFFE88A70)))]),
+                      ),
+                      const SizedBox(width: 10),
+                      Tooltip(
+                        message: 'Gold from foes here',
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.monetization_on, size: 16, color: Color(0xFFFFD45A)), Text(' ×${wildGold(d).toStringAsFixed(2)}', style: Txt.label(size: 14, color: Palette.amber))]),
+                      ),
                     ],
                   ),
                 ),
@@ -286,12 +298,12 @@ class _WildsPageState extends State<WildsPage> {
                   const SizedBox(width: 3),
                   Text(fmt(s.packGold), style: Txt.label(size: 18, color: const Color(0xFFFFD45A))),
                   const Spacer(),
-                  Flexible(child: Text('Not yours until you get it home', overflow: TextOverflow.ellipsis, style: Txt.onStone(size: 13))),
+                  const Tooltip(message: 'Not yours until you get it home', child: Icon(Icons.lock_clock, size: 18, color: Palette.parch2)),
                 ],
               ),
               const SizedBox(height: 6),
               if (s.pack.isEmpty)
-                Text('Nothing but crumbs and a bit of string, so far.', style: Txt.onStone(size: 14))
+                Text('Empty', style: Txt.onStone(size: 14))
               else
                 Wrap(
                   spacing: 6,
@@ -318,7 +330,8 @@ class _WildsPageState extends State<WildsPage> {
         else if (d == 0) ...[
           _Note(icon: Icons.forest, text: area.blurb),
           const SizedBox(height: 10),
-          const _Rules(),
+          // The rules, open on your first trip; after that, folded away under its heading.
+          _Rules(open: c.state.wildBest.values.every((b) => b == 0)),
         ]
         else
           const _Note(icon: Icons.help_outline, text: 'The path winds on into the ash. You can\'t see what\'s next.'),
@@ -371,9 +384,17 @@ class _WildsPageState extends State<WildsPage> {
   }
 }
 
-/// How the wilds work, in four lines.
-class _Rules extends StatelessWidget {
-  const _Rules();
+/// How the wilds work, in four lines (tap the heading to fold them away or bring them back).
+class _Rules extends StatefulWidget {
+  const _Rules({required this.open});
+  final bool open;
+
+  @override
+  State<_Rules> createState() => _RulesState();
+}
+
+class _RulesState extends State<_Rules> {
+  late bool _open = widget.open;
 
   @override
   Widget build(BuildContext context) {
@@ -392,12 +413,23 @@ class _Rules extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('How the wilds work', style: Txt.inkLabel(size: 16)),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => setState(() => _open = !_open),
+            child: Row(
+              children: [
+                Expanded(child: Text('How the wilds work', style: Txt.inkLabel(size: 16))),
+                Icon(_open ? Icons.expand_less : Icons.expand_more, color: Palette.inkSoft),
+              ],
+            ),
+          ),
+          if (_open) ...[
           const SizedBox(height: 6),
           line(Icons.help_outline, 'Every step is a surprise. No healing on the way.'),
           line(Icons.backpack, 'Loot goes in your pack. Deeper: tougher, richer.'),
           line(Icons.signpost, 'Waystone every $waystoneEvery steps: leave there, keep it all.'),
           line(Icons.directions_run, 'Leave early −${(fleeLoss * 100).round()}% · flee a fight −${(fightFleeLoss * 100).round()}% · knocked out −${(koLoss * 100).round()}%'),
+          ],
         ],
       ),
     );
