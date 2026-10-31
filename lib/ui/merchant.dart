@@ -240,7 +240,7 @@ class MerchantWares extends StatelessWidget {
               b.label,
               '',
               CostButton(
-                label: b == Brew.healing ? 'Brew' : (brewOn(k, b) ? (b == Brew.reaperbane ? 'In you' : 'Top up') : 'Brew & drink'),
+                label: b == Brew.reaperbane && brewOn(k, b) ? 'In you' : ((k.brews[b.name] ?? 0) >= brewFights ? 'Full' : (brewOn(k, b) ? 'Top up' : 'Brew & drink')),
                 onTap: c.whyNotBrew(b) == null
                     ? () {
                         c.brew(b);

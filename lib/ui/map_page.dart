@@ -13,6 +13,7 @@ import '../game/controller.dart';
 import '../audio/audio.dart';
 import 'battle_screen.dart' show openBattle, BattleStart, BattleExit;
 import 'hud.dart';
+import 'stat_icons.dart' show InfoChip;
 import 'loot_window.dart' show resolvePendingLoot;
 import 'theme.dart';
 import 'trail_data.dart';
@@ -304,6 +305,7 @@ class _MapPageState extends State<MapPage> {
                                                   pins: [for (final p in places) if (c.placeShown(p)) (p, s.explored.contains(p.id), c.whyNotExplore(p.id) == null)],
                                                   pinPicked: _placePick,
                                                   beaten: s.bossesDown,
+                                                  cleared: {for (var i = 0; i < continents.length; i++) if (c.engine.landCleared(i)) i},
                                                   wildsOpen: [for (var a = 0; a < wildAreas.length; a++) c.wildOpen(a)],
                                                   wildPicked: _wildPick,
                                                   trip: s.wild,
@@ -417,6 +419,33 @@ class _ContinentPanel extends StatelessWidget {
                     ),
                   ),
                 ],
+              ),
+              // What's left worth having here: places, dungeons and relic parts, found/all.
+              Builder(
+                builder: (context) {
+                  final p = c.engine.landProgress(index);
+                  Widget chip(IconData icon, int n, int all, String tip) => Tooltip(
+                    message: tip,
+                    child: InfoChip(icon: Icon(icon, size: 14, color: n >= all ? _done : Palette.parch2), text: '$n/$all', colour: n >= all ? _done : Palette.parch2, dense: true),
+                  );
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Wrap(
+                      spacing: 5,
+                      runSpacing: 4,
+                      children: [
+                        if (c.engine.landCleared(index))
+                          const Tooltip(
+                            message: 'Nothing new left to find here. Still good for gear, gold, XP and Cinder keys.',
+                            child: InfoChip(icon: Icon(Icons.check_circle, size: 14, color: Palette.amber), text: 'Cleared', colour: Palette.amber, dense: true),
+                          ),
+                        if (p.placesAll > 0) chip(Icons.place, p.places, p.placesAll, 'Places explored'),
+                        if (p.delvesAll > 0) chip(Icons.stairs, p.delves, p.delvesAll, 'Dungeons beaten'),
+                        if (p.partsAll > 0) chip(Icons.hardware, p.parts, p.partsAll, 'Relic parts found'),
+                      ],
+                    ),
+                  );
+                },
               ),
             ],
           ],
@@ -615,8 +644,11 @@ class _WildPanel extends StatelessWidget {
 
 /// The parchment map: the road, the six lands, fog over the ones not reached yet, and the wilds
 /// off the road between them.
+/// Green for a part of a region that's done.
+const _done = Color(0xFF9BE27A);
+
 class _MapPainter extends CustomPainter {
-  _MapPainter({required this.open, required this.selected, required this.beaten, required this.wildsOpen, this.wildPicked, this.trip, this.pins = const [], this.pinPicked, this.delves = const [], this.delvePicked});
+  _MapPainter({required this.open, required this.selected, required this.beaten, this.cleared = const {}, required this.wildsOpen, this.wildPicked, this.trip, this.pins = const [], this.pinPicked, this.delves = const [], this.delvePicked});
 
   /// Dungeons shown: each with whether it's open, whether its boss is beaten, and whether you're
   /// down in it now.
@@ -629,6 +661,9 @@ class _MapPainter extends CustomPainter {
   final List<bool> open;
   final int selected;
   final Set<int> beaten;
+
+  /// Regions with everything new done (see GameEngine.landCleared): a small gold tick by the flag.
+  final Set<int> cleared;
   final List<bool> wildsOpen;
   final int? wildPicked, trip;
 
@@ -707,6 +742,8 @@ class _MapPainter extends CustomPainter {
         _padlock(canvas, at + const Offset(0, -6));
       }
       if (beaten.contains(i)) _flag(canvas, at + const Offset(52, -44));
+      // Nothing new left here (still good to farm): a small gold tick by the flag.
+      if (cleared.contains(i)) _tick(canvas, at + const Offset(76, -36));
       final tp = TextPainter(
         text: TextSpan(text: land.name, style: Txt.inkLabel(size: isSideLand(i) ? 17 : 21, color: open ? const Color(0xFF2A1A0E) : const Color(0xFF6A5A44))),
         textDirection: TextDirection.ltr,
@@ -977,6 +1014,13 @@ class _MapPainter extends CustomPainter {
     c.drawCircle(at + const Offset(0, 3), 3, Paint()..color = const Color(0xFF2A1C10));
   }
 
+  /// A cleared region's mark: a small gold tick in an ink ring, beside its flag.
+  void _tick(Canvas c, Offset at) {
+    c.drawCircle(at, 9, Paint()..color = const Color(0xFFE3A548));
+    c.drawCircle(at, 9, strokePaint(const Color(0xFF3A2614), 1.6));
+    c.drawPath(Path()..moveTo(at.dx - 4, at.dy + .3)..lineTo(at.dx - 1, at.dy + 3.4)..lineTo(at.dx + 4.4, at.dy - 3.2), strokePaint(const Color(0xFF3A2614), 2.2));
+  }
+
   void _flag(Canvas c, Offset at) {
     c.drawLine(at, at + const Offset(0, 26), strokePaint(const Color(0xFF3A2614), 2));
     c.drawPath(poly([at, at + const Offset(16, 5), at + const Offset(0, 10)]), Paint()..color = const Color(0xFFE3A548));
@@ -1054,6 +1098,7 @@ class _MapPainter extends CustomPainter {
       old.open.toString() != open.toString() ||
       old.selected != selected ||
       old.beaten.length != beaten.length ||
+      old.cleared.length != cleared.length ||
       old.wildPicked != wildPicked ||
       old.pinPicked != pinPicked ||
       old.delvePicked != delvePicked ||

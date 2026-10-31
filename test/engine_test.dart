@@ -271,6 +271,51 @@ void main() {
     expect(r.kill?.clean ?? false, isFalse);
   });
 
+  test('a brew already at full strength can\'t be topped up (no reagents wasted)', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(1));
+    final s = e.state, k = s.knight;
+    s.reagents[Brew.might.land] = 10;
+    k.coins = 1000;
+    expect(e.brew(Brew.might), isTrue);
+    expect(k.brews[Brew.might.name], brewFights);
+    expect(e.whyNotBrew(Brew.might), isNotNull);
+    expect(e.brew(Brew.might), isFalse);
+    expect(s.reagents[Brew.might.land], 10 - Brew.might.reagents);
+    // One fight later, a top-up is worth it again.
+    k.brews[Brew.might.name] = brewFights - 1;
+    expect(e.whyNotBrew(Brew.might), isNull);
+  });
+
+  test('a region is cleared once its boss, places, dungeons and relic parts are all done', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(1));
+    final s = e.state;
+    // Pick a region with something of each kind, if there is one; else the first with a place.
+    var land = 0;
+    for (var c = 0; c < continents.length; c++) {
+      final p = e.landProgress(c);
+      if (p.placesAll > 0 && p.partsAll > 0) {
+        land = c;
+        break;
+      }
+    }
+    expect(e.landCleared(land), isFalse);
+    s.bossesDown.add(land);
+    expect(e.landCleared(land), e.landProgress(land).placesAll == 0 && e.landProgress(land).delvesAll == 0 && e.landProgress(land).partsAll == 0);
+    for (final p in places.where((p) => p.land == land)) {
+      s.explored.add(p.id);
+    }
+    for (final d in dungeons.where((d) => d.land == land)) {
+      s.dungeonsDone.add(d.id);
+    }
+    final parts = relicPartsOn(land);
+    if (parts.isNotEmpty) expect(e.landCleared(land), isFalse, reason: 'a relic part still to find');
+    for (final (r, i) in parts) {
+      s.relicParts[r] = (s.relicParts[r] ?? 0) | (1 << i);
+    }
+    expect(e.landCleared(land), isTrue);
+    expect(e.landCleared(land == 0 ? 1 : 0), isFalse);
+  });
+
   test('vault pieces grow with you: a level gained brings every one you own up to it', () {
     final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(4));
     final s = e.state, k = s.knight;

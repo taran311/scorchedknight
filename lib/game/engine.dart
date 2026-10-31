@@ -342,6 +342,28 @@ class GameEngine {
 
   // ---------------- the map ----------------
 
+  /// What there is to do in region [c], and how much of it is done: its boss; its places, its
+  /// dungeons and the relic parts that turn up there (each done/all).
+  ({bool boss, int places, int placesAll, int delves, int delvesAll, int parts, int partsAll}) landProgress(int c) {
+    final s = state;
+    final here = [for (final p in places) if (p.land == c) p], delves = [for (final d in dungeons) if (d.land == c) d], parts = relicPartsOn(c);
+    return (
+      boss: s.bossesDown.contains(c),
+      places: here.where((p) => s.explored.contains(p.id)).length,
+      placesAll: here.length,
+      delves: delves.where((d) => s.dungeonsDone.contains(d.id)).length,
+      delvesAll: delves.length,
+      parts: parts.where((e) => s.forged.contains(e.$1) || hasRelicPart(s.relicParts, e.$1, e.$2)).length,
+      partsAll: parts.length,
+    );
+  }
+
+  /// Region [c] is cleared: its boss down, every place and dungeon done, every relic part found.
+  bool landCleared(int c) {
+    final p = landProgress(c);
+    return p.boss && p.places == p.placesAll && p.delves == p.delvesAll && p.parts == p.partsAll;
+  }
+
   /// Why you can't go to continent [c] yet (null: you can).
   String? whyNotTravel(int c) {
     if (c < 0 || c >= continents.length) return 'No such land';
@@ -3567,6 +3589,8 @@ class GameEngine {
   String? whyNotBrew(Brew b) {
     if (state.inBattle) return 'Not mid-fight';
     if (b == Brew.reaperbane && brewOn(state.knight, b)) return 'It\'s still in you';
+    // A top-up only brings it back to full: nothing to gain (and reagents to lose) while it is.
+    if ((state.knight.brews[b.name] ?? 0) >= brewFights) return 'Already full: $brewFights fights left';
     if (state.reagents[b.land] < b.reagents) return 'Needs ${b.reagents} ${b.ingredient}';
     if (state.knight.coins < b.fee(state.knight.level)) return 'Needs ${b.fee(state.knight.level)} gold';
     return null;

@@ -51,7 +51,8 @@ class _HeroPageState extends State<HeroPage> {
     ];
     final tab = tabs.any((t) => t.$1 == _tab) ? _tab : _Tab.gear;
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+      // (Clear of the phone's navigation bar at the bottom.)
+      padding: EdgeInsets.fromLTRB(12, 8, 12, 24 + MediaQuery.paddingOf(context).bottom),
       child: RepaintBoundary(child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 820),
