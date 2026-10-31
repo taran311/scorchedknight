@@ -30,6 +30,7 @@ class MatIcon extends StatelessWidget {
     Trophy.skin => MatShape.skin,
     Trophy.feather => MatShape.feather,
     Trophy.lacquer => MatShape.scale,
+    Trophy.dragonscale => MatShape.scale,
   }, Color(t.argb), size: size);
   factory MatIcon.core(Color colour, {double size = 24}) => MatIcon(MatShape.core, colour, size: size);
   factory MatIcon.blueprint({double size = 24}) => MatIcon(MatShape.scroll, const Color(0xFF4A7AB8), size: size);

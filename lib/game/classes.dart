@@ -200,8 +200,36 @@ List<ArmourTier> tiersFor(HeroClass c) => [...armourTiers, ...wyrmArmour].where(
 
 ArmourTier armourTierById(String id) {
   if (id == 'leather') id = 'padded'; // saves from the first prototype
-  return [...armourTiers, ...wyrmArmour].firstWhere((t) => t.id == id, orElse: () => armourTiers.first);
+  return [...armourTiers, ...wyrmArmour, ...setArmour].firstWhere((t) => t.id == id, orElse: () => armourTiers.first);
 }
+
+/// The questline sets' own body armour, forged by Dunstan from the set's blueprint like its other
+/// pieces: (name, metal). As protective as gilded plate (a little under the forge's emberglass),
+/// in the set's colours; its worth is in counting toward the set.
+const forgedArmour = <String, (String, int)>{
+  'ashen': ('Ashen warplate', 0xFF5A5A62),
+  'nightblood': ('Nightblood plate', 0xFF3A2228),
+  'moonfang': ('Moonfang harness', 0xFF8E9AA0),
+  'silverleaf': ('Silverleaf mail', 0xFFCFE0D4),
+  'deepforge': ('Deepforge plate', 0xFF6A7A9A),
+  'faceless': ('Faceless plate', 0xFFD8D2CA),
+  'sunscale': ('Sunscale hauberk', 0xFF5A8A3A),
+  'tidecaller': ('Tidecaller plate', 0xFF3A8AB8),
+  'changeling': ('Changeling plate', 0xFF8A6AB0),
+  'skyborn': ('Skyborn plate', 0xFF9AC8E8),
+  'bushido': ('Bushido o-yoroi', 0xFFB8322A),
+  'drakesworn': ('Drakesworn plate', 0xFF3E3442),
+};
+
+String setArmourId(String set) => 'set-$set';
+
+/// The questline set a body armour belongs to, or null.
+String? setOfArmour(String id) => id.startsWith('set-') ? id.substring(4) : null;
+
+final setArmour = <ArmourTier>[
+  for (final e in forgedArmour.entries)
+    ArmourTier(setArmourId(e.key), e.value.$1, .4, 0, HeroClass.knight, dropOnly: true, metal: e.value.$2, look: e.key == 'bushido' ? ArmourLook.lamellar : (e.key == 'sunscale' || e.key == 'silverleaf' ? ArmourLook.scales : ArmourLook.plate)),
+];
 
 /// Index within its class (0 is the starting armour).
 int tierIndex(String id) => tiersFor(armourTierById(id).heroClass).indexWhere((t) => t.id == armourTierById(id).id);

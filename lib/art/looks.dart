@@ -565,11 +565,57 @@ String portraitSignature(Knight k) {
 }
 
 /// [glow] lights the weapon up for a moment (a lucky Roll of Fate).
-Look heroLook(Knight k, {Color? glow}) => lookFor(k.heroClass, k.loadout, dye: k.dye, gloves: k.gloves, poisoned: k.poisonFights > 0, trinket: k.trinket, female: k.female, soot: sootFor(k.level), shine: shinesAt(k.level), glow: glow);
+Look heroLook(Knight k, {Color? glow}) => lookFor(k.heroClass, k.loadout, dye: k.dye, gloves: k.gloves, poisoned: k.poisonFights > 0, trinket: k.trinket, ring: k.ring, female: k.female, soot: sootFor(k.level), shine: shinesAt(k.level), glow: glow);
 
 /// A look for any class and loadout (used for the hero and the class picker).
-Look lookFor(HeroClass c, Loadout l, {String dye = 'crimson', bool gloves = false, bool poisoned = false, GearItem? trinket, bool female = false, double soot = 0, bool shine = false, Color? glow}) {
-  final dyeCol = Color(dyeById(dye).argb);
+/// A questline set's livery: its colours for cloth (tabard, cape, plume, shield), its armour's
+/// metal and its trim, and what goes with it. Wear the whole set (gloves, boots and ring) and the
+/// knight is kitted out in it from head to foot, not just at the hands and feet.
+class SetLivery {
+  const SetLivery(this.cloth, this.metal, this.trim, {this.tattered = false, this.horns = false, this.ruff});
+  final int cloth, metal, trim;
+  final bool tattered, horns;
+  final int? ruff;
+}
+
+const setLiveries = <String, SetLivery>{
+  'ashen': SetLivery(0xFF34343A, 0xFF5A5A62, 0xFFFF6A2A, tattered: true),
+  'nightblood': SetLivery(0xFF6A0E1A, 0xFF2E2228, 0xFFB8283A, tattered: true),
+  'moonfang': SetLivery(0xFF4A4E58, 0xFF8E9AA0, 0xFFC8C4BC, ruff: 0xFFB8AA96),
+  'silverleaf': SetLivery(0xFF3E6A4E, 0xFFCFE0D4, 0xFFE8E0B0),
+  'deepforge': SetLivery(0xFF2E3A5A, 0xFF6A7A9A, 0xFFE8C060),
+  'faceless': SetLivery(0xFFE8E2D8, 0xFFD8D2CA, 0xFF8A8A8A),
+  'sunscale': SetLivery(0xFF4E7A2E, 0xFF5A8A3A, 0xFFE0C04A),
+  'tidecaller': SetLivery(0xFF1E5A7A, 0xFF3A8AB8, 0xFFF08A7A),
+  'changeling': SetLivery(0xFF5A3A7A, 0xFF8A6AB0, 0xFFC8B0E8),
+  'skyborn': SetLivery(0xFF5A88B0, 0xFF9AC8E8, 0xFFE8D8B0),
+  'bushido': SetLivery(0xFF8A1E1A, 0xFFB8322A, 0xFFE8C060),
+  'drakesworn': SetLivery(0xFF6A1A12, 0xFF3E3442, 0xFFE3A548, tattered: true, horns: true),
+  'vault': SetLivery(0xFF5A2A10, 0xFF9A5A2A, 0xFFFF9A4A),
+};
+
+/// The questline set worn whole, if any: all five pieces of a suit (helm, armour, gauntlets,
+/// sabatons, signet), or four of the vault's six.
+String? fullSetWorn(Loadout l, GearItem? ring, [GearItem? trinket]) {
+  final counts = <String, int>{};
+  for (final g in [l.helm, l.gloves, l.boots, ring, trinket]) {
+    final id = g?.gearSet;
+    if (id != null) counts[id] = (counts[id] ?? 0) + 1;
+  }
+  final body = setOfArmour(l.armour);
+  if (body != null) counts[body] = (counts[body] ?? 0) + 1;
+  for (final e in counts.entries) {
+    final set = gearSetById(e.key);
+    if (set != null && setLiveries.containsKey(e.key) && e.value >= (set.id == 'vault' ? 4 : set.pieces)) return e.key;
+  }
+  return null;
+}
+
+Ramp _toward(Ramp r, Color to, double f) => [for (final c in r) Color.lerp(c, to, f)!];
+
+Look lookFor(HeroClass c, Loadout l, {String dye = 'crimson', bool gloves = false, bool poisoned = false, GearItem? trinket, GearItem? ring, bool female = false, double soot = 0, bool shine = false, Color? glow}) {
+  final setId = fullSetWorn(l, ring, trinket), livery = setLiveries[setId];
+  final dyeCol = livery != null ? Color(livery.cloth) : Color(dyeById(dye).argb);
   final w = l.weapon, o = l.activeOffhand; // a mismatched off-hand is stowed, not held
   final gl = l.gloves == null ? null : gearRamp(l.gloves!), bt = l.boots == null ? null : gearRamp(l.boots!);
   // A cape won in battle is worn in its own colour.
@@ -588,7 +634,9 @@ Look lookFor(HeroClass c, Loadout l, {String dye = 'crimson', bool gloves = fals
   switch (c) {
     case HeroClass.knight:
       final tier = armourTierById(l.armour);
-      final m = tier.metal != null ? ramp(tier.metal!, .35, .5) : _knightMetals[l.armour];
+      final m0 = tier.metal != null ? ramp(tier.metal!, .35, .5) : _knightMetals[l.armour];
+      // A whole questline set re-colours the armour under it, so the kit reads as one suit.
+      final m = livery == null || m0 == null ? m0 : _toward(m0, Color(livery.metal), .55);
       final wyrmKit = wyrmTierOfArmour(l.armour) != null;
       // Dragonslayer armour is full plate too: armoured legs, knees and elbows, no surcoat over it.
       final plate = wyrmKit || tier.look == ArmourLook.plate || (tier.look == ArmourLook.auto && (l.armour == 'plate' || l.armour == 'gilded' || l.armour == 'bonemail'));
@@ -597,13 +645,13 @@ Look lookFor(HeroClass c, Loadout l, {String dye = 'crimson', bool gloves = fals
       // best of all carries a glowing ember sigil.
       final engrave = m == null ? 0 : (tier.reduction >= .4 ? 3 : (tier.reduction >= .28 ? 2 : 1));
       final wyrm = wyrmTierOfArmour(l.armour);
-      final engraveCol = wyrm != null ? Color(wyrmTiers[wyrm - 1].trim) : (engrave >= 2 ? const Color(0xFFE8C060) : shade(m?[1] ?? const Color(0xFF888888), -.5));
+      final engraveCol = livery != null ? Color(livery.trim) : wyrm != null ? Color(wyrmTiers[wyrm - 1].trim) : (engrave >= 2 ? const Color(0xFFE8C060) : shade(m?[1] ?? const Color(0xFF888888), -.5));
       const painted = {'padded': 'padded', 'chainmail': 'mail', 'plate': 'plate', 'gilded': 'gilded'};
       return Look(
-        sprite: painted[l.armour] == null ? null : '${female ? 'heroine' : 'knight'}_${painted[l.armour]}',
+        sprite: painted[l.armour] == null || livery != null ? null : '${female ? 'heroine' : 'knight'}_${painted[l.armour]}',
         kitDetail: true,
         blackIron: blackIron,
-        engrave: engrave,
+        engrave: livery != null && engrave < 2 ? 2 : engrave,
         engraveCol: engraveCol,
         female: female,
         soot: soot,
@@ -612,14 +660,14 @@ Look lookFor(HeroClass c, Loadout l, {String dye = 'crimson', bool gloves = fals
         stance: Stance.knight,
         skin: skin,
         // Starting kit: a battered mail shirt over the gambeson.
-        torso: m ?? ramp(0xFF6E7379, .3, .5),
+        torso: m ?? (livery != null ? ramp(livery.metal, .3, .5) : ramp(0xFF6E7379, .3, .5)),
         torsoKind: wyrmKit ? TorsoKind.dragonplate : (tier.look == ArmourLook.lamellar ? TorsoKind.lamellar : (tier.look == ArmourLook.scales ? TorsoKind.scales : (plate ? TorsoKind.plate : TorsoKind.mail))),
         // A ragged dark tasset hangs from the belt, and the cape is torn to match.
         skirt: wyrmKit ? ramp(0xFF2A2228, .2, .55) : null,
-        tattered: wyrmKit,
+        tattered: wyrmKit || (livery?.tattered ?? false),
         talons: wyrmKit,
-        fangCollar: wyrmKit,
-        ruff: l.armour == 'furmantle' ? const Color(0xFFB8AA96) : null,
+        fangCollar: wyrmKit || (livery?.horns ?? false),
+        ruff: l.armour == 'furmantle' ? const Color(0xFFB8AA96) : (livery?.ruff == null ? null : Color(livery!.ruff!)),
         upper: m ?? cloth,
         fore: m ?? ramp(0xFF6E4A2E),
         hand: gl ?? (plate ? m! : (gloves ? helmSteel : ramp(0xFF5A3A22, .25, .5))),
@@ -631,13 +679,13 @@ Look lookFor(HeroClass c, Loadout l, {String dye = 'crimson', bool gloves = fals
         pauldron: plate || blackIron || wyrmTierOfArmour(l.armour) != null ? m : ramp(0xFF6E4A2E),
         // Plate is worn bare so the breastplate shows; cloth and mail wear the surcoat.
         tabard: (plate && l.armour != 'surcoat') || tier.look == ArmourLook.lamellar ? null : dyeCol,
-        trim: tier.look == ArmourLook.lamellar ? const Color(0xFFE8C060) : (wyrmKit ? null : const Color(0xFFC9A24E)),
+        trim: livery != null ? Color(livery.trim) : (tier.look == ArmourLook.lamellar ? const Color(0xFFE8C060) : (wyrmKit ? null : const Color(0xFFC9A24E))),
         cape: capeCol ?? shade(dyeCol, -.15),
         head: head,
-        helm: _wyrmHelm(l.helm) ?? (head == HeadKind.kabuto ? _lacquer : null) ?? ((plate || blackIron) && head != HeadKind.nasal ? (blackIron ? _knightMetals['plate']! : m) : helmSteel),
+        helm: _wyrmHelm(l.helm) ?? (head == HeadKind.kabuto ? _lacquer : null) ?? (livery != null && helmRarity != Rarity.legendary ? _toward(helmSteel, Color(livery.metal), .55) : null) ?? ((plate || blackIron) && head != HeadKind.nasal ? (blackIron ? _knightMetals['plate']! : m) : helmSteel),
         plume: head == HeadKind.greathelm || head == HeadKind.sallet ? dyeCol : null,
         armourGlow: _wyrmGlow(l),
-        wyrmHorns: wyrmTierOfArmour(l.armour) != null,
+        wyrmHorns: wyrmTierOfArmour(l.armour) != null || (livery?.horns ?? false),
         wyrmGloves: _wyrmOf(l.gloves) != null,
         wyrmBoots: _wyrmOf(l.boots) != null,
         weapon: weapon == Weapon.none ? Weapon.longsword : weapon,
@@ -1120,6 +1168,44 @@ Look _ashen({String rank = 'knight'}) {
     weapon: champion || malric ? Weapon.greatsword : Weapon.longsword,
     weaponGlow: champion || malric ? const Color(0xFFFF8A3A) : null,
     shield: champion || malric ? null : const ShieldLook(field: Color(0xFF2E2E34), trim: ember, kind: ShieldKind.kite),
+  );
+}
+
+/// The Drakesworn: knights who swore to the dragons instead of the Ember King, in obsidian
+/// wyrmplate trimmed with gold, horned from helm to heel, a wyrmblade burning in hand.
+Look _dragonKnight() {
+  final plate = ramp(0xFF3E3442, .34, .5);
+  const ember = Color(0xFFFF6A2A), gold = Color(0xFFE3A548);
+  return Look(
+    build: 'human',
+    scale: 1.12,
+    stance: Stance.rose,
+    skin: ramp(0xFFB89478),
+    torso: plate,
+    torsoKind: TorsoKind.dragonplate,
+    upper: plate,
+    fore: plate,
+    hand: plate,
+    thigh: plate,
+    shin: plate,
+    boot: _darkBoot,
+    knee: plate,
+    elbow: plate,
+    pauldron: plate,
+    tabard: const Color(0xFF6A1A12),
+    trim: gold,
+    belt: const Color(0xFF1A120C),
+    cape: const Color(0xFF4A1410),
+    capeFlow: 14,
+    head: HeadKind.wyrmhelm,
+    helm: plate,
+    eyeGlow: ember,
+    weapon: Weapon.wyrmblade,
+    weaponGlow: const Color(0xFFFF8A3A),
+    wyrmHorns: true,
+    wyrmGloves: true,
+    wyrmBoots: true,
+    shield: const ShieldLook(field: Color(0xFF5A1410), trim: gold, kind: ShieldKind.dragon),
   );
 }
 
@@ -1718,6 +1804,7 @@ final Map<String, Look> foeLooks = {
   // The Ashen Order.
   'ashenKnight': _ashen(),
   'ashenChampion': _ashen(rank: 'champion'),
+  'dragonKnight': _dragonKnight(),
   'malric': _ashen(rank: 'malric'),
   // Ravenmoor.
   'thrall': _thrall(),

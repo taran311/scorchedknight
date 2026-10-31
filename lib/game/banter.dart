@@ -145,6 +145,11 @@ const _byLook = <String, Banter>{
   'thrall': Banter(enter: ['The Countess... needs... more...', 'Don\'t look at the castle. Never look at the castle.'], fall: ['Free... at last...']),
   'vampireSpawn': Banter(enter: ['*hisses, fangs out*', 'So warm. You\'re so WARM.'], hurt: ['*shrieks*'], fall: ['*crumbles to grey dust*']),
   'bloodBride': Banter(enter: ['The Countess sends her love. All of it. Through your neck.', 'Stay for supper, darling. You ARE supper.'], fall: ['My lady... forgive me...']),
+  'dragonKnight': Banter(
+    enter: ['The dragons were here before the Ember King. They will be here after. So will we.', 'You wear a knight\'s steel. I wear a dragon\'s.', 'Kneel to the wyrms, little knight. Or burn like the rest.'],
+    hurt: ['You strike like dragonfire...'],
+    fall: ['The scales... were not enough...', 'Tell the Elder... I held...'],
+  ),
   'vampireKnight': Banter(enter: ['I swore to protect the living. Then I stopped being one.', 'The moon is up. You should not be.'], fall: ['Dawn... at last...']),
   'countess': Banter(
     enter: ['A visitor! How lovely. Nobody visits any more. I wonder why.', 'Two hundred years I\'ve kept this moor. Two hundred years, and still so thirsty.'],

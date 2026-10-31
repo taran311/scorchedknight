@@ -345,6 +345,89 @@ void main() {
     expect(k.loadout.boots!.level, plain.level, reason: 'ordinary gear doesn\'t grow');
   });
 
+  test('dragon lairs: one per kind of dragon, each always leaves its wyrmscale', () {
+    final lairs = [for (final p in places) if (p.wyrm != null) p];
+    expect([for (final p in lairs) p.wyrm]..sort(), [1, 2, 3, 4, 5]);
+    for (final p in lairs) {
+      final f = Rare(lookIndex(p.foe!.$1, p.land), p.foe!.$3, name: p.foe!.$4, look: p.foe!.$2).type;
+      expect(f.dragon, isTrue, reason: p.name);
+      expect(wyrmTierFor(f.look)!.tier, p.wyrm, reason: p.name);
+    }
+    final rime = Rare(lookIndex('yeti', 18), Aura.frost, name: 'Grandfather Rime', look: rimeWyrmLook).type;
+    expect(rime.element, 'frost');
+    expect(elementEdgeOn(rime, 'burn'), greaterThan(1));
+    // Explored and won: the wyrmscale is in the spoils.
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(3));
+    final s = e.state;
+    s.knight.level = 40;
+    s.bossesDown.addAll({for (var c = 0; c < continents.length; c++) c});
+    s.unlocked = continents.length - 1;
+    s.day = false;
+    expect(e.whyNotExplore('rimehollow'), isNull);
+    e.explorePlace('rimehollow');
+    s.foeHp = 1;
+    var guard = 0;
+    while (s.inBattle && guard++ < 50) {
+      s.foeHp = 1;
+      e.takeTurn(BattleAction.attack);
+    }
+    expect(s.explored, contains('rimehollow'));
+    expect(s.pendingLoot.any((g) => g.name.startsWith('Rimescale')), isTrue);
+  });
+
+  test('the Dragon Knight: a Drakesworn knight in the dragons\' lands, sometimes in wyrmscale you can take', () {
+    final f = Rare(lookIndex('ashenKnight', 5), Aura.blazing, look: dragonKnightLook).type;
+    expect(f.look, dragonKnightLook);
+    expect(f.armoured, isTrue);
+    expect([for (final c in [5, 6]) continents[c].named.where((n) => n.look == dragonKnightLook).length], [1, 1]);
+    // Met over and over in the Cinderreach, he turns up as a rare Ashen Knight now and then.
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(5));
+    final s = e.state;
+    s.knight.level = 35;
+    s.bossesDown.addAll({0, 1, 2, 3, 4});
+    s.unlocked = 5;
+    var met = 0;
+    for (var i = 0; i < 3000 && met == 0; i++) {
+      s.continent = 5;
+      e.explore();
+      if (s.rare?.look == dragonKnightLook) met++;
+      s.inBattle = false;
+      s.rare = null;
+    }
+    expect(met, 1);
+  });
+
+  test('the Drakesworn set: dragons and Dragon Knights leave its scale and blueprints; all three turn fire', () {
+    expect(trophyLooks[dragonKnightLook], Trophy.dragonscale);
+    expect(forgedSetFor(Trophy.dragonscale).id, 'drakesworn');
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(6));
+    final s = e.state, k = s.knight;
+    k.level = 40;
+    s
+      ..inBattle = true
+      ..foe = lookIndex('pitdemon', 5)
+      ..foeLevel = 40;
+    final before = counterDamage(s);
+    for (final slot in setPieceSlots) {
+      final g = e.loot.setPiece('drakesworn', slot, k.heroClass, k.level);
+      switch (slot) {
+        case GearSlot.armour:
+          k.loadout.armour = g.art;
+        case GearSlot.ring:
+          k.ring = g;
+        default:
+          k.loadout.put(g);
+      }
+    }
+    // A full suit: helm, plate, gauntlets, sabatons and signet.
+    expect(activeSets(k.setGear).any((x) => x.$1.id == 'drakesworn' && x.$2 == 5), isTrue);
+    expect(armourTierById(k.loadout.armour).name, 'Drakesworn plate');
+    // Guard from the set softens every blow a little; fire is cut by dragonhide on top.
+    expect(counterDamage(s), lessThan(before * .75));
+    s.foe = lookIndex('ashenKnight', 5);
+    expect(counterDamage(s), greaterThan(counterDamage(s..foe = lookIndex('pitdemon', 5))));
+  });
+
   test('bolts can be swapped any time, plain ones in between', () {
     final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(2));
     final k = e.state.knight;
@@ -482,7 +565,7 @@ void main() {
     final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(4));
     final s = e.state, k = s.knight..level = 40;
     // Only Cindervale's places show at first (the Lost Isle hides until the end).
-    expect([for (final p in places) if (e.placeShown(p)) p.id], ['millcellar', 'scarecrow']);
+    expect([for (final p in places) if (e.placeShown(p)) p.id], ['millcellar', 'scarecrow', 'orkscouts']);
     final gold = k.coins, potions = k.potions;
     expect(e.explorePlace('millcellar'), contains('miller'));
     expect(k.coins, greaterThan(gold));
@@ -577,7 +660,8 @@ void main() {
       if (met < setPieceSlots.length) expect(r.kill!.blueprint, isNotNull);
     }
     expect(s.pendingLoot.any((g) => g.art == 'ashenseal'), isTrue);
-    expect(setPieceSlots.every((slot) => s.mat(blueprintKey('ashen', slot)) == 1), isTrue);
+    // One blueprint each time he yields (the suit has more pieces than he has meetings).
+    expect(setPieceSlots.where((slot) => s.mat(blueprintKey('ashen', slot)) == 1).length, greaterThanOrEqualTo(4));
     // He's gone for good: no more meetings.
     s.innRepaired = true;
     e.travel(0);
@@ -643,7 +727,7 @@ void main() {
       s.pendingLoot.add(piece);
       e.equipLoot(piece.id);
     }
-    expect(activeSets(k.gear).any((x) => x.$1.id == 'silverleaf' && x.$2 == 3), isTrue);
+    expect(activeSets(k.setGear).any((x) => x.$1.id == 'silverleaf' && x.$2 == 5), isTrue);
     e.travel(mainLands + 2);
     e.explore();
     s.foeHp = s.foeMax = 1 << 30;

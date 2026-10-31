@@ -315,6 +315,8 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     if (f.stone) return 'grit';
     if (f.ent) return 'sap';
     if (f.undead) return _foeLook.torsoKind == TorsoKind.ribs ? 'bone' : 'rot';
+    // (Frost things shatter in icy mist, the Rime Wyrm too; other dragons spill embers.)
+    if (f.element == 'frost') return 'mist';
     if (f.demon || f.dragon) return 'ember';
     return 'blood';
   }
@@ -3186,7 +3188,7 @@ final _xbow = GearItem(id: 'crossbow', name: 'Crossbow', slot: GearSlot.weapon, 
 Look _crossbowLook(Knight k) {
   final l = k.loadout;
   final kit = Loadout(armour: l.armour, weapon: _xbow, helm: l.helm, gloves: l.gloves, boots: l.boots, cape: l.cape, armourEnchant: l.armourEnchant);
-  return lookFor(k.heroClass, kit, dye: k.dye, gloves: k.gloves, trinket: k.trinket, female: k.female, soot: sootFor(k.level), shine: shinesAt(k.level));
+  return lookFor(k.heroClass, kit, dye: k.dye, gloves: k.gloves, trinket: k.trinket, ring: k.ring, female: k.female, soot: sootFor(k.level), shine: shinesAt(k.level));
 }
 
 /// A companion's run at the foe, 0 to 1 and back: out (easing in to land), held there while it

@@ -793,8 +793,15 @@ class _MapPainter extends CustomPainter {
       _ink(canvas, tp, at);
     }
     // A compass rose (wherever there's a clear patch of map) and the border.
-    const roses = [Offset(945, 545), Offset(950, 460), Offset(950, 380), Offset(950, 640), Offset(870, 640), Offset(300, 640), Offset(50, 450)];
-    _compass(canvas, roses.firstWhere((o) => !_taken.any((r) => r.overlaps(Rect.fromLTRB(o.dx - 28, o.dy - 48, o.dx + 28, o.dy + 28))), orElse: () => roses.first));
+    // (Its favourite corners first, then the sea and the edges; on a crowded map it simply isn't drawn.)
+    final roses = [
+      const Offset(945, 545), const Offset(950, 460), const Offset(950, 380), const Offset(950, 640), const Offset(870, 640), const Offset(300, 640), const Offset(50, 450),
+      // Along the sea at the foot of the map, then down either edge.
+      for (var x = 960.0; x >= 40; x -= 30) Offset(x, 655),
+      for (var y = 640.0; y >= 80; y -= 30) ...[Offset(965, y), Offset(35, y)],
+    ];
+    final rose = roses.where((o) => !_taken.any((r) => r.overlaps(Rect.fromLTRB(o.dx - 28, o.dy - 48, o.dx + 28, o.dy + 28)))).firstOrNull;
+    if (rose != null) _compass(canvas, rose);
     canvas.drawRect(rect.deflate(6), strokePaint(const Color(0xFF6A4A2A), 3));
     canvas.restore();
   }

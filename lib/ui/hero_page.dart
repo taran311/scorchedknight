@@ -268,7 +268,7 @@ class _PaperDoll extends StatelessWidget {
             ],
           ),
           // Sets and cape abilities, when they apply.
-          for (final (set, n) in activeSets(k.gear))
+          for (final (set, n) in activeSets(k.setGear))
             Padding(padding: const EdgeInsets.only(top: 8), child: SetChips(set: set, dense: true, worn: n)),
           if (capeByAbility(k.loadout.cape?.special) case final cape?)
             Padding(padding: const EdgeInsets.only(top: 6), child: Text('✦ ${cape.ability}', textAlign: TextAlign.center, style: Txt.label(size: 13, color: Palette.amber))),

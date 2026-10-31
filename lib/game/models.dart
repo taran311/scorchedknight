@@ -249,6 +249,13 @@ class Knight {
   /// Gear that counts: a mismatched off-hand doesn't.
   Iterable<GearItem> get gear => [loadout.weapon, loadout.activeOffhand, loadout.helm, loadout.gloves, loadout.boots, loadout.cape, trinket, ring].whereType<GearItem>();
 
+  /// [gear], plus the body armour when it's a questline set's own (it counts toward the set).
+  Iterable<GearItem> get setGear {
+    final set = setOfArmour(loadout.armour);
+    if (set == null) return gear;
+    return [...gear, GearItem(id: 'armour', name: armourTierById(loadout.armour).name, slot: GearSlot.armour, art: loadout.armour, rarity: Rarity.epic, level: level, value: 0, stats: const {}, gearSet: set)];
+  }
+
   Map<String, dynamic> toJson() => {
     'level': level,
     'xp': xp,

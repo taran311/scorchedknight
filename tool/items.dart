@@ -17,17 +17,21 @@ void main() {
   for (final g in gearSets) {
     print('${g.id.padRight(12)} two ${score(g.two).toString().padLeft(3)}  three+ ${score(g.three).toString().padLeft(3)}  ${g.forged ? "forged" : "random"}  ${[if (g.cheaperSpells) 'cheaper spells', if (g.bloodthirst) 'bloodthirst', if (g.longWolf) 'longWolf', if (g.firstMiss) 'firstMiss', if (g.forgeheart) 'forgeheart', if (g.firstCrit) 'firstCrit', if (g.regrowth) 'regrowth', if (g.undertow) 'undertow', if (g.adapt) 'adapt', if (g.updraft) 'updraft', if (g.bushido) 'bushido'].join(',')}');
   }
-  print('\n== Set pieces at level $level (avg score of 200 rolls, all three slots) vs random epic accessory ==');
+  // (The suit's body armour is judged by its protection, not a score: left out here.)
+  final rolled = [for (final s in setPieceSlots) if (s != GearSlot.armour) s];
+  print('\n== Set pieces at level $level (avg score of 200 rolls, by slot: ${rolled.map((s) => s.name).join(', ')}) vs random epic pieces ==');
   for (final f in forgedSets) {
-    var t = 0;
-    for (var i = 0; i < 200; i++) {
-      for (final s in setPieceSlots) {
+    final per = <String>[];
+    for (final s in rolled) {
+      var t = 0;
+      for (var i = 0; i < 200; i++) {
         t += loot.setPiece(f.id, s, HeroClass.knight, level).score;
       }
+      per.add((t / 200).toStringAsFixed(0).padLeft(4));
     }
-    print('${f.id.padRight(12)} ${(t / 600).toStringAsFixed(1)}');
+    print('${f.id.padRight(12)} ${per.join(' ')}');
   }
-  for (final slot in setPieceSlots) {
+  for (final slot in rolled) {
     var t = 0, n = 0;
     for (var i = 0; i < 3000; i++) {
       final g = loot.roll(HeroClass.knight, level, odds: const [0, 0, 0, 1, 0], only: slot);

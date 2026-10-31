@@ -361,11 +361,11 @@ class SetChips extends StatelessWidget {
         children: [
           const Icon(Icons.auto_awesome, size: 15, color: Palette.amber),
           const SizedBox(width: 5),
-          Text('${set.name} set${worn == null ? '' : ' $worn/3'}', style: Txt.label(size: dense ? 13 : 14, color: Palette.amber, weight: FontWeight.w800)),
+          Text('${set.name} set${worn == null ? '' : ' $worn/${set.pieces}'}', style: Txt.label(size: dense ? 13 : 14, color: Palette.amber, weight: FontWeight.w800)),
         ],
       ),
       _tier('2', set.two, null),
-      _tier('3', set.three, set.perk),
+      _tier('${set.full}', set.three, set.perk),
     ],
   );
 }

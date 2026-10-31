@@ -500,9 +500,12 @@ class GameEngine {
       if (named.isNotEmpty && _rng.nextDouble() < namedRareShare) {
         final n = named[_rng.nextInt(named.length)];
         at = lookIndex(n.base, c);
-        rare = Rare(at, n.aura, name: n.name);
+        rare = Rare(at, n.aura, name: n.name, look: n.look);
       } else {
-        rare = Rare(at, Aura.values[_rng.nextInt(Aura.values.length)]);
+        // An Ashen Knight or Champion turned rare in the dragons' lands is, often enough, one of the
+        // Drakesworn instead.
+        final drake = (c == 5 || c == 6) && const {'ashenKnight', 'ashenChampion'}.contains(foeAt(at).look) && _rng.nextDouble() < dragonKnightChance;
+        rare = Rare(at, Aura.values[_rng.nextInt(Aura.values.length)], look: drake ? dragonKnightLook : null);
       }
     }
     _begin(at, rare);
@@ -613,6 +616,12 @@ class GameEngine {
     if (p.trophies > 0) {
       state.addMat(trophyKey(trophy), p.trophies);
       got.add('${p.trophies} ${trophy.label.toLowerCase()}');
+    }
+    if (p.wyrm case final t?) {
+      // A dragon's lair: always a piece of its wyrmscale.
+      final g = loot.wyrmDrop(k.heroClass, k.level, wyrmTiers[t - 1]);
+      state.pendingLoot.add(g);
+      got.add(g.name);
     }
     if (p.legendary) {
       final g = loot.roll(k.heroClass, k.level, wielding: k.loadout.weapon, odds: const [0, 0, 0, 0, 1]);
@@ -1659,7 +1668,7 @@ class GameEngine {
     // The Faceless learn: whatever way you struck last turn, they're braced for now.
     final braced = foe.mimic && style != null && style.name == state.lastStyle;
     // The full Changeling set: a change of style lands harder.
-    final adapted = style != null && state.lastStyle != null && style.name != state.lastStyle && activeSets(k.gear).any((e) => e.$1.adapt && e.$2 >= 3);
+    final adapted = style != null && state.lastStyle != null && style.name != state.lastStyle && activeSets(k.setGear).any((e) => e.$1.adapt && e.$2 >= e.$1.full);
     if (style != null) state.lastStyle = style.name;
     final edge = triangle(foe.kind, style) * (braced ? mimicBrace : 1);
     final cape = k.loadout.cape?.special;
@@ -1670,11 +1679,11 @@ class GameEngine {
         : (shooting ? aimBoost(k) * (brewOn(k, Brew.hawkeye) ? hawkeyeBrew : 1) : (casting ? arcanaBoost(k) * (brewOn(k, Brew.arcane) ? arcaneBrew : 1) : 1.0));
     final song = state.inspired > 0 ? inspiredBoost : 1.0;
     final wolf = state.wolfTurns > 0 ? wolfDamage : 1.0;
-    final updraft = foe.aloft && activeSets(k.gear).any((e) => e.$1.updraft && e.$2 >= 3) ? updraftBoost : 1.0;
-    final bushido = activeSets(k.gear).any((e) => e.$1.bushido && e.$2 >= 3) ? 1 + math.min(bushidoCap, (state.turn - 1) * bushidoStep) : 1.0;
+    final updraft = foe.aloft && activeSets(k.setGear).any((e) => e.$1.updraft && e.$2 >= e.$1.full) ? updraftBoost : 1.0;
+    final bushido = activeSets(k.setGear).any((e) => e.$1.bushido && e.$2 >= e.$1.full) ? 1 + math.min(bushidoCap, (state.turn - 1) * bushidoStep) : 1.0;
     final mult = reach * edge * train * song * wolf * updraft * bushido * (adapted ? adaptBoost : 1) * (bash ? bashMult : (shooting ? crossbowShare(k) * aim : (casting && cape == 'starweave' ? 1.3 : 1.0)));
     final d = striking
-        ? swingDamage(state, _rng.nextDouble(), special: fire, ammo: shot, spell: cast, hitRoll: _rng.nextDouble(), mult: mult, sureCrit: state.turn == 1 && activeSets(k.gear).any((e) => e.$1.firstCrit && e.$2 >= 3))
+        ? swingDamage(state, _rng.nextDouble(), special: fire, ammo: shot, spell: cast, hitRoll: _rng.nextDouble(), mult: mult, sureCrit: state.turn == 1 && activeSets(k.setGear).any((e) => e.$1.firstCrit && e.$2 >= e.$1.full))
         : const SwingDamage();
     // Attacks and shots can miss now and then. Specials, rites and the bash always land.
     final miss = (action == BattleAction.attack || (shooting && aim <= 1)) && fire?.sure != true && _rng.nextDouble() < missChance;
@@ -1817,7 +1826,7 @@ class GameEngine {
       r.regrownFrom = 'Mending';
     }
     // The full Sunscale set: under half health, you regrow too.
-    if (state.inBattle && k.hp > 0 && k.hp < maxHp(k) / 2 && activeSets(k.gear).any((e) => e.$1.regrowth && e.$2 >= 3)) {
+    if (state.inBattle && k.hp > 0 && k.hp < maxHp(k) / 2 && activeSets(k.setGear).any((e) => e.$1.regrowth && e.$2 >= e.$1.full)) {
       final before = k.hp;
       k.hp = math.min(maxHp(k), k.hp + (maxHp(k) * regrowthHeal).round());
       r.regrown += k.hp - before;
@@ -2035,7 +2044,7 @@ class GameEngine {
       _note('The cold bites deep: $foeName freezes solid!', EntryKind.good);
     }
     // The full Tidecaller set: frost drags the foe down like the undertow.
-    if (d.frost > 0 && state.foeSlowed == 0 && activeSets(k.gear).any((e) => e.$1.undertow && e.$2 >= 3) && _rng.nextDouble() < undertowChance) {
+    if (d.frost > 0 && state.foeSlowed == 0 && activeSets(k.setGear).any((e) => e.$1.undertow && e.$2 >= e.$1.full) && _rng.nextDouble() < undertowChance) {
       state.foeSlowed = 2;
       _note('The undertow drags at $foeName: half its blows will miss for two turns.', EntryKind.good);
     }
@@ -2184,7 +2193,7 @@ class GameEngine {
       // Vanguard: the fight's first blow glances off the Crusader's mantle.
       state.vanguardUsed = true;
       spared(Guard.block, '$foeName strikes. The blow glances off your Crusader\'s mantle.');
-    } else if (!state.vanguardUsed && activeSets(k.gear).any((e) => e.$1.firstMiss && e.$2 >= 3)) {
+    } else if (!state.vanguardUsed && activeSets(k.setGear).any((e) => e.$1.firstMiss && e.$2 >= e.$1.full)) {
       // Silverleaf: the fight's first blow finds only a drift of silver leaves where you were.
       state.vanguardUsed = true;
       r
@@ -2222,7 +2231,7 @@ class GameEngine {
         r.reflected = full;
       }
       k.hp = math.max(0, k.hp - hurt);
-      if (blocked && k.hp > 0 && activeSets(k.gear).any((e) => e.$1.forgeheart && e.$2 >= 3)) {
+      if (blocked && k.hp > 0 && activeSets(k.setGear).any((e) => e.$1.forgeheart && e.$2 >= e.$1.full)) {
         // Deepforge: the block rings like an anvil, and you feel it in your bones.
         final before = k.hp;
         k.hp = math.min(maxHp(k), k.hp + (maxHp(k) * forgeheartHeal).round());
@@ -2416,6 +2425,11 @@ class GameEngine {
       rune = loot.runeWeapon(k.heroClass, k.level);
       state.trophies.add(rune.art);
       state.pendingLoot.add(rune);
+    }
+    if (f.look == dragonKnightLook && _rng.nextDouble() < dragonKnightWyrm) {
+      // A Dragon Knight's armour: obsidian wyrmscale (the Throne's own, Elder).
+      wyrm = loot.wyrmDrop(k.heroClass, k.level, wyrmTiers[c == 6 ? 4 : 3]);
+      state.pendingLoot.add(wyrm);
     }
     if (f.dragon) {
       // Dragons leave one kind of prize: wyrmscale, a piece in this dragon's colour (its tier).

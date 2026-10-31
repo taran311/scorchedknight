@@ -58,7 +58,7 @@ const capeChance = .06;
 /// A set of gloves, boots and a ring that steers a build. Wear two pieces for the first bonus,
 /// all three for the second as well.
 class GearSet {
-  const GearSet(this.id, this.name, this.two, this.three, this.twoText, this.threeText, {this.heroClass, this.cheaperSpells = false, this.forged = false, this.bloodthirst = false, this.longWolf = false, this.firstMiss = false, this.forgeheart = false, this.firstCrit = false, this.regrowth = false, this.undertow = false, this.adapt = false, this.updraft = false, this.bushido = false, this.perk});
+  const GearSet(this.id, this.name, this.two, this.three, this.twoText, this.threeText, {this.heroClass, this.cheaperSpells = false, this.forged = false, this.bloodthirst = false, this.longWolf = false, this.firstMiss = false, this.forgeheart = false, this.firstCrit = false, this.regrowth = false, this.undertow = false, this.adapt = false, this.updraft = false, this.bushido = false, this.dragonhide = false, this.perk});
   final String id, name, twoText, threeText;
 
   /// The full set's special power in a few words, for its chip (null: stats only).
@@ -106,6 +106,16 @@ class GearSet {
   /// The full Bushido set: each turn a fight lasts, your blows land [bushidoStep] harder, up to
   /// [bushidoCap].
   final bool bushido;
+
+  /// The full Drakesworn set: dragon scale over your steel. Fire (dragons, demons, the Ember King
+  /// himself) hits you [dragonhideFire] as hard.
+  final bool dragonhide;
+
+  /// Pieces it takes to wear the whole bonus (and its perk), and pieces there are. A questline set
+  /// is a full suit of five (helm, armour, gauntlets, sabatons, signet): four for the bonus, all
+  /// five to wear its colours head to foot. The vault's six count from three, like the rest.
+  int get full => forged && id != 'vault' ? 4 : 3;
+  int get pieces => !forged ? 3 : (id == 'vault' ? 6 : 5);
 }
 
 /// How hard each forged set's pieces roll, so every set's pieces come out about as strong as one
@@ -122,9 +132,12 @@ const _setPower = <String, double>{
   'changeling': 1.1,
   'skyborn': 1.6,
   'bushido': 1.25,
+  'drakesworn': 1.045,
 };
 
 /// Turns the full Moonfang set adds to the wolf; what the full Deepforge set mends on a block.
+const dragonhideFire = .7;
+
 const longWolfTurns = 2, forgeheartHeal = .06, regrowthHeal = .04, undertowChance = .25, adaptBoost = 1.2, updraftBoost = 1.25, bushidoStep = .05, bushidoCap = .25;
 
 const gearSets = <GearSet>[
@@ -147,6 +160,7 @@ const gearSets = <GearSet>[
   // dropped. Wear any three for the full bonus.
   GearSet('vault', 'Vaultkeeper', {Stat.burn: 4, Stat.fortune: 10}, {Stat.burn: 5, Stat.guard: 3}, '+4 fire on every full swing and +10% gold', '+5 more fire and +3% guard: the vault\'s embers burn for you', forged: true),
   GearSet('bushido', 'Bushido', {Stat.parry: 4, Stat.crit: 4}, {Stat.damage: 3, Stat.parry: 3}, '+4% parry and +4% crit', '+3 damage, +3% more parry, and every turn a fight goes on, your blows land 5% harder (up to 25%): the longer the duel, the surer the cut', forged: true, bushido: true, perk: '+5% a turn, up to 25%'),
+  GearSet('drakesworn', 'Drakesworn', {Stat.burn: 4, Stat.vigour: 10}, {Stat.burn: 3, Stat.guard: 3}, '+4 fire on every full swing and +10 vigour', '+3 more fire, +3% guard, and dragon scale over your steel: fire hits you 30% softer (dragons, demons, the Ember King)', forged: true, dragonhide: true, perk: 'Fire hits you 30% softer'),
   GearSet('skyborn', 'Skyborn', {Stat.dodge: 5, Stat.crit: 3}, {Stat.crit: 4, Stat.dodge: 3}, '+5% dodge and +3% crit', '+4% more crit, +3% dodge, and against anything in the air (fliers, ghosts, archers on the cliffs) all your blows land 25% harder', forged: true, updraft: true, perk: '+25% against fliers'),
 ];
 
@@ -155,7 +169,7 @@ GearSet? gearSetById(String? id) => gearSets.where((s) => s.id == id).firstOrNul
 /// Chance a rare-or-better pair of gloves, boots or ring belongs to a set.
 const gearSetChance = .25;
 
-/// Gear sets active from [gear]: each with how many pieces are worn (2 or 3).
+/// Gear sets active from [gear]: each with how many pieces are worn (2 or more).
 List<(GearSet, int)> activeSets(Iterable<GearItem> gear) {
   final counts = <String, int>{};
   for (final g in gear) {
@@ -1755,8 +1769,14 @@ class LootTable {
   /// A piece of a forged set (gloves, boots or a ring), made at Dunstan's from its blueprint: epic,
   /// at your level, with the set's own stats.
   GearItem setPiece(String setId, GearSlot slot, HeroClass heroClass, int level) {
+    if (slot == GearSlot.armour) {
+      // The suit's body armour: its protection is the armour tier's, its worth the set's.
+      final t = armourTierById(setArmourId(setId)), set = gearSetById(setId)!;
+      return GearItem(id: _id(), name: t.name, slot: GearSlot.armour, art: t.id, rarity: Rarity.epic, level: level, heroClass: heroClass, gearSet: setId, lore: 'Forged by Dunstan from a blueprint. Damage taken −${(t.reduction * 100).round()}%. Part of the ${set.name} suit.', value: _value(level, Rarity.epic, GearSlot.armour), stats: const {});
+    }
     final set = gearSetById(setId)!;
-    final (main, second, third) = switch ((setId, slot)) {
+    // (A suit's helm rolls like its sabatons: the sturdy pieces.)
+    final (main, second, third) = switch ((setId, slot == GearSlot.helm ? GearSlot.boots : slot)) {
       ('ashen', GearSlot.gloves) => (Stat.damage, Stat.burn, Stat.guard),
       ('ashen', GearSlot.boots) => (Stat.guard, Stat.block, Stat.vigour),
       ('ashen', _) => (Stat.burn, Stat.thorns, Stat.guard),
@@ -1787,6 +1807,9 @@ class LootTable {
       ('bushido', GearSlot.gloves) => (Stat.damage, Stat.parry, Stat.crit),
       ('bushido', GearSlot.boots) => (Stat.parry, Stat.vigour, Stat.crit),
       ('bushido', _) => (Stat.crit, Stat.parry, Stat.damage),
+      ('drakesworn', GearSlot.gloves) => (Stat.damage, Stat.burn, Stat.crit),
+      ('drakesworn', GearSlot.boots) => (Stat.vigour, Stat.guard, Stat.burn),
+      ('drakesworn', _) => (Stat.burn, Stat.guard, Stat.vigour),
       (_, GearSlot.gloves) => (Stat.damage, Stat.crit, Stat.dodge),
       (_, GearSlot.boots) => (Stat.dodge, Stat.crit, Stat.vigour),
       _ => (Stat.crit, Stat.damage, Stat.regen),
@@ -1801,7 +1824,8 @@ class LootTable {
     };
     // Each set's stats weigh differently, so each is tuned to land a little above an average
     // random epic piece of the same slot (see tool/items.dart).
-    final power = _setPower[setId] ?? 1.0;
+    // (A helm carries more than sabatons do: a random epic helm is worth nearly twice a pair.)
+    final power = (_setPower[setId] ?? 1.0) * (slot == GearSlot.helm ? 1.75 : 1);
     final stats = <Stat, int>{main: _roll(main, level, scale * rarity.power * 1.15 * power, _r)};
     for (final st in [second, third]) {
       stats[st] = (stats[st] ?? 0) + _roll(st, level, .8 * rarity.power * .6 * power, _r);
@@ -1813,11 +1837,13 @@ class LootTable {
         HeroClass.ranger => 'bracers',
       },
       GearSlot.boots => heroClass == HeroClass.knight ? 'sabatons' : 'boots',
+      GearSlot.helm => setId == 'bushido' ? 'kabuto' : (setId == 'drakesworn' ? 'wyrmhelm' : (setId == 'ashen' ? 'sallet' : 'greathelm')),
       _ => 'ring',
     };
     final noun = switch (slot) {
       GearSlot.gloves => heroClass == HeroClass.knight ? 'gauntlets' : (heroClass == HeroClass.mage ? 'gloves' : 'bracers'),
       GearSlot.boots => heroClass == HeroClass.knight ? 'sabatons' : 'boots',
+      GearSlot.helm => 'helm',
       _ => 'signet',
     };
     return GearItem(
@@ -1839,6 +1865,7 @@ class LootTable {
         'changeling' => 0xFF8A6AB0,
         'skyborn' => 0xFF9AC8E8,
         'bushido' => 0xFFB8322A,
+        'drakesworn' => 0xFF8A2A1A,
         _ => 0xFF8A94A8,
       },
       heroClass: slot == GearSlot.ring ? null : heroClass,

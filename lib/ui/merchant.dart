@@ -411,8 +411,8 @@ class ForgeWares extends StatelessWidget {
               if (s.mat(blueprintKey(f.id, slot)) > 0)
                 x.ware(
                   MatIcon.blueprint(size: 28),
-                  '${gearSetById(f.id)!.name} ${pieceNoun(slot)}',
-                  'Epic, at your level',
+                  slot == GearSlot.armour ? armourTierById(setArmourId(f.id)).name : '${gearSetById(f.id)!.name} ${pieceNoun(slot)}',
+                  slot == GearSlot.armour ? '−${(armourTierById(setArmourId(f.id)).reduction * 100).round()}% damage taken' : 'Epic, at your level',
                   CostButton(
                     label: 'Forge',
                     onTap: c.whyNotForgePiece(f.id, slot) == null

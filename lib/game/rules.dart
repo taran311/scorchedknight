@@ -93,10 +93,10 @@ HeroStats heroStats(Knight k, {Iterable<GearItem>? gear}) {
     final e = g.enchant;
     if (e != null) s.add(e.info.stat, e.value);
   }
-  // Gear sets: two pieces for the first bonus, three for the second as well.
-  for (final (set, n) in activeSets(gear ?? k.gear)) {
+  // Gear sets: two pieces for the first bonus, the set's [GearSet.full] for the second as well.
+  for (final (set, n) in activeSets(gear ?? k.setGear)) {
     set.two.forEach(s.add);
-    if (n >= 3) set.three.forEach(s.add);
+    if (n >= set.full) set.three.forEach(s.add);
   }
   final rune = k.loadout.armourEnchant;
   if (rune != null) s.add(rune.info.stat, rune.value);
@@ -122,7 +122,7 @@ HeroStats heroStats(Knight k, {Iterable<GearItem>? gear}) {
 
 /// Mana [spell] costs you: one less with the full Arcanist set (never below 1).
 int spellCost(Knight k, Spell spell) {
-  final cheaper = activeSets(k.gear).any((e) => e.$1.cheaperSpells && e.$2 >= 3);
+  final cheaper = activeSets(k.setGear).any((e) => e.$1.cheaperSpells && e.$2 >= e.$1.full);
   return math.max(1, spell.cost - (cheaper ? 1 : 0));
 }
 
@@ -499,7 +499,9 @@ int counterDamage(GameState s) {
   final bones = foeIn(s).undead && boneArmour.contains(k.loadout.armour) ? boneWard : 1.0;
   final bark = brewOn(k, Brew.barkskin) ? barkskinBrew : 1.0;
   final hide = s.wolfTurns > 0 ? wolfHide : 1.0;
-  return math.max(1, (foeAttack(s.foe, s.rare, s.foeLevel) * (1 - damageReduction(k)) * weakened * bones * bark * hide * manaShield(s) * outmatched(s.foeLevel, k.level) * ngFoeHit(s.ng)).round());
+  // The full Drakesworn set: dragon scale turns fire.
+  final scale = foeIn(s).strike == Strike.fire && activeSets(k.setGear).any((e) => e.$1.dragonhide && e.$2 >= e.$1.full) ? dragonhideFire : 1.0;
+  return math.max(1, (foeAttack(s.foe, s.rare, s.foeLevel) * (1 - damageReduction(k)) * weakened * bones * bark * hide * scale * manaShield(s) * outmatched(s.foeLevel, k.level) * ngFoeHit(s.ng)).round());
 }
 
 /// The Bloodmoon Pelt: when a blow leaves you under [wolfAt] of your HP, the wolf comes out (once a
@@ -511,11 +513,11 @@ const peltArt = 'bloodmoonpelt';
 bool wearsPelt(Knight k) => k.trinket?.art == peltArt;
 
 /// Turns the wolf lasts for [k] (longer in the full Moonfang set).
-int wolfTurnsFor(Knight k) => wolfTurns + (activeSets(k.gear).any((e) => e.$1.longWolf && e.$2 >= 3) ? longWolfTurns : 0);
+int wolfTurnsFor(Knight k) => wolfTurns + (activeSets(k.setGear).any((e) => e.$1.longWolf && e.$2 >= e.$1.full) ? longWolfTurns : 0);
 
 /// Whether the full Nightblood set's Bloodthirst is on: under half health, heals from your blows
 /// are doubled.
-bool bloodthirsty(Knight k) => k.hp < maxHp(k) / 2 && activeSets(k.gear).any((e) => e.$1.bloodthirst && e.$2 >= 3);
+bool bloodthirsty(Knight k) => k.hp < maxHp(k) / 2 && activeSets(k.setGear).any((e) => e.$1.bloodthirst && e.$2 >= e.$1.full);
 
 /// A mage's unspent mana hums around them like a shield: 7% softer blows for each point held.
 /// Casting spends the protection too.

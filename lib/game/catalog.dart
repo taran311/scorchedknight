@@ -568,6 +568,7 @@ const continents = <Continent>[
       NamedRare('Cinderqueen Ashkara', 'obsidian', Aura.blazing),
       NamedRare('The Bone Marshal', 'dragonboneWarden', Aura.ancient),
       NamedRare('Glimmerscale the Hoarder', 'wyvern', Aura.gilded),
+      NamedRare('Sir Vaelric the Drakesworn', 'ashenKnight', Aura.blazing, look: dragonKnightLook),
     ],
   ),
   Continent(
@@ -593,6 +594,7 @@ const continents = <Continent>[
     named: [
       NamedRare('Pyrelord Kazzak', 'pitdemon', Aura.blazing),
       NamedRare('The Smouldering Saint', 'archwarlock', Aura.cursed),
+      NamedRare('Drakelord Ormund', 'ashenChampion', Aura.gilded, look: dragonKnightLook),
     ],
   ),
   // ---- Side lands, off the road. Their foes keep their worst for the night. ----
@@ -1070,9 +1072,12 @@ extension AuraInfo on Aura {
 
 /// A named rare boss: a variant of a regular foe ([base] is its look key).
 class NamedRare {
-  const NamedRare(this.name, this.base, this.aura);
+  const NamedRare(this.name, this.base, this.aura, {this.look});
   final String name, base;
   final Aura aura;
+
+  /// Drawn (and fought) as something else (a Dragon Knight over an Ashen Knight's place in the land).
+  final String? look;
 }
 
 /// A rare encounter: a variant of a regular foe ([base] is its index in [foes]).
@@ -1106,6 +1111,14 @@ class Rare {
     if (look == malricLook) {
       // Sir Malric the Ashen: a knight like you, gone over to the Ember King.
       return FoeType(name ?? malricName, look!, hp: 1.05, aura: aura, named: true, armoured: true);
+    }
+    if (look == dragonKnightLook) {
+      // A Dragon Knight: plate of dragon scale, a blade of dragon fire, a little tougher than the Order.
+      return FoeType(name ?? 'Dragon Knight', look!, hp: 1.2, aura: aura, named: name != null && !pack, armoured: true, pack: pack);
+    }
+    if (look == rimeWyrmLook) {
+      // The Rime Wyrm: a frost dragon (fire melts it; frost does nothing), wherever it lairs.
+      return FoeType(name ?? 'Rime Wyrm', look!, dragon: true, hp: 1.1, aura: aura, named: name != null, aloft: true, strike: Strike.magic, element: 'frost');
     }
     final golem = golemTypes[look];
     if (golem != null) {
@@ -1157,6 +1170,17 @@ String elementWeakness(String element) => switch (element) {
 /// along, and each time you beat him he yields and rides off; the last time, in the Cinderreach or
 /// beyond, it's a duel to the end.
 const malricLook = 'malric', malricName = 'Sir Malric the Ashen';
+
+/// The Drakesworn: knights who serve the dragons of the Cinderreach and the Throne, not the Ember
+/// King. Met as a rare Ashen Knight or Champion there ([dragonKnightChance] of them), and by name.
+const dragonKnightLook = 'dragonKnight';
+const dragonKnightChance = .35;
+
+/// The share of the wyrmscale a Dragon Knight wears that you can take off him.
+const dragonKnightWyrm = .35;
+
+/// The frost dragon, only ever met in its lair under the Frostmarch glacier.
+const rimeWyrmLook = 'frostWyrm';
 
 /// The land he first turns up in for each meeting (the last is the duel).
 const malricLands = [2, 3, 4, 5];
@@ -1432,7 +1456,12 @@ class Place {
     this.hidden = false,
     this.relic,
     this.above = 0,
+    this.wyrm,
   });
+
+  /// A dragon's lair: its guardian is a dragon, and beaten, it always leaves a wyrmscale piece of
+  /// this tier (1 Ashen to 5 Elder; see wyrmTiers).
+  final int? wyrm;
 
   /// A relic part's guardian: this place only shows once you hold that relic's blueprint (and still
   /// need the part), and winning it gives the part: (relic, part index).
@@ -1478,7 +1507,7 @@ const places = <Place>[
   Place('sphinx', 'The Riddling Sphinx', 4, 905, 245, PlaceKind.shrine, 'A stone sphinx half-buried in the sand. "What walks on four legs, then two, then fights a dragon?" You say "me". It seems to accept that.', 'The sphinx\'s eyes glow, and you feel wiser, and sturdier. (Barkskin for three fights, and a purse it was sitting on.)', brew: 'barkskin', purses: 2),
   Place('treasury', 'The Sunken Treasury', 4, 928, 360, PlaceKind.cache, 'Steps going down into the glass sand, and at the bottom, a door with a pharaoh\'s seal. It\'s been opened before. Not all the way.', 'Gold, dusty and heavy, and a jewel the tomb-robbers missed.', purses: 4, gems: 1),
   Place('malriccamp', 'An Abandoned Camp', 5, 610, 430, PlaceKind.cache, 'A cold campfire on the black glass, a bedroll, and a knight\'s things left neatly folded. Someone left in a hurry, or doesn\'t mean to come back.', 'Under the bedroll: Ashen steel, and a letter in a careful hand. "If I don\'t come back, I was wrong about all of it. — M."', trophies: 3, purses: 2),
-  Place('glasswyrm', 'Glassjaw\'s Roost', 5, 790, 560, PlaceKind.guarded, 'A wyvern\'s nest of melted glass and stolen silver, and the wyvern, wide awake.', 'Glassjaw crashes down into her own hoard. You fill your pockets.', foe: ('wyvern', null, Aura.gilded, 'Glassjaw'), purses: 4, ore: {'obsidian': 4}),
+  Place('glasswyrm', 'Glassjaw\'s Roost', 5, 790, 560, PlaceKind.guarded, 'A wyvern\'s nest of melted glass and stolen silver, and the wyvern, wide awake.', 'Glassjaw crashes down into her own hoard. You fill your pockets.', foe: ('wyvern', null, Aura.gilded, 'Glassjaw'), purses: 4, ore: {'obsidian': 4}, wyrm: 1),
   Place('battower', 'The Bat Tower', 7, 318, 350, PlaceKind.guarded, 'A ruined tower on the moor, black with roosting bats. They all wake at dusk, and so does their master.', 'The Bat King bursts into a cloud of shrieking wings. In his roost: fangs, and the Countess\'s tithe.', foe: ('vampireSpawn', null, Aura.cursed, 'The Bat King'), purses: 2, trophies: 3),
   Place('moonpool', 'The Moon Pool', 8, 48, 255, PlaceKind.shrine, 'A still pool in the pines that holds the moon even by day. The werewolves drink here. So, carefully, do you.', 'The water is ice-cold and tastes of silver. You feel wolfish. At the edge, shed pelts, silver in the moonlight.', trophies: 3, potions: 1),
   Place('starlitglade', 'The Starlit Glade', 9, 440, 38, PlaceKind.shrine, 'A glade where the elves leave offerings to the stars: bowls of water, and folded silk. Taking some seems rude. Kneeling seems right.', 'Starlight pools in your hands and runs up your arms. (Arcane brew for three fights.) Somebody left elven silk on the stone; you take it, gratefully.', brew: 'arcane', trophies: 3),
@@ -1490,6 +1519,29 @@ const places = <Place>[
   Place('mirrorhall', 'The Hall of Mirrors', 14, 868, 600, PlaceKind.shrine, 'A ruined hall full of mirrors, and in every one, a different you: older, younger, a goblin, a dragon. One of them winks.', 'You stare until your reflection settles back into your own shape, and feel stronger for it. (Might for three fights.) The mirrors shed their silver skins at your feet.', brew: 'might', trophies: 3),
   Place('castleoflanterns', 'The Lantern Shrine', 16, 700, 640, PlaceKind.shrine, 'A shrine on a rock in the sea, hung with a thousand paper lanterns. An old priest sweeps the steps and doesn\'t look up.', 'You ring the bell and bow. The priest nods, once, and hands you a cup of tea and a folded scrap of lacquer. (Might for three fights.)', brew: 'might', trophies: 3),
   Place('rocnest', 'The Great Nest', 15, 798, 26, PlaceKind.guarded, 'A nest the size of a cottage on the highest peak, woven from whole trees, and something huge and feathered sitting on it.', 'The mother griffin takes wing and is gone. In the nest: feathers by the armful, gold the aeriekin left as offerings, and eggshell like porcelain.', foe: ('griffin', null, Aura.ancient, 'The Mother Griffin'), purses: 3, trophies: 4, gems: 1),
+  // The second wave: something to go and look at in every corner of the map.
+  Place('orkscouts', 'The Ork Scout Camp', 0, 205, 590, PlaceKind.guarded, 'A ring of spears by the shore and a cooking fire nobody bothered to hide. Orks, this far from the Badlands, scouting.', 'Snagga the Scout won\'t be reporting back. His camp is full of things the orks stole on the way here.', foe: ('pillager', 'ork', Aura.blazing, 'Snagga the Scout'), purses: 2, potions: 1),
+  Place('barrow', 'The Champion\'s Barrow', 1, 440, 535, PlaceKind.guarded, 'A grassy mound with a door in it, and on the door, a tourney shield. Someone in there is still waiting for his next match.', 'Sir Rattlesby bows from the waist as he falls apart. Among his bones: a century of tourney purses.', foe: ('skeleton', 'skeletonChampion', Aura.ancient, 'Sir Rattlesby the Undying'), purses: 2, trophies: 2),
+  Place('warcamp', 'The Ork War Camp', 3, 585, 345, PlaceKind.guarded, 'Drums, smoke and a stockade of sharpened logs. Every ork in the Badlands seems to be sharpening something, and the biggest one is sharpening two things.', 'Gorehowl goes down roaring. His tent holds the camp\'s whole war chest, and the iron they meant to make into axes.', foe: ('orkWarlord', null, Aura.blazing, 'Gorehowl the Many-Scarred'), purses: 3, ore: {'iron': 4}),
+  Place('queensleep', 'The Queen\'s Sarcophagus', 4, 705, 300, PlaceKind.guarded, 'A painted coffin standing upright in the sand, lid ajar. The paint shows a queen asleep. The coffin is empty.', 'Merit-Ash crumbles back to dust, still wearing her jewels. You take them. She won\'t mind now.', foe: ('mummyGuard', null, Aura.cursed, 'Merit-Ash, the Sleepless Queen'), purses: 3, gems: 1),
+  Place('glassfurnace', 'The Glass Furnace', 5, 655, 575, PlaceKind.guarded, 'A crater of molten glass that never cools, and in the middle of it, the fire has stood up. It has noticed you.', 'The Furnace Heart gutters out into a lump of black glass. Around the crater: obsidian, cooled and glittering.', foe: ('pitdemon', 'elementalEmber', Aura.blazing, 'The Furnace Heart'), purses: 3, ore: {'obsidian': 4}),
+  Place('ashengate', 'The Ashen Gate', 6, 945, 185, PlaceKind.guarded, 'A gate of black iron in the middle of nowhere, with no wall either side. Its keeper stands in front of it anyway. He has stood there since the Burning.', 'Lord Cindermane kneels and lets his sword fall. "Go on, then," he says. Behind the gate: everything he was set to guard.', foe: ('ashenChampion', null, Aura.blazing, 'Lord Cindermane, the Last Gatekeeper'), purses: 4, gems: 2),
+  Place('reliquary', 'The Burnt Reliquary', 6, 775, 95, PlaceKind.cache, 'A chapel the Ember King\'s fire went straight through. The roof is gone, the pews are ash, and the reliquary under the altar is still locked.', 'The lock gives. Inside: the chapel\'s gold, a jewel, and two flasks of holy water that kept the fire out.', purses: 3, gems: 1, potions: 2),
+  Place('gallows', 'The Gallows Crossroads', 7, 405, 282, PlaceKind.guarded, 'Four roads, one gibbet, and a crowd of ghouls round it, waiting on their king. Something with a crown is sitting on the crossbeam.', 'The Gallows King drops off his beam for the last time. In the gibbet cage: the Countess\'s tithe, and what the hanged left behind.', foe: ('ghoul', 'ghoulking', Aura.cursed, 'The Gallows King'), purses: 2, trophies: 3),
+  Place('woodcutter', 'The Woodcutter\'s Hut', 8, 150, 385, PlaceKind.guarded, 'A hut in a clearing, an axe in the block, and the woodcutter at the door, smiling too wide. The moon is up. His shadow isn\'t a man\'s.', 'Old Hatchet goes down, and stays a man as he does. Under the hut: his savings, and the pelts of everything he hunted.', foe: ('woodsman', null, Aura.cursed, 'Old Hatchet, the Woodcutter'), purses: 2, trophies: 3),
+  Place('unicornspring', 'The Unicorn Spring', 9, 408, 98, PlaceKind.shrine, 'A spring in the silver birches where the unicorns drink. One is drinking now. It looks at you, and decides you can stay.', 'You drink after it. The water is sweet and cold and mends you all the way through. (Mending draught for three fights.)', brew: 'healing', potions: 2),
+  Place('foundry', 'The Golem Foundry', 10, 525, 180, PlaceKind.guarded, 'A forgotten forge where the dwarves once poured their golems. One is still in its mould, gold from head to foot, and it has just woken up.', 'The Gilded Sentinel topples, ringing like a bell. The moulds around it are full of gold, cooled where it was poured.', foe: ('golemIron', 'golemGold', Aura.gilded, 'The Gilded Sentinel'), purses: 2, ore: {'gold': 4}),
+  Place('choirstones', 'The Choir Stones', 11, 40, 130, PlaceKind.guarded, 'A ring of standing stones in the mist, and in the middle, one faceless figure, singing. The stones sing back.', 'The Hollow Cantor stops mid-note, and the stones go quiet. At their feet: offerings left by every sailor who heard the song and turned back.', foe: ('facelessChoir', null, Aura.cursed, 'The Hollow Cantor'), purses: 3, trophies: 3),
+  Place('wallow', 'Mudjaw\'s Wallow', 12, 855, 430, PlaceKind.guarded, 'A steaming mud-pool in the jungle, and two yellow eyes just above the surface. The lizardfolk leave it goats. It would rather have you.', 'Old Mudjaw sinks into his wallow and doesn\'t come up. Round the edge, in the mud: every bangle the goats were wearing.', foe: ('mossDragon', null, Aura.venom, 'Old Mudjaw'), purses: 3, trophies: 3, wyrm: 2),
+  Place('skinthief', 'The Hall of Faces', 14, 950, 585, PlaceKind.guarded, 'A long hall hung with faces like coats on pegs. One of the faces is yours. Someone is trying it on.', 'The Skinthief Queen drops every face she ever wore. Yours goes back where it belongs. Hers was never there to begin with.', foe: ('shifterSly', null, Aura.cursed, 'The Skinthief Queen'), purses: 3, trophies: 3),
+  Place('stormaltar', 'The Storm Altar', 15, 968, 108, PlaceKind.shrine, 'An altar on a crag where lightning strikes every hour, on the hour. The aeriekin leave their arrows here to be blessed.', 'You hold your hand over the stone and the next bolt runs up your arm, harmless and bright. Your eye goes keen as a hawk\'s. (Hawkeye for three fights.)', brew: 'hawkeye', purses: 2),
+  Place('onigate', 'The Oni\'s Gate', 16, 725, 560, PlaceKind.guarded, 'A red torii gate on the beach, and under it, a red oni with an iron club, collecting a toll. Everybody pays it.', 'Akagane sits down hard, laughing, and tosses you the toll-box. "Nobody\'s ever not paid," he says. "Keep it."', foe: ('oni', null, Aura.blazing, 'Akagane, the Red Oni'), purses: 3, trophies: 3),
+  // Dragon lairs: one for every kind of dragon (Glassjaw's Roost and Mudjaw's Wallow are the first
+  // two). Each always leaves a wyrmscale piece in its dragon's colour.
+  Place('rimehollow', 'The Rime Wyrm\'s Hollow', 18, 650, 300, PlaceKind.guarded, 'A hole in the glacier, blue all the way down, and breath coming up out of it that freezes on the air. The reavers won\'t go near it. They call what\'s in there the Grandfather.', 'The Rime Wyrm shatters like a frozen lake in spring. Among the ice: scales as clear as glass, and everything that ever fell down its hole.', foe: ('yeti', 'frostWyrm', Aura.frost, 'Grandfather Rime'), purses: 3, gems: 1, wyrm: 3),
+  Place('caldera', 'The Obsidian Caldera', 5, 815, 500, PlaceKind.guarded, 'A crater of black glass, still smoking, and a drake asleep in the bottom of it, curled round a clutch of eggs gone cold. She is not asleep.', 'Cinderjaw falls across her nest. Her scales come away black and hot, and her hoard is in the glass beneath her.', foe: ('obsidian', null, Aura.blazing, 'Cinderjaw'), purses: 4, ore: {'obsidian': 3}, wyrm: 4),
+  Place('eyrie', 'The Elder\'s Eyrie', 6, 755, 175, PlaceKind.guarded, 'A spire of red rock above the Throne, and on top of it, an old gold wyrm, older than the Ember King, watching him burn the world and doing nothing about it.', 'The Elder Wyrm sighs, a long, hot, tired sigh, and lies down for the last time. Her gold is your gold now. So are her scales.', foe: ('elderWyrm', null, Aura.ancient, 'Aurumvex the Elder'), purses: 5, gems: 2, wyrm: 5),
+  Place('seacave', 'The Sea Cave', 17, 405, 655, PlaceKind.cache, 'The Hollowdeep runs all the way to the sea, and the tide fills its last cave twice a day. Smugglers used it. Then the bats came.', 'Behind a rock the bats never moved: the smugglers\' last load, still dry in oilcloth.', purses: 3, gems: 2),
   // Relic guardians: they show once you hold the blueprint that needs what they guard.
   Place('emberpit', 'The Ember Pit', 3, 600, 140, PlaceKind.guarded, 'A pit in the red rock, glowing from the bottom. An ork fire-priest sits in it, cross-legged, a coal the size of your head cupped in his hands. It is the old king\'s ember core, and he has been praying to it.', 'Skarr the Ember-Keeper falls into his own fire and doesn\'t come out. The ember core is still warm. It will be warm for a thousand years.', foe: ('orkShaman', null, Aura.blazing, 'Skarr the Ember-Keeper'), purses: 3, relic: (0, 1), above: 3),
   Place('briarheart', 'The Briar Heart', 2, 140, 215, PlaceKind.guarded, 'Deep in the Thornwild, the brambles twist into a knot the size of a house, and the knot is breathing. Something at its heart keeps the whole wood growing.', 'The Briar Heart shudders, and lets go of the one living strand it was holding. It coils round your wrist, gently, like it\'s decided you\'ll do.', foe: ('thornEnt', null, Aura.venom, 'The Briar Heart'), purses: 2, relic: (2, 0), above: 3),

@@ -160,7 +160,7 @@ ArmourTier craftedTier(String id) => armourTierById(id);
 /// Trophies: what the Ashen Order, the vampires of Ravenmoor, the werewolves of the Howling Weald,
 /// the elves of the Silverwood and the dwarves of Deepforge Hold leave behind. With a blueprint,
 /// Dunstan forges them into set pieces.
-enum Trophy { ashenSteel, fang, pelt, silk, runesteel, face, scale, coral, skin, feather, lacquer }
+enum Trophy { ashenSteel, fang, pelt, silk, runesteel, face, scale, coral, skin, feather, lacquer, dragonscale }
 
 extension TrophyInfo on Trophy {
   String get label => switch (this) {
@@ -175,6 +175,7 @@ extension TrophyInfo on Trophy {
     Trophy.skin => 'Shifting skin',
     Trophy.feather => 'Griffin feather',
     Trophy.lacquer => 'Lacquered scale',
+    Trophy.dragonscale => 'Dragon scale',
   };
   int get argb => switch (this) {
     Trophy.ashenSteel => 0xFF8A8A92,
@@ -188,6 +189,7 @@ extension TrophyInfo on Trophy {
     Trophy.skin => 0xFFB89AE0,
     Trophy.feather => 0xFFE8D8B0,
     Trophy.lacquer => 0xFFB8322A,
+    Trophy.dragonscale => 0xFFC2501E,
   };
 }
 
@@ -197,6 +199,12 @@ String trophyKey(Trophy t) => 'trophy:${t.name}';
 const trophyLooks = <String, Trophy>{
   'ashenKnight': Trophy.ashenSteel,
   'ashenChampion': Trophy.ashenSteel,
+  // The dragons, and the Dragon Knights who serve them.
+  'dragonKnight': Trophy.dragonscale,
+  'wyvern': Trophy.dragonscale,
+  'obsidian': Trophy.dragonscale,
+  'elderWyrm': Trophy.dragonscale,
+  'frostWyrm': Trophy.dragonscale,
   'malric': Trophy.ashenSteel,
   'vampireSpawn': Trophy.fang,
   'bloodBride': Trophy.fang,
@@ -288,19 +296,22 @@ const forgedSets = <ForgedSet>[
   ForgedSet('changeling', Trophy.skin, Metal.obsidian, 'the shapeshifters of the Changeling Isle'),
   ForgedSet('skyborn', Trophy.feather, Metal.gold, 'the aeriekin, harpies and griffins of the Skyreach Aeries'),
   ForgedSet('bushido', Trophy.lacquer, Metal.iron, 'the ronin, ashigaru, shinobi and oni of the Blossom Isles'),
+  ForgedSet('drakesworn', Trophy.dragonscale, Metal.obsidian, 'the dragons of the Cinderreach and the Throne, and the Dragon Knights who serve them'),
 ];
 
 ForgedSet? forgedSetById(String id) => forgedSets.where((f) => f.id == id).firstOrNull;
 ForgedSet forgedSetFor(Trophy t) => forgedSets.firstWhere((f) => f.trophy == t);
 
-/// The three pieces of a forged set.
-const setPieceSlots = [GearSlot.gloves, GearSlot.boots, GearSlot.ring];
+/// The five pieces of a forged set: a full suit, head to foot, and a signet.
+const setPieceSlots = [GearSlot.helm, GearSlot.armour, GearSlot.gloves, GearSlot.boots, GearSlot.ring];
 
 /// Key into the state's materials for a blueprint you hold: 'bp:ashen:gloves'.
 String blueprintKey(String set, GearSlot slot) => 'bp:$set:${slot.name}';
 
 /// What a piece is called: "gloves", "boots", "ring".
 String pieceNoun(GearSlot slot) => switch (slot) {
+  GearSlot.helm => 'helm',
+  GearSlot.armour => 'armour',
   GearSlot.gloves => 'gloves',
   GearSlot.boots => 'boots',
   _ => 'ring',
