@@ -7,10 +7,13 @@ import 'classes.dart';
 import 'loot.dart';
 
 class Settings {
-  Settings({this.name = 'Sir Smudge', this.guest = false, this.tourSeen = false, this.fastFights = false, this.gore = true, this.music = .5, this.sound = .8, this.muted = false, this.autoSellJunk = true});
+  Settings({this.name = 'Sir Smudge', this.guest = false, this.tourSeen = false, this.fastFights = false, this.gore = true, this.music = .5, this.sound = .8, this.muted = false, this.autoSellJunk = true, this.vibrate = true});
 
   /// Common and uncommon drops that are no upgrade are sold where they fall.
   bool autoSellJunk;
+
+  /// Short buzzes on blows, kills and level-ups (phones only).
+  bool vibrate;
 
   String name;
 
@@ -43,6 +46,7 @@ class Settings {
     'sound': sound,
     if (muted) 'mute': true,
     if (!autoSellJunk) 'junk': false,
+    if (!vibrate) 'vibe': false,
   };
 
   factory Settings.fromJson(Map<String, dynamic> j) => Settings(
@@ -55,6 +59,7 @@ class Settings {
     sound: (j['sound'] as num?)?.toDouble() ?? .8,
     muted: j['mute'] == true,
     autoSellJunk: j['junk'] != false,
+    vibrate: j['vibe'] != false,
   );
 }
 
@@ -385,6 +390,7 @@ class GameState {
     this.shifts = 0,
     this.lastStyle,
     Set<String>? explored,
+    Set<int>? risenDown,
     this.place,
     this.wolfTurns = 0,
     this.wolfUsed = false,
@@ -441,9 +447,11 @@ class GameState {
     this.chestsOpened = 0,
     this.knockouts = 0,
     this.flees = 0,
+    this.ng = 0,
   }) : settings = settings ?? Settings(),
        gearSets = gearSets ?? [],
        explored = explored ?? {},
+       risenDown = risenDown ?? {},
        pack = pack ?? [],
        mats = mats ?? {},
        wildBest = wildBest ?? {},
@@ -570,6 +578,9 @@ class GameState {
   /// The way you struck last turn (blade, rite or bolt), which the Faceless brace for.
   String? lastStyle;
 
+  /// Lands whose boss you've beaten risen, at the end of the Heroic trail.
+  final Set<int> risenDown;
+
   /// Places on the map you've explored (by id), and the one whose guard you're fighting now.
   final Set<String> explored;
   String? place;
@@ -666,6 +677,10 @@ class GameState {
   bool dealBought;
   int foesFelled, raresFelled, chestsOpened, knockouts, flees;
 
+  /// New Game+: how many times the Ember King has fallen before this road (0: the first time
+  /// through). Each one makes the foes tougher and legendaries likelier.
+  int ng;
+
   /// Whether Vharrax has fallen (the story is done; the world keeps going).
   bool get won => bossesDown.contains(mainLands - 1);
 
@@ -729,6 +744,7 @@ class GameState {
     if (shifts > 0) 'shifts': shifts,
     if (lastStyle != null) 'lastStyle': lastStyle,
     if (explored.isNotEmpty) 'explored': explored.toList(),
+    if (risenDown.isNotEmpty) 'risenDown': risenDown.toList(),
     if (place != null) 'place': place,
     if (wolfTurns > 0) 'wolf': wolfTurns,
     if (wolfUsed) 'wolfUsed': true,
@@ -785,6 +801,7 @@ class GameState {
     'chests': chestsOpened,
     'kos': knockouts,
     'flees': flees,
+    if (ng > 0) 'ng': ng,
   };
 
   factory GameState.fromJson(Map<String, dynamic> raw) {
@@ -852,6 +869,7 @@ class GameState {
       shifts: n('shifts'),
       lastStyle: j['lastStyle'] as String?,
       explored: {...((j['explored'] as List?) ?? const []).whereType<String>()},
+      risenDown: {for (final v in ((j['risenDown'] as List?) ?? const [])) if (v is num) v.toInt()},
       place: j['place'] as String?,
       wolfTurns: n('wolf'),
       wolfUsed: j['wolfUsed'] == true,
@@ -914,6 +932,7 @@ class GameState {
       chestsOpened: n('chests'),
       knockouts: n('kos'),
       flees: n('flees'),
+      ng: n('ng'),
     );
   }
 }

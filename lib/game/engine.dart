@@ -245,7 +245,9 @@ class SwingResult {
 }
 
 class GameEngine {
-  GameEngine(this.state, {math.Random? random, DateTime Function()? clock}) : _rng = random ?? math.Random(), loot = LootTable(random), clock = clock ?? DateTime.now;
+  GameEngine(this.state, {math.Random? random, DateTime Function()? clock}) : _rng = random ?? math.Random(), loot = LootTable(random), clock = clock ?? DateTime.now {
+    loot.ng = state.ng;
+  }
 
   /// Today, for seasonal events (swapped out in tests and the simulator).
   final DateTime Function() clock;
@@ -344,11 +346,12 @@ class GameEngine {
 
   /// What there is to do in region [c], and how much of it is done: its boss; its places, its
   /// dungeons and the relic parts that turn up there (each done/all).
-  ({bool boss, int places, int placesAll, int delves, int delvesAll, int parts, int partsAll}) landProgress(int c) {
+  ({bool boss, bool risen, int places, int placesAll, int delves, int delvesAll, int parts, int partsAll}) landProgress(int c) {
     final s = state;
     final here = [for (final p in places) if (p.land == c) p], delves = [for (final d in dungeons) if (d.land == c) d], parts = relicPartsOn(c);
     return (
       boss: s.bossesDown.contains(c),
+      risen: heroicCleared(c),
       places: here.where((p) => s.explored.contains(p.id)).length,
       placesAll: here.length,
       delves: delves.where((d) => s.dungeonsDone.contains(d.id)).length,
@@ -361,7 +364,16 @@ class GameEngine {
   /// Region [c] is cleared: its boss down, every place and dungeon done, every relic part found.
   bool landCleared(int c) {
     final p = landProgress(c);
-    return p.boss && p.places == p.placesAll && p.delves == p.delvesAll && p.parts == p.partsAll;
+    return p.boss && p.risen && p.places == p.placesAll && p.delves == p.delvesAll && p.parts == p.partsAll;
+  }
+
+  /// Region [c]'s Heroic trail is done: its boss beaten risen (saves from before this was kept
+  /// show it by the relic part the risen boss carried), and every part the trail gives found.
+  bool heroicCleared(int c) {
+    final s = state, risenParts = [for (final (r, i) in relicPartsOn(c)) if (relics[r]!.parts[i].risen) (r, i)];
+    bool have((int, int) e) => s.forged.contains(e.$1) || hasRelicPart(s.relicParts, e.$1, e.$2);
+    final beaten = s.risenDown.contains(c) || risenParts.any(have);
+    return beaten && risenParts.every(have);
   }
 
   /// Why you can't go to continent [c] yet (null: you can).
@@ -688,6 +700,7 @@ class GameEngine {
   /// perhaps the next part of the land's relic.
   String? _heroicWin(int c, bool risen) {
     state.heroicWins[c] = risen ? 0 : (state.heroicWins[c] ?? 0) + 1;
+    if (risen) state.risenDown.add(c);
     // A risen boss always carries the relic part it's keeping (if you hold that relic's blueprint).
     if (!risen) return null;
     for (final (r, i) in relicPartsOn(c)) {
@@ -1397,7 +1410,7 @@ class GameEngine {
       ..foe = foe
       ..rare = rare
       ..foeLevel = level
-      ..foeMax = spawnHp(foe, level, rare)
+      ..foeMax = (spawnHp(foe, level, rare) * ngFoeHp(state.ng)).round()
       ..turn = 0
       ..fleeTries = 0
       ..skillWait = 0
@@ -2664,6 +2677,7 @@ class GameEngine {
     if (formTrophy != null) _note('It died wearing that shape so well it left ${withArticle(formTrophy.label.toLowerCase())} behind!', EntryKind.gold);
     if (blueprint != null) _note('Folded inside its armour: a blueprint! The $blueprint. Take it to $smithName.', EntryKind.gold);
     if (won) _note('Vharrax the Ember King is no more. The Great Burning is over. The world can start growing back.', EntryKind.gold);
+    if (won) _note('New Game+ waits in town, whenever you want the road again, harder.', EntryKind.gold);
     if (wonMount != null) _note('The ${wonMount.name.toLowerCase()} bows its head to you. It\'s yours to ride.', EntryKind.gold);
     if (wyrm != null) _note('From its scales and bones: ${wyrm.name}!', EntryKind.gold);
     if (orkPrize != null) _note('The ork drops its ${orkPrize.name.toLowerCase()}!', EntryKind.gold);
@@ -3550,6 +3564,76 @@ class GameEngine {
   }
 
   /// Dunstan reworks [g] (something you wear) up to your level.
+  // ---------------- New Game+ ----------------
+
+  /// Why you can't start the road again yet (null: you can).
+  String? whyNotNewGamePlus() {
+    final s = state;
+    if (!s.won) return 'Defeat the Ember King first';
+    if (s.inBattle) return 'Not mid-fight';
+    if (s.wild != null || s.dungeon != null) return 'Come back to town first';
+    return null;
+  }
+
+  /// New Game+: the Ember King fell, and the ash comes back thicker. You start again at level 1 in
+  /// Cindervale with nothing but your name, your looks, your Cinder keys and the vault's own pieces
+  /// (back to level 1, growing with you as ever: worn where they were worn). Everything else
+  /// starts over, and every foe is tougher for it ([ngFoeHp], [ngFoeHit]) while legendaries
+  /// drop more often.
+  bool newGamePlus() {
+    if (whyNotNewGamePlus() != null) return false;
+    final old = state, k = old.knight;
+    final fresh = newGame(heroClass: k.heroClass);
+    final n = fresh.knight;
+    n
+      ..female = k.female
+      ..dye = k.dye
+      ..ownedDyes = [...k.ownedDyes];
+    // The vault's pieces: each one you own comes along once, worn if it was worn.
+    final seen = <String>{};
+    GearItem? carry(GearItem? g) {
+      if (g == null || g.gearSet != 'vault' || !seen.add(g.name)) return null;
+      final p = vaultPieceNamed(g.name);
+      return p == null ? null : loot.vaultPiece(p, 1);
+    }
+    final l = k.loadout, nl = n.loadout;
+    nl
+      ..helm = carry(l.helm) ?? nl.helm
+      ..gloves = carry(l.gloves) ?? nl.gloves
+      ..boots = carry(l.boots) ?? nl.boots;
+    n
+      ..trinket = carry(k.trinket)
+      ..ring = carry(k.ring);
+    for (final g in [
+      for (final lo in k.loadouts.values) ...[lo.helm, lo.gloves, lo.boots],
+      ...k.stash,
+      ...old.pack,
+      ...old.pendingLoot,
+    ]) {
+      final c = carry(g);
+      if (c != null) n.stash.add(c);
+    }
+    n.hp = maxHp(n);
+    fresh
+      ..settings = old.settings
+      ..ng = old.ng + 1
+      ..keys = old.keys
+      ..vaultDry = old.vaultDry
+      ..seasonSeen = old.seasonSeen
+      ..foesFelled = old.foesFelled
+      ..raresFelled = old.raresFelled
+      ..chestsOpened = old.chestsOpened
+      ..knockouts = old.knockouts
+      ..flees = old.flees;
+    fresh.vaultFound.addAll(old.vaultFound);
+    fresh.journal
+      ..clear()
+      ..add(JournalEntry('New Game+ ${'★' * math.min(fresh.ng, 5)}: the ash comes back thicker, and so do the things in it. You start again in Cindervale, the vault\'s pieces still on you.', EntryKind.gold));
+    state = fresh;
+    loot.ng = fresh.ng;
+    return true;
+  }
+
   GearItem? temper(GearItem g) {
     if (whyNotTemper(g) != null) return null;
     final k = state.knight, gold = temperCost(g), better = tempered(g, temperTo(g.level, k.level));

@@ -272,6 +272,7 @@ class GameController extends ChangeNotifier {
   }
 
   bool heroicOpen(int c) => engine.heroicOpen(c);
+  bool heroicCleared(int c) => engine.heroicCleared(c);
   String? whyNotForge(int c) => engine.whyNotForge(c);
 
   GearItem? forgeRelic(int c) {
@@ -838,6 +839,19 @@ class GameController extends ChangeNotifier {
     state.settings.name = name;
     _emit(ResetEvent());
     busy = false;
+    outcome = null;
+    _syncShown();
+    await storage.save(state);
+    _schedulePush();
+    notifyListeners();
+  }
+
+  /// New Game+: why not yet (null: ready), and going round again (see GameEngine.newGamePlus).
+  String? get whyNotNewGamePlus => engine.whyNotNewGamePlus();
+
+  Future<void> newGamePlus() async {
+    if (busy || !engine.newGamePlus()) return;
+    _emit(ResetEvent());
     outcome = null;
     _syncShown();
     await storage.save(state);

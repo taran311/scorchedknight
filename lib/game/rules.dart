@@ -253,6 +253,11 @@ int foeMenace(GameState s) {
   return over >= 6 ? 2 : (over >= 3 ? 1 : 0);
 }
 
+/// New Game+ [ng]: foes have this much more HP, and hit this much harder (levelling off after
+/// three times round).
+double ngFoeHp(int ng) => 1 + .3 * math.min(ng, 3);
+double ngFoeHit(int ng) => 1 + .2 * math.min(ng, 3);
+
 /// A foe's HP, fixed when the fight starts.
 int spawnHp(int foeIndex, int level, [Rare? rare]) {
   // A rare in its own clothes (the Hidden Ones, golems) has its own HP; the base foe sets the land.
@@ -494,7 +499,7 @@ int counterDamage(GameState s) {
   final bones = foeIn(s).undead && boneArmour.contains(k.loadout.armour) ? boneWard : 1.0;
   final bark = brewOn(k, Brew.barkskin) ? barkskinBrew : 1.0;
   final hide = s.wolfTurns > 0 ? wolfHide : 1.0;
-  return math.max(1, (foeAttack(s.foe, s.rare, s.foeLevel) * (1 - damageReduction(k)) * weakened * bones * bark * hide * manaShield(s) * outmatched(s.foeLevel, k.level)).round());
+  return math.max(1, (foeAttack(s.foe, s.rare, s.foeLevel) * (1 - damageReduction(k)) * weakened * bones * bark * hide * manaShield(s) * outmatched(s.foeLevel, k.level) * ngFoeHit(s.ng)).round());
 }
 
 /// The Bloodmoon Pelt: when a blow leaves you under [wolfAt] of your HP, the wolf comes out (once a

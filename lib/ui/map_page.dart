@@ -439,6 +439,7 @@ class _ContinentPanel extends StatelessWidget {
                             message: 'Nothing new left to find here. Still good for gear, gold, XP and Cinder keys.',
                             child: InfoChip(icon: Icon(Icons.check_circle, size: 14, color: Palette.amber), text: 'Cleared', colour: Palette.amber, dense: true),
                           ),
+                        if (p.boss) chip(Icons.workspace_premium, p.risen ? 1 : 0, 1, 'The boss beaten risen, on the Heroic trail'),
                         if (p.placesAll > 0) chip(Icons.place, p.places, p.placesAll, 'Places explored'),
                         if (p.delvesAll > 0) chip(Icons.stairs, p.delves, p.delvesAll, 'Dungeons beaten'),
                         if (p.partsAll > 0) chip(Icons.hardware, p.parts, p.partsAll, 'Relic parts found'),
@@ -669,6 +670,22 @@ class _MapPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    _taken.clear();
+    _queued.clear();
+    _inks.clear();
+    // Every marker's spot is claimed up front, so no name (a region's included) lands on one.
+    for (var i = 0; i < continents.length; i++) {
+      final at = _spots[i];
+      _taken.add(Rect.fromCenter(center: at + const Offset(0, -12), width: 80, height: 44));
+      if (beaten.contains(i)) _taken.add(Rect.fromLTWH(at.dx + 50, at.dy - 46, 20, 30));
+      if (cleared.contains(i)) _taken.add(Rect.fromCircle(center: at + const Offset(76, -36), radius: 11));
+    }
+    for (final (p, _, _) in pins) {
+      _taken.add(Rect.fromCircle(center: Offset(p.x, p.y), radius: 13));
+    }
+    for (final (d, _, _, _) in delves) {
+      _taken.add(Rect.fromCenter(center: Offset(d.x, d.y) + const Offset(4, -4), width: 40, height: 34));
+    }
     canvas.save();
     canvas.scale(size.width / 1000);
     const rect = Rect.fromLTWH(0, 0, 1000, _mapH);
@@ -740,19 +757,25 @@ class _MapPainter extends CustomPainter {
               ..color = const Color(0xFFCBBB96).withValues(alpha: .55)
               ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8));
         _padlock(canvas, at + const Offset(0, -6));
+        _taken.add(Rect.fromCenter(center: at + const Offset(0, -6), width: 30, height: 34));
       }
-      if (beaten.contains(i)) _flag(canvas, at + const Offset(52, -44));
+      if (beaten.contains(i)) {
+        _flag(canvas, at + const Offset(52, -44));
+        _taken.add(Rect.fromLTWH(at.dx + 50, at.dy - 46, 20, 30));
+      }
       // Nothing new left here (still good to farm): a small gold tick by the flag.
       if (cleared.contains(i)) _tick(canvas, at + const Offset(76, -36));
       final tp = TextPainter(
         text: TextSpan(text: land.name, style: Txt.inkLabel(size: isSideLand(i) ? 17 : 21, color: open ? const Color(0xFF2A1A0E) : const Color(0xFF6A5A44))),
         textDirection: TextDirection.ltr,
       )..layout();
-      tp.paint(canvas, Offset(at.dx - tp.width / 2, at.dy + (isSideLand(i) ? 30 : 40)));
+      _fixed(canvas, tp, Offset(at.dx - tp.width / 2, at.dy + (isSideLand(i) ? 30 : 40)));
     }
     for (var a = 0; a < wildAreas.length; a++) {
       _wild(canvas, a, _wildSpots[a]);
     }
+    // The Inn: a little house with a tankard sign, where it all starts.
+    _inn(canvas, _innSpot);
     // Places to explore: a red orb on a pin (dim once explored, with a tick).
     for (final (p, done, ready) in pins) {
       _pin(canvas, Offset(p.x, p.y), p.name, done, ready, p.id == pinPicked);
@@ -761,10 +784,17 @@ class _MapPainter extends CustomPainter {
     for (final (d, open, done, here) in delves) {
       _delve(canvas, Offset(d.x, d.y), d.name, open, done, here, d.id == delvePicked);
     }
-    // The Inn: a little house with a tankard sign, where it all starts.
-    _inn(canvas, _innSpot);
-    // A compass rose and the border.
-    _compass(canvas, const Offset(945, 545));
+    // Their names last, each in the first free spot round its marker, so none lands on another.
+    for (final (tp, at, gap) in _queued) {
+      _float(canvas, tp, at, gap);
+    }
+    // Every name on top of everything else, in its parchment halo.
+    for (final (tp, at) in _inks) {
+      _ink(canvas, tp, at);
+    }
+    // A compass rose (wherever there's a clear patch of map) and the border.
+    const roses = [Offset(945, 545), Offset(950, 460), Offset(950, 380), Offset(950, 640), Offset(870, 640), Offset(300, 640), Offset(50, 450)];
+    _compass(canvas, roses.firstWhere((o) => !_taken.any((r) => r.overlaps(Rect.fromLTRB(o.dx - 28, o.dy - 48, o.dx + 28, o.dy + 28))), orElse: () => roses.first));
     canvas.drawRect(rect.deflate(6), strokePaint(const Color(0xFF6A4A2A), 3));
     canvas.restore();
   }
@@ -950,11 +980,15 @@ class _MapPainter extends CustomPainter {
       c.drawCircle(at + const Offset(-3, -3.5), 2.6, Paint()..color = const Color(0xCCFFFFFF));
       if (!ready) _padlock(c, at + const Offset(10, 4), .45);
     }
-    final tp = TextPainter(
-      text: TextSpan(text: name, style: Txt.inkLabel(size: 13, color: done ? const Color(0xFF6A5A44) : const Color(0xFF2A1A0E))),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    tp.paint(c, Offset((at.dx - tp.width / 2).clamp(8, 992 - tp.width), at.dy + 11));
+    _taken.add(Rect.fromCircle(center: at, radius: 12));
+    _queued.add((
+      TextPainter(
+        text: TextSpan(text: name, style: Txt.inkLabel(size: 13, color: done ? const Color(0xFF6A5A44) : const Color(0xFF2A1A0E))),
+        textDirection: TextDirection.ltr,
+      )..layout(),
+      at,
+      12.0,
+    ));
   }
 
   /// A dungeon's mouth: a stone arch over steps going down into the dark, a glow if you're down
@@ -993,11 +1027,99 @@ class _MapPainter extends CustomPainter {
     } else if (!open) {
       _padlock(c, at + const Offset(15, 6), .45);
     }
-    final tp = TextPainter(
-      text: TextSpan(text: name, style: Txt.inkLabel(size: 13, color: open ? const Color(0xFF2A1A0E) : const Color(0xFF6A5A44))),
+    _taken.add(Rect.fromCenter(center: at + const Offset(2, -2), width: 36, height: 30));
+    _queued.add((
+      TextPainter(
+        text: TextSpan(text: name, style: Txt.inkLabel(size: 13, color: open ? const Color(0xFF2A1A0E) : const Color(0xFF6A5A44))),
+        textDirection: TextDirection.ltr,
+      )..layout(),
+      at,
+      14.0,
+    ));
+  }
+
+  /// Rects already used on the map (names, padlocks, flags, markers), and the place and dungeon
+  /// names still to put down: (text, marker, how far from it).
+  final _taken = <Rect>[];
+  final _queued = <(TextPainter, Offset, double)>[];
+
+  /// Names placed, painted last so no patch or blob covers one.
+  final _inks = <(TextPainter, Offset)>[];
+
+  /// How much of [box] is already in use.
+  double _clash(Rect box) {
+    var sum = 0.0;
+    for (final r in _taken) {
+      if (!r.overlaps(box)) continue;
+      final o = r.intersect(box);
+      sum += o.width * o.height;
+    }
+    return sum;
+  }
+
+  /// The first of [spots] (kept inside the map) that's clear, else the one least in the way.
+  Offset _place(TextPainter tp, List<Offset> spots) {
+    final w = tp.width, h = tp.height;
+    Offset fit(Offset o) => Offset(o.dx.clamp(8, 992 - w), o.dy.clamp(8, _mapH - 8 - h));
+    Offset? best;
+    var least = double.infinity;
+    for (final o in spots.map(fit)) {
+      final c = _clash((o & tp.size).deflate(1));
+      if (c == 0) return o;
+      if (c < least - 1) {
+        least = c;
+        best = o;
+      }
+    }
+    return best!;
+  }
+
+  /// A name with a soft parchment edge, so it reads over lines and patches.
+  void _ink(Canvas c, TextPainter tp, Offset at) {
+    final span = tp.text! as TextSpan;
+    final edge = TextPainter(
+      text: TextSpan(text: span.text, style: span.style!.copyWith(foreground: Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3.2
+        ..strokeJoin = StrokeJoin.round
+        ..color = const Color(0xFFEADFC4).withValues(alpha: .85))),
       textDirection: TextDirection.ltr,
     )..layout();
-    tp.paint(c, Offset((at.dx - tp.width / 2).clamp(8, 992 - tp.width), at.dy + 12));
+    edge.paint(c, at);
+    tp.paint(c, at);
+  }
+
+  /// A name that goes exactly where it's told (a region's, the Inn's), claiming its space.
+  /// (Nudged sideways or down a little if something's already there.)
+  void _fixed(Canvas c, TextPainter tp, Offset at) {
+    final at0 = _place(tp, [
+      for (final dy in const [0.0, 10.0, -8.0, 20.0])
+        for (final dx in const [0.0, -24.0, 24.0, -48.0, 48.0, -72.0, 72.0]) at + Offset(dx, dy),
+    ]);
+    _taken.add((at0 & tp.size).inflate(2));
+    _inks.add((tp, at0));
+  }
+
+  /// A marker's name: under it if there's room, else above, right or left, else further down,
+  /// whichever overlaps nothing already on the map (inside the map's edges).
+  void _float(Canvas c, TextPainter tp, Offset at, double gap) {
+    final w = tp.width, h = tp.height;
+    final below = at.dy + gap, above = at.dy - gap - h - 4;
+    final at0 = _place(tp, [
+      Offset(at.dx - w / 2, below),
+      Offset(at.dx - w / 2, above),
+      Offset(at.dx + gap + 4, at.dy - h / 2),
+      Offset(at.dx - gap - 4 - w, at.dy - h / 2),
+      // Below or above but slid along, then further off.
+      for (final f in const [.15, .85, 0.0, 1.0]) ...[Offset(at.dx - w * f, below), Offset(at.dx - w * f, above)],
+      Offset(at.dx + gap + 4, at.dy - h * 1.3),
+      Offset(at.dx + gap + 4, at.dy + h * .3),
+      Offset(at.dx - gap - 4 - w, at.dy - h * 1.3),
+      Offset(at.dx - gap - 4 - w, at.dy + h * .3),
+      for (final f in const [.5, .15, .85]) ...[Offset(at.dx - w * f, below + h), Offset(at.dx - w * f, above - h)],
+    ]);
+    _taken.add((at0 & tp.size).inflate(2));
+    _inks.add((tp, at0));
   }
 
   void _padlock(Canvas c, Offset at, [double scale = 1]) {
@@ -1035,7 +1157,8 @@ class _MapPainter extends CustomPainter {
     c.drawLine(at + const Offset(12, -24), at + const Offset(12, -38), strokePaint(const Color(0xFF8A8A8A).withValues(alpha: .6), 4));
     // The label sits under the house, clear of Cindervale's name.
     final tp = TextPainter(text: TextSpan(text: 'The Soot & Kettle', style: Txt.inkLabel(size: 15, color: const Color(0xFF3A2614))), textDirection: TextDirection.ltr)..layout();
-    tp.paint(c, at + Offset(math.max(-at.dx + 14, -tp.width / 2), 14));
+    _taken.add(Rect.fromCenter(center: at + const Offset(0, -8), width: 46, height: 46));
+    _fixed(c, tp, at + Offset(math.max(-at.dx + 14, -tp.width / 2), 14));
   }
 
   /// A patch of wild country: scrub and dead trees, tinted the area's colour, its name in italics.
@@ -1074,7 +1197,7 @@ class _MapPainter extends CustomPainter {
       text: TextSpan(text: w.name, style: Txt.inkLabel(size: 16, color: open ? const Color(0xFF2E3A1E) : const Color(0xFF6A5A44)).copyWith(fontStyle: FontStyle.italic)),
       textDirection: TextDirection.ltr,
     )..layout();
-    tp.paint(c, Offset(at.dx - tp.width / 2, at.dy + 30));
+    _fixed(c, tp, Offset(at.dx - tp.width / 2, at.dy + 30));
   }
 
   void _fillPatch(Canvas c, Path patch, Color col, bool open, bool picked) {

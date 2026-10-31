@@ -1108,13 +1108,17 @@ class LootTable {
   LootTable([math.Random? random]) : _r = random ?? math.Random();
   final math.Random _r;
 
+  /// New Game+ (see GameState.ng): each time round, legendaries twice as likely again as the first.
+  int ng = 0;
+
   /// Below this level no random legendary drops; from it they grow more likely until [legendFull].
   static const legendFrom = 15, legendFull = 26;
 
   Rarity _rarity(bool boss, [List<int>? odds]) {
     // Per 1000 drops from a regular foe: 550 common, 300 uncommon, 120 rare, 27 epic, 3 legendary.
     // Legendaries should be a moment, not a Tuesday.
-    final weights = odds ?? (boss ? const [0, 100, 650, 230, 20] : const [550, 300, 120, 27, 3]);
+    var weights = odds ?? (boss ? const [0, 100, 650, 230, 20] : const [550, 300, 120, 27, 3]);
+    if (ng > 0 && weights.length == 5 && weights[4] > 0) weights = [...weights.take(4), weights[4] * (1 + math.min(ng, 4))];
     var pick = _r.nextInt(weights.reduce((a, b) => a + b));
     for (var i = 0; i < weights.length; i++) {
       if (pick < weights[i]) return Rarity.values[i];

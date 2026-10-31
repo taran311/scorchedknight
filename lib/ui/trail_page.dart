@@ -22,6 +22,7 @@ import 'battle_screen.dart';
 import 'encounter_window.dart';
 import 'hud.dart';
 import 'item_icons.dart';
+import 'stat_icons.dart' show InfoChip;
 import 'theme.dart';
 import 'trail_data.dart';
 import 'wilds_page.dart';
@@ -448,7 +449,19 @@ class _Heroic extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('HEROIC TRAIL', style: Txt.label(size: 12, color: gold)),
+                    Row(
+                      children: [
+                        Text('HEROIC TRAIL', style: Txt.label(size: 12, color: gold)),
+                        // Its risen boss beaten and its prize won: still there to farm.
+                        if (controller.heroicCleared(land)) ...[
+                          const SizedBox(width: 8),
+                          const Tooltip(
+                            message: 'Its risen boss is beaten and its relic part found. Still good for elite loot.',
+                            child: InfoChip(icon: Icon(Icons.check_circle, size: 13, color: Color(0xFF9BE27A)), text: 'Cleared', colour: Color(0xFF9BE27A), dense: true),
+                          ),
+                        ],
+                      ],
+                    ),
                     Text(risen ? '${continents[land].boss.name}, Risen' : 'Elite foes · stop ${at + 1} of $heroicStops', style: Txt.label(size: 19, color: Palette.cream, weight: FontWeight.w800)),
                     const SizedBox(height: 6),
                     // The stops, then the crown of the risen boss.

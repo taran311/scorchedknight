@@ -200,6 +200,12 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   double? _cleanAt;
 
   GameController get c => widget.controller;
+
+  /// A buzz in the hand: 1 a tap, 2 a thump, 3 a big hit. (Does nothing off a phone.)
+  void _buzz(int n) {
+    if (!c.state.settings.vibrate) return;
+    unawaited(switch (n) { 1 => HapticFeedback.lightImpact(), 2 => HapticFeedback.mediumImpact(), _ => HapticFeedback.heavyImpact() });
+  }
   double get now => _clock;
 
   /// Hit-stop (real milliseconds the stage slows for) and screen shake (pixels, decaying).
@@ -1054,6 +1060,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         _foe.stone ? Sfx.stoneHit : (_material == 'bone' ? Sfx.boneHit : (dmg.crit ? Sfx.crit : (bashHit ? Sfx.bash : Sfx.hit))),
         power: dmg.devastating ? 1.4 : (dmg.crit ? 1.2 : (dmg.glancing ? .6 : 1)),
       );
+      _buzz(dmg.devastating ? 3 : (dmg.crit || bashHit ? 2 : 1));
       _spill(chest + const Offset(-10, 0), dmg.devastating ? 2.4 : (dmg.crit || bashHit ? 1.6 : (dmg.glancing ? .5 : 1)));
       _foeClip = hitClip;
       _foeClipStart = now;
@@ -1247,6 +1254,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         _oathAt = now;
         _oathHit = now + 220 + strikeMs;
         Audio.play(Sfx.castHoly);
+        _at(220 + strikeMs, () => _buzz(3));
         _spark('fire', const Offset(_knightX + 105, _groundY - 6), 22, dir: -math.pi / 2, spread: 1.2, speed: 3, life: 700, radius: 6, lift: 1, gravity: -.02);
       });
     }
@@ -1336,6 +1344,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
             _tween('kflash', 0, 450, delay: 90);
             if (_gore) _spark('gore', const Offset(_knightX + 30, _groundY - 150), 8, dir: math.pi, spread: 1.4, speed: 2.8, life: 900, radius: 3.2, lift: 1.5, gravity: .3);
             Audio.play(Sfx.hurt, power: counter > maxHp(c.state.knight) * .2 ? 1.3 : 1);
+            _buzz(r.heavy || counter > maxHp(c.state.knight) * .2 ? 3 : 2);
             _mark(r.heavy ? 'Heavy! -$counter' : '-$counter', _red, at);
             if (r.heavy) _punch(.6);
             if (r.poisoned) _at(260, () => _mark('Poison!', _green, at + const Offset(0, -40), icon: Icons.science_rounded));
@@ -1395,6 +1404,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     _tween('ko', .12, 260, delay: 80, ease: easeOut);
     _tween('gloom', 1, 900, delay: 100);
     if (!spared) Audio.play(Sfx.defeat);
+    _buzz(3);
     _at(250, () {
       _spark('mist', _reaperAt + const Offset(0, -10), 18, dir: -math.pi / 2, spread: 2.6, speed: 1.6, life: 1300, radius: 12, gravity: -.01);
       _tween('reaper', 1, 900, ease: easeOut);
@@ -1591,6 +1601,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       // A last word.
       _say(_lines.fall, chance: k.boss ? 1 : .55, hold: 2000);
       Audio.play(Sfx.victory);
+      _buzz(k.boss ? 3 : 2);
       _at(500, () => Audio.play(Sfx.coins));
       // The finishing blow lands big.
       _burst(_foeChest, k.boss ? const Color(0xFFFFD45A) : const Color(0xFFFFF0D0), k.boss ? 2.6 : 1.7);
@@ -1600,7 +1611,10 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         // A clean kill: the crossbow's sight snaps shut on it, and the bounty's paid.
         _cleanAt = now;
         if (!k.boss && k.jackpot == 0) _banner = ('Clean kill!', const Color(0xFF9BE27A), now + 150);
-        _at(120, () => Audio.play(Sfx.shoot, power: 1.3));
+        _at(120, () {
+          Audio.play(Sfx.shoot, power: 1.3);
+          _buzz(2);
+        });
       }
       _drops.add(_Mark('+${k.xp} XP', const [], Offset.zero, now));
       _drops.add(_Mark('+${k.coins}', const [], Offset.zero, now + 180, icon: Icons.paid_rounded));
@@ -1641,6 +1655,8 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       _at(d0 + 1100, () {
         _banner = ('Level ${c.state.knight.level}!', const Color(0xFFF2C14E), now);
         Audio.play(Sfx.levelUp);
+        _buzz(2);
+        _at(140, () => _buzz(3));
         _tween('ward', .8, 200);
         _tween('ward', 0, 1000, delay: 500);
         _burst(const Offset(_knightX, _groundY - 130), const Color(0xFFF2C14E), 1.8);

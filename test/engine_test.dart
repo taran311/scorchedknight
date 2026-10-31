@@ -317,7 +317,11 @@ void main() {
     for (final (r, i) in parts) {
       s.relicParts[r] = (s.relicParts[r] ?? 0) | (1 << i);
     }
+    // (Finding the risen boss's part counts as beating it; otherwise it's recorded.)
+    s.risenDown.add(land);
     expect(e.landCleared(land), isTrue);
+    expect(e.heroicCleared(land), isTrue);
+    expect(GameState.fromJson(jsonDecode(jsonEncode(s.toJson())) as Map<String, dynamic>).risenDown, contains(land));
     expect(e.landCleared(land == 0 ? 1 : 0), isFalse);
   });
 
@@ -339,6 +343,46 @@ void main() {
     expect(k.loadout.helm!.gearSet, 'vault');
     expect(k.stash.single.level, k.level);
     expect(k.loadout.boots!.level, plain.level, reason: 'ordinary gear doesn\'t grow');
+  });
+
+  test('New Game+: start again at level 1 with your keys and vault pieces, foes tougher', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(4));
+    final s = e.state, k = s.knight;
+    expect(e.whyNotNewGamePlus(), isNotNull, reason: 'only once the Ember King is down');
+    while (k.level < 30) {
+      e.grantXp(xpToNext(k));
+    }
+    k.loadout.helm = e.loot.vaultPiece(vaultPieceNamed('Cinder Crown')!, k.level);
+    k.stash.add(e.loot.vaultPiece(vaultPieceNamed('Brimstone Charm')!, k.level));
+    k.coins = 5000;
+    k.dye = 'midnight';
+    s
+      ..keys = 3
+      ..vaultFound.addAll(['Cinder Crown', 'Brimstone Charm'])
+      ..bossesDown.addAll({for (var c = 0; c < mainLands; c++) c})
+      ..unlocked = mainLands - 1
+      ..foesFelled = 300;
+    expect(e.whyNotNewGamePlus(), isNull);
+    expect(e.newGamePlus(), isTrue);
+    final n = e.state, h = n.knight;
+    expect(n.ng, 1);
+    expect(n.won, isFalse);
+    expect(n.bossesDown, isEmpty);
+    expect(h.level, 1);
+    expect(h.coins, 0);
+    expect(h.dye, 'midnight');
+    expect(n.keys, 3);
+    expect(n.vaultFound, containsAll(['Cinder Crown', 'Brimstone Charm']));
+    expect(n.foesFelled, 300);
+    expect(h.loadout.helm!.name, 'Cinder Crown');
+    expect(h.loadout.helm!.level, 1);
+    expect(h.stash.single.name, 'Brimstone Charm');
+    expect(e.loot.ng, 1);
+    expect(ngFoeHp(1), greaterThan(1));
+    // Saved and loaded, still the second time round.
+    final back = GameState.fromJson(jsonDecode(jsonEncode(n.toJson())) as Map<String, dynamic>);
+    expect(back.ng, 1);
+    expect(GameEngine(back).loot.ng, 1);
   });
 
   test('the vault has a floor on bad luck: after a dry run of keys, a piece is sure', () {

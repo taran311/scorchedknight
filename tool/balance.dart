@@ -16,6 +16,7 @@ import '../lib/game/wilds.dart';
 import '../lib/game/dungeons.dart';
 import '../lib/game/rules.dart';
 import '../lib/game/spells.dart';
+import '../lib/game/vault.dart';
 
 class Stats {
   final turns = List.generate(continents.length, (_) => <int>[]);
@@ -79,6 +80,9 @@ int? sideToDo(GameEngine e) {
 
 /// Whether the auto-player uses Mags' brews (pass 'nobrews' to compare without), and how often.
 var brews = true;
+
+/// New Game+ round to simulate ('ng1', 'ng2'…; 0 the first time through).
+var ngTier = 0;
 final brewed = <Brew, int>{};
 
 /// The level each crafted armour tier was forged at, across the runs.
@@ -93,6 +97,21 @@ void run(String style, int seed, Stats st, {void Function(GameEngine e, int land
   final rng = Random(seed + 7);
   e.takeHobsJob();
   final s = e.state, k = s.knight;
+  if (ngTier > 0) {
+    // New Game+: the whole vault set carried over (Pendant worn, Charm put by), foes tougher.
+    s.ng = ngTier;
+    e.loot.ng = ngTier;
+    final p = {for (final v in vaultPieces) v.name: e.loot.vaultPiece(v, 1)};
+    k
+      ..trinket = p['Emberwake Pendant']
+      ..ring = p['Ring of the Ember Vault'];
+    k.loadout
+      ..helm = p['Cinder Crown']
+      ..gloves = p['Keeper\'s Gauntlets']
+      ..boots = p['Ashwalker Boots'];
+    s.vaultFound.addAll(p.keys);
+    k.hp = maxHp(k);
+  }
   void loot() {
     for (final g in List.of(s.pendingLoot)) {
       rarityTally[g.rarity] = (rarityTally[g.rarity] ?? 0) + 1;
@@ -480,6 +499,7 @@ void main(List<String> args) {
   final runs = args.isEmpty ? 20 : int.parse(args.first);
   brews = !args.contains('nobrews');
   side = args.contains('side');
+  ngTier = int.tryParse(args.firstWhere((a) => a.startsWith('ng'), orElse: () => 'ng0').substring(2)) ?? 0;
   if (args.contains('wilds')) return wildsReport(runs);
   if (args.contains('dungeons')) return dungeonsReport(runs);
   // 'all' uses every tool; 'nocast' never casts; 'blade' only swings (and bashes): a pure melee

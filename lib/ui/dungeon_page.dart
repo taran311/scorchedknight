@@ -414,33 +414,220 @@ class _WallPainter extends CustomPainter {
       c.drawRect(Rect.fromCenter(center: Offset(x, 82), width: 6, height: 26), Paint()..color = const Color(0xFF3A2A1A));
       c.drawOval(Rect.fromCenter(center: Offset(x, 64), width: 12, height: 20), Paint()..color = const Color(0xFFFFC05A));
     }
-    if (hoard) {
-      // A heap of gold, a chest thrown open, gems catching the torchlight.
-      final mid = Offset(w / 2, h - 22);
-      c.drawOval(Rect.fromCenter(center: mid, width: 260, height: 70), Paint()
-        ..color = const Color(0xFFFFD45A).withValues(alpha: .25)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18));
-      final heap = Path()
-        ..moveTo(mid.dx - 130, mid.dy)
-        ..quadraticBezierTo(mid.dx, mid.dy - 90, mid.dx + 130, mid.dy)
-        ..close();
-      c.drawPath(heap, Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFFFFE08A), Color(0xFFB8862A)]).createShader(Rect.fromCenter(center: mid, width: 260, height: 180)));
-      for (var i = 0; i < 40; i++) {
-        final x = mid.dx - 110 + r.nextDouble() * 220, top = mid.dy - 90 * (1 - math.pow((x - mid.dx) / 130, 2));
-        c.drawOval(Rect.fromCenter(center: Offset(x, top + 4 + r.nextDouble() * (mid.dy - top - 6)), width: 9, height: 4), Paint()..color = const Color(0xFFFFF0B0).withValues(alpha: .7));
-      }
-      final chest = Rect.fromCenter(center: mid + const Offset(70, -24), width: 66, height: 40);
-      c.drawRect(chest, Paint()..color = const Color(0xFF6A3E1E));
-      c.drawRect(chest, Paint()
-        ..color = Colors.black
+    if (hoard) _hoard(c, Offset(w / 2, h - 22), r);
+  }
+
+  // ---- the hoard: a heap of coin, a chest thrown open, cut gems, a goblet, glints ----
+  // (Two-colour gradients only: the phone's renderer throws on more without stops.)
+
+  static const _gold = Color(0xFFFFD45A), _goldLight = Color(0xFFFFF0B0), _goldDark = Color(0xFF9A6A1A), _ink = Color(0xFF2A1808);
+
+  void _hoard(Canvas c, Offset mid, math.Random r) {
+    // Light pooled on the floor round it.
+    final pool = Rect.fromCenter(center: mid, width: 330, height: 80);
+    c.drawOval(pool, Paint()..shader = RadialGradient(colors: [_gold.withValues(alpha: .35), _gold.withValues(alpha: 0)]).createShader(pool));
+    _goblet(c, mid + const Offset(-118, 0));
+    _coinStack(c, mid + const Offset(-92, 0), 7);
+    // The heap: a shaded mound, then coins all over its face.
+    const hw = 112.0, hh = 74.0;
+    double top(double x) => mid.dy - hh * (1 - math.pow((x - mid.dx) / hw, 2)).clamp(0.0, 1.0);
+    final heap = Path()
+      ..moveTo(mid.dx - hw, mid.dy)
+      ..quadraticBezierTo(mid.dx, mid.dy - hh * 2, mid.dx + hw, mid.dy)
+      ..close();
+    c.drawPath(heap, Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFFE8B84A), Color(0xFF8A5A14)]).createShader(Rect.fromLTRB(mid.dx - hw, mid.dy - hh, mid.dx + hw, mid.dy)));
+    // Back to front, so the nearer coins lie over the further ones.
+    final coins = <Offset>[
+      for (var i = 0; i < 70; i++)
+        () {
+          final x = mid.dx - hw * .92 + r.nextDouble() * hw * 1.84, t = top(x);
+          return Offset(x, t + 3 + math.pow(r.nextDouble(), 1.6) * (mid.dy - t - 5));
+        }(),
+    ]..sort((a, b) => a.dy.compareTo(b.dy));
+    for (final at in coins) {
+      _coin(c, at, 5.5 + r.nextDouble() * 2, r.nextDouble() < .25);
+    }
+    // A few spilled on the floor in front.
+    for (var i = 0; i < 9; i++) {
+      _coin(c, mid + Offset(-hw + r.nextDouble() * hw * 2.1, 4 + r.nextDouble() * 10), 5 + r.nextDouble() * 1.5, r.nextBool());
+    }
+    // The chest on the heap's right shoulder, and gems on the gold.
+    _chest(c, mid + const Offset(78, -2));
+    _gem(c, mid + const Offset(-46, -36), const Color(0xFFE0304A), 9);
+    _gem(c, mid + const Offset(-8, -62), const Color(0xFF3A8AE8), 10);
+    _gem(c, mid + const Offset(26, -38), const Color(0xFF2EC46A), 8);
+    _gem(c, mid + const Offset(-74, -12), const Color(0xFFB05AE8), 7.5);
+    // Glints where the torchlight catches.
+    for (final g in const [Offset(-20, -66), Offset(40, -30), Offset(-60, -24), Offset(10, -46), Offset(104, -64)]) {
+      _glint(c, mid + g, 6 + r.nextDouble() * 4);
+    }
+  }
+
+  /// One coin lying tilted: a gold ellipse with a darker rim and a shine.
+  void _coin(Canvas c, Offset at, double size, bool edgeOn) {
+    final face = Rect.fromCenter(center: at, width: size * 2, height: size * (edgeOn ? .55 : .95));
+    c.drawOval(face.shift(const Offset(0, 1.6)), Paint()..color = _goldDark);
+    c.drawOval(face, Paint()..shader = const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [_goldLight, _gold]).createShader(face));
+    c.drawOval(face, Paint()
+      ..color = _goldDark
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = .9);
+    if (!edgeOn) {
+      c.drawOval(face.deflate(size * .32), Paint()
+        ..color = _goldDark.withValues(alpha: .55)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2);
-      c.drawPath(Path()..addPolygon([chest.topLeft, chest.topLeft + const Offset(-6, -30), chest.topRight + const Offset(-6, -30), chest.topRight], true), Paint()..color = const Color(0xFF5A3418));
-      for (final (dx, col) in const [(-50.0, Color(0xFFE04A5A)), (-20.0, Color(0xFF5AA0E0)), (30.0, Color(0xFF6ACF7A))]) {
-        c.drawCircle(mid + Offset(dx, -40), 6, Paint()..color = col);
-        c.drawCircle(mid + Offset(dx - 2, -42), 2, Paint()..color = Colors.white70);
+        ..strokeWidth = .7);
+    }
+  }
+
+  void _coinStack(Canvas c, Offset base, int n) {
+    for (var i = 0; i < n; i++) {
+      _coin(c, base + Offset((i.isOdd ? .8 : -.6), -i * 3.2), 7, true);
+    }
+  }
+
+  /// A gold goblet with a gem set in its bowl.
+  void _goblet(Canvas c, Offset base) {
+    final gold = Paint()..shader = const LinearGradient(colors: [_goldLight, _goldDark]).createShader(Rect.fromLTWH(base.dx - 12, base.dy - 46, 24, 46));
+    final ink = Paint()
+      ..color = _ink
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.4;
+    final foot = Rect.fromCenter(center: base + const Offset(0, -2), width: 22, height: 6);
+    c.drawOval(foot, gold);
+    c.drawOval(foot, ink);
+    final stem = Rect.fromCenter(center: base + const Offset(0, -13), width: 5, height: 20);
+    c.drawRect(stem, gold);
+    c.drawRect(stem, ink);
+    final bowl = Path()
+      ..moveTo(base.dx - 12, base.dy - 44)
+      ..quadraticBezierTo(base.dx - 12, base.dy - 22, base.dx, base.dy - 22)
+      ..quadraticBezierTo(base.dx + 12, base.dy - 22, base.dx + 12, base.dy - 44)
+      ..close();
+    c.drawPath(bowl, gold);
+    c.drawPath(bowl, ink);
+    c.drawOval(Rect.fromCenter(center: base + const Offset(0, -44), width: 24, height: 5), Paint()..color = const Color(0xFF5A3A10));
+    _gem(c, base + const Offset(0, -32), const Color(0xFFE0304A), 3.6);
+  }
+
+  /// A cut gem: a crown of facets over a pointed pavilion, light on one side, a sparkle.
+  void _gem(Canvas c, Offset at, Color col, double s) {
+    final light = Color.lerp(col, Colors.white, .5)!, dark = Color.lerp(col, Colors.black, .45)!;
+    final girdleL = at + Offset(-s, 0), girdleR = at + Offset(s, 0), tableL = at + Offset(-s * .5, -s * .6), tableR = at + Offset(s * .5, -s * .6), tip = at + Offset(0, s * 1.15);
+    // Shadow on the gold.
+    c.drawOval(Rect.fromCenter(center: at + Offset(s * .3, s * 1.2), width: s * 2, height: s * .6), Paint()..color = Colors.black.withValues(alpha: .25));
+    // Pavilion: the lower half, two faces.
+    c.drawPath(Path()..addPolygon([girdleL, at, tip], true), Paint()..color = col);
+    c.drawPath(Path()..addPolygon([at, girdleR, tip], true), Paint()..color = dark);
+    // Crown: the table on top, a bright face and a darker one.
+    c.drawPath(Path()..addPolygon([girdleL, tableL, tableR, girdleR], true), Paint()..shader = LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [light, col]).createShader(Rect.fromPoints(girdleL + Offset(0, -s), girdleR)));
+    final facet = Paint()
+      ..color = dark.withValues(alpha: .7)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = .8;
+    c.drawLine(tableL, at, facet);
+    c.drawLine(tableR, at, facet);
+    c.drawLine(girdleL, girdleR, facet);
+    c.drawPath(Path()..addPolygon([girdleL, tableL, tableR, girdleR, tip], true), Paint()
+      ..color = _ink
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.1);
+    _glint(c, tableL + Offset(s * .15, s * .1), s * .7);
+  }
+
+  /// A four-pointed glint of light.
+  void _glint(Canvas c, Offset at, double s) {
+    final p = Paint()..color = Colors.white.withValues(alpha: .9);
+    c.drawPath(
+      Path()
+        ..moveTo(at.dx, at.dy - s)
+        ..quadraticBezierTo(at.dx, at.dy, at.dx + s, at.dy)
+        ..quadraticBezierTo(at.dx, at.dy, at.dx, at.dy + s)
+        ..quadraticBezierTo(at.dx, at.dy, at.dx - s, at.dy)
+        ..quadraticBezierTo(at.dx, at.dy, at.dx, at.dy - s)
+        ..close(),
+      p,
+    );
+  }
+
+  /// A treasure chest thrown open, seen a little from the side: oak planks bound in gold, studs,
+  /// a lock plate, the arched lid back on its hinges, and gold spilling out over the lip.
+  void _chest(Canvas c, Offset base) {
+    const w = 70.0, h = 38.0, d = 16.0; // front width, height, how much of the side shows
+    final ink = Paint()
+      ..color = _ink
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.8;
+    final fl = base + const Offset(-w / 2, 0), fr = base + const Offset(w / 2, 0);
+    final front = Rect.fromLTRB(fl.dx, fl.dy - h, fr.dx, fr.dy);
+    // The side face, going back up to the right.
+    final side = Path()..addPolygon([front.topRight, front.topRight + const Offset(d, -d * .6), front.bottomRight + const Offset(d, -d * .6), front.bottomRight], true);
+    c.drawPath(side, Paint()..color = const Color(0xFF4A2A12));
+    c.drawPath(side, ink);
+    // The lid thrown back: its inside showing, arched, leaning away.
+    final hingeL = front.topLeft + const Offset(4, -d * .6), hingeR = front.topRight + const Offset(d - 4, -d * .6);
+    final lid = Path()
+      ..moveTo(hingeL.dx, hingeL.dy)
+      ..lineTo(hingeL.dx + 6, hingeL.dy - 34)
+      ..quadraticBezierTo((hingeL.dx + hingeR.dx) / 2 + 6, hingeL.dy - 50, hingeR.dx + 6, hingeR.dy - 34)
+      ..lineTo(hingeR.dx, hingeR.dy)
+      ..close();
+    c.drawPath(lid, Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF6A3E1E), Color(0xFF2E180A)]).createShader(lid.getBounds()));
+    // The gold band round the lid's rim, and its planks.
+    c.drawPath(lid, Paint()
+      ..color = const Color(0xFFD8A040)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.4);
+    c.drawPath(lid, ink);
+    for (final f in const [.33, .66]) {
+      final x = hingeL.dx + (hingeR.dx - hingeL.dx) * f;
+      c.drawLine(Offset(x, hingeL.dy - 2), Offset(x + 6, hingeL.dy - 42), Paint()
+        ..color = const Color(0x66000000)
+        ..strokeWidth = 1.2);
+    }
+    // Light pouring up out of it.
+    final glowAt = Offset(base.dx + d / 2, front.top - 6);
+    c.drawCircle(glowAt, 46, Paint()..shader = RadialGradient(colors: [_goldLight.withValues(alpha: .55), _goldLight.withValues(alpha: 0)]).createShader(Rect.fromCircle(center: glowAt, radius: 46)));
+    // The opening, heaped with gold over the lip.
+    final mouth = Path()..addPolygon([front.topLeft, front.topLeft + const Offset(d, -d * .6), front.topRight + const Offset(d, -d * .6), front.topRight], true);
+    c.drawPath(mouth, Paint()..color = const Color(0xFF3A220C));
+    final spill = Path()
+      ..moveTo(front.left + 2, front.top + 2)
+      ..quadraticBezierTo(front.left + w * .35, front.top - 18, front.left + w * .6, front.top - 10)
+      ..quadraticBezierTo(front.right + d * .6, front.top - 16, front.right + d - 2, front.top - d * .6 + 2)
+      ..lineTo(front.right, front.top + 2)
+      ..close();
+    c.drawPath(spill, Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [_goldLight, _gold]).createShader(spill.getBounds()));
+    for (final o in const [Offset(10, -6), Offset(22, -11), Offset(36, -9), Offset(50, -10), Offset(62, -6)]) {
+      _coin(c, front.topLeft + o, 4.5, false);
+    }
+    // The front: oak planks, gold corner bands and straps, studs, a lock plate.
+    c.drawRect(front, Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF8A5228), Color(0xFF5A3216)]).createShader(front));
+    for (var y = front.top + h / 3; y < front.bottom - 2; y += h / 3) {
+      c.drawLine(Offset(front.left, y), Offset(front.right, y), Paint()
+        ..color = const Color(0x55000000)
+        ..strokeWidth = 1.2);
+    }
+    final band = Paint()..shader = const LinearGradient(colors: [Color(0xFFF0C860), Color(0xFFA87420)]).createShader(front);
+    c.drawRect(Rect.fromLTWH(front.left, front.top, w, 5), band);
+    c.drawRect(Rect.fromLTWH(front.left, front.bottom - 5, w, 5), band);
+    for (final x in [front.left, front.right - 7, front.left + w * .3 - 3, front.left + w * .7 - 3]) {
+      c.drawRect(Rect.fromLTWH(x, front.top, 7, h), band);
+    }
+    for (final x in [front.left + 3.5, front.right - 3.5]) {
+      for (final y in [front.top + 10, front.bottom - 10]) {
+        c.drawCircle(Offset(x, y), 1.6, Paint()..color = _ink);
       }
     }
+    final plate = RRect.fromRectAndRadius(Rect.fromCenter(center: Offset(base.dx, front.top + 13), width: 14, height: 16), const Radius.circular(3));
+    c.drawRRect(plate, Paint()..color = const Color(0xFFE8B850));
+    c.drawRRect(plate, Paint()
+      ..color = _ink
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2);
+    c.drawCircle(Offset(base.dx, front.top + 11), 2, Paint()..color = _ink);
+    c.drawRect(Rect.fromCenter(center: Offset(base.dx, front.top + 15), width: 1.6, height: 4), Paint()..color = _ink);
+    c.drawRect(front, ink);
   }
 
   @override

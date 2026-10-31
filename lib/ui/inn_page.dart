@@ -260,6 +260,11 @@ class _InnPageState extends State<InnPage> with RouteAware {
                           _ResumeBanner(controller: c, onTap: _resume),
                           const SizedBox(height: 10),
                         ],
+                        // The Ember King is down: go round again, harder.
+                        if (s.won) ...[
+                          _NewGamePlusCard(controller: c),
+                          const SizedBox(height: 10),
+                        ],
                         // Hob's cellar: once you've a Cinder key (or have ever opened it).
                         if (s.keys > 0 || s.vaultFound.isNotEmpty) ...[
                           _VaultCard(controller: c),
@@ -1178,6 +1183,7 @@ class _SettingsWindowState extends State<_SettingsWindow> {
               ),
               _toggle('Faster fights', Icons.fast_forward_rounded, _s.fastFights, (v) => _set((s) => s.fastFights = v)),
               _toggle('Blood & gore', Icons.water_drop_rounded, _s.gore, (v) => _set((s) => s.gore = v)),
+              _toggle('Vibration', Icons.vibration_rounded, _s.vibrate, (v) => _set((s) => s.vibrate = v)),
               _toggle('Sell junk where it falls', Icons.sell_rounded, _s.autoSellJunk, (v) => _set((s) => s.autoSellJunk = v)),
               _toggle('Mute all', Icons.volume_off_rounded, _s.muted, (v) => _set((s) => s.muted = v)),
               _slider(Icons.music_note_rounded, _s.music, (v) => _set((s) => s.music = v)),
@@ -1346,6 +1352,102 @@ class _CloudSection extends StatelessWidget {
 
 /// The Ember Vault in Hob's cellar: your Cinder keys, the six pieces only it holds (the ones you've
 /// found shown, the rest still locked), and the door.
+/// New Game+: after the Ember King, start again at level 1 with the vault's pieces and your keys,
+/// against tougher foes, for better loot and another star by your name.
+class _NewGamePlusCard extends StatelessWidget {
+  const _NewGamePlusCard({required this.controller});
+  final GameController controller;
+
+  static const _gold = Color(0xFFF2C14E);
+
+  Widget _chip(IconData icon, String text, {Color colour = _gold}) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+    decoration: BoxDecoration(color: Colors.black38, borderRadius: BorderRadius.circular(12), border: Border.all(color: colour.withValues(alpha: .5))),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: colour),
+        const SizedBox(width: 3),
+        Text(text, style: Txt.onStone(size: 12, color: Palette.cream)),
+      ],
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final c = controller, s = c.state, next = s.ng + 1, why = c.whyNotNewGamePlus;
+    final stars = next <= 3 ? '★' * next : '★$next';
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: _gold.withValues(alpha: .75), width: 1.5),
+        gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF3A3016), Color(0xFF1A1408)]),
+        boxShadow: [BoxShadow(color: _gold.withValues(alpha: .18), blurRadius: 12)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.auto_awesome, color: _gold, size: 26),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('NEW GAME+ $stars', style: Txt.label(size: 15, color: _gold, weight: FontWeight.w800)),
+                    Text(why ?? 'The ash returns, thicker', style: Txt.onStone(size: 12.5, color: why != null ? const Color(0xFFE8B070) : Palette.parch2)),
+                  ],
+                ),
+              ),
+              SizedBox(
+                width: 96,
+                child: StoneButton(title: 'Begin', compact: true, tone: ButtonTone.blood, onPressed: why == null ? () => _begin(context) : null),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            alignment: WrapAlignment.center,
+            children: [
+              _chip(Icons.restart_alt_rounded, 'Level 1', colour: const Color(0xFFE07A5A)),
+              _chip(Icons.vpn_key_rounded, 'Keys kept'),
+              _chip(Icons.shield_rounded, 'Vault set kept'),
+              _chip(Icons.trending_up_rounded, 'Tougher foes', colour: const Color(0xFFE07A5A)),
+              _chip(Icons.diamond_rounded, 'Legendaries ×${1 + math.min(next, 4)}'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _begin(BuildContext context) async {
+    final c = controller;
+    final sure = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Palette.stone2,
+        title: Text('Start the road again?', style: Txt.label(size: 18, color: _gold)),
+        content: Text(
+          'You start again at level 1 in Cindervale. Your Cinder keys and the vault\'s pieces come with you (back to level 1, growing as you do). Gold, other gear, companions and the map start over.',
+          style: Txt.onStone(size: 14, color: Palette.cream),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text('Not yet', style: Txt.label(size: 14))),
+          TextButton(onPressed: () => Navigator.of(context).pop(true), child: Text('Begin', style: Txt.label(size: 14, color: _gold))),
+        ],
+      ),
+    );
+    if (sure != true) return;
+    Audio.play(Sfx.levelUp);
+    await c.newGamePlus();
+  }
+}
+
 class _VaultCard extends StatelessWidget {
   const _VaultCard({required this.controller});
   final GameController controller;

@@ -74,7 +74,7 @@ class HeroCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(s.settings.name, overflow: TextOverflow.ellipsis, style: Txt.label(size: 15, color: Palette.cream, weight: FontWeight.w800)),
+                HeroName(s, style: Txt.label(size: 15, color: Palette.cream, weight: FontWeight.w800)),
                 const SizedBox(height: 3),
                 Tooltip(message: 'Health', child: Bar(value: hp, max: mh, height: 14, colours: const [Color(0xFFE0604A), Color(0xFF8E2117)], label: 'HP ${fmt(hp)} / ${fmt(mh)}')),
                 if (!compact) ...[
@@ -409,7 +409,7 @@ class HeroStrip extends StatelessWidget {
         children: [
           Row(
             children: [
-              Expanded(child: Text(s.settings.name, overflow: TextOverflow.ellipsis, style: Txt.label(size: 13.5, color: Palette.cream, weight: FontWeight.w800))),
+              Expanded(child: HeroName(s, style: Txt.label(size: 13.5, color: Palette.cream, weight: FontWeight.w800))),
             ],
           ),
           const SizedBox(height: 4),
@@ -607,11 +607,7 @@ class StatsHeader extends StatelessWidget {
                     const SizedBox(width: 8),
                   ],
                   Expanded(
-                    child: Text(
-                      s.settings.name,
-                      overflow: TextOverflow.ellipsis,
-                      style: Txt.label(size: 17, weight: FontWeight.w800),
-                    ),
+                    child: HeroName(s, style: Txt.label(size: 17, weight: FontWeight.w800)),
                   ),
                   _LevelBadge(level: k.level),
                   const SizedBox(width: 8),
@@ -984,3 +980,27 @@ IconData kindIcon(FoeKind k) => switch (k) {
 /// What a foe is weak to, and what it shrugs off, for its card (see [foeEdges]).
 List<String> weakTo(FoeType f) => foeEdges(f).$1;
 List<String> shrugsOff(FoeType f) => foeEdges(f).$2;
+
+/// The hero's name, and a gold star for every time they've beaten the Ember King and gone round
+/// again (New Game+).
+class HeroName extends StatelessWidget {
+  const HeroName(this.s, {super.key, required this.style});
+  final GameState s;
+  final TextStyle style;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = Text(s.settings.name, overflow: TextOverflow.ellipsis, style: style);
+    if (s.ng == 0) return name;
+    return Row(
+      children: [
+        Flexible(child: name),
+        const SizedBox(width: 4),
+        Tooltip(
+          message: 'New Game+ ${s.ng}',
+          child: Text(s.ng <= 3 ? '★' * s.ng : '★${s.ng}', style: style.copyWith(color: const Color(0xFFF2C14E), fontSize: (style.fontSize ?? 14) * .85, shadows: const [Shadow(color: Colors.black, blurRadius: 3)])),
+        ),
+      ],
+    );
+  }
+}
