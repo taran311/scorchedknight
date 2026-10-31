@@ -27,7 +27,7 @@ import 'item_icons.dart';
 import 'loot_window.dart' show resolvePendingLoot;
 import 'material_icons.dart';
 import 'journal_panel.dart' show fmt;
-import 'hero_view.dart' show GearIcon, SetChips;
+import 'hero_view.dart' show GearIcon, SetChips, UpgradeBadge, upgradeVerdict;
 import 'hud.dart' show brewIcon;
 import 'stat_icons.dart' show InfoChip, StatChip;
 import 'quest_dialog.dart' show NpcPortrait, magsLook;
@@ -213,7 +213,17 @@ class MerchantWares extends StatelessWidget {
             final left = c.untilNextDeal, hours = left.inHours, mins = left.inMinutes % 60;
             final when = hours > 0 ? '${hours}h ${mins}m' : '${mins}m';
             return x.ware(
-              Opacity(opacity: sold ? .4 : 1, child: GearIcon(item: g, size: 30, heroClass: k.heroClass, dye: k.dye)),
+              Opacity(
+                opacity: sold ? .4 : 1,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    GearIcon(item: g, size: 30, heroClass: k.heroClass, dye: k.dye),
+                    // Better or worse than what you wear, before you pay for it.
+                    if (!sold) Positioned(right: -8, top: -8, child: UpgradeBadge(upgradeVerdict(g, e.equippedFor(g), k.loadouts[g.heroClass ?? k.heroClass]!), size: 18)),
+                  ],
+                ),
+              ),
               sold ? 'Today\'s find · sold' : 'Today\'s find: ${g.name}',
               sold ? 'Something new in $when' : '${g.rarity.label} ${g.slot.label.toLowerCase()} · new in $when',
               sold
