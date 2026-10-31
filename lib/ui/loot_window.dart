@@ -157,6 +157,7 @@ class _LootWindowState extends State<_LootWindow> {
   Widget _build(BuildContext context) {
     final k = controller.state.knight, old = controller.engine.equippedFor(item), col = rarityColour(item.rarity);
     final cant = controller.engine.whyNotWear(item);
+    final stowed = old != null && old.slot == GearSlot.offhand && !offhandWorksWith(k.loadouts[item.heroClass ?? k.heroClass]!.weapon, old);
     final better = cant == null && (item.slot == GearSlot.armour ? armourTierById(item.art).reduction > armourTierById(k.loadouts[item.heroClass ?? k.heroClass]!.armour).reduction : old == null || item.score > old.score);
     return PopScope(
       canPop: false,
@@ -233,8 +234,9 @@ class _LootWindowState extends State<_LootWindow> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text('Equipped now', style: Txt.label(size: 11, color: Palette.parch2)),
-                                      Text(old.name, style: Txt.label(size: 14, color: rarityColour(old.rarity))),
+                                      // An off-hand your weapon has no hand for is kept, but stowed.
+                                      Text(stowed ? 'Stowed · not used with your ${k.loadouts[item.heroClass ?? k.heroClass]!.weapon?.name ?? 'bare hands'}' : 'Equipped now', style: Txt.label(size: 11, color: stowed ? const Color(0xFFE8B070) : Palette.parch2)),
+                                      Text(old.name, style: Txt.label(size: 14, color: rarityColour(old.rarity).withValues(alpha: stowed ? .55 : 1))),
                                     ],
                                   ),
                                 ),

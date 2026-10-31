@@ -42,7 +42,7 @@ extension StatLook on Stat {
     Stat.smite => 'vs undead',
     Stat.crit => 'crit',
     Stat.lifesteal => 'HP per hit',
-    Stat.guard => 'less damage',
+    Stat.guard => 'damage taken',
     Stat.vigour => 'max HP',
     Stat.regen => 'HP per win',
     Stat.thorns => 'thorns',
