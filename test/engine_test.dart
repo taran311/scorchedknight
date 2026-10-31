@@ -157,7 +157,7 @@ void main() {
     expect(e.whyNotDeal, isNull);
   });
 
-  test('Ashen keys drop now and then, and the Ember Vault gives out all six of its pieces in time', () {
+  test('Cinder keys drop now and then, and the Ember Vault gives out all six of its pieces in time', () {
     final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight)..innRepaired = true, random: Random(11));
     final s = e.state, k = s.knight;
     // Keys turn up from ordinary fights.
@@ -201,6 +201,122 @@ void main() {
       }
       expect(piece, lessThanOrEqualTo(legend * 1.05), reason: p.name);
     }
+  });
+
+  test('the Guardian\'s Oath: all six found, the first heavy blow each fight meets your shield', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight)..innRepaired = true, random: Random(5));
+    final s = e.state, k = s.knight;
+    for (var i = 0; i < 20 && !s.inBattle; i++) {
+      e.explore();
+    }
+    expect(s.inBattle, isTrue);
+    // Not sworn: a heavy blow is just a heavy blow.
+    s.foeHp = s.foeMax = 99999;
+    s.foeWindup = true;
+    expect(e.takeTurn(BattleAction.attack).oath, isFalse);
+    // Sworn: the next heavy blow is caught, whole.
+    s.vaultFound
+      ..clear()
+      ..addAll([for (final p in vaultPieces) p.name]);
+    // (A dodge or a parry doesn't spend it: it waits for a heavy blow that gets through.)
+    SwingResult? caught;
+    for (var i = 0; i < 30 && caught == null; i++) {
+      k.hp = maxHp(k);
+      s.foeWindup = true;
+      final r = e.takeTurn(BattleAction.attack);
+      if (r.oath) caught = r;
+    }
+    expect(caught, isNotNull);
+    expect(caught!.heavy, isFalse, reason: 'it lands as an ordinary blow');
+    expect(caught.counter, greaterThan(0));
+    // Once a fight.
+    for (var i = 0; i < 10; i++) {
+      k.hp = maxHp(k);
+      s.foeWindup = true;
+      expect(e.takeTurn(BattleAction.attack).oath, isFalse);
+    }
+    expect(GameState.fromJson(jsonDecode(jsonEncode(s.toJson())) as Map<String, dynamic>).oathUsed, isTrue);
+  });
+
+  test('a clean kill: a crossbow bolt that fells the foe pays a bounty, and the special bolt comes back', () {
+    // (Seeds where the shot lands: a bolt can miss.)
+    var cleanSeen = false;
+    for (var seed = 0; seed < 40 && !cleanSeen; seed++) {
+      final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight)..innRepaired = true, random: Random(seed));
+      final s = e.state, k = s.knight;
+      for (var i = 0; i < 20 && !s.inBattle; i++) {
+        e.explore();
+      }
+      if (!s.inBattle || e.whyNot(BattleAction.shoot) != null) continue;
+      k.ammo[AmmoType.fire.name] = 2;
+      k.ammoLoaded = AmmoType.fire.name;
+      s.foeHp = 1;
+      final r = e.takeTurn(BattleAction.shoot);
+      if (r.miss) continue;
+      final kill = r.kill!;
+      expect(kill.clean, isTrue);
+      expect(kill.bounty, greaterThan(0));
+      expect(kill.boltBack, AmmoType.fire);
+      expect(k.ammo[AmmoType.fire.name], 2, reason: 'the bolt it was shot with came back');
+      cleanSeen = true;
+    }
+    expect(cleanSeen, isTrue);
+    // A blade's finishing blow is no clean kill.
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight)..innRepaired = true, random: Random(9));
+    for (var i = 0; i < 20 && !e.state.inBattle; i++) {
+      e.explore();
+    }
+    e.state.foeHp = 1;
+    final r = e.takeTurn(BattleAction.skill);
+    expect(r.kill?.clean ?? false, isFalse);
+  });
+
+  test('vault pieces grow with you: a level gained brings every one you own up to it', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(4));
+    final s = e.state, k = s.knight;
+    final crown = e.loot.vaultPiece(vaultPieceNamed('Cinder Crown')!, k.level);
+    final charm = e.loot.vaultPiece(vaultPieceNamed('Brimstone Charm')!, k.level);
+    final plain = e.loot.roll(HeroClass.knight, k.level, odds: const [0, 0, 0, 0, 1], only: GearSlot.boots);
+    k.loadout.helm = crown;
+    k.loadout.boots = plain;
+    k.stash.add(charm);
+    final before = crown.stats[Stat.vigour]!;
+    while (k.level < 12) {
+      e.grantXp(xpToNext(k));
+    }
+    expect(k.loadout.helm!.level, k.level);
+    expect(k.loadout.helm!.stats[Stat.vigour], greaterThan(before));
+    expect(k.loadout.helm!.gearSet, 'vault');
+    expect(k.stash.single.level, k.level);
+    expect(k.loadout.boots!.level, plain.level, reason: 'ordinary gear doesn\'t grow');
+  });
+
+  test('the vault has a floor on bad luck: after a dry run of keys, a piece is sure', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(1));
+    final s = e.state;
+    s.keys = 1;
+    s.vaultDry = vaultSure;
+    expect(e.openVault()!.piece, isTrue);
+    expect(s.vaultDry, 0);
+    expect(GameState.fromJson(jsonDecode(jsonEncode((s..vaultDry = 3).toJson())) as Map<String, dynamic>).vaultDry, 3);
+  });
+
+  test('vault pieces are a set: three worn give the full bonus, and it never drops at random', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(3));
+    final three = [for (final p in vaultPieces.take(3)) e.loot.vaultPiece(p, 20)];
+    expect(activeSets(three).single.$1.id, 'vault');
+    expect(activeSets(three).single.$2, 3);
+    expect(gearSetById('vault')!.forged, isTrue);
+    // A piece found before the set existed joins it on loading.
+    final old = three.first.toJson()..remove('set');
+    expect(GearItem.fromJson(old).gearSet, 'vault');
+    // And one saved with an older mix of stats comes back with today's (the same each load).
+    final ring = e.loot.vaultPiece(vaultPieceNamed('Ring of the Ember Vault')!, 20).toJson();
+    ring['stats'] = {'fortune': 30, 'lifesteal': 5};
+    final back = GearItem.fromJson(ring);
+    expect(back.stats.keys.toSet(), {Stat.lifesteal, Stat.guard, Stat.damage, Stat.fortune});
+    expect(GearItem.fromJson(ring).stats, back.stats);
+    expect(GearItem.fromJson(back.toJson()).stats, back.stats);
   });
 
   test('every continent has foes, a boss and a level', () {

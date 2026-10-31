@@ -8,6 +8,9 @@ import 'audio.dart' show Sfx;
 
 const _rate = 22050;
 
+/// Samples a second in the rendered WAVs.
+const sfxRate = _rate;
+
 /// One voice of a sound: a tone or filtered noise, with its envelope and glides.
 class _Voice {
   _Voice(this.start, this.osc, this.f0, this.f1, this.vol, this.attack, this.decay, this.filter, this.ff0, this.ff1, this.q);

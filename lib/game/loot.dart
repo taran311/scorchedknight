@@ -140,6 +140,9 @@ const gearSets = <GearSet>[
   GearSet('sunscale', 'Sunscale', {Stat.vigour: 20, Stat.regen: 6}, {Stat.thorns: 15, Stat.guard: 4}, '+20 vigour and regeneration', '+15 thorns and +4% guard, and under half health you regrow 4% of your HP every turn, like a lizard', forged: true, regrowth: true),
   GearSet('tidecaller', 'Tidecaller', {Stat.frost: 5, Stat.dodge: 3}, {Stat.frost: 4, Stat.regen: 6}, '+5 frost on every full swing and +3% dodge', '+4 more frost, regeneration, and now and then your frost drags the foe down like the undertow: half its blows miss for two turns', forged: true, undertow: true),
   GearSet('changeling', 'Changeling', {Stat.dodge: 4, Stat.crit: 4}, {Stat.damage: 2, Stat.crit: 4}, '+4% dodge and +4% crit', '+2 damage, +4% more crit, and whenever you change how you strike from the turn before (blade, rite or bolt), the blow lands 20% harder', forged: true, adapt: true),
+  // The Ember Vault's own six (vault.dart): found only behind Hob's cellar door, never forged or
+  // dropped. Wear any three for the full bonus.
+  GearSet('vault', 'Vaultkeeper', {Stat.burn: 4, Stat.fortune: 10}, {Stat.burn: 5, Stat.guard: 3}, '+4 fire on every full swing and +10% gold', '+5 more fire and +3% guard: the vault\'s embers burn for you', forged: true),
   GearSet('bushido', 'Bushido', {Stat.parry: 4, Stat.crit: 4}, {Stat.damage: 3, Stat.parry: 3}, '+4% parry and +4% crit', '+3 damage, +3% more parry, and every turn a fight goes on, your blows land 5% harder (up to 25%): the longer the duel, the surer the cut', forged: true, bushido: true),
   GearSet('skyborn', 'Skyborn', {Stat.dodge: 5, Stat.crit: 3}, {Stat.crit: 4, Stat.dodge: 3}, '+5% dodge and +3% crit', '+4% more crit, +3% dodge, and against anything in the air (fliers, ghosts, archers on the cliffs) all your blows land 25% harder', forged: true, updraft: true),
 ];
@@ -549,13 +552,26 @@ class GearItem {
     lore: j['lore'] as String?,
     tint: (j['tn'] as num?)?.toInt(),
     special: j['sp'] as String?,
-    gearSet: j['set'] as String?,
+    // (Vault pieces found before they became a set join it on loading.)
+    gearSet: j['set'] as String? ?? (vaultPieceNamed(j['name'] as String? ?? '') != null ? 'vault' : null),
     enchant: EnchantRoll.fromJson(j['en']),
-    stats: {
+    stats: _vaultStats(j) ?? {
       for (final e in ((j['stats'] as Map?) ?? {}).entries)
         if (Stat.values.any((s) => s.name == e.key)) Stat.values.byName(e.key as String): (e.value as num).toInt(),
     },
   );
+}
+
+/// A vault piece saved with an older mix of stats (the pendant's XP, the ring before its fire),
+/// rolled afresh to today's mix at its level, the same way every load (null if it's up to date,
+/// or not a vault piece).
+Map<Stat, int>? _vaultStats(Map<String, dynamic> j) {
+  final piece = vaultPieceNamed(j['name'] as String? ?? '');
+  if (piece == null) return null;
+  final have = {for (final k in ((j['stats'] as Map?) ?? {}).keys) '$k'};
+  if (have.length == piece.stats.length && piece.stats.keys.every((s) => have.contains(s.name))) return null;
+  final r = math.Random((j['id'] as String).hashCode), level = (j['level'] as num).toInt();
+  return {for (final e in piece.stats.entries) e.key: _roll(e.key, level, e.value, r)};
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1200,6 +1216,7 @@ class LootTable {
     rarity: Rarity.legendary,
     level: level,
     lore: p.lore,
+    gearSet: 'vault',
     value: _value(level, Rarity.legendary, p.slot),
     stats: {for (final e in p.stats.entries) e.key: _roll(e.key, level, e.value, _r)},
   );

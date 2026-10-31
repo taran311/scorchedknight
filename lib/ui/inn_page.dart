@@ -256,7 +256,7 @@ class _InnPageState extends State<InnPage> with RouteAware {
                           _ResumeBanner(controller: c, onTap: _resume),
                           const SizedBox(height: 10),
                         ],
-                        // Hob's cellar: once you've an Ashen key (or have ever opened it).
+                        // Hob's cellar: once you've a Cinder key (or have ever opened it).
                         if (s.keys > 0 || s.vaultFound.isNotEmpty) ...[
                           _VaultCard(controller: c),
                           const SizedBox(height: 10),
@@ -1195,6 +1195,7 @@ class _SettingsWindowState extends State<_SettingsWindow> {
               TextButton(onPressed: _newHero, child: Text('Start a new hero…', style: Txt.label(size: 13, color: const Color(0xFFE07A5A)))),
               // Which build this is: to tell at a glance that a phone has the latest.
               Center(child: Text('Build $buildStamp', style: Txt.onStone(size: 11.5, color: Palette.parch2))),
+              if (Audio.report() case final r?) Padding(padding: const EdgeInsets.only(top: 4), child: Center(child: Text(r, textAlign: TextAlign.center, style: Txt.onStone(size: 10.5, color: Palette.parch2)))),
             ],
           )),
           ),
@@ -1339,7 +1340,7 @@ class _CloudSection extends StatelessWidget {
 }
 
 
-/// The Ember Vault in Hob's cellar: your Ashen keys, the six pieces only it holds (the ones you've
+/// The Ember Vault in Hob's cellar: your Cinder keys, the six pieces only it holds (the ones you've
 /// found shown, the rest still locked), and the door.
 class _VaultCard extends StatelessWidget {
   const _VaultCard({required this.controller});
@@ -1370,7 +1371,7 @@ class _VaultCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('THE EMBER VAULT', style: Txt.label(size: 15, color: _ember, weight: FontWeight.w800)),
-                    Text('Hob\'s cellar · ${s.keys} Ashen ${s.keys == 1 ? 'key' : 'keys'}', style: Txt.onStone(size: 12.5)),
+                    Text('Hob\'s cellar · ${s.keys} Cinder ${s.keys == 1 ? 'key' : 'keys'}', style: Txt.onStone(size: 12.5)),
                   ],
                 ),
               ),
@@ -1403,7 +1404,18 @@ class _VaultCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 4),
-          Text('${found.length} of ${vaultPieces.length} vault pieces found', textAlign: TextAlign.center, style: Txt.onStone(size: 11.5, color: Palette.parch2)),
+          // Find all six: the Guardian's Oath.
+          if (guardianSworn(found))
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.verified_user_rounded, size: 15, color: _ember),
+                const SizedBox(width: 4),
+                Flexible(child: Text('Guardian\'s Oath: each fight\'s first heavy blow hits no harder than a normal one', textAlign: TextAlign.center, style: Txt.onStone(size: 11.5, color: _ember))),
+              ],
+            )
+          else
+            Text('${found.length} of ${vaultPieces.length} found · all six: the Guardian\'s Oath', textAlign: TextAlign.center, style: Txt.onStone(size: 11.5, color: Palette.parch2)),
         ],
       ),
     );
@@ -1420,8 +1432,10 @@ class _VaultCard extends StatelessWidget {
 
   Future<void> _open(BuildContext context) async {
     final c = controller;
+    final wasSworn = guardianSworn(c.state.vaultFound);
     final find = c.openVault();
     if (find == null || !context.mounted) return;
+    final oath = !wasSworn && guardianSworn(c.state.vaultFound);
     Audio.play(find.piece ? Sfx.legendaryDrop : (find.item != null ? Sfx.rareDrop : Sfx.coins));
     await showDialog<void>(
       context: context,
@@ -1449,6 +1463,13 @@ class _VaultCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text('+${find.gold} gold', style: Txt.label(size: 15, color: Palette.amber, weight: FontWeight.w800)),
+                if (oath) ...[
+                  const SizedBox(height: 12),
+                  const Icon(Icons.verified_user_rounded, color: _ember, size: 34),
+                  Text('THE GUARDIAN\'S OATH', style: Txt.label(size: 18, color: const Color(0xFFFFB04A), weight: FontWeight.w900)),
+                  const SizedBox(height: 4),
+                  Text('Every treasure the vault kept is yours, and its keeper\'s oath with them. From now on, the first heavy blow in every fight meets your shield and lands no harder than a normal one.', textAlign: TextAlign.center, style: Txt.onStone(size: 13.5)),
+                ],
                 const SizedBox(height: 12),
                 StoneButton(title: find.item != null ? 'Look closer' : 'Lovely', tone: ButtonTone.blood, onPressed: () => Navigator.pop(context)),
               ],

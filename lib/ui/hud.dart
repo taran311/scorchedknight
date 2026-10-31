@@ -22,6 +22,7 @@ import '../game/models.dart';
 import '../game/rules.dart';
 import '../game/spells.dart';
 import '../game/tarot.dart' show chariotHp;
+import '../game/vault.dart' show guardianSworn;
 import 'item_icons.dart';
 import 'journal_panel.dart' show fmt;
 import 'frames.dart';
@@ -475,6 +476,9 @@ class HeroBuffs extends StatelessWidget {
       if (k.chariotFights > 0) (Icons.favorite_rounded, const Color(0xFFFF8FA8), k.chariotFights, 'The Chariot: +${(chariotHp * 100).round()}% most health (${more(k.chariotFights)})'),
       if (s.inspired > 0) (Icons.bolt_rounded, const Color(0xFFFFD24A), s.inspired, 'Inspired: you hit ${((inspiredBoost - 1) * 100).round()}% harder (${more(s.inspired)})'),
       if (k.poisonFights > 0) (Icons.science_rounded, const Color(0xFF9BE27A), k.poisonFights, 'Poisoned blade: poison on every attack (${more(k.poisonFights)})'),
+      // The Guardian's Oath, while it's still ready this fight.
+      if (guardianSworn(s.vaultFound) && !(s.inBattle && s.oathUsed))
+        (Icons.verified_user_rounded, const Color(0xFFFF9A4A), null, 'Guardian\'s Oath: the first heavy blow this fight lands no harder than a normal one'),
     ];
   }
 

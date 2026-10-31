@@ -97,8 +97,15 @@ class _Projectile {
 }
 
 class _Mark {
-  _Mark(this.text, this.colours, this.pos, this.start);
+  _Mark(this.text, this.colours, this.pos, this.start, {this.heart = false, this.icon});
   final String text;
+
+  /// A symbol before the text (a shield on a block, a coin on gold): the game says it with
+  /// pictures and numbers, a word at most.
+  final IconData? icon;
+
+  /// HP back, drawn as a red heart with the number in it (floating up), not a chip.
+  final bool heart;
   final List<Color> colours;
   final Offset pos;
   final double start;
@@ -184,6 +191,13 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   /// A companion that joins after a boss: it isn't drawn until this time, then pops in with a
   /// "New companion!" tag over it.
   double? _arrival;
+
+  /// The Guardian's Oath: when its great ember shield rose in front of you, and when the heavy
+  /// blow meets it.
+  double? _oathAt, _oathHit;
+
+  /// A clean kill: when the crossbow's sight snapped shut on the foe.
+  double? _cleanAt;
 
   GameController get c => widget.controller;
   double get now => _clock;
@@ -281,7 +295,10 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     }
   }
 
-  void _mark(String text, List<Color> colours, Offset at) => _marks.add(_Mark(text, colours, at, now));
+  void _mark(String text, List<Color> colours, Offset at, {IconData? icon}) => _marks.add(_Mark(text, colours, at, now, icon: icon));
+
+  /// HP back as a heart floating up with the number in it.
+  void _heart(int n, Offset at) => _marks.add(_Mark('+$n', const [], at, now, heart: true));
 
   bool get _gore => c.state.settings.gore;
 
@@ -438,9 +455,8 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         }
         if (result.hazard > 0) {
           // The land itself bites, at the end of the turn.
-          final hz = continents[realmAt(c.state.rare?.base ?? c.state.foe)];
           _at(math.max(0, _queueFree - now - 260), () {
-            _mark('−${result.hazard} ${hz.hazard}', _orange, const Offset(_knightX - 30, _groundY - 300));
+            _mark('−${result.hazard}', _orange, const Offset(_knightX - 30, _groundY - 300), icon: Icons.warning_amber_rounded);
             _spark('smoke', const Offset(_knightX, _groundY - 120), 8, lift: 1.5, speed: 1.5, life: 700, radius: 6, gravity: -.02);
           });
         }
@@ -741,7 +757,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         for (var i = 0; i < 6; i++) {
           _at(d0 + hit + 80.0 * i, () => _shots.add(_Projectile('bolt', _foeChest + Offset(0, 10.0 * (i % 3) - 10), const Offset(_knightX + 10, _groundY - 140), now, 380, colour)));
         }
-        if (r.drained > 0) _at(d0 + hit + 500, () => _mark('+${r.drained}', _green, const Offset(_knightX + 10, _groundY - 270)));
+        if (r.drained > 0) _at(d0 + hit + 500, () => _heart(r.drained, const Offset(_knightX + 10, _groundY - 270)));
       case SpellKind.blast:
         _at(d0 + hit, () => _spark('bolt', _foeChest, 18, speed: 5.5, life: 500, radius: 4));
       case SpellKind.sleep:
@@ -757,7 +773,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
           _tween('ward', .3, 700, delay: 300);
           _tween('ward', 0, 500, delay: 1100);
           _spark('rime', const Offset(_knightX + 70, _groundY - 130), 24, dir: -math.pi / 2, spread: 1.2, speed: 2.5, life: 900, radius: 3, gravity: -.02);
-          _mark('Mirror ×${c.state.mirror}', const [Color(0xFFCFE8F8), Color(0xFF4A6A8A)], const Offset(_knightX + 30, _groundY - 280));
+          _mark('×${c.state.mirror}', const [Color(0xFFCFE8F8), Color(0xFF4A6A8A)], const Offset(_knightX + 30, _groundY - 280), icon: Icons.flip_rounded);
         });
       case SpellKind.charge:
         // A ghostly warhorse gallops out of the mist, straight through the foe.
@@ -775,7 +791,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
           _spark('holy', const Offset(_knightX, _groundY - 40), 26, dir: -math.pi / 2, spread: .9, speed: 3, life: 1100, radius: 4, lift: 2, gravity: -.03);
           _spark('mend', const Offset(_knightX, _groundY - 140), 18, lift: 2.5, speed: 2.5, life: 900, gravity: -.02);
         });
-        if (r.mended > 0) _at(d0 + castReleaseMs + 300, () => _mark('+${r.mended} ${r.mendedFrom}'.trim(), _green, const Offset(_knightX + 10, _groundY - 270)));
+        if (r.mended > 0) _at(d0 + castReleaseMs + 300, () => _heart(r.mended, const Offset(_knightX + 10, _groundY - 270)));
       case SpellKind.slow || SpellKind.weaken || SpellKind.expose:
         // A hex settles on the foe.
         _at(d0 + hit, () {
@@ -845,7 +861,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       _spark('smoke', const Offset(_foeX - 60, _groundY - 6), 10, dir: -math.pi / 2, spread: 2, speed: 2, life: 700, radius: 8, gravity: -.01);
       _mark('${r.chargeHit}', const [Color(0xFFF2C14E), Color(0xFF8A5A1A)], _foeChest + const Offset(-40, -40));
       c.revealDamage(r.chargeHit);
-      if (m.mend > 0) _mark('+${r.mended} ${r.mendedFrom}'.trim(), _green, const Offset(_knightX + 10, _groundY - 270));
+      if (m.mend > 0) _heart(r.mended, const Offset(_knightX + 10, _groundY - 270));
     });
     _at(d0 + 1200, () {
       fx['charge'] = 0;
@@ -908,7 +924,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     }
     _playLingering(r, d0 + end - 520);
     if (r.froze) _at(d0 + end - 520, () => _mark('Frozen!', const [Color(0xFF9ADFFF), Color(0xFF2A5A8A)], _foeChest + const Offset(0, -90)));
-    if (r.regrown > 0) _at(d0 + end - 300, () => _mark('+${r.regrown} ${r.regrownFrom}'.trim(), _green, const Offset(_knightX + 10, _groundY - 250)));
+    if (r.regrown > 0) _at(d0 + end - 300, () => _heart(r.regrown, const Offset(_knightX + 10, _groundY - 250)));
     final k = c.state.knight, look = heroLook(k);
     final sp = r.damage.special;
     if (sp != null) _playSpecial(sp, mode, d0);
@@ -1067,10 +1083,10 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       };
       final pct = ((r.edge - 1).abs() * 100).round();
       if (r.edge > 1.05) {
-        _mark('Weak to $style +$pct%', const [Color(0xFF9BE27A), Color(0xFF2F5A1F)], chest + const Offset(30, -100));
+        _mark('WEAK +$pct%', const [Color(0xFF9BE27A), Color(0xFF2F5A1F)], chest + const Offset(30, -100));
       } else if (r.edge < .95) {
         final reach = style == 'blades' && c.shownFoeType.aloft;
-        _mark(reach ? 'Out of reach −$pct%' : 'Resists $style −$pct%', _grey, chest + const Offset(30, -100));
+        _mark(reach ? 'ALOFT −$pct%' : 'RESIST −$pct%', _grey, chest + const Offset(30, -100));
       }
       // How the bolt was timed on the aiming bar.
       if (r.aim > 1) {
@@ -1111,7 +1127,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       }
       if (r.healed > 0) {
         _at(120, () {
-          _mark('+${r.healed} ${c.state.wolfTurns > 0 ? 'Wolf' : 'Lifesteal'}', _green, const Offset(_knightX + 10, _groundY - 250));
+          _heart(r.healed, const Offset(_knightX + 10, _groundY - 250));
           _spark('mend', const Offset(_knightX, _groundY - 140), 8, lift: 2, speed: 2, life: 700, gravity: -.02);
         });
       }
@@ -1157,7 +1173,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
             c.revealDamage(r.charmHit);
           }
           if (r.charmHeal > 0) {
-            _mark('+${r.charmHeal} Fairy', _green, const Offset(_knightX + 10, _groundY - 250));
+            _heart(r.charmHeal, const Offset(_knightX + 10, _groundY - 250));
             _spark('mend', const Offset(_knightX, _groundY - 140), 12, lift: 2.5, speed: 2.5, life: 900, gravity: -.02);
           }
         });
@@ -1224,9 +1240,27 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         }
       });
     }
+    if (r.oath) {
+      // The Guardian's Oath: a great ember shield, the vault's keyhole on its face, rises out of
+      // the ground between you and the heavy blow.
+      _at(at - 220, () {
+        _oathAt = now;
+        _oathHit = now + 220 + strikeMs;
+        Audio.play(Sfx.castHoly);
+        _spark('fire', const Offset(_knightX + 105, _groundY - 6), 22, dir: -math.pi / 2, spread: 1.2, speed: 3, life: 700, radius: 6, lift: 1, gravity: -.02);
+      });
+    }
     if (counter != null) {
       _at(at + strikeMs, () {
         const at = Offset(_knightX + 10, _groundY - 250), clash = Offset(_knightX + 120, _groundY - 150);
+        // The Guardian's Oath took the weight out of a heavy blow.
+        if (r.oath) {
+          _mark('Oath!', const [Color(0xFFFFC46A), Color(0xFF8A3A10)], at + const Offset(0, -50), icon: Icons.verified_user_rounded);
+          Audio.play(Sfx.clang, power: 1.5);
+          _spark('fire', const Offset(_knightX + 112, _groundY - 120), 30, dir: math.pi, spread: 1.6, speed: 6, life: 650, radius: 5);
+          _spark('spark', const Offset(_knightX + 112, _groundY - 120), 18, speed: 6, life: 450, radius: 4);
+          _punch(.6);
+        }
         switch (r.guard) {
           case Guard.dodge:
             Audio.play(Sfx.miss);
@@ -1258,7 +1292,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
           case Guard.block:
             _spark('holy', clash, 12, speed: 4, life: 400, radius: 3.5);
             Audio.play(Sfx.block);
-            _mark(counter == 0 ? 'Blocked!' : 'Blocked −$counter', _holy, at);
+            _mark(counter == 0 ? 'Block!' : '−$counter', _holy, at, icon: Icons.shield_rounded);
             if (counter > 0) {
               _tween('kflash', .5, 80);
               _tween('kflash', 0, 300, delay: 80);
@@ -1304,7 +1338,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
             Audio.play(Sfx.hurt, power: counter > maxHp(c.state.knight) * .2 ? 1.3 : 1);
             _mark(r.heavy ? 'Heavy! -$counter' : '-$counter', _red, at);
             if (r.heavy) _punch(.6);
-            if (r.poisoned) _at(260, () => _mark('Poisoned!', _green, at + const Offset(0, -40)));
+            if (r.poisoned) _at(260, () => _mark('Poison!', _green, at + const Offset(0, -40), icon: Icons.science_rounded));
             if (r.drank > 0) {
               // The vampire drinks: your blood, its health.
               _at(220, () {
@@ -1382,7 +1416,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         _spark('holy', chest, 30, speed: 4, life: 900, radius: 4, gravity: -.02);
         _tween('ko', 0, 400, delay: 120, ease: easeOut);
         _banner = ('Cheated death!', const Color(0xFFFFE27A), now + 150);
-        _mark('Reaper\'s Bane', const [Color(0xFFFFF0B0), Color(0xFF8A6A1A)], const Offset(_knightX - 20, _groundY - 270));
+        _mark('Saved!', const [Color(0xFFFFF0B0), Color(0xFF8A6A1A)], const Offset(_knightX - 20, _groundY - 270), icon: Icons.health_and_safety_rounded);
       });
       // He recoils and fades, empty-handed; the world warms again.
       _at(2300, () {
@@ -1452,7 +1486,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     switch (r.action) {
       case BattleAction.potion:
         _at(d0 + 100, () {
-          _mark('+${r.potion}', _green, const Offset(_knightX + 10, _groundY - 250));
+          _heart(r.potion, const Offset(_knightX + 10, _groundY - 250));
           if (r.cured) _at(240, () => _mark('Cured!', _green, const Offset(_knightX + 10, _groundY - 290)));
           Audio.play(Sfx.potion);
           _spark('mend', const Offset(_knightX, _groundY - 140), 18, lift: 2.5, speed: 2.5, life: 900, gravity: -.02);
@@ -1470,7 +1504,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         break;
     }
     _playLingering(r, d0 + act - 120);
-    if (r.regrown > 0) _at(d0 + act + tail + 120, () => _mark('+${r.regrown} ${r.regrownFrom}'.trim(), _green, const Offset(_knightX + 10, _groundY - 250)));
+    if (r.regrown > 0) _at(d0 + act + tail + 120, () => _heart(r.regrown, const Offset(_knightX + 10, _groundY - 250)));
     if (r.counter != null) _playCounter(r, d0 + act);
     _at(d0 + act + tail + 300, () => c.swingFinished(r));
   }
@@ -1491,7 +1525,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
           _mark('${r.charmHit}', _holy, _foeChest + const Offset(-10, -40));
           c.revealDamage(r.charmHit);
         }
-        if (r.charmHeal > 0) _mark('+${r.charmHeal} Fairy', _green, const Offset(_knightX + 10, _groundY - 250));
+        if (r.charmHeal > 0) _heart(r.charmHeal, const Offset(_knightX + 10, _groundY - 250));
       });
       _at(d0 + 720, () => fx['pounce'] = 0);
       return;
@@ -1545,7 +1579,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     _at(d0 + 250, () {
       // The bar rises and the label says why, at the same moment.
       c.revealHeroHp();
-      if (k.breathed > 0) _mark('+${k.breathed} Catch your breath', _green, const Offset(_knightX + 10, _groundY - 250));
+      if (k.breathed > 0) _heart(k.breathed, const Offset(_knightX + 10, _groundY - 250));
     });
     _at(d0, () {
       _tween('flash', 1, 80);
@@ -1562,8 +1596,14 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       _burst(_foeChest, k.boss ? const Color(0xFFFFD45A) : const Color(0xFFFFF0D0), k.boss ? 2.6 : 1.7);
       _punch(k.boss ? 1 : .7);
       if (k.boss) _banner = (k.won ? 'The Ember King falls!' : 'Boss defeated!', const Color(0xFFF2C14E), now + 200);
+      if (k.clean) {
+        // A clean kill: the crossbow's sight snaps shut on it, and the bounty's paid.
+        _cleanAt = now;
+        if (!k.boss && k.jackpot == 0) _banner = ('Clean kill!', const Color(0xFF9BE27A), now + 150);
+        _at(120, () => Audio.play(Sfx.shoot, power: 1.3));
+      }
       _drops.add(_Mark('+${k.xp} XP', const [], Offset.zero, now));
-      _drops.add(_Mark('+${k.coins} gold', const [], Offset.zero, now + 180));
+      _drops.add(_Mark('+${k.coins}', const [], Offset.zero, now + 180, icon: Icons.paid_rounded));
       if (k.jackpot > 0) {
         // A lucky moment: a fat purse.
         _banner = ('Jackpot!', const Color(0xFFF2C14E), now + 300);
@@ -1572,7 +1612,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       }
       final junked = k.loot != null && !c.state.pendingLoot.any((g) => g.id == k.loot!.id) && k.junkGold > 0;
       if (k.loot case final drop? when junked) {
-        _drops.add(_Mark('Junk sold +${k.junkGold} gold', [Color(drop.rarity.argb)], Offset.zero, now + 360));
+        _drops.add(_Mark('Sold +${k.junkGold}', [Color(drop.rarity.argb)], Offset.zero, now + 360, icon: Icons.paid_rounded));
       } else if (k.loot case final drop?) {
         _drops.add(_Mark('${drop.rarity.label} ${drop.slot.label.toLowerCase()}!', [Color(drop.rarity.argb)], Offset.zero, now + 360));
         // A beam of light in the drop's rarity colour, where the foe fell, and a sound to match.
@@ -1589,9 +1629,11 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         _drops.add(_Mark('${g.name}!', [Color(g.rarity.argb)], Offset.zero, now + 540 + 180.0 * i));
       }
       if (k.relicPart != null) _drops.add(_Mark('${k.relicPart}!', const [Color(0xFFFFB04A)], Offset.zero, now + 720));
-      if (k.egg) _drops.add(_Mark('A dragon egg!', const [], Offset.zero, now + 900));
+      if (k.egg) _drops.add(_Mark('Egg!', const [], Offset.zero, now + 900, icon: Icons.egg_rounded));
       if (k.chest != null) _drops.add(_Mark('${k.chest!.tier.label}!', const [], Offset.zero, now + 1080));
-      if (k.key) _drops.add(_Mark('Ashen key!', const [Color(0xFFFF9A4A)], Offset.zero, now + 1170));
+      if (k.key) _drops.add(_Mark('Key!', const [Color(0xFFFF9A4A)], Offset.zero, now + 1170, icon: Icons.vpn_key_rounded));
+      if (k.clean) _drops.add(_Mark('+${k.bounty}', const [Color(0xFF9BE27A)], Offset.zero, now + 270, icon: Icons.gps_fixed_rounded));
+      if (k.boltBack != null) _drops.add(_Mark('+1 bolt', const [Color(0xFF9BE27A)], Offset.zero, now + 450, icon: Icons.replay_rounded));
       if (k.levelUps > 0) _drops.add(_Mark('Level up!', const [Color(0xFF9BE27A)], Offset.zero, now + 1260));
     });
     if (k.levelUps > 0) {
@@ -2657,12 +2699,29 @@ class _ScenePainter extends CustomPainter {
       if (s._banner != null) Rect.fromLTWH(left, 96, visibleW, 76),
       if (s._bubbleBox != null) s._bubbleBox!,
     ];
+    if (s._oathAt case final o0?) {
+      final o = t - o0, hitAt = (s._oathHit ?? o0) - o0;
+      if (o > hitAt + 750) {
+        s._oathAt = null;
+      } else if (o >= 0) {
+        _drawOathShield(canvas, const Offset(_knightX + 108, _groundY), o, hitAt, still);
+      }
+    }
+    if (s._cleanAt case final c0?) {
+      final o = t - c0;
+      if (o > 900) {
+        s._cleanAt = null;
+      } else if (o >= 0) {
+        _drawSight(canvas, s._foeChest, o);
+      }
+    }
     for (final m in s._marks) {
       final age = (t - m.start) / _markMs;
       if (age < 0 || age > 1) continue;
       if (m.box == null) {
-        final tp = _laidOut('m:${m.text}', () => _markText(m.text));
-        m.box = _place(Size(math.max(54.0, tp.width + 22) * boost * 1.12, 38 * boost * 1.12), m.pos, view, taken);
+        final tp = _laidOut('m:${m.icon?.codePoint ?? ''}:${m.text}', () => _markText(m.text, m.icon));
+        final (w, h) = m.heart ? _heartSize(tp) : (_chipWidth(tp), 38.0);
+        m.box = _place(Size(w * boost * 1.12, h * boost * 1.12), m.pos, view, taken);
         taken.add(m.box!);
       }
       _tag(canvas, m, age, boost);
@@ -2703,7 +2762,17 @@ class _ScenePainter extends CustomPainter {
       if (age < 0 || age > 1) continue;
       final a = (age < .12 ? age / .12 : 1 - math.max(0.0, (age - .7) / .3)).clamp(0.0, 1.0).toDouble();
       final colour = d.colours.isEmpty ? Palette.amber : d.colours.first;
-      final tp = _laidOut('d:${d.text}:${colour.toARGB32()}', () => TextPainter(text: TextSpan(text: d.text, style: Txt.label(size: 26, color: colour, weight: FontWeight.w900)), textDirection: TextDirection.ltr)..layout());
+      final icon = d.icon;
+      final tp = _laidOut('d:${icon?.codePoint ?? ''}:${d.text}:${colour.toARGB32()}', () => TextPainter(
+        text: TextSpan(
+          style: Txt.label(size: 26, color: colour, weight: FontWeight.w900),
+          children: [
+            if (icon != null) TextSpan(text: '${String.fromCharCode(icon.codePoint)} ', style: TextStyle(fontFamily: icon.fontFamily, package: icon.fontPackage, fontSize: 24, color: colour)),
+            TextSpan(text: d.text),
+          ],
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout());
       if (d.box == null) {
         // Rewards stack up the right-hand side, under the foe's head height.
         final w = (tp.width + 24) * boost, h = (tp.height + 8) * boost;
@@ -2854,8 +2923,58 @@ class _ScenePainter extends CustomPainter {
     );
   }
 
-  static TextPainter _markText(String text) => TextPainter(
-    text: TextSpan(text: text, style: Txt.label(size: 30, color: Colors.white, weight: FontWeight.w800)),
+  /// A label chip's width: the words, clear of its pointed ends.
+  static double _chipWidth(TextPainter tp) => math.max(54.0, tp.width + 36);
+
+  /// A heart's size for its number.
+  static (double, double) _heartSize(TextPainter tp) {
+    final w = math.max(58.0, tp.width + 30);
+    return (w, w * .92);
+  }
+
+  /// HP back: a red heart with the number in it, popping in, floating up and fading.
+  void _drawHeart(Canvas canvas, _Mark m, TextPainter tp, double age, double scale, double alpha) {
+    final (w, h) = _heartSize(tp);
+    final lift = 40 * Curves.easeOut.transform(age);
+    canvas.save();
+    canvas.translate(m.box!.center.dx, m.box!.center.dy - lift);
+    canvas.scale(scale);
+    // The heart: two lobes and a point, a little wider than it is tall.
+    final heart = Path()
+      ..moveTo(0, h * .5)
+      ..cubicTo(-w * .62, h * .05, -w * .55, -h * .62, 0, -h * .22)
+      ..cubicTo(w * .55, -h * .62, w * .62, h * .05, 0, h * .5)
+      ..close();
+    canvas.drawPath(heart.shift(const Offset(0, 3)), Paint()..color = Colors.black.withValues(alpha: .35 * alpha));
+    canvas.drawPath(heart, Paint()..shader = ui.Gradient.linear(Offset(0, -h / 2), Offset(0, h / 2), [const Color(0xFFFF7A86).withValues(alpha: alpha), const Color(0xFFB0182C).withValues(alpha: alpha)]));
+    canvas.drawPath(heart, strokePaint(const Color(0xFF4A0810).withValues(alpha: .8 * alpha), 2));
+    // A glint on the left lobe.
+    canvas.drawOval(Rect.fromCenter(center: Offset(-w * .2, -h * .2), width: w * .16, height: h * .12), Paint()..color = Colors.white.withValues(alpha: .45 * alpha));
+    // The number, white with a dark edge so it reads on the red.
+    final s = .78;
+    canvas.save();
+    canvas.translate(0, -h * .04);
+    canvas.scale(s);
+    final edge = _laidOut('he:${m.text}', () => TextPainter(
+      text: TextSpan(text: m.text, style: Txt.label(size: 30, weight: FontWeight.w800).copyWith(foreground: strokePaint(const Color(0xFF3A060C), 4))),
+      textDirection: TextDirection.ltr,
+    )..layout());
+    canvas.saveLayer(Rect.fromCenter(center: Offset.zero, width: tp.width + 12, height: tp.height + 12), Paint()..color = Color.fromRGBO(0, 0, 0, alpha));
+    edge.paint(canvas, Offset(-edge.width / 2, -edge.height / 2));
+    tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
+    canvas.restore();
+    canvas.restore();
+    canvas.restore();
+  }
+
+  static TextPainter _markText(String text, [IconData? icon]) => TextPainter(
+    text: TextSpan(
+      style: Txt.label(size: 30, color: Colors.white, weight: FontWeight.w800),
+      children: [
+        if (icon != null) TextSpan(text: '${String.fromCharCode(icon.codePoint)}${text.isEmpty ? '' : ' '}', style: TextStyle(fontFamily: icon.fontFamily, package: icon.fontPackage, fontSize: 28, color: Colors.white)),
+        TextSpan(text: text),
+      ],
+    ),
     textDirection: TextDirection.ltr,
   )..layout();
 
@@ -2896,18 +3015,24 @@ class _ScenePainter extends CustomPainter {
         : age > .8
         ? 1 - (age - .8) / .2
         : 1.0;
+    final tp = _laidOut('m:${m.icon?.codePoint ?? ''}:${m.text}', () => _markText(m.text, m.icon));
+    if (m.heart) {
+      _drawHeart(canvas, m, tp, age, scale, alpha);
+      return;
+    }
     final rise = age > .8 ? (age - .8) / .2 * 6 : 0.0;
-    final tp = _laidOut('m:${m.text}', () => _markText(m.text));
-    final w = math.max(54.0, tp.width + 22), h = 38.0;
+    final w = _chipWidth(tp), h = 38.0;
     canvas.save();
     canvas.translate(m.box!.center.dx, m.box!.center.dy - rise);
     canvas.scale(scale);
+    // Pointed ends of a set size (they used to grow with the label and cut into long words).
+    const tip = 11.0;
     final path = poly([
-      Offset(-w / 2 + w * .12, -h / 2),
-      Offset(w / 2 - w * .12, -h / 2),
+      Offset(-w / 2 + tip, -h / 2),
+      Offset(w / 2 - tip, -h / 2),
       Offset(w / 2, 0),
-      Offset(w / 2 - w * .12, h / 2),
-      Offset(-w / 2 + w * .12, h / 2),
+      Offset(w / 2 - tip, h / 2),
+      Offset(-w / 2 + tip, h / 2),
       Offset(-w / 2, 0),
     ]);
     // Fading needs a layer, but only the label's own patch of screen and only while it fades.
@@ -2920,6 +3045,69 @@ class _ScenePainter extends CustomPainter {
     tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
     if (fading) canvas.restore();
     canvas.restore();
+  }
+
+  /// The Guardian's Oath: a great kite shield of ember-light standing on the ground at [base],
+  /// the vault's keyhole on its face. [o] ms since it began rising; the heavy blow meets it at
+  /// [hitAt]; it fades after. (No layers, and two-colour gradients only: the phone's renderer.)
+  void _drawOathShield(Canvas canvas, Offset base, double o, double hitAt, bool still) {
+    final rise = Curves.easeOutBack.transform((o / 220).clamp(0.0, 1.0));
+    final fade = o < hitAt + 350 ? 1.0 : (1 - (o - hitAt - 350) / 400).clamp(0.0, 1.0);
+    final a = (o / 160).clamp(0.0, 1.0) * fade;
+    if (a <= 0) return;
+    final hit = o < hitAt ? 0.0 : (1 - (o - hitAt) / 280).clamp(0.0, 1.0);
+    final shake = still ? 0.0 : math.sin(o / 16) * 7 * hit;
+    // A pool of ember-light on the ground at its foot.
+    canvas.drawOval(Rect.fromCenter(center: base, width: 190 * rise, height: 26), Paint()..shader = ui.Gradient.radial(base, 95, [const Color(0xFFFF9A4A).withValues(alpha: .5 * a), const Color(0x00FF9A4A)]));
+    canvas.save();
+    canvas.translate(base.dx + shake, base.dy + (1 - rise) * 60);
+    canvas.scale(.7 + .3 * rise, rise);
+    const top = -210.0, w = 70.0;
+    final shield = Path()
+      ..moveTo(-w, top + 12)
+      ..quadraticBezierTo(0, top - 10, w, top + 12)
+      ..lineTo(w - 3, top + 95)
+      ..quadraticBezierTo(w - 10, -40, 0, -6)
+      ..quadraticBezierTo(-w + 10, -40, -w + 3, top + 95)
+      ..close();
+    final c = const Offset(0, -118);
+    // Its glow, then its face, rim and keyhole.
+    canvas.drawCircle(c, 150, Paint()..shader = ui.Gradient.radial(c, 150, [const Color(0xFFFF9A4A).withValues(alpha: (.32 + .3 * hit) * a), const Color(0x00FF9A4A)]));
+    canvas.drawPath(shield, Paint()..shader = ui.Gradient.linear(const Offset(0, top), Offset.zero, [const Color(0xFFFFC46A).withValues(alpha: .62 * a), const Color(0xFF8A2A10).withValues(alpha: .72 * a)]));
+    canvas.save();
+    canvas.translate(c.dx, c.dy);
+    canvas.scale(.82);
+    canvas.translate(-c.dx, -c.dy);
+    canvas.drawPath(shield, strokePaint(const Color(0xFFFFE2A0).withValues(alpha: .55 * a), 2.5));
+    canvas.restore();
+    canvas.drawPath(shield, strokePaint(const Color(0xFFFFD27A).withValues(alpha: .95 * a), 4.5));
+    final hole = Paint()..color = const Color(0xFF2A0E06).withValues(alpha: .85 * a);
+    canvas.drawCircle(const Offset(0, -132), 13, hole);
+    canvas.drawPath(poly(const [Offset(-7, -124), Offset(7, -124), Offset(12, -94), Offset(-12, -94)]), hole);
+    canvas.drawCircle(const Offset(0, -132), 13, strokePaint(const Color(0xFFFFD27A).withValues(alpha: .8 * a), 2));
+    if (hit > 0) {
+      // The blow lands: a white flare, and cracks of light across the face.
+      canvas.drawPath(shield, Paint()..color = Colors.white.withValues(alpha: .55 * hit * a));
+      final crack = strokePaint(const Color(0xFFFFF4D0).withValues(alpha: .9 * hit * a), 2.2);
+      for (final (dx, dy) in const [(40.0, -60.0), (-46.0, -40.0), (30.0, 50.0), (-20.0, 64.0)]) {
+        canvas.drawLine(c + const Offset(16, -6), c + Offset(dx, dy), crack);
+      }
+    }
+    canvas.restore();
+  }
+
+  /// A clean kill: the crossbow's sight closing on [at], then holding as it fades ([o] ms).
+  void _drawSight(Canvas canvas, Offset at, double o) {
+    final close = Curves.easeOutCubic.transform((o / 260).clamp(0.0, 1.0));
+    final a = o < 500 ? 1.0 : (1 - (o - 500) / 400).clamp(0.0, 1.0);
+    final r = 90 - 52 * close;
+    final col = const Color(0xFF9BE27A).withValues(alpha: .9 * a);
+    canvas.drawCircle(at, r, strokePaint(col, 3));
+    canvas.drawCircle(at, r * .35, strokePaint(col, 2));
+    for (final d in const [Offset(1, 0), Offset(-1, 0), Offset(0, 1), Offset(0, -1)]) {
+      canvas.drawLine(at + d * (r * .55), at + d * (r + 14), strokePaint(col, 3));
+    }
+    if (close >= 1) canvas.drawCircle(at, 5, Paint()..color = col);
   }
 
   /// A treasure chest: wood and iron bands in the tier's colours, the lid tipping back as it opens.

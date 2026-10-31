@@ -360,6 +360,7 @@ class GameState {
     this.encounterCalm = 0,
     this.chestIn = chestEvery,
     this.keys = 0,
+    this.vaultDry = 0,
     List<String>? vaultFound,
     this.lastRoll,
     this.inspired = 0,
@@ -428,6 +429,7 @@ class GameState {
     this.mended = false,
     this.rallied = false,
     this.vanguardUsed = false,
+    this.oathUsed = false,
     this.charged = false,
     List<JournalEntry>? journal,
     List<GearItem>? pendingLoot,
@@ -522,9 +524,12 @@ class GameState {
   /// Wins until the next strongbox by the road ([chestEvery]).
   int chestIn;
 
-  /// Ashen keys in hand, for the Ember Vault, and which of its own pieces you've found (by name).
+  /// Cinder keys in hand, for the Ember Vault, and which of its own pieces you've found (by name).
   int keys;
   final List<String> vaultFound;
+
+  /// Keys turned since the vault last gave up one of its own pieces (see [vaultSure]).
+  int vaultDry;
 
   /// What the strongbox's die last came up (for the window to show it landing).
   int? lastRoll;
@@ -646,6 +651,9 @@ class GameState {
   /// first block, and the mount's opening charge.
   bool mended, rallied, vanguardUsed, charged;
 
+  /// The Guardian's Oath has caught this fight's heavy blow.
+  bool oathUsed;
+
   List<JournalEntry> journal;
 
   /// Drops waiting for "equip or sell". Usually empty; survives closing the app mid-choice.
@@ -693,6 +701,7 @@ class GameState {
     'encounterCalm': encounterCalm,
     'chestIn': chestIn,
     if (keys > 0) 'keys': keys,
+    if (vaultDry > 0) 'vaultDry': vaultDry,
     if (vaultFound.isNotEmpty) 'vaultFound': vaultFound,
     'inspired': inspired,
     if (wild != null) ...{
@@ -762,6 +771,7 @@ class GameState {
       'mended': mended,
       'rallied': rallied,
       'vanguard': vanguardUsed,
+      'oath': oathUsed,
       'charged': charged,
     },
     'special': specialCharge,
@@ -818,6 +828,7 @@ class GameState {
       encounterCalm: n('encounterCalm'),
       chestIn: n('chestIn', chestEvery),
       keys: n('keys'),
+      vaultDry: n('vaultDry'),
       vaultFound: (j['vaultFound'] as List?)?.cast<String>().toList(),
       inspired: n('inspired'),
       wild: (j['wild'] as num?)?.toInt(),
@@ -891,6 +902,7 @@ class GameState {
       mended: j['mended'] == true,
       rallied: j['rallied'] == true,
       vanguardUsed: j['vanguard'] == true,
+      oathUsed: j['oath'] == true,
       charged: j['charged'] == true,
       journal: list('journal', JournalEntry.fromJson),
       pendingLoot: list('pendingLoot', GearItem.fromJson),

@@ -49,6 +49,9 @@ class Audio {
   /// Fades to [track] (a file name in web/music/ without ".mp3"), or to silence with null.
   static void music(String? track) => impl.music(track);
 
+  /// How the sound effects are doing, for Settings (the app only: which loaded, plays, errors).
+  static String? report() => impl.report();
+
   /// Volumes from the settings.
   static void configure({required double music, required double sound, required bool muted}) => impl.configure(music, sound, muted);
 }

@@ -345,3 +345,6 @@ void _fade() {
     _fader = null;
   }
 }
+
+/// A line on how sound is doing (the app only).
+String? report() => null;

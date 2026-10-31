@@ -23,24 +23,59 @@ const _version = 2;
 final _pools = <Sfx, _Ring>{};
 
 class _Ring {
-  _Ring(this.players);
+  _Ring(this.sfx, this.players, this.length);
+  final Sfx sfx;
   final List<AudioPlayer> players;
+
+  /// How long the sound runs.
+  final Duration length;
   int _next = 0;
+  final _turn = <AudioPlayer, int>{};
 
   void play(double volume) {
     final p = players[_next];
     _next = (_next + 1) % players.length;
-    // Fire and forget: the calls reach the phone in order, and nothing here waits on a reply.
     unawaited(_go(p, volume));
   }
 
-  static Future<void> _go(AudioPlayer p, double volume) async {
+  // audioplayers skips a play on a player it thinks is still playing, and skips a stop that a
+  // play has already overtaken. These sounds never report finishing, so without care every
+  // player made its sound once and then never again. So: each player is stopped once its sound
+  // has run (free for next time), and one still sounding is stopped first, waited for.
+  Future<void> _go(AudioPlayer p, double volume) async {
+    final turn = (_turn[p] ?? 0) + 1;
+    _turn[p] = turn;
     try {
-      p.stop().ignore();
-      p.setVolume(volume).ignore();
+      if (p.state == PlayerState.playing) await p.stop();
+      p.setVolume(volume).then((_) {}, onError: (Object e) => _fail(sfx, 'vol', e));
       await p.resume();
-    } catch (_) {}
+      Timer(length + const Duration(milliseconds: 60), () {
+        if (_turn[p] == turn && p.state == PlayerState.playing) p.stop().then((_) {}, onError: (Object e) => _fail(sfx, 'stop', e));
+      });
+    } catch (e) {
+      _fail(sfx, 'play', e);
+    }
   }
+}
+
+// What Settings shows: sounds loaded, plays asked for, and the last thing that went wrong.
+int _plays = 0, _missing = 0;
+final _hitPlays = <Sfx, int>{};
+String? _lastError, _loadError;
+void _fail(Sfx s, String what, Object e) {
+  final msg = '$e';
+  _lastError = '${s.name} $what: ${msg.length > 140 ? msg.substring(0, 140) : msg}';
+}
+
+String? report() {
+  final want = Sfx.values.length;
+  final hits = [for (final s in const [Sfx.swing, Sfx.hit, Sfx.crit, Sfx.boneHit]) '${s.name} ${_pools[s]?.players.length ?? 0}p/${_hitPlays[s] ?? 0}x'].join(', ');
+  return [
+    'Sounds ${_pools.length}/$want loaded${_started ? '' : ' (not started)'}, $_plays played, $_missing not ready',
+    hits,
+    if (_loadError != null) 'Load: $_loadError',
+    if (_lastError != null) 'Play: $_lastError',
+  ].join('\n');
 }
 
 /// A game's sound effects: don't pause the player's music or podcast, just mix in.
@@ -85,16 +120,18 @@ Future<void> _load() async {
           await p.setReleaseMode(ReleaseMode.stop);
           await p.setSource(DeviceFileSource(f.path));
           players.add(p);
-        } catch (_) {
+        } catch (e) {
           // One player that won't load shouldn't silence the rest.
+          _loadError = '${s.name}#$i: ${'$e'.length > 140 ? '$e'.substring(0, 140) : e}';
         }
       }
-      if (players.isNotEmpty) _pools[s] = _Ring(players);
+      if (players.isNotEmpty) _pools[s] = _Ring(s, players, Duration(milliseconds: (await File('${dir.path}/${s.name}_0.wav').length() - 44) * 1000 ~/ (2 * sfxRate)));
       // (A breath between sounds, so the first screen never stutters while they're made.)
       await Future<void>.delayed(Duration.zero);
     }
-  } catch (_) {
+  } catch (e) {
     // Nowhere to write, or no player: stay silent rather than fall over.
+    _loadError = '$e';
   }
 }
 
@@ -103,8 +140,13 @@ const _busy = {Sfx.swing, Sfx.hit, Sfx.hurt, Sfx.click, Sfx.coins, Sfx.miss, Sfx
 
 void play(Sfx s, double power) {
   if (_muted || _soundVol <= 0) return;
+  _plays++;
+  _hitPlays[s] = (_hitPlays[s] ?? 0) + 1;
   final pool = _pools[s];
-  if (pool == null) return;
+  if (pool == null) {
+    _missing++;
+    return;
+  }
   pool.play((_soundVol * .9 * power.clamp(.3, 2.0)).clamp(0.0, 1.0).toDouble());
 }
 

@@ -1280,6 +1280,10 @@ const toxinGrowth = .35, bleedTurns = 2, frostFreeze = .08;
 const windupChance = .15, windupBoss = .15, heavyBlow = 1.5;
 const jackpotChance = .04;
 
+/// A clean kill (a crossbow bolt lands the finishing blow): this much more gold from the foe, and
+/// a special bolt comes back out of it.
+const cleanKillGold = .3;
+
 /// Elemental arms (see LootTable.elementArms): the chance a fire or frost elemental leaves its
 /// weapon, and the chance one of the Aeries' foes (dawn) or Ravenmoor's night-walkers (shadow) does.
 const elementArmsChance = .25, landArmsChance = .04;

@@ -47,7 +47,7 @@ class ChestFind {
 }
 
 class KillResult {
-  const KillResult(this.foeIndex, this.name, this.xp, this.coins, this.levelUps, this.loot, {this.egg = false, this.orkGear, this.entGear, this.runeGear, this.prize, this.foe, this.chest, this.companion, this.opened = const [], this.trophy, this.blueprint, this.boss = false, this.won = false, this.reagents = 0, this.jobFind, this.potion = false, this.relicPart, this.packGold = 0, this.packed = const [], this.junkGold = 0, this.jackpot = 0, this.hoard = const [], this.finds = const [], this.breathed = 0, this.key = false});
+  const KillResult(this.foeIndex, this.name, this.xp, this.coins, this.levelUps, this.loot, {this.egg = false, this.orkGear, this.entGear, this.runeGear, this.prize, this.foe, this.chest, this.companion, this.opened = const [], this.trophy, this.blueprint, this.boss = false, this.won = false, this.reagents = 0, this.jobFind, this.potion = false, this.relicPart, this.packGold = 0, this.packed = const [], this.junkGold = 0, this.jackpot = 0, this.hoard = const [], this.finds = const [], this.breathed = 0, this.key = false, this.clean = false, this.bounty = 0, this.boltBack});
 
   /// A lucky purse: extra gold on top of the usual (already counted in [coins]).
   final int jackpot;
@@ -67,8 +67,14 @@ class KillResult {
   /// HP you got back catching your breath after the win.
   final int breathed;
 
-  /// It left an Ashen key, for the Ember Vault.
+  /// It left a Cinder key, for the Ember Vault.
   final bool key;
+
+  /// A clean kill: your crossbow bolt brought it down. [bounty] is the extra gold (counted in
+  /// [coins]); [boltBack] the special bolt you pulled back out of it, if there was one.
+  final bool clean;
+  final int bounty;
+  final AmmoType? boltBack;
   final GearItem? loot;
 
   /// A dragon egg was found (the Cinderreach's boss).
@@ -220,6 +226,9 @@ class SwingResult {
   /// The foe's blow this turn was a heavy one it wound up; and it's winding up another.
   bool heavy = false, windup = false;
 
+  /// The Guardian's Oath caught the heavy blow.
+  bool oath = false;
+
   /// Its blow poisoned you; poison it did to you this turn; HP it drank from you.
   bool poisoned = false;
   int poisonTick = 0, drank = 0;
@@ -244,6 +253,10 @@ class GameEngine {
 
   GameState state;
   final math.Random _rng;
+
+  /// The bolt just loosed brought the foe down (see [cleanKillGold]); and the special bolt it was.
+  bool _cleanKill = false;
+  AmmoType? _cleanBolt;
   final LootTable loot;
 
   static GameState newGame({HeroClass? heroClass}) {
@@ -268,6 +281,9 @@ class GameEngine {
     state.journal.add(JournalEntry(text, kind));
     if (state.journal.length > 80) state.journal.removeRange(0, state.journal.length - 80);
   }
+
+  /// [_grantXp] from outside (tests and tools): [n] XP, and any levels it brings.
+  int grantXp(int n) => _grantXp(n);
 
   int _grantXp(int n) {
     final k = state.knight;
@@ -296,10 +312,32 @@ class GameEngine {
     }
     // A new level patches you up a little, and brings a training point to spend.
     if (ups > 0) {
+      _growVault();
       k.hp = math.min(maxHp(k), k.hp + 10 * ups);
       _note('${ups == 1 ? 'A training point' : '$ups training points'} to spend in your tent: Might, Arcana, Aim or Vigour.', EntryKind.gold);
     }
     return ups;
+  }
+
+  /// The vault's own pieces grow with their keeper: every one you own, worn or put by, comes up to
+  /// your level whenever you gain one (no other gear does; the rest wants replacing or the forge).
+  void _growVault() {
+    final k = state.knight, lvl = k.level;
+    GearItem? grow(GearItem? g) => g != null && g.gearSet == 'vault' && g.level < lvl ? tempered(g, lvl) : g;
+    for (final l in k.loadouts.values) {
+      l
+        ..helm = grow(l.helm)
+        ..gloves = grow(l.gloves)
+        ..boots = grow(l.boots);
+    }
+    k
+      ..trinket = grow(k.trinket)
+      ..ring = grow(k.ring);
+    for (final list in [k.stash, state.pack, state.pendingLoot]) {
+      for (var i = 0; i < list.length; i++) {
+        list[i] = grow(list[i])!;
+      }
+    }
   }
 
   // ---------------- the map ----------------
@@ -1365,6 +1403,7 @@ class GameEngine {
       ..mended = false
       ..rallied = false
       ..vanguardUsed = false
+      ..oathUsed = false
       ..charged = false
       ..wolfTurns = 0
       ..wolfUsed = false
@@ -1657,6 +1696,9 @@ class GameEngine {
         _strike(r, fire, cast, foeName);
     }
     if (shot != null && !r.miss && state.foeHp > 0) _shotTakes(shot, r, foe, foeName);
+    // A clean kill: the bolt itself brought it down (not your companion, the dead or a burn after).
+    _cleanKill = shooting && !r.miss && state.inBattle && state.foeHp <= 0;
+    _cleanBolt = _cleanKill ? shot : null;
     if (fire != null) _specialTakes(fire, r, foe, foeName);
     // A lucky moment: the foe leaves an opening, and you get a free second blow in.
     if (action == BattleAction.attack && fire == null && !r.miss && state.foeHp > 0 && _rng.nextDouble() < openingChance) {
@@ -2126,8 +2168,16 @@ class GameEngine {
       r.kill = _checkKill();
     } else {
       final blocked = _rng.nextDouble() < block;
-      final full = (counterDamage(state) * (heavy ? heavyBlow : 1)).round();
-      r.heavy = heavy;
+      // The Guardian's Oath: the first heavy blow each fight that gets through to you meets the
+      // vault-keeper's shield, and lands no harder than an ordinary one.
+      final oath = heavy && !state.oathUsed && guardianSworn(state.vaultFound);
+      if (oath) {
+        state.oathUsed = true;
+        r.oath = true;
+        _note('$foeName brings its heavy blow down. Your Guardian\'s Oath holds: the shield takes the worst of it.');
+      }
+      final full = (counterDamage(state) * (heavy && !oath ? heavyBlow : 1)).round();
+      r.heavy = heavy && !oath;
       var hurt = blocked ? (full * blockLeak(k)).round() : full;
       if (state.mirror > 0) {
         // Mirror Ward: you take half; the foe takes the whole blow back.
@@ -2173,7 +2223,7 @@ class GameEngine {
         state.foeHp -= thorns;
         r.thorns = thorns;
       }
-      final how = blocked ? (hurt == 0 ? 'You block it completely.' : 'You block most of it: $hurt gets through.') : (heavy ? 'A heavy blow: $hurt!' : 'It hits you for $hurt.');
+      final how = blocked ? (hurt == 0 ? 'You block it completely.' : 'You block most of it: $hurt gets through.') : (r.heavy ? 'A heavy blow: $hurt!' : 'It hits you for $hurt.');
       _note('$foeName strikes. $how${thorns > 0 ? ' Your thorns bite for $thorns.' : ''}${r.reflected > 0 ? ' Your mirror hurls ${r.reflected} back!' : ''}', hurt > 0 ? EntryKind.damage : EntryKind.plain);
       if (thorns > 0 || r.reflected > 0) r.kill = _checkKill();
       if (r.kill == null && k.hp <= 0) {
@@ -2243,6 +2293,17 @@ class GameEngine {
     final jackpot = _rng.nextDouble() < jackpotChance ? r.coins * 2 : 0;
     k.coins += r.coins + jackpot;
     if (jackpot > 0) _note('Jackpot! It was carrying a fat purse: +$jackpot gold.', EntryKind.gold);
+    // A clean kill with the crossbow: a hunter's bounty, and the bolt pulled back out.
+    final clean = _cleanKill, boltBack = _cleanBolt;
+    _cleanKill = false;
+    _cleanBolt = null;
+    final bounty = clean ? math.max(1, (r.coins * cleanKillGold).round()) : 0;
+    k.coins += bounty;
+    if (boltBack != null) {
+      k.ammo[boltBack.name] = (k.ammo[boltBack.name] ?? 0) + 1;
+      k.ammoLoaded ??= boltBack.name;
+    }
+    if (clean) _note('A clean kill! One bolt, and it\'s down. +$bounty gold${boltBack != null ? ', and you pull your bolt back out' : ''}.', EntryKind.gold);
     final ups = _grantXp(r.xp);
     final gearLevel = wild ? k.level + wildGearLift(state.wildDepth) : k.level;
     // Not every foe carries something worth taking; rare foes and bosses always do.
@@ -2492,12 +2553,12 @@ class GameEngine {
       }
     }
     final chest = f.boss || _rng.nextDouble() < (single ? rareChestChance : chestChance) ? openChest(rare: single ? rare : null, grand: f.boss) : null;
-    // Now and then an Ashen key for the Ember Vault: likelier the tougher the foe was.
+    // Now and then a Cinder key for the Ember Vault: likelier the tougher the foe was.
     final over = state.foeLevel - k.level;
     final key = _rng.nextDouble() < (f.boss ? keyChanceBoss : keyChance[over >= 6 ? 2 : (over >= 3 ? 1 : 0)]);
     if (key) {
       state.keys++;
-      _note('Among the spoils: an Ashen key, still warm. Hob\'s cellar has a door it would fit.', EntryKind.gold);
+      _note('Among the spoils: a Cinder key, still warm. Hob\'s cellar has a door it would fit.', EntryKind.gold);
     }
     // In the wilds: everything this fight was worth goes into the pack, gold with the depth bonus.
     var packGold = 0, packed = <GearItem>[];
@@ -2643,7 +2704,7 @@ class GameEngine {
     }
     if (ups > 0) _note('You reached level ${k.level}. ${shineLine(k.level)}', EntryKind.gold);
     final junkGold = _sellJunk(loot0);
-    return KillResult(i, f.name, r.xp, r.coins + jackpot, ups, breathed: breathed, key: key, jackpot: jackpot, drop, junkGold: junkGold, egg: egg, orkGear: orkPrize, entGear: entPrize, runeGear: rune, prize: prize, foe: f, chest: chest, companion: companion, opened: opened, trophy: trophies > 0 ? '${trophies > 1 ? '$trophies× ' : ''}${trophy!.label}' : null, blueprint: blueprint, boss: f.boss && rare == null, won: won, reagents: reagents, jobFind: jobFind, potion: flask, relicPart: relicPart, packGold: packGold, packed: packed, hoard: hoard, finds: [
+    return KillResult(i, f.name, r.xp, r.coins + jackpot + bounty, ups, breathed: breathed, key: key, clean: clean, bounty: bounty, boltBack: boltBack, jackpot: jackpot, drop, junkGold: junkGold, egg: egg, orkGear: orkPrize, entGear: entPrize, runeGear: rune, prize: prize, foe: f, chest: chest, companion: companion, opened: opened, trophy: trophies > 0 ? '${trophies > 1 ? '$trophies× ' : ''}${trophy!.label}' : null, blueprint: blueprint, boss: f.boss && rare == null, won: won, reagents: reagents, jobFind: jobFind, potion: flask, relicPart: relicPart, packGold: packGold, packed: packed, hoard: hoard, finds: [
       if (gem != null) ('gem', gem.name),
       if (pearl) ('gem', Gem.pearl.name),
       if (elemental != null) ('core', elemental.name),
@@ -3204,11 +3265,11 @@ class GameEngine {
 
   String? get whyNotVault {
     if (state.inBattle || state.wild != null) return 'You\'re a long way from Hob\'s cellar';
-    if (state.keys <= 0) return 'You need an Ashen key';
+    if (state.keys <= 0) return 'You need a Cinder key';
     return null;
   }
 
-  /// Turns an Ashen key in the Ember Vault's door: one of its own pieces (one you haven't found,
+  /// Turns a Cinder key in the Ember Vault's door: one of its own pieces (one you haven't found,
   /// while there are any), or good gear and gold, or gold alone. Gear goes to your spoils.
   VaultFind? openVault() {
     if (whyNotVault != null) return null;
@@ -3217,16 +3278,23 @@ class GameEngine {
     final gold = (25 * k.level + 40) * (1 + heroStats(k).fortune / 100) * (.8 + _rng.nextDouble() * .4);
     final roll = _rng.nextDouble();
     VaultFind find;
-    if (roll < vaultPieceChance) {
-      final unfound = [for (final p in vaultPieces) if (!s.vaultFound.contains(p.name)) p];
+    final unfound = [for (final p in vaultPieces) if (!s.vaultFound.contains(p.name)) p];
+    final sure = unfound.isNotEmpty && s.vaultDry >= vaultSure;
+    if (sure || roll < vaultPieceChance) {
+      s.vaultDry = 0;
       final pool = unfound.isEmpty ? vaultPieces : unfound;
       final piece = pool[_rng.nextInt(pool.length)];
       final g = loot.vaultPiece(piece, k.level);
-      if (!s.vaultFound.contains(piece.name)) s.vaultFound.add(piece.name);
+      if (!s.vaultFound.contains(piece.name)) {
+        s.vaultFound.add(piece.name);
+        if (guardianSworn(s.vaultFound)) _note('The last of the vault\'s treasures is yours. You swear the Guardian\'s Oath: from now on, the first heavy blow in every fight lands no harder than a normal one.', EntryKind.good);
+      }
       find = VaultFind((gold * .5).round(), g, piece: true);
     } else if (roll < vaultPieceChance + vaultGearChance) {
+      s.vaultDry++;
       find = VaultFind((gold * .6).round(), loot.roll(k.heroClass, k.level, wielding: k.loadout.weapon, odds: const [0, 0, 60, 35, 5]));
     } else {
+      s.vaultDry++;
       find = VaultFind((gold * 1.6).round(), null);
     }
     k.coins += find.gold;
