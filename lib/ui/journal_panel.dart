@@ -26,6 +26,8 @@ class JournalEntryList extends StatelessWidget {
     return ConstrainedBox(
       constraints: const BoxConstraints(maxHeight: 320),
       child: ListView.builder(
+        // (No padding: a list pads itself by the phone's status bar otherwise, an empty band on top.)
+        padding: EdgeInsets.zero,
         shrinkWrap: true,
         itemCount: list.length,
         itemBuilder: (context, i) {

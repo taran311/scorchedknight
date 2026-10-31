@@ -569,6 +569,48 @@ class _HobPainter extends CustomPainter {
   bool shouldRepaint(_HobPainter old) => old.mags != mags;
 }
 
+/// Anyone's head and shoulders in a round frame (the shopkeepers'), lit by [glow].
+class NpcPortrait extends StatelessWidget {
+  const NpcPortrait({super.key, required this.look, this.size = 64, this.glow = const [Color(0xFF8A4A22), Color(0xFF2A160C)], this.border = Palette.amber, this.zoom = 2.8});
+  final Look look;
+  final double size;
+
+  /// How close in: lower shows more above the head (a wizard's hat).
+  final double zoom;
+
+  /// The light behind them (two colours) and the ring round them.
+  final List<Color> glow;
+  final Color border;
+  @override
+  Widget build(BuildContext context) => Container(
+    width: size,
+    height: size,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      border: Border.all(color: border, width: size > 60 ? 3 : 2),
+      gradient: RadialGradient(center: const Alignment(.3, -.2), colors: glow),
+      boxShadow: const [BoxShadow(color: Colors.black, offset: Offset(0, 2), blurRadius: 4)],
+    ),
+    child: ClipOval(child: CustomPaint(painter: _NpcPainter(look, zoom))),
+  );
+}
+
+class _NpcPainter extends CustomPainter {
+  _NpcPainter(this.look, this.zoom);
+  final Look look;
+  final double zoom;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final h = builds[look.build]!.height;
+    final scale = size.height / h * zoom;
+    final pose = Pose.of({J.head: -3, J.nS: -34, J.nE: 20, J.fS: 8, J.fE: 40});
+    drawHumanoid(canvas, look, pose, 0, DrawOptions(at: Offset(size.width * .5, size.height + h * scale * .7), scale: scale, shadow: false), still: true);
+  }
+
+  @override
+  bool shouldRepaint(_NpcPainter old) => !identical(old.look, look) || old.zoom != zoom;
+}
+
 /// The quest marker: a gold "!" (go and get it) or a tick (bring it back).
 class QuestMark extends StatelessWidget {
   const QuestMark({super.key, required this.ready, this.size = 32});

@@ -239,6 +239,10 @@ class _InnPageState extends State<InnPage> with RouteAware {
                           const SizedBox(height: 8),
                           // The six places as big buttons under the scene, where thumbs reach.
                           GridView.count(
+                            // (No padding: by default a grid pads itself by the phone's status and
+                            // navigation bars, which left big empty bands round the buttons on
+                            // Android.)
+                            padding: EdgeInsets.zero,
                             crossAxisCount: 2,
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),

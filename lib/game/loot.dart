@@ -58,8 +58,11 @@ const capeChance = .06;
 /// A set of gloves, boots and a ring that steers a build. Wear two pieces for the first bonus,
 /// all three for the second as well.
 class GearSet {
-  const GearSet(this.id, this.name, this.two, this.three, this.twoText, this.threeText, {this.heroClass, this.cheaperSpells = false, this.forged = false, this.bloodthirst = false, this.longWolf = false, this.firstMiss = false, this.forgeheart = false, this.firstCrit = false, this.regrowth = false, this.undertow = false, this.adapt = false, this.updraft = false, this.bushido = false});
+  const GearSet(this.id, this.name, this.two, this.three, this.twoText, this.threeText, {this.heroClass, this.cheaperSpells = false, this.forged = false, this.bloodthirst = false, this.longWolf = false, this.firstMiss = false, this.forgeheart = false, this.firstCrit = false, this.regrowth = false, this.undertow = false, this.adapt = false, this.updraft = false, this.bushido = false, this.perk});
   final String id, name, twoText, threeText;
+
+  /// The full set's special power in a few words, for its chip (null: stats only).
+  final String? perk;
   final Map<Stat, int> two, three;
   final HeroClass? heroClass;
 
@@ -129,22 +132,22 @@ const gearSets = <GearSet>[
   GearSet('bloodbound', 'Bloodbound', {Stat.leech: 4}, {Stat.leech: 6, Stat.lifesteal: 6}, 'Heal 4% of your damage', 'Heal 6% more, plus 6 per swing: a lifesteal build'),
   GearSet('windrunner', 'Windrunner', {Stat.dodge: 5}, {Stat.dodge: 5, Stat.crit: 8}, '+5% dodge', '+5% more dodge and +8% crit: a quick, deadly build'),
   GearSet('bulwark', 'Bulwark', {Stat.block: 5}, {Stat.block: 5, Stat.thorns: 25, Stat.guard: 5}, '+5% block', '+5% more block, +5% guard and thorns: a wall'),
-  GearSet('arcanist', 'Arcanist', {Stat.wisdom: 20, Stat.crit: 3}, {}, '+20% XP and +3% crit', 'Every spell costs 1 less mana', heroClass: HeroClass.mage, cheaperSpells: true),
+  GearSet('arcanist', 'Arcanist', {Stat.wisdom: 20, Stat.crit: 3}, {}, '+20% XP and +3% crit', 'Every spell costs 1 less mana', heroClass: HeroClass.mage, cheaperSpells: true, perk: 'Spells cost 1 less mana'),
   // Forged from blueprints: the Ashen Order's, Ravenmoor's vampires' and the Weald's werewolves'.
   GearSet('ashen', 'Ashen', {Stat.guard: 4, Stat.burn: 3}, {Stat.thorns: 20, Stat.burn: 4}, '+4% guard and +3 fire', '+20 thorns and +4 more fire: whoever strikes you burns', forged: true),
-  GearSet('nightblood', 'Nightblood', {Stat.leech: 4, Stat.lifesteal: 4}, {Stat.leech: 3}, 'Heal 4% of your damage, plus 4 a swing', 'Bloodthirst: under half health, everything your blows heal you is doubled', forged: true, bloodthirst: true),
-  GearSet('moonfang', 'Moonfang', {Stat.crit: 5, Stat.dodge: 3}, {Stat.crit: 4, Stat.dodge: 3, Stat.damage: 3}, '+5% crit and +3% dodge', '+4% crit, +3% dodge, +3 damage, and the Bloodmoon Pelt\'s wolf stays $longWolfTurns turns longer', forged: true, longWolf: true),
-  GearSet('silverleaf', 'Silverleaf', {Stat.dodge: 4, Stat.crit: 4}, {Stat.dodge: 4, Stat.regen: 8}, '+4% dodge and +4% crit', '+4% more dodge, regeneration, and the first blow at you each fight always misses', forged: true, firstMiss: true),
-  GearSet('deepforge', 'Deepforge', {Stat.guard: 5, Stat.block: 4}, {Stat.block: 5, Stat.vigour: 20}, '+5% guard and +4% block', '+5% more block, +20 vigour, and every blow you block mends you 6% of your HP', forged: true, forgeheart: true),
-  GearSet('faceless', 'Faceless', {Stat.crit: 5, Stat.parry: 4}, {Stat.crit: 5, Stat.damage: 4}, '+5% crit and +4% parry', '+5% more crit, +4 damage, and your first blow each fight is always a critical hit', forged: true, firstCrit: true),
-  GearSet('sunscale', 'Sunscale', {Stat.vigour: 20, Stat.regen: 6}, {Stat.thorns: 15, Stat.guard: 4}, '+20 vigour and regeneration', '+15 thorns and +4% guard, and under half health you regrow 4% of your HP every turn, like a lizard', forged: true, regrowth: true),
-  GearSet('tidecaller', 'Tidecaller', {Stat.frost: 5, Stat.dodge: 3}, {Stat.frost: 4, Stat.regen: 6}, '+5 frost on every full swing and +3% dodge', '+4 more frost, regeneration, and now and then your frost drags the foe down like the undertow: half its blows miss for two turns', forged: true, undertow: true),
-  GearSet('changeling', 'Changeling', {Stat.dodge: 4, Stat.crit: 4}, {Stat.damage: 2, Stat.crit: 4}, '+4% dodge and +4% crit', '+2 damage, +4% more crit, and whenever you change how you strike from the turn before (blade, rite or bolt), the blow lands 20% harder', forged: true, adapt: true),
+  GearSet('nightblood', 'Nightblood', {Stat.leech: 4, Stat.lifesteal: 4}, {Stat.leech: 3}, 'Heal 4% of your damage, plus 4 a swing', 'Bloodthirst: under half health, everything your blows heal you is doubled', forged: true, bloodthirst: true, perk: 'Under half HP: heals doubled'),
+  GearSet('moonfang', 'Moonfang', {Stat.crit: 5, Stat.dodge: 3}, {Stat.crit: 4, Stat.dodge: 3, Stat.damage: 3}, '+5% crit and +3% dodge', '+4% crit, +3% dodge, +3 damage, and the Bloodmoon Pelt\'s wolf stays $longWolfTurns turns longer', forged: true, longWolf: true, perk: 'Wolf form lasts 2 turns longer'),
+  GearSet('silverleaf', 'Silverleaf', {Stat.dodge: 4, Stat.crit: 4}, {Stat.dodge: 4, Stat.regen: 8}, '+4% dodge and +4% crit', '+4% more dodge, regeneration, and the first blow at you each fight always misses', forged: true, firstMiss: true, perk: 'First blow at you misses'),
+  GearSet('deepforge', 'Deepforge', {Stat.guard: 5, Stat.block: 4}, {Stat.block: 5, Stat.vigour: 20}, '+5% guard and +4% block', '+5% more block, +20 vigour, and every blow you block mends you 6% of your HP', forged: true, forgeheart: true, perk: 'Blocks heal 6% HP'),
+  GearSet('faceless', 'Faceless', {Stat.crit: 5, Stat.parry: 4}, {Stat.crit: 5, Stat.damage: 4}, '+5% crit and +4% parry', '+5% more crit, +4 damage, and your first blow each fight is always a critical hit', forged: true, firstCrit: true, perk: 'First blow always crits'),
+  GearSet('sunscale', 'Sunscale', {Stat.vigour: 20, Stat.regen: 6}, {Stat.thorns: 15, Stat.guard: 4}, '+20 vigour and regeneration', '+15 thorns and +4% guard, and under half health you regrow 4% of your HP every turn, like a lizard', forged: true, regrowth: true, perk: 'Under half HP: regrow 4% a turn'),
+  GearSet('tidecaller', 'Tidecaller', {Stat.frost: 5, Stat.dodge: 3}, {Stat.frost: 4, Stat.regen: 6}, '+5 frost on every full swing and +3% dodge', '+4 more frost, regeneration, and now and then your frost drags the foe down like the undertow: half its blows miss for two turns', forged: true, undertow: true, perk: 'Frost can slow the foe'),
+  GearSet('changeling', 'Changeling', {Stat.dodge: 4, Stat.crit: 4}, {Stat.damage: 2, Stat.crit: 4}, '+4% dodge and +4% crit', '+2 damage, +4% more crit, and whenever you change how you strike from the turn before (blade, rite or bolt), the blow lands 20% harder', forged: true, adapt: true, perk: 'Switch style: +20% damage'),
   // The Ember Vault's own six (vault.dart): found only behind Hob's cellar door, never forged or
   // dropped. Wear any three for the full bonus.
   GearSet('vault', 'Vaultkeeper', {Stat.burn: 4, Stat.fortune: 10}, {Stat.burn: 5, Stat.guard: 3}, '+4 fire on every full swing and +10% gold', '+5 more fire and +3% guard: the vault\'s embers burn for you', forged: true),
-  GearSet('bushido', 'Bushido', {Stat.parry: 4, Stat.crit: 4}, {Stat.damage: 3, Stat.parry: 3}, '+4% parry and +4% crit', '+3 damage, +3% more parry, and every turn a fight goes on, your blows land 5% harder (up to 25%): the longer the duel, the surer the cut', forged: true, bushido: true),
-  GearSet('skyborn', 'Skyborn', {Stat.dodge: 5, Stat.crit: 3}, {Stat.crit: 4, Stat.dodge: 3}, '+5% dodge and +3% crit', '+4% more crit, +3% dodge, and against anything in the air (fliers, ghosts, archers on the cliffs) all your blows land 25% harder', forged: true, updraft: true),
+  GearSet('bushido', 'Bushido', {Stat.parry: 4, Stat.crit: 4}, {Stat.damage: 3, Stat.parry: 3}, '+4% parry and +4% crit', '+3 damage, +3% more parry, and every turn a fight goes on, your blows land 5% harder (up to 25%): the longer the duel, the surer the cut', forged: true, bushido: true, perk: '+5% a turn, up to 25%'),
+  GearSet('skyborn', 'Skyborn', {Stat.dodge: 5, Stat.crit: 3}, {Stat.crit: 4, Stat.dodge: 3}, '+5% dodge and +3% crit', '+4% more crit, +3% dodge, and against anything in the air (fliers, ghosts, archers on the cliffs) all your blows land 25% harder', forged: true, updraft: true, perk: '+25% against fliers'),
 ];
 
 GearSet? gearSetById(String? id) => gearSets.where((s) => s.id == id).firstOrNull;

@@ -61,6 +61,15 @@ extension AmmoInfo on AmmoType {
     AmmoType.venom => 'Each shot adds ${venomTick(level)} venom a turn, for the rest of the fight (it stacks)',
   };
 
+  /// What it does, in a few words (for a chip).
+  String short(int level) => switch (this) {
+    AmmoType.fire => '${burnTick(level)} burn ×$burnTurns turns',
+    AmmoType.blessed => '+${holyShot(level, false)} holy · +${holyShot(level, true)} vs undead',
+    AmmoType.leech => 'Heals 15% of the hit',
+    AmmoType.frost => '+${(ammoBonus(level) * frostShare).round()} frost · ${(freezeChance * 100).round()}% freeze',
+    AmmoType.venom => '+${venomTick(level)} venom a turn, stacks',
+  };
+
   int get argb => switch (this) {
     AmmoType.fire => 0xFFFF8A2A,
     AmmoType.blessed => 0xFFFFE27A,

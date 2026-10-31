@@ -64,7 +64,7 @@ class _GearGlance extends StatelessWidget {
               ],
             ),
             for (final (set, n) in activeSets(k.gear))
-              Padding(padding: const EdgeInsets.only(top: 5), child: Text('✦ ${set.name} set $n/3: ${set.twoText}${n >= 3 ? '; ${set.threeText}' : ''}', style: Txt.label(size: 12.5, color: Palette.amber))),
+              Padding(padding: const EdgeInsets.only(top: 6), child: SetChips(set: set, dense: true, worn: n)),
             if (armour.perkText case final perk?) Padding(padding: const EdgeInsets.only(top: 5), child: Text('✦ ${armour.name}: $perk', style: Txt.label(size: 12.5, color: Palette.amber))),
             if (k.loadout.armourEnchant case final rune?) Padding(padding: const EdgeInsets.only(top: 5), child: Text('✦ Armour rune, ${rune.title}: ${rune.describe}', style: Txt.label(size: 12.5, color: const Color(0xFFB8A0FF)))),
             const Divider(color: Palette.stone3, height: 16),

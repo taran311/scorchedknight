@@ -446,6 +446,17 @@ class HeroStrip extends StatelessWidget {
   }
 }
 
+/// Each brew's symbol (its chip on your fight card and at Mags' stall).
+IconData brewIcon(Brew b) => switch (b) {
+  Brew.healing => Icons.healing_rounded,
+  Brew.might => Icons.fitness_center_rounded,
+  Brew.arcane => Icons.auto_awesome_rounded,
+  Brew.hawkeye => Icons.my_location_rounded,
+  Brew.barkskin => Icons.shield_rounded,
+  Brew.wisp => Icons.water_drop_rounded,
+  Brew.reaperbane => Icons.health_and_safety_rounded,
+};
+
 /// Your lasting boons as little icon chips (an icon in its colour, the fights it has left), for
 /// the fight card: Mags' brews, the poisoned blade, Strength or the bard's song, the Chariot.
 /// A tap says what each one is.
@@ -460,15 +471,7 @@ class HeroBuffs extends StatelessWidget {
     return [
       for (final (b, left) in activeBrews(k))
         (
-          switch (b) {
-            Brew.healing => Icons.healing_rounded,
-            Brew.might => Icons.fitness_center_rounded,
-            Brew.arcane => Icons.auto_awesome_rounded,
-            Brew.hawkeye => Icons.my_location_rounded,
-            Brew.barkskin => Icons.shield_rounded,
-            Brew.wisp => Icons.water_drop_rounded,
-            Brew.reaperbane => Icons.health_and_safety_rounded,
-          },
+          brewIcon(b),
           Color(b.argb),
           b == Brew.reaperbane ? null : left,
           b == Brew.reaperbane ? '${b.label}: ${b.desc}' : '${b.label}: ${b.desc.replaceAll(' for $brewFights fights', '')} (${more(left)})',

@@ -43,6 +43,17 @@ extension BrewInfo on Brew {
     Brew.reaperbane => 'The next blow that would knock you out leaves you standing on ${(reaperbaneHp * 100).round()}% HP',
   };
 
+  /// What it does, in a few words (for a chip).
+  String get short => switch (this) {
+    Brew.healing => '+${(mendingBrew * 100).round()}% HP a turn',
+    Brew.might => '+${((mightBrew - 1) * 100).round()}% blades',
+    Brew.arcane => '+${((arcaneBrew - 1) * 100).round()}% rites',
+    Brew.hawkeye => '+${((hawkeyeBrew - 1) * 100).round()}% bolts',
+    Brew.barkskin => '−${((1 - barkskinBrew) * 100).round()}% damage taken',
+    Brew.wisp => '+$wispMana mana a fight',
+    Brew.reaperbane => 'Survive one knockout',
+  };
+
   /// Short, for a status badge.
   String get badge => switch (this) {
     Brew.healing => 'Mending',

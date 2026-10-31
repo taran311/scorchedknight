@@ -226,11 +226,8 @@ class GearDetails extends StatelessWidget {
           ),
         if (g.slot == GearSlot.cape && capeByAbility(g.special) != null)
           Padding(padding: const EdgeInsets.only(top: 6), child: Text('✦ ${capeByAbility(g.special)!.ability}.', style: note.copyWith(color: Palette.amber))),
-        if (gearSetById(g.gearSet) case final set?)
-          Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Text('✦ ${set.name} set · 2: ${set.twoText} · 3: ${set.threeText}', style: note.copyWith(color: Palette.amber)),
-          ),
+        // Its set: the name, then what two and three pieces worn add, as chips.
+        if (gearSetById(g.gearSet) case final set?) Padding(padding: const EdgeInsets.only(top: 8), child: SetChips(set: set, dense: dense)),
         if (g.specialMove != null)
           Padding(
             padding: const EdgeInsets.only(top: 6),
@@ -313,5 +310,62 @@ class ClassEmblem extends StatelessWidget {
     },
     size: size,
     color: colour,
+  );
+}
+
+/// A gear set at a glance: its name, then a "2" row and a "3" row of what those pieces worn add
+/// (stat chips, and the full set's special power in a few words).
+class SetChips extends StatelessWidget {
+  const SetChips({super.key, required this.set, this.dense = false, this.named = true, this.worn});
+  final GearSet set;
+  final bool dense;
+
+  /// Pieces of it you're wearing: shown by its name, and the tiers not reached yet are dimmed.
+  final int? worn;
+
+  /// With its name on top (off where a heading already names it).
+  final bool named;
+
+  Widget _tier(String n, Map<Stat, int> stats, String? perk) => Padding(
+    padding: const EdgeInsets.only(top: 5),
+    child: Opacity(opacity: worn == null || worn! >= int.parse(n) ? 1 : .4, child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 22,
+          height: 22,
+          margin: const EdgeInsets.only(right: 6, top: 1),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(color: Palette.amber.withValues(alpha: .18), shape: BoxShape.circle, border: Border.all(color: Palette.amber.withValues(alpha: .7))),
+          child: Text(n, style: Txt.label(size: 12, color: Palette.amber, weight: FontWeight.w900)),
+        ),
+        Expanded(
+          child: Wrap(
+            spacing: 5,
+            runSpacing: 5,
+            children: [
+              for (final e in stats.entries) StatChip(stat: e.key, value: e.value, dense: true),
+              if (perk != null) InfoChip(icon: const Icon(Icons.auto_awesome, size: 14, color: Palette.amber), text: perk, colour: Palette.amber, dense: true),
+            ],
+          ),
+        ),
+      ],
+    )),
+  );
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      if (named) Row(
+        children: [
+          const Icon(Icons.auto_awesome, size: 15, color: Palette.amber),
+          const SizedBox(width: 5),
+          Text('${set.name} set${worn == null ? '' : ' $worn/3'}', style: Txt.label(size: dense ? 13 : 14, color: Palette.amber, weight: FontWeight.w800)),
+        ],
+      ),
+      _tier('2', set.two, null),
+      _tier('3', set.three, set.perk),
+    ],
   );
 }

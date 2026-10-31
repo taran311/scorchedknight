@@ -2403,6 +2403,27 @@ final Map<String, Look> questGiverLooks = {
     head: HeadKind.bare,
     hair: const Color(0xFF8A3A1E),
   ),
+  // Dunstan the smith: a dwarf, bald and soot-streaked, with a great braided ginger beard, bare
+  // forearms and a scorched leather apron over his shirt.
+  'smith': Look(
+    build: 'dwarf',
+    stance: Stance.mage,
+    skin: ramp(0xFFD49A78, .25, .5),
+    torso: ramp(0xFF4A4038, .25, .5),
+    torsoKind: TorsoKind.plain,
+    upper: ramp(0xFF4A4038, .25, .5),
+    fore: ramp(0xFFD49A78, .25, .5),
+    hand: ramp(0xFFD49A78, .25, .5),
+    thigh: ramp(0xFF3A2E24, .2, .5),
+    shin: ramp(0xFF3A2E24, .2, .5),
+    boot: ramp(0xFF2A1E14, .2, .5),
+    tabard: const Color(0xFF6A4228),
+    belt: const Color(0xFF2E1E12),
+    head: HeadKind.bare,
+    hair: const Color(0xFF2E2420),
+    beard: const Color(0xFFB0602A),
+    weapon: Weapon.hammer,
+  ),
   'king': Look(
     build: 'human',
     stance: Stance.mage,

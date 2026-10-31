@@ -1271,6 +1271,7 @@ void _showLog(BuildContext context, List<JournalEntry> lines, Color Function(Ent
         const SizedBox(height: 6),
         Flexible(
           child: ListView(
+            padding: EdgeInsets.zero,
             shrinkWrap: true,
             reverse: true,
             children: [for (final e in lines.reversed) Padding(padding: const EdgeInsets.only(bottom: 4), child: Text(e.text, style: Txt.onStone(size: 14, color: tone(e.kind))))],

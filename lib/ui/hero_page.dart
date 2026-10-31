@@ -268,7 +268,7 @@ class _PaperDoll extends StatelessWidget {
           ),
           // Sets and cape abilities, when they apply.
           for (final (set, n) in activeSets(k.gear))
-            Padding(padding: const EdgeInsets.only(top: 6), child: Text('✦ ${set.name} set $n/3: ${set.twoText}${n >= 3 ? '; ${set.threeText}' : ''}', textAlign: TextAlign.center, style: Txt.label(size: 13, color: Palette.amber))),
+            Padding(padding: const EdgeInsets.only(top: 8), child: SetChips(set: set, dense: true, worn: n)),
           if (capeByAbility(k.loadout.cape?.special) case final cape?)
             Padding(padding: const EdgeInsets.only(top: 6), child: Text('✦ ${cape.ability}', textAlign: TextAlign.center, style: Txt.label(size: 13, color: Palette.amber))),
           const Divider(color: Palette.stone3, height: 22),
@@ -688,6 +688,7 @@ class _Spellbook extends StatelessWidget {
             builder: (context, box) {
               final cols = box.maxWidth > 640 ? 6 : (box.maxWidth > 420 ? 5 : 4);
               return GridView.count(
+                padding: EdgeInsets.zero,
                 crossAxisCount: cols,
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),

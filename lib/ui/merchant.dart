@@ -7,6 +7,7 @@
 import 'package:flutter/material.dart';
 
 import '../art/beasts.dart';
+import '../art/looks.dart' show Look, questGiverLooks;
 import '../art/griffin.dart';
 import '../audio/audio.dart';
 import '../art/creatures.dart' show drawFoeDragon, foeDragons;
@@ -24,7 +25,10 @@ import 'item_icons.dart';
 import 'loot_window.dart' show resolvePendingLoot;
 import 'material_icons.dart';
 import 'journal_panel.dart' show fmt;
-import 'hero_view.dart' show GearIcon;
+import 'hero_view.dart' show GearIcon, SetChips;
+import 'hud.dart' show brewIcon;
+import 'stat_icons.dart' show InfoChip, StatChip;
+import 'quest_dialog.dart' show NpcPortrait, magsLook;
 import 'theme.dart';
 
 const _tierTint = <String, int>{
@@ -115,7 +119,7 @@ class _Shop {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(name, style: Txt.onStone(size: 15, color: Palette.cream).copyWith(fontWeight: FontWeight.w700)),
-            Text(desc, style: Txt.onStone(size: 12.5)),
+            if (desc.isNotEmpty) Text(desc, style: Txt.onStone(size: 12.5)),
             if (extra != null) Padding(padding: const EdgeInsets.only(top: 3), child: extra),
           ],
         );
@@ -184,20 +188,32 @@ class MerchantWares extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        x.gold(),
         x.heading('Supplies'),
-        x.ware(const ItemIcon(Item.potion), 'Health potion', 'Heals ${potionHeal(k)} HP · belt ${k.potions}/$potionBelt · $potionsPerFight a fight', x.buy('potion')),
+        x.ware(
+          const ItemIcon(Item.potion),
+          'Health potion',
+          '',
+          x.buy('potion'),
+          extra: Wrap(
+            spacing: 5,
+            runSpacing: 4,
+            children: [
+              InfoChip(icon: const Icon(Icons.favorite, size: 14, color: Color(0xFFE0604A)), text: '+${potionHeal(k)}', dense: true),
+              InfoChip(icon: const ItemIcon(Item.potion, size: 14), text: '${k.potions}/$potionBelt', dense: true),
+              const InfoChip(icon: Icon(Icons.repeat, size: 14, color: Palette.parch2), text: '$potionsPerFight a fight', dense: true),
+            ],
+          ),
+        ),
         // Mags' find of the day: one piece, seen before you buy, new every day.
         Builder(
           builder: (context) {
             final g = c.dailyDeal, sold = c.whyNotDeal == 'Sold out: back tomorrow';
             final left = c.untilNextDeal, hours = left.inHours, mins = left.inMinutes % 60;
             final when = hours > 0 ? '${hours}h ${mins}m' : '${mins}m';
-            final stats = [for (final e in g.stats.entries.take(3)) e.key.describe(e.value)].join(' · ');
             return x.ware(
               Opacity(opacity: sold ? .4 : 1, child: GearIcon(item: g, size: 30, heroClass: k.heroClass, dye: k.dye)),
               sold ? 'Today\'s find · sold' : 'Today\'s find: ${g.name}',
-              sold ? 'Mags has something new in $when' : '${g.rarity.label} ${g.slot.label.toLowerCase()} · $stats · new find in $when',
+              sold ? 'Something new in $when' : '${g.rarity.label} ${g.slot.label.toLowerCase()} · new in $when',
               sold
                   ? Text('Sold', style: Txt.label(size: 13, color: _Shop.ok))
                   : CostButton(
@@ -210,16 +226,17 @@ class MerchantWares extends StatelessWidget {
                             }
                           : null,
                     ),
+              extra: sold ? null : Wrap(spacing: 5, runSpacing: 4, children: [for (final e in g.stats.entries) StatChip(stat: e.key, value: e.value, dense: true)]),
             );
           },
         ),
-        x.heading('Mags\' brews · from the reagents your foes drop'),
+        x.heading('Brews · each lasts $brewFights fights'),
         for (final b in Brew.values)
           if (b.land <= c.state.unlocked || c.state.reagents[b.land] > 0)
             x.ware(
               MatIcon.brew(Color(b.argb), size: 28),
               b.label,
-              b.desc,
+              '',
               CostButton(
                 label: b == Brew.healing ? 'Brew' : (brewOn(k, b) ? (b == Brew.reaperbane ? 'In you' : 'Top up') : 'Brew & drink'),
                 onTap: c.whyNotBrew(b) == null
@@ -230,12 +247,14 @@ class MerchantWares extends StatelessWidget {
                     : null,
               ),
               extra: Wrap(
-                spacing: 10,
+                spacing: 8,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
+                  InfoChip(icon: Icon(brewIcon(b), size: 14, color: Color(b.argb)), text: b.short, colour: Color(b.argb), dense: true),
                   Tooltip(message: b.ingredient, child: x.have(const Icon(Icons.eco, size: 15, color: Color(0xFF9BE27A)), c.state.reagents[b.land], b.reagents)),
-                  Text(b.ingredient, style: Txt.onStone(size: 12)),
                   x.have(const ItemIcon(Item.coins, size: 14), k.coins, b.fee(k.level)),
-                  if (brewOn(k, b) && b != Brew.reaperbane) Text('${k.brews[b.name]} fights left', style: Txt.label(size: 12.5, color: _Shop.ok)),
+                  if (brewOn(k, b) && b != Brew.reaperbane) InfoChip(icon: const Icon(Icons.hourglass_bottom, size: 14, color: _Shop.ok), text: '${k.brews[b.name]} left', colour: _Shop.ok, dense: true),
                 ],
               ),
             ),
@@ -250,7 +269,7 @@ class MerchantWares extends StatelessWidget {
         ),
         if (upgrades.isNotEmpty) ...[
           x.heading('${k.heroClass.label} armour'),
-          for (final t in bought) x.ware(armourIcon(t), t.name, '−${(t.reduction * 100).round()}% damage (now −${(armourTierById(k.armour).reduction * 100).round()}%)', x.buy(t.id)),
+          for (final t in bought) x.ware(armourIcon(t), t.name, '−${(t.reduction * 100).round()}% damage taken · now −${(armourTierById(k.armour).reduction * 100).round()}%', x.buy(t.id)),
           if (bought.length < upgrades.length) Text('Better armour: forged at $smithName\'s', style: Txt.onStone(size: 12.5)),
         ],
         x.heading('Dyes · ${switch (k.heroClass) {
@@ -301,7 +320,6 @@ class ForgeWares extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        x.gold(),
         x.heading('Your ore and bars'),
         if (anyOre || Trophy.values.any((t) => s.mat(trophyKey(t)) > 0)) x.stock(gems: false, trophies: true) else Text('None yet: golems carry ore', style: Txt.onStone(size: 12.5)),
         const SizedBox(height: 4),
@@ -327,7 +345,7 @@ class ForgeWares extends StatelessWidget {
           x.ware(
             armourIcon(t),
             t.name,
-            'Damage taken −${(t.reduction * 100).round()}% (yours: −${(armourTierById(k.armour).reduction * 100).round()}%)',
+            '−${(t.reduction * 100).round()}% damage taken · now −${(armourTierById(k.armour).reduction * 100).round()}%',
             CostButton(
               label: 'Forge',
               onTap: c.whyNotCraft(t.id) == null
@@ -369,12 +387,12 @@ class ForgeWares extends StatelessWidget {
             ),
           )
         else
-          Text('Rework an old epic or legendary weapon up to your level', style: Txt.onStone(size: 12.5)),
+          Text('Epic and legendary weapons, back up to your level', style: Txt.onStone(size: 12.5)),
         // Set pieces, from the blueprints the Ashen Order, the vampires and the werewolves carry.
         for (final f in forgedSets)
           if (s.mat(trophyKey(f.trophy)) > 0 || setPieceSlots.any((slot) => s.mat(blueprintKey(f.id, slot)) > 0)) ...[
             x.heading('${gearSetById(f.id)!.name} set · blueprints from ${f.from}'),
-            Text('2 pieces: ${gearSetById(f.id)!.twoText}. All 3: ${gearSetById(f.id)!.threeText}.', style: Txt.onStone(size: 12.5)),
+            SetChips(set: gearSetById(f.id)!, dense: true, named: false),
             const SizedBox(height: 4),
             for (final slot in setPieceSlots)
               if (s.mat(blueprintKey(f.id, slot)) > 0)
@@ -448,7 +466,6 @@ class EnchanterWares extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        x.gold(),
         x.heading('Runes · ${enchantCost(k.level)} gold a rune'),
         for (final slot in EnchantSlot.values)
           Builder(
@@ -459,7 +476,7 @@ class EnchanterWares extends StatelessWidget {
               return x.ware(
                 Icon(slot == EnchantSlot.weapon ? Icons.auto_fix_high : Icons.shield_moon, color: const Color(0xFFB89AE0), size: 26),
                 slot == EnchantSlot.weapon ? 'Your weapon' : 'Your armour',
-                '$what · ${current == null ? 'no rune yet. Choose one of three.' : '${current.title}: ${current.describe}'}',
+                '$what · ${current == null ? 'no rune yet' : '${current.title}: ${current.describe}'}',
                 k.scrolls > 0
                     ? CostButton(label: 'Read a scroll (${k.scrolls})', onTap: () => enchantFlow(context, c, slot, scroll: true))
                     : CostButton(
@@ -476,7 +493,7 @@ class EnchanterWares extends StatelessWidget {
             x.ware(
               const Icon(Icons.swap_horiz, color: Color(0xFFB89AE0), size: 26),
               '${g.enchant!.title} from your ${g.name}',
-              'Onto your ${k.loadout.weapon!.name}${k.loadout.weapon!.enchant == null ? '' : ', replacing ${k.loadout.weapon!.enchant!.title}'} · ${g.enchant!.describe}',
+              '→ ${k.loadout.weapon!.name}${k.loadout.weapon!.enchant == null ? '' : ' (replaces ${k.loadout.weapon!.enchant!.title})'}',
               CostButton(
                 label: 'Move',
                 onTap: c.whyNotMoveRune(g) == null
@@ -513,7 +530,7 @@ class EnchanterWares extends StatelessWidget {
               child: Icon(Icons.north_east, size: 16, color: Color(a.argb)),
             ),
             a.label(Missile.bolt),
-            '${a.describe(k.level)}${(k.ammo[a.name] ?? 0) > 0 ? ' · you have ${k.ammo[a.name]}' : ''}',
+            '${a.short(k.level)}${(k.ammo[a.name] ?? 0) > 0 ? ' · ×${k.ammo[a.name]}' : ''}',
             extra: x.have(MatIcon.gem(gemFor(a), size: 16), s.mat(gemKey(gemFor(a))), 1),
             Row(
               mainAxisSize: MainAxisSize.min,
@@ -535,14 +552,23 @@ class EnchanterWares extends StatelessWidget {
             ),
           ),
         if (s.unlocked > 0 || s.reagents.any((n) => n > 0)) ...[
-          x.heading('Wards · against each land\'s hazard'),
+          x.heading('Wards'),
           for (var i = 1; i < continents.length; i++)
             if (continents[i].ward != null && i <= s.unlocked + 1)
               x.ware(
                 Icon(Icons.shield_moon, color: s.warded.contains(i) ? _Shop.ok : const Color(0xFF9ADFFF), size: 26),
                 continents[i].ward!,
-                'Stops ${continents[i].hazard!.toLowerCase()} in ${continents[i].name} · ${s.reagents[i - 1]}/$reagentsForWard ${continents[i - 1].reagent} · ${fmt(wardPrice(i))} gold',
+                'Stops ${continents[i].hazard!.toLowerCase()} · ${continents[i].name}',
                 s.warded.contains(i) ? Text('Warded', style: Txt.label(size: 13, color: _Shop.ok)) : CostButton(label: 'Craft', onTap: c.whyNotWard(i) == null ? () => c.craftWard(i) : null),
+                extra: s.warded.contains(i)
+                    ? null
+                    : Wrap(
+                        spacing: 10,
+                        children: [
+                          Tooltip(message: continents[i - 1].reagent, child: x.have(const Icon(Icons.eco, size: 15, color: Color(0xFF9BE27A)), s.reagents[i - 1], reagentsForWard)),
+                          x.have(const ItemIcon(Item.coins, size: 14), k.coins, wardPrice(i)),
+                        ],
+                      ),
               ),
         ],
       ],
@@ -720,36 +746,63 @@ class CostButton extends StatelessWidget {
   );
 }
 
-/// A shop window: a name, a line from whoever keeps it, and their wares.
-Future<void> _showShop(BuildContext context, GameController c, {required String title, required String line, required IconData icon, required Color colour, required Widget Function() wares}) => showDialog<void>(
+/// A shop window: whoever keeps it (their face, name and one line in a speech bubble), your gold,
+/// and their wares.
+Future<void> _showShop(BuildContext context, GameController c, {required String name, required String role, required String line, required Look look, required List<Color> glow, required Color colour, required Widget Function() wares, double zoom = 2.8}) => showDialog<void>(
   context: context,
   builder: (context) => Dialog(
     backgroundColor: Colors.transparent,
-    insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+    insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 20),
     child: ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 480),
       child: Stone(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(icon, color: colour, size: 22),
-                const SizedBox(width: 8),
-                Expanded(child: Text(title, style: Txt.label(size: 18, color: colour, weight: FontWeight.w800))),
-                IconButton(
-                  tooltip: 'Close',
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close, size: 20, color: Palette.parch),
+                NpcPortrait(look: look, size: 68, glow: glow, border: colour, zoom: zoom),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(child: Text(name, style: Txt.label(size: 18, color: colour, weight: FontWeight.w800))),
+                          // Your gold, as a coin and a number.
+                          ListenableBuilder(
+                            listenable: c,
+                            builder: (context, _) => Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [const ItemIcon(Item.coins, size: 16), Text(' ${fmt(c.state.knight.coins)}', style: Txt.label(size: 15, color: Palette.amber, weight: FontWeight.w800))],
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Close',
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () => Navigator.of(context).pop(),
+                            icon: const Icon(Icons.close, size: 20, color: Palette.parch),
+                          ),
+                        ],
+                      ),
+                      Text(role, style: Txt.onStone(size: 12, color: Palette.parch2)),
+                      const SizedBox(height: 5),
+                      // What they say, in a speech bubble like Hob's.
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+                        decoration: BoxDecoration(color: const Color(0xFFEDE3CC), borderRadius: BorderRadius.circular(3), border: Border.all(color: const Color(0xFF2A2016), width: 1.5)),
+                        child: Text(line, style: Txt.onStone(size: 13, color: const Color(0xFF2A2016))),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Text(line, style: Txt.onStone(size: 13.5, color: Palette.parch2).copyWith(fontStyle: FontStyle.italic)),
-            ),
+            const SizedBox(height: 6),
             Flexible(
               child: SingleChildScrollView(
                 child: RepaintBoundary(child: ListenableBuilder(listenable: c, builder: (context, _) => wares())),
@@ -768,10 +821,12 @@ Future<void> _showShop(BuildContext context, GameController c, {required String 
 Future<void> showMerchantWindow(BuildContext context, GameController c) => _showShop(
   context,
   c,
-  title: 'Mags\' Stall',
-  line: '"Bring me what your foes drop, dear, and I\'ll brew you something. Potions, a crossbow if you\'ve the arms for it, and whatever turned up in my cart today."',
-  icon: Icons.storefront,
-  colour: Palette.amber,
+  name: 'Mags',
+  role: 'Merchant',
+  line: 'Potions, brews, and whatever turned up in my cart today, dear.',
+  look: magsLook,
+  glow: const [Color(0xFF3A6A3A), Color(0xFF12200F)],
+  colour: const Color(0xFF8BD46A),
   wares: () => MerchantWares(controller: c),
 );
 
@@ -779,9 +834,11 @@ Future<void> showMerchantWindow(BuildContext context, GameController c) => _show
 Future<void> showForgeWindow(BuildContext context, GameController c) => _showShop(
   context,
   c,
-  title: '$smithName\'s Forge',
-  line: '"Bring me ore and I\'ll make you something worth wearing. Bring me gold and I\'ll make it quicker."',
-  icon: Icons.hardware,
+  name: smithName,
+  role: 'Blacksmith',
+  line: 'Ore in, armour out. Gold makes it quicker.',
+  look: questGiverLooks['smith']!,
+  glow: const [Color(0xFFB0501E), Color(0xFF2A0E06)],
   colour: const Color(0xFFFFB04A),
   wares: () => ForgeWares(controller: c),
 );
@@ -790,9 +847,12 @@ Future<void> showForgeWindow(BuildContext context, GameController c) => _showSho
 Future<void> showEnchanterWindow(BuildContext context, GameController c) => _showShop(
   context,
   c,
-  title: '$mageName\'s Tower',
-  line: '"Runes, wards, little stones that burn. Mind the cat. It bites, and it isn\'t always a cat."',
-  icon: Icons.auto_fix_high,
+  name: mageName,
+  role: 'Hedge-mage',
+  line: 'Runes, wards, little stones that burn. Mind the cat.',
+  look: questGiverLooks['mage']!,
+  zoom: 2.1,
+  glow: const [Color(0xFF4A3A8A), Color(0xFF120C24)],
   colour: const Color(0xFFC8A8FF),
   wares: () => EnchanterWares(controller: c),
 );
