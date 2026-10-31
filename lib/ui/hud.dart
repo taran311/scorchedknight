@@ -689,8 +689,11 @@ class _LevelBadge extends StatelessWidget {
 
 /// Small badges for status effects, poison, the dragon and Peaceful mode.
 class StatusBadges extends StatelessWidget {
-  const StatusBadges({super.key, required this.state, this.boons = true});
+  const StatusBadges({super.key, required this.state, this.boons = true, this.onBolts});
   final GameState state;
+
+  /// In a fight: the bolt badge becomes a button that swaps bolts (shown whenever you carry any).
+  final VoidCallback? onBolts;
 
   /// Brews and the poisoned blade too (off where the hero card already shows them).
   final bool boons;
@@ -724,7 +727,7 @@ class StatusBadges extends StatelessWidget {
           },
           pet.$1 == Pet.fairy ? 'Your fairy strikes with every attack and casts a charm every ${pet.$2.charm} attacks' : 'Your companion bites with every attack',
         ),
-      if (ammoById(k.ammoLoaded) != null)
+      if (onBolts == null && ammoById(k.ammoLoaded) != null)
         (
           '${ammoById(k.ammoLoaded)!.label(Missile.bolt)} ×${k.ammo[k.ammoLoaded] ?? 0}',
           Color(ammoById(k.ammoLoaded)!.argb),
@@ -737,10 +740,37 @@ class StatusBadges extends StatelessWidget {
       if (state.wards > 0) ('Ward ×${state.wards}', const Color(0xFF7FB8E8), 'Absorbs the foe\'s next blow'),
       if (state.mirror > 0) ('Mirror ×${state.mirror}', const Color(0xFFCFE8F8), 'You take half; the foe takes the whole blow back'),
     ];
+    final bolt = ammoById(k.ammoLoaded), carried = k.ammo.values.any((n) => n > 0);
     return Wrap(
       spacing: 5,
       runSpacing: 4,
       children: [
+        if (onBolts != null && carried)
+          Tooltip(
+            message: 'Tap to swap bolts (no turn used)',
+            child: GestureDetector(
+              onTap: onBolts,
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(5, 1, 6, 1),
+                  decoration: BoxDecoration(
+                    color: const Color(0xC70F0C09),
+                    border: Border.all(color: bolt == null ? Palette.stone3 : Color(bolt.argb).withValues(alpha: .8), width: 1.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.swap_horiz_rounded, size: 14, color: bolt == null ? Palette.parch2 : Color(bolt.argb)),
+                      const SizedBox(width: 3),
+                      Text(bolt == null ? 'Plain bolts' : '${bolt.label(Missile.bolt)} ×${k.ammo[bolt.name] ?? 0}', style: Txt.label(size: 12, color: bolt == null ? Palette.parch : Color(bolt.argb))),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         for (final (label, colour, tip) in items)
           Tooltip(
             message: tip,

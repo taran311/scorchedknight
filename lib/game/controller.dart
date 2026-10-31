@@ -815,6 +815,12 @@ class GameController extends ChangeNotifier {
     _changed();
   }
 
+  /// The next kind of bolt (see GameEngine.cycleAmmo).
+  void cycleAmmo() {
+    engine.cycleAmmo();
+    _changed();
+  }
+
   void wearDye(String id) {
     engine.wearDye(id);
     _changed();

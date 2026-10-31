@@ -345,6 +345,32 @@ void main() {
     expect(k.loadout.boots!.level, plain.level, reason: 'ordinary gear doesn\'t grow');
   });
 
+  test('bolts can be swapped any time, plain ones in between', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(2));
+    final k = e.state.knight;
+    expect(e.cycleAmmo(), isNull, reason: 'nothing to swap to');
+    k.ammo['fire'] = 3;
+    k.ammo['frost'] = 2;
+    k.ammoLoaded = 'fire';
+    e.state.inBattle = true;
+    expect(e.cycleAmmo(), 'frost');
+    expect(e.cycleAmmo(), isNull, reason: 'plain bolts');
+    expect(e.cycleAmmo(), 'fire');
+  });
+
+  test('rare dyes cost their own price, ordinary ones the usual', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(2));
+    final k = e.state.knight;
+    expect(e.priceOf('dye:royal'), prices['dye']);
+    expect(e.priceOf('dye:obsidian'), 12000);
+    k.coins = 11999;
+    expect(e.purchase('dye:obsidian'), isFalse);
+    k.coins = 12500;
+    expect(e.purchase('dye:obsidian'), isTrue);
+    expect(k.coins, 500);
+    expect(k.dye, 'obsidian');
+  });
+
   test('New Game+: start again at level 1 with your keys and vault pieces, foes tougher', () {
     final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(4));
     final s = e.state, k = s.knight;

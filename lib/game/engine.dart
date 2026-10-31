@@ -3195,7 +3195,7 @@ class GameEngine {
       'boots' => 40 + 6 * lvl,
       'ringbox' => 60 + 10 * lvl,
       'bonecarver' => 90 + 12 * lvl,
-      _ => id.startsWith('dye:') ? prices['dye']! : (tier?.price ?? prices[id] ?? 1 << 30),
+      _ => id.startsWith('dye:') ? (dyeById(id.substring(4)).price ?? prices['dye']!) : (tier?.price ?? prices[id] ?? 1 << 30),
     };
   }
 
@@ -3778,6 +3778,16 @@ class GameEngine {
   /// Loads a kind of ammunition you own.
   void loadAmmo(String type) {
     if ((state.knight.ammo[type] ?? 0) > 0) state.knight.ammoLoaded = type;
+  }
+
+  /// Swaps to the next kind of bolt you carry, plain ones in between. Any time, even mid-fight
+  /// (a frost elemental just turned up and you've fire loaded): it costs no turn.
+  String? cycleAmmo() {
+    final k = state.knight;
+    final order = [null, for (final a in AmmoType.values) if ((k.ammo[a.name] ?? 0) > 0) a.name];
+    if (order.length == 1) return null;
+    k.ammoLoaded = order[(order.indexOf(k.ammoLoaded) + 1) % order.length];
+    return k.ammoLoaded;
   }
 
   void wearDye(String id) {

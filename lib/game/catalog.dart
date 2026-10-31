@@ -1289,9 +1289,13 @@ const cleanKillGold = .3;
 const elementArmsChance = .25, landArmsChance = .04;
 
 class Dye {
-  const Dye(this.id, this.name, this.argb);
+  const Dye(this.id, this.name, this.argb, [this.price]);
   final String id, name;
   final int argb;
+
+  /// A rare dye's own price (null: Mags' usual [prices]['dye']). Nothing but looks, for a knight
+  /// with gold to show off.
+  final int? price;
 }
 
 const dyes = <Dye>[
@@ -1303,6 +1307,11 @@ const dyes = <Dye>[
   Dye('midnight', 'Midnight', 0xFF1E2238),
   Dye('amethyst', 'Amethyst', 0xFF6A3A9A),
   Dye('pumpkin', 'Hallowash pumpkin', 0xFFD8661A),
+  // Mags' rare dyes, for a purse that's grown heavy.
+  Dye('gilded', 'Gilded', 0xFFC9982E, 2500),
+  Dye('ashen', 'Ashen white', 0xFFB8B2A8, 4000),
+  Dye('dragonblood', 'Dragonblood', 0xFF5E0A10, 7000),
+  Dye('obsidian', 'Obsidian', 0xFF151116, 12000),
 ];
 
 /// Dyes Mags only stocks during their seasonal event (yours to keep once bought).

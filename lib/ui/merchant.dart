@@ -288,7 +288,7 @@ class MerchantWares extends StatelessWidget {
           HeroClass.knight => 'cape, tabard, plume and shield',
           HeroClass.mage => 'sash and hat',
           HeroClass.ranger => 'cloak and feather',
-        }} · ${prices['dye']} gold'),
+        }}'),
         // One row of swatches: tap one you own to wear it, or buy it.
         Wrap(
           spacing: 8,
@@ -297,6 +297,7 @@ class MerchantWares extends StatelessWidget {
             for (final d in dyes.where((d) => !seasonalDyes.containsKey(d.id) || k.ownedDyes.contains(d.id) || c.season.name == seasonalDyes[d.id]))
               _DyeSwatch(
                 colour: Color(d.argb),
+                rare: d.price != null,
                 name: seasonalDyes.containsKey(d.id) ? '${d.name} (this season only)' : d.name,
                 owned: k.ownedDyes.contains(d.id),
                 wearing: k.dye == d.id,
@@ -871,11 +872,14 @@ Future<void> showEnchanterWindow(BuildContext context, GameController c) => _sho
 
 /// A dye as a round swatch: a tick on the one you're wearing, a coin price on ones you don't own.
 class _DyeSwatch extends StatelessWidget {
-  const _DyeSwatch({required this.colour, required this.name, required this.owned, required this.wearing, required this.price, this.onTap});
+  const _DyeSwatch({required this.colour, required this.name, required this.owned, required this.wearing, required this.price, this.rare = false, this.onTap});
+
+  /// One of Mags' rare dyes: a gold rim and a sheen.
   final Color colour;
   final String name;
   final bool owned, wearing;
   final int price;
+  final bool rare;
   final VoidCallback? onTap;
 
   @override
@@ -896,7 +900,8 @@ class _DyeSwatch extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: colour,
-                  border: Border.all(color: wearing ? Palette.amber : Colors.black, width: wearing ? 3 : 1.5),
+                  gradient: rare ? RadialGradient(center: const Alignment(-.4, -.5), radius: .9, colors: [Color.lerp(colour, Colors.white, .45)!, colour, Color.lerp(colour, Colors.black, .35)!], stops: const [0, .5, 1]) : null,
+                  border: Border.all(color: wearing ? Palette.amber : (rare ? const Color(0xFFE3A548) : Colors.black), width: wearing ? 3 : (rare ? 2 : 1.5)),
                   boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 3, offset: Offset(0, 1))],
                 ),
                 child: wearing ? const Icon(Icons.check, size: 18, color: Colors.white) : null,
@@ -904,7 +909,7 @@ class _DyeSwatch extends StatelessWidget {
               const SizedBox(height: 2),
               owned
                   ? Text(wearing ? 'On' : 'Owned', style: Txt.label(size: 10.5, color: wearing ? Palette.amber : Palette.parch2))
-                  : Row(mainAxisSize: MainAxisSize.min, children: [const ItemIcon(Item.coins, size: 11), Text(' $price', style: Txt.label(size: 10.5, color: Palette.amber))]),
+                  : Row(mainAxisSize: MainAxisSize.min, children: [const ItemIcon(Item.coins, size: 11), Text(' ${price >= 1000 ? '${price ~/ 1000}${price % 1000 == 0 ? '' : '.${price % 1000 ~/ 100}'}k' : price}', style: Txt.label(size: 10.5, color: Palette.amber))]),
             ],
           ),
         ),

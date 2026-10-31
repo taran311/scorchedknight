@@ -190,6 +190,12 @@ class _BattleScreenState extends State<BattleScreen> {
   bool get _hasCompanion => petStage(c.state.knight) != null || dragonStage(c.state.knight) != null;
 
   /// Shoot: up comes the timing bar. Every bolt is aimed by hand (no auto-aim: your timing is the skill).
+  /// The bolt badge: on to the next kind you carry (no turn spent).
+  void _swapBolts() {
+    c.cycleAmmo();
+    Audio.play(Sfx.click);
+  }
+
   void _shoot() {
     if (_aiming) return;
     if (c.busy || c.outcome != null || !c.state.inBattle || c.whyNot(BattleAction.shoot) != null) return;
@@ -319,7 +325,7 @@ class _BattleScreenState extends State<BattleScreen> {
                                     children: [
                                       BattleStage(controller: c, aspectRatio: aspect, fill: fill),
                                       if (phone)
-                                        Positioned(left: 6, top: 6, child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 260), child: StatusBadges(state: s, boons: false))),
+                                        Positioned(left: 6, top: 6, child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 260), child: StatusBadges(state: s, boons: false, onBolts: _swapBolts))),
                                       // You top-left, the foe top-right, like facing cards.
                                       if (!phone)
                                       Positioned(
@@ -330,7 +336,7 @@ class _BattleScreenState extends State<BattleScreen> {
                                           children: [
                                             MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(onTap: () => showGearGlance(context, c), child: Tooltip(message: 'Your gear', child: HeroCard(controller: c, mana: true)))),
                                             const SizedBox(height: 6),
-                                            ConstrainedBox(constraints: const BoxConstraints(maxWidth: 300), child: StatusBadges(state: s)),
+                                            ConstrainedBox(constraints: const BoxConstraints(maxWidth: 300), child: StatusBadges(state: s, onBolts: _swapBolts)),
                                           ],
                                         ),
                                       ),
@@ -574,6 +580,7 @@ class _BattleScreenState extends State<BattleScreen> {
           _SlotInfo('Shoot', const Color(0xFFDDD0B1), [
             ('🏹', '~${(swing * crossbowShare(k) * boltEdge * aimBoost(k)).round()} damage', plain),
             ('🎯', 'Bullseye ×$bullseye', soft),
+            if (ammoById(k.ammoLoaded) != null) ('🔥', '${ammoById(k.ammoLoaded)!.label(Missile.bolt)} ×${k.ammo[k.ammoLoaded] ?? 0}', Color(ammoById(k.ammoLoaded)!.argb)),
             if (aloft) ('🦅', 'Easy shot in the air ${pct(aloftShot)}', good),
             if (triangle(kind, AttackStyle.bolt) != 1) edgeLine(triangle(kind, AttackStyle.bolt), 'bolts'),
           ]),
