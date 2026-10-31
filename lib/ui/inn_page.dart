@@ -135,7 +135,7 @@ class _InnPageState extends State<InnPage> with RouteAware {
   }
 
   Future<void> _openWilds() async {
-    await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => WildsPage(controller: c)));
+    await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => WildsPage(controller: c, fromTown: true)));
   }
 
   Future<void> _resume() async {
@@ -1374,8 +1374,24 @@ class _VaultCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('THE EMBER VAULT', style: Txt.label(size: 15, color: _ember, weight: FontWeight.w800)),
+                    Row(
+                      children: [
+                        Text('THE EMBER VAULT', style: Txt.label(size: 15, color: _ember, weight: FontWeight.w800)),
+                        const SizedBox(width: 4),
+                        // Where keys come from: a tap away.
+                        const Tooltip(
+                          message: 'Foes drop Cinder keys now and then. Tough foes drop them twice as often, Deadly ones four times, and bosses two times in five.',
+                          triggerMode: TooltipTriggerMode.tap,
+                          showDuration: Duration(seconds: 5),
+                          child: Icon(Icons.info_outline, size: 16, color: _ember),
+                        ),
+                      ],
+                    ),
                     Text('Hob\'s cellar · ${s.keys} Cinder ${s.keys == 1 ? 'key' : 'keys'}', style: Txt.onStone(size: 12.5)),
+                    // Why the door won't open, when you've a key but it still won't.
+                    if (s.keys > 0 && c.whyNotVault != null) Text(c.whyNotVault!, style: Txt.onStone(size: 12, color: const Color(0xFFE8B070))),
+                    // No key yet: where to get one, in a few words.
+                    if (s.keys == 0) Text('Foes drop keys · tougher ones more often', style: Txt.onStone(size: 12, color: const Color(0xFFE8B070))),
                   ],
                 ),
               ),

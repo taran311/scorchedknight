@@ -138,6 +138,10 @@ void run(String style, int seed, Stats st, {void Function(GameEngine e, int land
     if (k.coins > e.priceOf('crossbow') * 1.5) e.purchase('crossbow');
     if (k.coins > 500 && k.mounts.isEmpty) e.purchase('mount:pony');
     if (k.coins > 1500) e.purchase('mount:warhorse');
+    // Dunstan tempers favourite epic and legendary pieces back up to your level.
+    for (final g in e.temperables) {
+      if (k.coins > e.temperCost(g) * 1.5) e.temper(g);
+    }
     if (k.coins > 1200) {
       final r = e.enchantOffer(EnchantSlot.weapon);
       final cur = k.loadout.weapon?.enchant;

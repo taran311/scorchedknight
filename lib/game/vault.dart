@@ -6,15 +6,15 @@ import 'loot.dart';
 
 /// The chance a fallen foe leaves a Cinder key: an even match, a tough one and a deadly one (see
 /// foeMenace), and a boss.
-const keyChance = [.02, .045, .08], keyChanceBoss = .25;
+const keyChance = [.04, .09, .16], keyChanceBoss = .4;
 
 /// From one key: the chance it's one of the vault's own pieces (else good gear and gold, else
 /// just gold).
-const vaultPieceChance = .2, vaultGearChance = .5;
+const vaultPieceChance = .35, vaultGearChance = .4;
 
 /// Bad luck has a floor: after this many keys in a row without one of the vault's own pieces,
 /// the next one is sure to be one (while any are left to find).
-const vaultSure = 7;
+const vaultSure = 3;
 
 /// One of the six pieces only the vault holds: each carries a stat no ordinary piece of its kind
 /// ever rolls (dodge on a pendant, crit on boots, block on gauntlets, guard on a ring, lifesteal

@@ -33,8 +33,11 @@ const _icons = <WildEvent, IconData>{
 };
 
 class WildsPage extends StatefulWidget {
-  const WildsPage({super.key, required this.controller, this.area});
+  const WildsPage({super.key, required this.controller, this.area, this.fromTown = false});
   final GameController controller;
+
+  /// Opened from the town square (a trip already under way), so back goes to town, not the map.
+  final bool fromTown;
 
   /// The area picked on the map (already entered by the map).
   final int? area;
@@ -149,7 +152,7 @@ class _WildsPageState extends State<WildsPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Align(alignment: Alignment.centerLeft, child: InnBackButton(label: 'Map', icon: Icons.public, onPressed: () => Navigator.of(context).pop())),
+                          Align(alignment: Alignment.centerLeft, child: (widget.fromTown ? InnBackButton(label: 'Town', onPressed: () => Navigator.of(context).pop()) : InnBackButton(label: 'Map', icon: Icons.public, onPressed: () => Navigator.of(context).pop()))),
                           const SizedBox(height: 10),
                           a == null ? _picker() : _trip(a),
                         ],

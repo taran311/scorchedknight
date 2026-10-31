@@ -280,12 +280,12 @@ class GameController extends ChangeNotifier {
     return item;
   }
 
-  GearItem? get temperable => engine.temperable;
-  (Metal, int, int) temperCost(GearItem w) => engine.temperCost(w);
-  String? whyNotTemper() => engine.whyNotTemper();
+  List<GearItem> get temperables => engine.temperables;
+  int temperCost(GearItem g) => engine.temperCost(g);
+  String? whyNotTemper(GearItem g) => engine.whyNotTemper(g);
 
-  GearItem? temper() {
-    final item = engine.temper();
+  GearItem? temper(GearItem g) {
+    final item = engine.temper(g);
     if (item != null) _changed();
     return item;
   }

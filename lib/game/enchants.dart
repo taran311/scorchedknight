@@ -63,7 +63,7 @@ class EnchantRoll {
 }
 
 /// The enchanter's fee at [level].
-int enchantCost(int level) => 40 + 8 * level;
+int enchantCost(int level) => 60 + 20 * level;
 
 /// Rolls a random rune for [slot]: tier I 60%, II 30%, III 10%. [tierFloor] raises the minimum.
 EnchantRoll rollEnchant(EnchantSlot slot, int level, math.Random rng, {int tierFloor = 1}) {

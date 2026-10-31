@@ -170,6 +170,11 @@ void main() {
     }
     expect(s.keys, greaterThan(0));
     expect(GameState.fromJson(jsonDecode(jsonEncode(s.toJson())) as Map<String, dynamic>).keys, s.keys);
+    // A trip into the wilds is no bar to it (you're in town).
+    s.keys = 1;
+    s.wild = 0;
+    expect(e.whyNotVault, isNull);
+    s.wild = null;
     // No key, no door.
     s.keys = 0;
     expect(e.whyNotVault, isNotNull);
@@ -1366,23 +1371,32 @@ void main() {
     expect(bitten, unlucky);
   });
 
-  test('Dunstan tempers a farmed weapon up to your level, for bars and gold', () {
+  test('Dunstan tempers any epic or legendary piece you wear halfway up to your level, for gold', () {
     final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(13));
     final k = e.state.knight..level = 20;
     k.loadout.weapon = e.loot.entDrop(HeroClass.knight, 8);
-    final before = k.loadout.weapon!;
-    final (metal, bars, gold) = e.temperCost(before);
-    expect(metal, Metal.iron);
-    expect(e.whyNotTemper(), isNotNull); // no bars yet
-    e.state.addMat(barKey(Metal.iron), bars);
+    k.ring = e.loot.roll(HeroClass.knight, 8, odds: const [0, 0, 0, 0, 1], only: GearSlot.ring);
+    final before = k.loadout.weapon!, ring = k.ring!;
+    expect(e.temperables.map((g) => g.id), containsAll([before.id, ring.id]));
+    final gold = e.temperCost(before);
+    k.coins = gold - 1;
+    expect(e.whyNotTemper(before), isNotNull); // a coin short
     k.coins = gold;
-    expect(e.whyNotTemper(), isNull);
-    final after = e.temper()!;
-    expect(after.level, 20);
+    final after = e.temper(before)!;
+    expect(after.level, 14); // halfway from 8 to 20
     expect(after.id, before.id);
+    expect(k.loadout.weapon!.level, 14);
     expect(after.stat(Stat.damage), greaterThan(before.stat(Stat.damage)));
     expect(k.coins, 0);
-    expect(e.temperable, isNull); // it's at your level now
+    // The ring too, and a legendary costs more than an epic the same distance behind.
+    k.coins = 100000;
+    expect(e.temper(ring)!.level, 14);
+    expect(k.ring!.level, 14);
+    // Still behind: another visit takes it halfway again, and once it's close it can't be.
+    expect(e.temper(k.ring!)!.level, 17);
+    expect(e.temper(k.ring!)!.level, 19);
+    expect(e.temperables.any((g) => g.id == ring.id), isFalse);
+    expect(temperFee(20, 12, legendary: true), greaterThan(temperFee(20, 12)));
   });
 
   test('every class finds armour variants, with the same protection on offer', () {

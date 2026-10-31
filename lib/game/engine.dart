@@ -3286,7 +3286,8 @@ class GameEngine {
   // ---------------- the Ember Vault ----------------
 
   String? get whyNotVault {
-    if (state.inBattle || state.wild != null) return 'You\'re a long way from Hob\'s cellar';
+    // (A trip into the wilds is no bar: you're back in town, and the shops serve you too.)
+    if (state.inBattle) return 'Not mid-fight';
     if (state.keys <= 0) return 'You need a Cinder key';
     return null;
   }
@@ -3528,39 +3529,45 @@ class GameEngine {
 
   /// The weapon in your hand, if it's worth tempering: epic or legendary (a farmed prize, a relic,
   /// a set piece), and at least [temperMinGap] levels behind you.
-  GearItem? get temperable {
-    final w = state.knight.loadout.weapon;
-    if (w == null || w.rarity.index < Rarity.epic.index) return null;
-    return state.knight.level - w.level >= temperMinGap ? w : null;
+  /// What you wear that Dunstan can temper: epic and legendary pieces a few levels behind you
+  /// (vault pieces keep up on their own).
+  List<GearItem> get temperables {
+    final k = state.knight;
+    return [
+      for (final g in k.gear)
+        if (g.rarity.index >= Rarity.epic.index && g.gearSet != 'vault' && k.level - g.level >= temperMinGap) g,
+    ];
   }
 
-  /// What tempering [w] takes: bars (iron for epics, gold for legendaries) and gold.
-  (Metal, int, int) temperCost(GearItem w) {
-    final gap = state.knight.level - w.level;
-    return (w.rarity == Rarity.legendary ? Metal.gold : Metal.iron, math.max(1, (gap + 4) ~/ 5), temperFee(state.knight.level, gap));
-  }
+  /// What tempering [g] costs, in gold.
+  int temperCost(GearItem g) => temperFee(state.knight.level, state.knight.level - g.level, legendary: g.rarity == Rarity.legendary);
 
-  String? whyNotTemper() {
+  String? whyNotTemper(GearItem g) {
     if (state.inBattle) return 'Not mid-fight';
-    final w = state.knight.loadout.weapon;
-    if (w == null || w.rarity.index < Rarity.epic.index) return 'Only epic and legendary weapons';
-    if (state.knight.level - w.level < temperMinGap) return 'Already close to your level';
-    final (metal, bars, gold) = temperCost(w);
-    if (state.mat(barKey(metal)) < bars) return 'Needs $bars ${metal.bar.toLowerCase()}${bars == 1 ? '' : 's'}';
-    if (state.knight.coins < gold) return 'Needs $gold gold';
+    if (!temperables.any((t) => t.id == g.id)) return 'Already close to your level';
+    if (state.knight.coins < temperCost(g)) return 'Needs ${temperCost(g)} gold';
     return null;
   }
 
-  /// Dunstan reworks the weapon in your hand up to your level.
-  GearItem? temper() {
-    if (whyNotTemper() != null) return null;
-    final k = state.knight, w = k.loadout.weapon!;
-    final (metal, bars, gold) = temperCost(w);
-    state.addMat(barKey(metal), -bars);
+  /// Dunstan reworks [g] (something you wear) up to your level.
+  GearItem? temper(GearItem g) {
+    if (whyNotTemper(g) != null) return null;
+    final k = state.knight, gold = temperCost(g), better = tempered(g, temperTo(g.level, k.level));
     k.coins -= gold;
-    final better = tempered(w, k.level);
-    k.loadout.weapon = better;
-    _note('$smithName heats ${w.name} white, folds in $bars ${metal.bar.toLowerCase()}${bars == 1 ? '' : 's'}, and hammers until dark. It comes out level ${k.level}, and hungry.', EntryKind.gold);
+    if (identical(k.trinket, g) || k.trinket?.id == g.id) {
+      k.trinket = better;
+    } else if (k.ring?.id == g.id) {
+      k.ring = better;
+    } else {
+      final l = k.loadout;
+      if (l.weapon?.id == g.id) l.weapon = better;
+      if (l.offhand?.id == g.id) l.offhand = better;
+      if (l.helm?.id == g.id) l.helm = better;
+      if (l.gloves?.id == g.id) l.gloves = better;
+      if (l.boots?.id == g.id) l.boots = better;
+      if (l.cape?.id == g.id) l.cape = better;
+    }
+    _note('$smithName heats ${g.name} white and hammers until dark. It comes out level ${better.level}, and hungry. (−$gold gold)', EntryKind.gold);
     return better;
   }
 

@@ -385,29 +385,21 @@ class ForgeWares extends StatelessWidget {
           ),
         // Tempering: a favourite weapon reworked up to your level, so a farmed prize stays useful.
         x.heading('Tempering'),
-        if (c.temperable case final w?)
+        for (final w in c.temperables)
           x.ware(
             GearIcon(item: w, size: 30, heroClass: k.heroClass, dye: k.dye),
-            'Temper ${w.name}',
-            'Lv ${w.level} → ${k.level}, runes and specials kept',
+            w.name,
+            'Lv ${w.level} → ${k.level}',
             CostButton(
-              label: 'Temper',
-              onTap: c.whyNotTemper() == null
+              label: '${c.temperCost(w)} gold',
+              onTap: c.whyNotTemper(w) == null
                   ? () {
-                      if (c.temper() != null) Audio.play(Sfx.clang);
+                      if (c.temper(w) != null) Audio.play(Sfx.clang);
                     }
                   : null,
             ),
-            extra: Wrap(
-              spacing: 10,
-              children: [
-                x.have(MatIcon.bar(c.temperCost(w).$1, size: 16), s.mat(barKey(c.temperCost(w).$1)), c.temperCost(w).$2),
-                x.have(const ItemIcon(Item.coins, size: 14), k.coins, c.temperCost(w).$3),
-              ],
-            ),
-          )
-        else
-          Text('Epic and legendary weapons, back up to your level', style: Txt.onStone(size: 12.5)),
+          ),
+        if (c.temperables.isEmpty) Text('Epic and legendary gear, back up to your level', style: Txt.onStone(size: 12.5)),
         // Set pieces, from the blueprints the Ashen Order, the vampires and the werewolves carry.
         for (final f in forgedSets)
           if (s.mat(trophyKey(f.trophy)) > 0 || setPieceSlots.any((slot) => s.mat(blueprintKey(f.id, slot)) > 0)) ...[

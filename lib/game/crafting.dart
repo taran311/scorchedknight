@@ -83,7 +83,12 @@ int smeltFee(int level) => 4 + level;
 /// Tempering a favourite weapon up to your level: worth it once it's this many levels behind, and
 /// Dunstan's fee for closing a gap of [gap] levels at [level].
 const temperMinGap = 3;
-int temperFee(int level, int gap) => 20 + level * 2 + gap * 6;
+
+/// The level a piece at [from] comes out at, tempered by a hero at [hero]: halfway there. A
+/// favourite stays worth wearing (and worth paying for again) without ever outclassing fresh finds.
+int temperTo(int from, int hero) => from + ((hero - from) / 2).ceil();
+/// Tempering's gold: more the higher you are, the further behind the piece is, and for legendaries.
+int temperFee(int level, int gap, {bool legendary = false}) => ((40 + level * 6 + gap * 15) * (legendary ? 1.6 : 1)).round();
 
 /// What an armour tier takes at Dunstan's forge: bars of each metal, and gold.
 class Recipe {
