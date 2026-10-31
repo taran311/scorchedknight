@@ -4,6 +4,8 @@
 // into special bolts, and the wards against each land's hazard. Everything else (weapons, shields, helms, gloves, boots, rings,
 // trinkets) comes from the spoils of victory.
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../art/beasts.dart';
@@ -300,8 +302,16 @@ class MerchantWares extends StatelessWidget {
               ),
           ],
         ),
-        x.heading('Stable'),
-        for (final m in mounts.where((m) => !m.dropOnly)) x.ware(MountIcon(m.id), m.name, m.desc, x.buy('mount:${m.id}')),
+        // Only mounts that beat the best you've got: you ride one, the strongest, so a weaker one
+        // would never leave the stable.
+        ...() {
+          final best = [for (final id in k.mounts) mountById(id)?.charge ?? 0].fold(0.0, math.max);
+          final better = [for (final m in mounts) if (!m.dropOnly && !k.mounts.contains(m.id) && m.charge > best) m];
+          return [
+            if (better.isNotEmpty) x.heading('Stable'),
+            for (final m in better) x.ware(MountIcon(m.id), m.name, 'Opening charge: ${(m.charge * 100).round()}% of a blow', x.buy('mount:${m.id}')),
+          ];
+        }(),
       ],
     );
   }
