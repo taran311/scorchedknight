@@ -795,7 +795,7 @@ Future<void> _showShop(BuildContext context, GameController c, {required String 
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
                         decoration: BoxDecoration(color: const Color(0xFFEDE3CC), borderRadius: BorderRadius.circular(3), border: Border.all(color: const Color(0xFF2A2016), width: 1.5)),
-                        child: Text(line, style: Txt.onStone(size: 13, color: const Color(0xFF2A2016))),
+                        child: Text(line, style: Txt.body(size: 14)),
                       ),
                     ],
                   ),

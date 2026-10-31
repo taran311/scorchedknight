@@ -200,7 +200,7 @@ class _InnPageState extends State<InnPage> with RouteAware {
             SizedBox(height: MediaQuery.paddingOf(context).top),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
+                padding: EdgeInsets.fromLTRB(12, 12, 12, 20 + MediaQuery.paddingOf(context).bottom),
                 child: RepaintBoundary(child: Center(
                   child: ConstrainedBox(
                     constraints: BoxConstraints(maxWidth: fitWidth(context, aspect: 2, below: 230, chrome: 130)),

@@ -84,7 +84,7 @@ class _TrailPageState extends State<TrailPage> {
             SizedBox(height: MediaQuery.paddingOf(context).top),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
+                padding: EdgeInsets.fromLTRB(12, 12, 12, 16 + MediaQuery.paddingOf(context).bottom),
                 child: RepaintBoundary(child: Center(
                   child: ConstrainedBox(
                     constraints: BoxConstraints(maxWidth: fitWidth(context, aspect: 1000 / 530, below: 330)),
