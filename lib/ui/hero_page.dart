@@ -460,7 +460,13 @@ class _SlotSheetState extends State<_SlotSheet> {
                                   border: Border.all(color: picked?.id == g.id ? Palette.amber : rarityColour(g.rarity), width: picked?.id == g.id ? 2.5 : 1.2),
                                   borderRadius: BorderRadius.circular(5),
                                 ),
-                                child: Center(child: GearIcon(item: g, size: 42, heroClass: k.heroClass, dye: k.dye)),
+                                child: Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    Center(child: GearIcon(item: g, size: 42, heroClass: k.heroClass, dye: k.dye)),
+                                    Positioned(right: -6, top: -6, child: UpgradeBadge(upgradeVerdict(g, worn, kit ?? k.loadout))),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -598,7 +604,13 @@ class _Satchel extends StatelessWidget {
                             border: Border.all(color: rarityColour(g.rarity), width: 1.5),
                             borderRadius: BorderRadius.circular(5),
                           ),
-                          child: Center(child: GearIcon(item: g, size: 46, heroClass: k.heroClass, dye: k.dye)),
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Center(child: GearIcon(item: g, size: 46, heroClass: k.heroClass, dye: k.dye)),
+                              Positioned(right: -6, top: -6, child: UpgradeBadge(upgradeVerdict(g, c.engine.equippedFor(g), k.loadouts[g.heroClass ?? k.heroClass]!))),
+                            ],
+                          ),
                         ),
                       ),
                     ),

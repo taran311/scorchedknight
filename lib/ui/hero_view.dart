@@ -369,3 +369,47 @@ class SetChips extends StatelessWidget {
     ],
   );
 }
+
+/// Whether [item] would be an upgrade (1), a downgrade (-1) or about the same (0) on a hero
+/// whose [kit] it joins, against [worn] (what's in that slot now). Armour goes by how much damage
+/// it takes off; anything else by its overall worth (within 5% counts as the same).
+int upgradeVerdict(GearItem item, GearItem? worn, Loadout kit) {
+  if (item.slot == GearSlot.armour) {
+    final d = armourTierById(item.art).reduction - armourTierById(kit.armour).reduction;
+    return d > .005 ? 1 : (d < -.005 ? -1 : 0);
+  }
+  if (worn == null) return 1;
+  final r = item.score / (worn.score < 1 ? 1 : worn.score);
+  return r > 1.05 ? 1 : (r < .95 ? -1 : 0);
+}
+
+/// A small round badge on an item: a green up arrow (an upgrade), a red down arrow (a downgrade)
+/// or a grey bar (about the same as what you wear).
+class UpgradeBadge extends StatelessWidget {
+  const UpgradeBadge(this.verdict, {super.key, this.size = 20});
+  final int verdict;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final (icon, colour) = switch (verdict) {
+      > 0 => (Icons.arrow_upward_rounded, const Color(0xFF6FD04A)),
+      < 0 => (Icons.arrow_downward_rounded, const Color(0xFFE0503A)),
+      _ => (Icons.drag_handle_rounded, const Color(0xFF9A9286)),
+    };
+    return Tooltip(
+      message: verdict > 0 ? 'An upgrade' : (verdict < 0 ? 'A downgrade' : 'About the same as yours'),
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: const Color(0xFF15110C),
+          shape: BoxShape.circle,
+          border: Border.all(color: colour, width: 1.5),
+          boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 3)],
+        ),
+        child: Icon(icon, size: size * .72, color: colour),
+      ),
+    );
+  }
+}

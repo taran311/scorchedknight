@@ -183,7 +183,14 @@ class _LootWindowState extends State<_LootWindow> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _Halo(rarity: item.rarity, child: GearIcon(item: item, size: 72, heroClass: k.heroClass, dye: k.dye)),
+                      Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          _Halo(rarity: item.rarity, child: GearIcon(item: item, size: 72, heroClass: k.heroClass, dye: k.dye)),
+                          // Better or worse than what you wear, at a glance.
+                          Positioned(right: -4, top: -4, child: UpgradeBadge(upgradeVerdict(item, old, k.loadouts[item.heroClass ?? k.heroClass]!), size: 24)),
+                        ],
+                      ),
                       const SizedBox(width: 12),
                       Expanded(child: GearDetails(item: item, compare: old, kit: k.loadouts[item.heroClass ?? k.heroClass])),
                     ],

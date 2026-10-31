@@ -1,3 +1,3 @@
 // Which build this is, shown small at the foot of Settings so you can tell at a glance whether
 // the app on a phone has the latest changes. Updated with every change sent over.
-const buildStamp = '31 Oct 09:56';
+const buildStamp = '31 Oct 10:27';
