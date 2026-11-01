@@ -122,7 +122,7 @@ class _Shop {
           children: [
             Text(name, style: Txt.onStone(size: 15, color: Palette.cream).copyWith(fontWeight: FontWeight.w700)),
             if (desc.isNotEmpty) Text(desc, style: Txt.onStone(size: 12.5)),
-            if (extra != null) Padding(padding: const EdgeInsets.only(top: 3), child: extra),
+            if (extra != null && !narrow) Padding(padding: const EdgeInsets.only(top: 3), child: extra),
           ],
         );
         final button = ConstrainedBox(
@@ -138,9 +138,25 @@ class _Shop {
           ],
         );
         if (!narrow) return top;
+        // Narrow: what it costs (or does) and the button share the second line.
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [top, const SizedBox(height: 4), Align(alignment: Alignment.centerRight, child: button)],
+          children: [
+            top,
+            const SizedBox(height: 4),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const SizedBox(width: 38),
+                Expanded(child: extra ?? const SizedBox()),
+                const SizedBox(width: 6),
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: extra == null ? box.maxWidth - 38 : box.maxWidth * .45),
+                  child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerRight, child: action),
+                ),
+              ],
+            ),
+          ],
         );
       },
     ),
@@ -179,17 +195,22 @@ class _Shop {
 
 /// Mags' stall: supplies, the crossbow, the first armour upgrade, dyes and the stable.
 class MerchantWares extends StatelessWidget {
-  const MerchantWares({super.key, required this.controller});
+  const MerchantWares({super.key, required this.controller, this.tab});
   final GameController controller;
+
+  /// The stall's one section on show ('supplies', 'brews', 'kit', 'dyes'), or all of them.
+  final String? tab;
 
   @override
   Widget build(BuildContext context) {
     final c = controller, k = c.state.knight, e = c.engine, x = _Shop(context, c);
     final upgrades = [for (final t in tiersFor(k.heroClass).skip(1)) if (!t.dropOnly && t.reduction > armourTierById(k.armour).reduction) t];
     final bought = upgrades.where((t) => !isCrafted(t.id)).toList();
+    bool on(String t) => tab == null || tab == t;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (on('supplies')) ...[
         x.heading('Supplies'),
         x.ware(
           const ItemIcon(Item.potion),
@@ -242,6 +263,8 @@ class MerchantWares extends StatelessWidget {
             );
           },
         ),
+        ],
+        if (on('brews')) ...[
         x.heading('Brews · each lasts $brewFights fights'),
         for (final b in Brew.values)
           if (b.land <= c.state.unlocked || c.state.reagents[b.land] > 0)
@@ -270,6 +293,8 @@ class MerchantWares extends StatelessWidget {
                 ],
               ),
             ),
+        ],
+        if (on('kit')) ...[
         x.heading('Crossbow'),
         x.ware(
           const Icon(Icons.gps_fixed, color: Color(0xFFC8A070), size: 26),
@@ -284,6 +309,8 @@ class MerchantWares extends StatelessWidget {
           for (final t in bought) x.ware(armourIcon(t), t.name, '−${(t.reduction * 100).round()}% damage taken · now −${(armourTierById(k.armour).reduction * 100).round()}%', x.buy(t.id)),
           if (bought.length < upgrades.length) Text('Better armour: forged at $smithName\'s', style: Txt.onStone(size: 12.5)),
         ],
+        ],
+        if (on('dyes')) ...[
         x.heading('Dyes · ${switch (k.heroClass) {
           HeroClass.knight => 'cape, tabard, plume and shield',
           HeroClass.mage => 'sash and hat',
@@ -313,9 +340,10 @@ class MerchantWares extends StatelessWidget {
               ),
           ],
         ),
+        ],
         // Only mounts that beat the best you've got: you ride one, the strongest, so a weaker one
         // would never leave the stable.
-        ...() {
+        if (on('kit')) ...() {
           final best = [for (final id in k.mounts) mountById(id)?.charge ?? 0].fold(0.0, math.max);
           final better = [for (final m in mounts) if (!m.dropOnly && !k.mounts.contains(m.id) && m.charge > best) m];
           return [
@@ -330,17 +358,22 @@ class MerchantWares extends StatelessWidget {
 
 /// The smith's forge: smelting golems' ore into bars, forging armour from them, and relics.
 class ForgeWares extends StatelessWidget {
-  const ForgeWares({super.key, required this.controller});
+  const ForgeWares({super.key, required this.controller, this.tab});
   final GameController controller;
+
+  /// The forge's one section on show ('forge', 'temper', 'suits'), or all of them.
+  final String? tab;
 
   @override
   Widget build(BuildContext context) {
     final c = controller, s = c.state, k = s.knight, x = _Shop(context, c);
     final forged = [for (final t in tiersFor(k.heroClass)) if (isCrafted(t.id) && t.reduction > armourTierById(k.armour).reduction) t];
     final anyOre = Metal.values.any((m) => s.mat(oreKey(m)) > 0 || s.mat(barKey(m)) > 0);
+    bool on(String t) => tab == null || tab == t;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (on('forge')) ...[
         x.heading('Your ore and bars'),
         if (anyOre || Trophy.values.any((t) => s.mat(trophyKey(t)) > 0)) x.stock(gems: false, trophies: true) else Text('None yet: golems carry ore', style: Txt.onStone(size: 12.5)),
         const SizedBox(height: 4),
@@ -384,6 +417,8 @@ class ForgeWares extends StatelessWidget {
               ],
             ),
           ),
+        ],
+        if (on('temper')) ...[
         // Tempering: a favourite weapon reworked up to your level, so a farmed prize stays useful.
         x.heading('Tempering'),
         for (final w in c.temperables)
@@ -401,6 +436,10 @@ class ForgeWares extends StatelessWidget {
             ),
           ),
         if (c.temperables.isEmpty) Text('Epic and legendary gear, back up to your level', style: Txt.onStone(size: 12.5)),
+        ],
+        if (on('suits')) ...[
+        if (!forgedSets.any((f) => s.mat(trophyKey(f.trophy)) > 0 || setPieceSlots.any((slot) => s.mat(blueprintKey(f.id, slot)) > 0)))
+          Padding(padding: const EdgeInsets.only(top: 8), child: Text('Faction suits: their foes drop trophies and blueprints, and $smithName forges the pieces', style: Txt.onStone(size: 12.5))),
         // Set pieces, from the blueprints the Ashen Order, the vampires and the werewolves carry.
         for (final f in forgedSets)
           if (s.mat(trophyKey(f.trophy)) > 0 || setPieceSlots.any((slot) => s.mat(blueprintKey(f.id, slot)) > 0)) ...[
@@ -462,6 +501,7 @@ class ForgeWares extends StatelessWidget {
               ),
             ),
           ],
+        ],
       ],
     );
   }
@@ -470,15 +510,20 @@ class ForgeWares extends StatelessWidget {
 /// The hedge-mage's tower: runes on your weapon and armour, gems ground into special bolts, and the
 /// wards against each land's hazard.
 class EnchanterWares extends StatelessWidget {
-  const EnchanterWares({super.key, required this.controller});
+  const EnchanterWares({super.key, required this.controller, this.tab});
   final GameController controller;
+
+  /// The tower's one section on show ('runes', 'bolts', 'wards'), or all of them.
+  final String? tab;
 
   @override
   Widget build(BuildContext context) {
     final c = controller, s = c.state, k = s.knight, x = _Shop(context, c);
+    bool on(String t) => tab == null || tab == t;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (on('runes')) ...[
         x.heading('Runes · ${enchantCost(k.level)} gold a rune'),
         for (final slot in EnchantSlot.values)
           Builder(
@@ -533,6 +578,8 @@ class EnchanterWares extends StatelessWidget {
                 extra: x.have(MatIcon.core(Color(el.argb), size: 16), s.mat(coreKey(el)), coresPerRune),
               ),
         ],
+        ],
+        if (on('bolts')) ...[
         x.heading('Special bolts · 1 gem = $ammoBundle'),
         for (final a in AmmoType.values)
           x.ware(
@@ -564,7 +611,9 @@ class EnchanterWares extends StatelessWidget {
               ],
             ),
           ),
-        if (s.unlocked > 0 || s.reagents.any((n) => n > 0)) ...[
+        ],
+        if (on('wards') && !(s.unlocked > 0 || s.reagents.any((n) => n > 0))) Padding(padding: const EdgeInsets.only(top: 8), child: Text('Wards against each land\'s hazard, once you\'ve gathered its reagents', style: Txt.onStone(size: 12.5))),
+        if (on('wards') && (s.unlocked > 0 || s.reagents.any((n) => n > 0))) ...[
           x.heading('Wards'),
           for (var i = 1; i < continents.length; i++)
             if (continents[i].ward != null && i <= s.unlocked + 1)
@@ -761,11 +810,15 @@ class CostButton extends StatelessWidget {
 
 /// A shop window: whoever keeps it (their face, name and one line in a speech bubble), your gold,
 /// and their wares.
-Future<void> _showShop(BuildContext context, GameController c, {required String name, required String role, required String line, required Look look, required List<Color> glow, required Color colour, required Widget Function() wares, double zoom = 2.8}) => showDialog<void>(
+Future<void> _showShop(BuildContext context, GameController c, {required String name, required String role, required String line, required Look look, required List<Color> glow, required Color colour, required Widget Function(String tab) wares, required List<(String, String, IconData)> tabs, double zoom = 2.8}) {
+  // Each shop in a few short sections, one at a time, so a section fits a phone screen whole.
+  var tab = tabs.first.$1;
+  return showDialog<void>(
   context: context,
-  builder: (context) => Dialog(
+  builder: (context) => StatefulBuilder(builder: (context, setTab) => Dialog(
     backgroundColor: Colors.transparent,
-    insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 20),
+    // Clear of the phone's own bars, top and bottom.
+    insetPadding: EdgeInsets.fromLTRB(12, 16 + MediaQuery.paddingOf(context).top, 12, 16 + MediaQuery.paddingOf(context).bottom),
     child: ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 480),
       child: Stone(
@@ -815,10 +868,24 @@ Future<void> _showShop(BuildContext context, GameController c, {required String 
                 ),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
+            // The sections: an icon and a word each.
+            Row(
+              children: [
+                for (final (id, label, icon) in tabs)
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                      child: _ShopTab(label: label, icon: icon, colour: colour, on: tab == id, onTap: () => setTab(() => tab = id)),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 4),
             Flexible(
               child: SingleChildScrollView(
-                child: RepaintBoundary(child: ListenableBuilder(listenable: c, builder: (context, _) => wares())),
+                key: ValueKey(tab),
+                child: RepaintBoundary(child: ListenableBuilder(listenable: c, builder: (context, _) => wares(tab))),
               ),
             ),
             const SizedBox(height: 10),
@@ -827,8 +894,49 @@ Future<void> _showShop(BuildContext context, GameController c, {required String 
         ),
       ),
     ),
-  ),
+  )),
 );
+}
+
+/// One of a shop's sections, as a tab: an icon over a word, lit when it's the one on show.
+class _ShopTab extends StatelessWidget {
+  const _ShopTab({required this.label, required this.icon, required this.colour, required this.on, required this.onTap});
+  final String label;
+  final IconData icon;
+  final Color colour;
+  final bool on;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    selected: on,
+    label: label,
+    child: GestureDetector(
+      onTap: onTap,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          decoration: BoxDecoration(
+            color: on ? colour.withValues(alpha: .22) : Colors.black26,
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: on ? colour : Palette.stone3, width: on ? 1.6 : 1),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 20, color: on ? colour : Palette.parch2),
+              const SizedBox(height: 2),
+              FittedBox(fit: BoxFit.scaleDown, child: Text(label, style: Txt.label(size: 12, color: on ? Palette.cream : Palette.parch2))),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
 
 /// Mags' stall, from the square.
 Future<void> showMerchantWindow(BuildContext context, GameController c) => _showShop(
@@ -840,7 +948,8 @@ Future<void> showMerchantWindow(BuildContext context, GameController c) => _show
   look: magsLook,
   glow: const [Color(0xFF3A6A3A), Color(0xFF12200F)],
   colour: const Color(0xFF8BD46A),
-  wares: () => MerchantWares(controller: c),
+  tabs: const [('supplies', 'Supplies', Icons.local_drink), ('brews', 'Brews', Icons.science), ('kit', 'Kit', Icons.gps_fixed), ('dyes', 'Dyes', Icons.palette)],
+  wares: (tab) => MerchantWares(controller: c, tab: tab),
 );
 
 /// The forge, from the square.
@@ -853,7 +962,8 @@ Future<void> showForgeWindow(BuildContext context, GameController c) => _showSho
   look: questGiverLooks['smith']!,
   glow: const [Color(0xFFB0501E), Color(0xFF2A0E06)],
   colour: const Color(0xFFFFB04A),
-  wares: () => ForgeWares(controller: c),
+  tabs: const [('forge', 'Forge', Icons.hardware), ('temper', 'Temper', Icons.trending_up), ('suits', 'Suits', Icons.shield)],
+  wares: (tab) => ForgeWares(controller: c, tab: tab),
 );
 
 /// The hedge-mage's tower, from the square.
@@ -867,7 +977,8 @@ Future<void> showEnchanterWindow(BuildContext context, GameController c) => _sho
   zoom: 2.1,
   glow: const [Color(0xFF4A3A8A), Color(0xFF120C24)],
   colour: const Color(0xFFC8A8FF),
-  wares: () => EnchanterWares(controller: c),
+  tabs: const [('runes', 'Runes', Icons.auto_fix_high), ('bolts', 'Bolts', Icons.north_east), ('wards', 'Wards', Icons.shield_moon)],
+  wares: (tab) => EnchanterWares(controller: c, tab: tab),
 );
 
 /// A dye as a round swatch: a tick on the one you're wearing, a coin price on ones you don't own.

@@ -260,6 +260,15 @@ class _MapPageState extends State<MapPage> {
 
   void _home() => Navigator.of(context).pop();
 
+  /// The page's frame: on a phone it fits the screen exactly, above the system bar; elsewhere it
+  /// scrolls if it must.
+  Widget _frame(BuildContext context, bool phone, Widget child) => phone
+      ? Padding(padding: EdgeInsets.fromLTRB(10, 8, 10, 8 + MediaQuery.paddingOf(context).bottom), child: child)
+      : SingleChildScrollView(padding: EdgeInsets.fromLTRB(12, 12, 12, 20 + MediaQuery.paddingOf(context).bottom), child: child);
+
+  /// The map on a phone stretches into whatever height the rest leaves.
+  Widget _grow(bool phone, Widget child) => phone ? Expanded(child: child) : child;
+
   /// The next thing to aim for: the first land on the road whose boss still stands (once you can
   /// get there), else nothing (the road is done; the map is yours).
   Offset? _nextGoal() {
@@ -286,7 +295,7 @@ class _MapPageState extends State<MapPage> {
   Widget build(BuildContext context) => ListenableBuilder(
         listenable: c,
         builder: (context, _) {
-          final s = c.state;
+          final s = c.state, phone = isPhone(context);
           return MusicZone(
               track: 'travel',
               child: Scaffold(
@@ -294,9 +303,12 @@ class _MapPageState extends State<MapPage> {
                   children: [
                     SizedBox(height: MediaQuery.paddingOf(context).top),
                     Expanded(
-                      child: SingleChildScrollView(
-                        padding: EdgeInsets.fromLTRB(12, 12, 12, 20 + MediaQuery.paddingOf(context).bottom),
-                        child: RepaintBoundary(child: Center(
+                      // On a phone the whole page fits the screen (no scrolling to reach the button):
+                      // the map takes whatever room the panel leaves it.
+                      child: _frame(
+                        context,
+                        phone,
+                        RepaintBoundary(child: Center(
                           child: ConstrainedBox(
                             constraints: BoxConstraints(maxWidth: fitWidth(context, aspect: 1000 / _mapH, below: 200)),
                             child: Column(
@@ -314,7 +326,7 @@ class _MapPageState extends State<MapPage> {
                                   ),
                                   const SizedBox(height: 8),
                                 ],
-                                Stone(
+                                _grow(phone, Stone(
                                   padding: const EdgeInsets.all(3),
                                   child: Builder(
                                     builder: (context) {
@@ -375,22 +387,17 @@ class _MapPageState extends State<MapPage> {
                                         );
                                       }
 
-                                      if (isPhone(context)) {
-                                        // As tall as the screen allows with the panel still showing under it.
-                                        final screen = MediaQuery.sizeOf(context).height - MediaQuery.paddingOf(context).vertical;
-                                        final tall = (screen - 330).clamp(300.0, 640.0);
-                                        return SizedBox(height: tall, child: _PhoneMap(focus: _spots[_pick], builder: mapAt));
-                                      }
+                                      if (phone) return _PhoneMap(focus: _spots[_pick], builder: mapAt);
                                       return AspectRatio(aspectRatio: 1000 / _mapH, child: LayoutBuilder(builder: (context, box) => mapAt(box.maxWidth)));
                                     },
                                   ),
-                                ),
-                                if (isPhone(context) && s.knight.level < 3)
+                                )),
+                                if (phone && s.knight.level < 3)
                                   Padding(
                                     padding: const EdgeInsets.only(top: 4),
                                     child: Text('Drag to look around · pinch in to see every name', textAlign: TextAlign.center, style: Txt.label(size: 12, color: Palette.parch2)),
                                   ),
-                                const SizedBox(height: 10),
+                                SizedBox(height: phone ? 6 : 10),
                                 if (dungeonById(_dungeonPick) case final d?)
                                   _DungeonPanel(controller: c, dungeon: d, onGo: () => _delve(d))
                                 else if (placeById(_placePick) case final p?)

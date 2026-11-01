@@ -248,7 +248,8 @@ class _InnPageState extends State<InnPage> with RouteAware {
                             physics: const NeverScrollableScrollPhysics(),
                             mainAxisSpacing: 8,
                             crossAxisSpacing: 8,
-                            childAspectRatio: 2.6,
+                            // (Shorter on a phone, so the whole square fits the screen without scrolling.)
+                            childAspectRatio: 3.7,
                             children: [
                               for (final spot in const [TownSpot.gate, TownSpot.inn, TownSpot.stall, TownSpot.forge, TownSpot.enchanter, TownSpot.tent])
                                 _PlaceButton(icon: _TownSquareState._icons[spot]!, label: labels[spot]!, onTap: taps[spot], hot: spot == TownSpot.gate, accent: _placeAccent[spot], ready: (spot == TownSpot.forge && c.engine.forgeReady) || (spot == TownSpot.enchanter && c.engine.gemsWaiting)),
@@ -267,7 +268,7 @@ class _InnPageState extends State<InnPage> with RouteAware {
                         ],
                         // Hob's cellar: once you've a Cinder key (or have ever opened it).
                         if (s.keys > 0 || s.vaultFound.isNotEmpty) ...[
-                          _VaultCard(controller: c),
+                          _VaultCard(controller: c, compact: phone),
                           const SizedBox(height: 10),
                         ],
                         if (s.raid != null && !s.inBattle) ...[
@@ -285,6 +286,7 @@ class _InnPageState extends State<InnPage> with RouteAware {
                         ],
                         if (job) ...[
                           _QuestCard(
+                            compact: phone,
                             timber: s.timber,
                             iron: s.ironScrap,
                             ready: ready,
@@ -428,9 +430,12 @@ class _TalkBanner extends StatelessWidget {
 
 /// Hob's quest: a marked card with what to fetch, how far along you are, and the reward.
 class _QuestCard extends StatelessWidget {
-  const _QuestCard({required this.timber, required this.iron, required this.ready, required this.onTap, required this.onOpen, this.nudge = false});
+  const _QuestCard({required this.timber, required this.iron, required this.ready, required this.onTap, required this.onOpen, this.nudge = false, this.compact = false});
   final int timber, iron;
   final bool ready;
+
+  /// On a phone: smaller, the reward as icons and numbers.
+  final bool compact;
 
   /// Glow the button: your first step (go hunting) or the last (hand it in).
   final bool nudge;
@@ -444,12 +449,12 @@ class _QuestCard extends StatelessWidget {
     child: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        ItemIcon(item, size: 30),
+        ItemIcon(item, size: compact ? 22 : 30),
         const SizedBox(width: 6),
         for (var i = 0; i < need; i++)
           Container(
-            width: 13,
-            height: 13,
+            width: compact ? 11 : 13,
+            height: compact ? 11 : 13,
             margin: const EdgeInsets.only(right: 3),
             decoration: BoxDecoration(
               color: i < have ? Palette.amber : const Color(0xFF15110C),
@@ -488,7 +493,7 @@ class _QuestCard extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
       child: Row(
         children: [
-          QuestMark(ready: ready, size: 38),
+          QuestMark(ready: ready, size: compact ? 30 : 38),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -499,10 +504,21 @@ class _QuestCard extends StatelessWidget {
                     Text(ready ? 'READY TO HAND IN' : 'QUEST', style: Txt.label(size: 11, color: Palette.amber)),
                   ],
                 ),
-                Text('Mend the Soot & Kettle', style: Txt.label(size: 18, color: Palette.cream, weight: FontWeight.w800)),
-                const SizedBox(height: 6),
-                Wrap(spacing: 18, runSpacing: 6, children: [_need(Item.timber, 'Charred timber', timber, timberNeeded), _need(Item.iron, 'Iron scrap', iron, ironNeeded)]),
-                const SizedBox(height: 8),
+                Text('Mend the Soot & Kettle', style: Txt.label(size: compact ? 16 : 18, color: Palette.cream, weight: FontWeight.w800)),
+                SizedBox(height: compact ? 4 : 6),
+                Wrap(spacing: compact ? 12 : 18, runSpacing: 4, children: [_need(Item.timber, 'Charred timber', timber, timberNeeded), _need(Item.iron, 'Iron scrap', iron, ironNeeded)]),
+                SizedBox(height: compact ? 5 : 8),
+                if (compact)
+                  Wrap(
+                    spacing: 10,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      _reward(const ItemIcon(Item.coins, size: 16), '$innRepairReward'),
+                      _reward(const ItemIcon(Item.potion, size: 16), '$innRepairPotions'),
+                      _reward(const Icon(Icons.local_fire_department, size: 16, color: Color(0xFFFF8A3A)), 'Rests'),
+                    ],
+                  )
+                else
                 // What Hob gives you for it, spelled out.
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -1449,14 +1465,62 @@ class _NewGamePlusCard extends StatelessWidget {
 }
 
 class _VaultCard extends StatelessWidget {
-  const _VaultCard({required this.controller});
+  const _VaultCard({required this.controller, this.compact = false});
   final GameController controller;
+
+  /// On a phone: one row (the pieces as a count, the Oath as a shield) so the square fits the screen.
+  final bool compact;
 
   static const _ember = Color(0xFFFF9A4A);
 
   @override
   Widget build(BuildContext context) {
     final c = controller, s = c.state, found = s.vaultFound;
+    if (compact) {
+      final sworn = guardianSworn(found);
+      return Container(
+        padding: const EdgeInsets.fromLTRB(10, 6, 8, 6),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: _ember.withValues(alpha: .7), width: 1.5),
+          gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF3A2216), Color(0xFF1A0E08)]),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.vpn_key_rounded, color: _ember, size: 22),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('EMBER VAULT', style: Txt.label(size: 14, color: _ember, weight: FontWeight.w800)),
+                  Row(
+                    children: [
+                      Text('${s.keys} ${s.keys == 1 ? 'key' : 'keys'}', style: Txt.onStone(size: 12.5)),
+                      const SizedBox(width: 10),
+                      Tooltip(
+                        message: sworn ? 'Guardian\'s Oath: each fight\'s first heavy blow hits no harder than a normal one' : 'Vault pieces found · all six: the Guardian\'s Oath',
+                        triggerMode: TooltipTriggerMode.tap,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(sworn ? Icons.verified_user_rounded : Icons.inventory_2_outlined, size: 14, color: _ember),
+                            const SizedBox(width: 3),
+                            Text('${found.length}/${vaultPieces.length}', style: Txt.label(size: 12.5, color: _ember)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (s.keys > 0 && c.whyNotVault != null) Text(c.whyNotVault!, style: Txt.onStone(size: 11.5, color: const Color(0xFFE8B070))),
+                ],
+              ),
+            ),
+            SizedBox(width: 88, child: StoneButton(title: 'Open', compact: true, tone: ButtonTone.blood, onPressed: c.whyNotVault == null ? () => _open(context) : null)),
+          ],
+        ),
+      );
+    }
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(

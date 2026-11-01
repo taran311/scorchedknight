@@ -145,6 +145,8 @@ class _PaperDoll extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = controller, s = c.state, k = s.knight, tier = armourTierById(k.armour), h = heroStats(k), ds = dragonStage(k);
+    // (Tighter on a phone, so the knight, the slots and the totals fit one screen.)
+    final phone = isPhone(context), box = phone ? 56.0 : 68.0;
     Widget slot(GearSlot gs, String empty) {
       final g = k.equipped(gs);
       final idle = gs == GearSlot.offhand && g != null && k.loadout.activeOffhand == null;
@@ -163,15 +165,15 @@ class _PaperDoll extends StatelessWidget {
                   clipBehavior: Clip.none,
                   children: [
                 Container(
-                  width: 68,
-                  height: 68,
+                  width: box,
+                  height: box,
                   decoration: BoxDecoration(
                     gradient: const RadialGradient(colors: [Color(0xFF3A3128), Color(0xFF15110C)]),
                     border: Border.all(color: colour, width: g == null ? 1 : 2),
                     borderRadius: BorderRadius.circular(6),
                     boxShadow: [if (g != null) BoxShadow(color: colour.withValues(alpha: .35), blurRadius: 8)],
                   ),
-                  child: Opacity(opacity: idle ? .4 : 1, child: Center(child: GearIcon(item: g, size: 52, heroClass: k.heroClass, dye: k.dye, empty: ''))),
+                  child: Opacity(opacity: idle ? .4 : 1, child: Center(child: GearIcon(item: g, size: box - 16, heroClass: k.heroClass, dye: k.dye, empty: ''))),
                 ),
                     // Spares for this slot in your chest.
                     if (spare > 0)
@@ -204,7 +206,7 @@ class _PaperDoll extends StatelessWidget {
       OffhandKind.wand => 'Wand',
       null => 'Off-hand',
     };
-    Widget column(List<Widget> slots) => Column(children: [for (final (i, w) in slots.indexed) ...[if (i > 0) const SizedBox(height: 10), w]]);
+    Widget column(List<Widget> slots) => Column(children: [for (final (i, w) in slots.indexed) ...[if (i > 0) SizedBox(height: phone ? 4 : 10), w]]);
 
     // The totals as chips: a symbol and a number, the name in the tooltip.
     final chip = ds == null || ds.chip == 0 ? 0 : ds.chip + k.level ~/ 5 + h.dragonkin;
@@ -243,7 +245,7 @@ class _PaperDoll extends StatelessWidget {
                   children: [
                     Text(s.settings.name, style: Txt.label(size: 20, color: Palette.cream, weight: FontWeight.w800)),
                     Text('Level ${k.level} knight', style: Txt.label(size: 13, color: Palette.amber)),
-                    SizedBox(height: 300, child: HeroFigure(look: heroLook(k))),
+                    SizedBox(height: phone ? 220 : 300, child: HeroFigure(look: heroLook(k))),
                     // The armour you wear, under your feet.
                     Tooltip(
                       message: '${tier.name}: −${(tier.reduction * 100).round()}% damage taken${k.loadout.armourEnchant == null ? '' : ' · ${k.loadout.armourEnchant!.title}: ${k.loadout.armourEnchant!.describe}'}',
@@ -272,26 +274,26 @@ class _PaperDoll extends StatelessWidget {
             Padding(padding: const EdgeInsets.only(top: 8), child: SetChips(set: set, dense: true, worn: n)),
           if (capeByAbility(k.loadout.cape?.special) case final cape?)
             Padding(padding: const EdgeInsets.only(top: 6), child: Text('✦ ${cape.ability}', textAlign: TextAlign.center, style: Txt.label(size: 13, color: Palette.amber))),
-          const Divider(color: Palette.stone3, height: 22),
+          Divider(color: Palette.stone3, height: phone ? 14 : 22),
           Wrap(
-            spacing: 6,
-            runSpacing: 6,
+            spacing: phone ? 4 : 6,
+            runSpacing: phone ? 4 : 6,
             alignment: WrapAlignment.center,
             children: [
               for (final (icon, value, tip) in stats)
                 Tooltip(
                   message: tip,
                   child: Container(
-                    width: 78,
-                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    width: phone ? 60 : 78,
+                    padding: EdgeInsets.symmetric(vertical: phone ? 3 : 6),
                     decoration: BoxDecoration(color: const Color(0x55000000), border: Border.all(color: Palette.stone3), borderRadius: BorderRadius.circular(4)),
                     child: Column(
                       children: [
-                        SizedBox(height: 22, child: Center(child: icon)),
-                        const SizedBox(height: 2),
-                        Text(value, style: Txt.label(size: 15, color: Palette.cream)),
+                        SizedBox(height: phone ? 18 : 22, child: Center(child: FittedBox(child: icon))),
+                        if (!phone) const SizedBox(height: 2),
+                        Text(value, style: Txt.label(size: phone ? 13 : 15, color: Palette.cream)),
                         // A word under each number, so nobody has to hover to know what it is.
-                        Text(_statWord(tip), maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.label(size: 10.5, color: Palette.parch2)),
+                        Text(_statWord(tip), maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.label(size: phone ? 9.5 : 10.5, color: Palette.parch2)),
                       ],
                     ),
                   ),
@@ -1091,6 +1093,71 @@ class _Training extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = controller, k = c.state.knight, free = unspentPoints(k), any = Trait.values.any((t) => trained(k, t) > 0);
     final style = _style(k);
+    if (isPhone(context)) {
+      // On a phone: the four traits as one row of tiles (icon, points, a + while you've points),
+      // what each does a tap-and-hold away, so your knight and gear still fit the screen.
+      return Container(
+        padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF3A3024), Color(0xFF1A1510)]),
+          border: Border.all(color: free > 0 ? Palette.amber : Palette.stone3, width: free > 0 ? 2 : 1),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(child: Text(free > 0 ? 'Training · $free to spend' : 'Training${style == null ? '' : ' · $style'}', style: Txt.label(size: 14, color: Palette.amber))),
+                if (any)
+                  GestureDetector(
+                    onTap: k.coins >= resetTrainingCost(k) && !c.state.inBattle ? c.resetTraining : null,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [const Icon(Icons.restart_alt, size: 16, color: Palette.parch2), Text(' ${resetTrainingCost(k)}', style: Txt.label(size: 12, color: Palette.parch2))],
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                for (final t in Trait.values)
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      child: Tooltip(
+                        message: '${t.label}: ${t.perPoint}',
+                        child: Material(
+                          color: Colors.black26,
+                          borderRadius: BorderRadius.circular(4),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(4),
+                            onTap: free > 0 ? () => c.train(t) : null,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 6),
+                              decoration: BoxDecoration(borderRadius: BorderRadius.circular(4), border: Border.all(color: free > 0 ? _colours[t]!.withValues(alpha: .7) : Palette.stone3)),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(_icons[t], color: _colours[t], size: 18),
+                                  const SizedBox(width: 4),
+                                  Text('${trained(k, t)}', style: Txt.label(size: 15, color: _colours[t]!, weight: FontWeight.w800)),
+                                  if (free > 0) Text(' +', style: Txt.label(size: 15, color: Palette.cream, weight: FontWeight.w800)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
