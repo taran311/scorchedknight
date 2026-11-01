@@ -1083,6 +1083,38 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         dmg.crit ? _crit : (dmg.glancing ? _grey : _red),
         chest + const Offset(-6, -30),
       );
+      // A whole suit's signature on the bash: its word in its colour, a burst of it, and its own
+      // flourish (fire for the Ashen and the dragon, blood, venom, mist, a second flash…).
+      if (r.art case final word?) {
+        final col = Color(suitArtFor(c.state.knight)?.argb ?? 0xFFFFD98A);
+        _burst(chest, col, 2.1);
+        _punch(.5);
+        _at(140, () => _mark(word, [col, shade(col, -.55)], chest + const Offset(-24, -72)));
+        switch (word) {
+          case 'IGNITE' || 'BREATH':
+            _spark('fire', chest + const Offset(-30, -10), word == 'BREATH' ? 36 : 22, dir: 0, spread: 1.2, speed: 6, life: 850, radius: word == 'BREATH' ? 11 : 7, lift: 1, gravity: -.03);
+          case 'DRINK':
+            _spark('blood', chest, 16, dir: math.pi, spread: .8, speed: 5, life: 700, radius: 3.5, lift: .4, gravity: 0);
+          case 'BLEED':
+            if (_gore) _spark('gore', chest, 18, dir: 0, spread: 1.6, speed: 5, life: 900, radius: 3.6, lift: 2, gravity: .3);
+          case 'VENOM':
+            _spark('venom', chest, 18, dir: -math.pi / 2, spread: 2, speed: 3, life: 900, radius: 4.5, lift: .8, gravity: -.01);
+          case 'SLOW' || 'WEAKEN' || 'EXPOSE':
+            _spark(word == 'SLOW' ? 'rime' : (word == 'EXPOSE' ? 'holy' : 'mist'), chest, 16, dir: -math.pi / 2, spread: 3, speed: 2.5, life: 1000, radius: 6, lift: .4, gravity: -.01);
+          case 'TWICE':
+            _at(220, () {
+              _tween('flash', 1, 40);
+              _tween('flash', 0, 260, delay: 40);
+              _spark('curse', chest + const Offset(-30, 10), 16, dir: 0, spread: 2.2, speed: 5.5, life: 420, radius: 4);
+            });
+          case 'SKYFALL':
+            _spark('holy', chest + const Offset(0, -160), 22, dir: math.pi / 2, spread: .5, speed: 8, life: 500, radius: 4, lift: 0, gravity: .2);
+          case 'IAIDO' || 'STUN':
+            _spark('spark', chest, 26, dir: 0, spread: 3, speed: 7, life: 420, radius: 4.5);
+        }
+        if (r.artHit > 0) _at(280, () => _mark('+${r.artHit}', [col, shade(col, -.55)], chest + const Offset(24, -36)));
+        if (r.artHeal > 0) _at(320, () => _heart(r.artHeal, const Offset(_knightX, _groundY - 190)));
+      }
       // Its weaknesses: the right tool for the job, or the wrong one.
       // (The pop-up says what it's about: the damage, not any daze or hex that comes with it.)
       final style = switch (r.action) {

@@ -428,6 +428,66 @@ void main() {
     expect(counterDamage(s), greaterThan(counterDamage(s..foe = lookIndex('pitdemon', 5))));
   });
 
+  test('a whole suit: the attack and the bash become the order\'s own, with a signature', () {
+    GameEngine suited(String set, int seed) {
+      final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(seed));
+      final k = e.state.knight..level = 40;
+      for (final slot in setPieceSlots) {
+        final g = e.loot.setPiece(set, slot, k.heroClass, k.level);
+        switch (slot) {
+          case GearSlot.armour:
+            k.loadout.armour = g.art;
+          case GearSlot.ring:
+            k.ring = g;
+          default:
+            k.loadout.put(g);
+        }
+      }
+      k.hp = maxHp(k);
+      return e;
+    }
+
+    final e = suited('drakesworn', 8);
+    final s = e.state, k = s.knight;
+    expect(suitWorn(k), 'drakesworn');
+    expect(skillName(k), 'Dragon\'s Breath');
+    expect(attackName(k), 'Wyrm Cut');
+    s
+      ..inBattle = true
+      ..foe = lookIndex('ashenKnight', 5)
+      ..foeLevel = 40
+      ..foeHp = 1 << 20
+      ..foeMax = 1 << 20;
+    final r = e.takeTurn(BattleAction.skill);
+    expect(r.art, 'BREATH');
+    expect(r.artHit, greaterThan(0));
+    // Four pieces: the bonus and its perk, but not the suit's arts.
+    k.ring = null;
+    expect(suitWorn(k), isNull);
+    expect(skillName(k), isNot('Dragon\'s Breath'));
+    // The Deepforge suit's Anvil Strike stuns bosses every time; the Bushido's draw always crits.
+    final d = suited('deepforge', 9), ds = d.state;
+    for (var i = 0; i < 6; i++) {
+      ds
+        ..inBattle = true
+        ..foe = foeIndexes(3).last + 1
+        ..foeLevel = 40
+        ..foeHp = 1 << 20
+        ..foeMax = 1 << 20
+        ..skillWait = 0;
+      expect(foeIn(ds).boss, isTrue);
+      expect(d.takeTurn(BattleAction.skill).stunned, isTrue);
+    }
+    final b = suited('bushido', 10), bs = b.state;
+    bs
+      ..inBattle = true
+      ..foe = lookIndex('ronin', 16)
+      ..foeLevel = 40
+      ..foeHp = 1 << 20
+      ..foeMax = 1 << 20;
+    expect(b.takeTurn(BattleAction.skill).damage.crit, isTrue);
+  });
+
   test('bolts can be swapped any time, plain ones in between', () {
     final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(2));
     final k = e.state.knight;

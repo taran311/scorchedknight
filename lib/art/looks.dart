@@ -622,7 +622,8 @@ Look lookFor(HeroClass c, Loadout l, {String dye = 'crimson', bool gloves = fals
   final capeCol = l.cape?.tint == null ? null : Color(l.cape!.tint!);
   final weapon = Weapon.fromArt(w?.art);
   final off = _shieldFor(o) != null ? Weapon.none : Weapon.fromArt(o?.art);
-  final lit = glow ?? (poisoned ? elementGlow(Stat.poison) : elementGlow(w?.element));
+  // (A whole questline suit lights the blade in the order's colour when nothing else does.)
+  final lit = glow ?? (poisoned ? elementGlow(Stat.poison) : elementGlow(w?.element)) ?? (livery != null ? Color(livery.trim) : null);
   final legendary = [w, o, l.helm, trinket].any((g) => g?.rarity == Rarity.legendary);
   final skin = ramp(0xFFC99474, .25, .45);
   // Blackened mail and plate come with an iron full helm until a better one drops.

@@ -426,6 +426,8 @@ class _BattleScreenState extends State<BattleScreen> {
     Color edgeColour(double e) => e > 1 ? good : (e < 1 ? bad : Palette.amber);
     final swing = fullSwing(k);
     final bash = skillName(k) == 'Shield Bash';
+    // A whole questline suit: the attack and the bash are the order's own.
+    final art = suitArtFor(k);
     var key = 0;
     Widget slot(BattleAction a, Widget icon, String name, _SlotInfo info, {String? badge, Color badgeColour = Palette.amber, Widget? badgeArt, String? figure, int wait = 0, bool glow = false, Color tint = const Color(0xFF3B3327), String? rite}) {
       final why = rite != null ? c.whyNotRite(rite) : c.whyNot(a);
@@ -529,9 +531,9 @@ class _BattleScreenState extends State<BattleScreen> {
       [
         slot(
           BattleAction.attack,
-          const ItemIcon(Item.swords, size: 40),
-          'Attack',
-          _SlotInfo('Attack', const Color(0xFFFF9A7A), [
+          art == null ? const ItemIcon(Item.swords, size: 40) : Icon(Icons.auto_awesome, size: 38, color: Color(art.argb)),
+          art == null ? 'Attack' : art.attack,
+          _SlotInfo(art?.attack ?? 'Attack', art == null ? const Color(0xFFFF9A7A) : Color(art.argb), [
             ('⚔️', '~${(swing * bladeEdge * mightBoost(k)).round()} damage', plain),
             if (aloft) ('🦅', 'Out of reach ${pct(aloftMelee)}', bad),
             if (triangle(kind, AttackStyle.blade) != 1) edgeLine(triangle(kind, AttackStyle.blade), 'blades'),
@@ -544,11 +546,12 @@ class _BattleScreenState extends State<BattleScreen> {
         ),
         slot(
           BattleAction.skill,
-          bash ? const ItemIcon(Item.shield, size: 38) : const Icon(Icons.gavel, size: 38, color: Color(0xFFFFD98A)),
-          bash ? 'Bash' : 'Mighty Blow',
-          _SlotInfo(bash ? 'Shield Bash' : 'Mighty Blow', const Color(0xFFFFD98A), [
+          art != null ? Icon(Icons.flare, size: 40, color: Color(art.argb)) : (bash ? const ItemIcon(Item.shield, size: 38) : const Icon(Icons.gavel, size: 38, color: Color(0xFFFFD98A))),
+          art?.skill ?? (bash ? 'Bash' : 'Mighty Blow'),
+          _SlotInfo(art?.skill ?? (bash ? 'Shield Bash' : 'Mighty Blow'), art == null ? const Color(0xFFFFD98A) : Color(art.argb), [
             ('⚔️', '~${(swing * bashMult * bladeEdge * mightBoost(k)).round()} damage', plain),
-            ('😵', 'Stuns it (bosses 50%)', good),
+            ('😵', suitWorn(k) == 'deepforge' ? 'Stuns it, bosses too' : 'Stuns it (bosses 50%)', good),
+            if (art != null) ('✨', art.desc, good),
             if (bladeEdge != 1) edgeLine(bladeEdge, 'blades'),
             ('⏳', s.skillWait > 0 ? 'Ready in ${turns(s.skillWait)}' : 'Cooldown ${turns(skillCooldown)}', soft),
           ]),

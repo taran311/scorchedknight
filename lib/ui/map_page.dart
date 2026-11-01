@@ -44,7 +44,9 @@ const _wildSpots = <Offset>[Offset(560, 524), Offset(480, 120), Offset(690, 110)
 class _PhoneMap extends StatefulWidget {
   const _PhoneMap({required this.focus, required this.builder});
   final Offset focus;
-  final Widget Function(double width) builder;
+
+  /// The map at [width]; [close] once you've pinched in far enough to read every name.
+  final Widget Function(double width, bool close) builder;
 
   @override
   State<_PhoneMap> createState() => _PhoneMapState();
@@ -54,8 +56,24 @@ class _PhoneMapState extends State<_PhoneMap> {
   final _view = TransformationController();
   Size? _placed;
 
+  /// Pinched in past [_closeAt]: every land's spots get their names.
+  bool _close = false;
+  static const _closeAt = 1.6;
+
+  @override
+  void initState() {
+    super.initState();
+    _view.addListener(_zoomed);
+  }
+
+  void _zoomed() {
+    final close = _view.value.getMaxScaleOnAxis() >= _closeAt;
+    if (close != _close) setState(() => _close = close);
+  }
+
   @override
   void dispose() {
+    _view.removeListener(_zoomed);
     _view.dispose();
     super.dispose();
   }
@@ -86,7 +104,7 @@ class _PhoneMapState extends State<_PhoneMap> {
           maxScale: 3,
           // Its own layer: panning used to redraw the whole map (every land, label and fog patch)
           // on every frame of the drag.
-          child: RepaintBoundary(child: SizedBox(width: w, height: h, child: widget.builder(w))),
+          child: RepaintBoundary(child: SizedBox(width: w, height: h, child: widget.builder(w, _close))),
         ),
       );
     },
@@ -242,6 +260,16 @@ class _MapPageState extends State<MapPage> {
 
   void _home() => Navigator.of(context).pop();
 
+  /// The next thing to aim for: the first land on the road whose boss still stands (once you can
+  /// get there), else nothing (the road is done; the map is yours).
+  Offset? _nextGoal() {
+    for (var i = 0; i < mainLands; i++) {
+      if (c.state.bossesDown.contains(i)) continue;
+      return c.whyNotTravel(i) == null ? _spots[i] : null;
+    }
+    return null;
+  }
+
   Widget _hotspot(Offset centre, double w, double h, double k, String label, VoidCallback onTap) => Positioned(
         left: (centre.dx - w / 2) * k,
         top: (centre.dy - h / 2) * k,
@@ -290,8 +318,11 @@ class _MapPageState extends State<MapPage> {
                                   padding: const EdgeInsets.all(3),
                                   child: Builder(
                                     builder: (context) {
-                                      Widget mapAt(double width) {
+                                      Widget mapAt(double width, [bool close = true]) {
                                         final k = width / 1000;
+                                        // The land you're looking at: picked, or the one a picked spot is in.
+                                        final focus = placeById(_placePick)?.land ?? dungeonById(_dungeonPick)?.land ?? (_wildPick == null ? _pick : null);
+                                        final next = _nextGoal();
                                         return Stack(
                                           children: [
                                             Positioned.fill(
@@ -300,10 +331,15 @@ class _MapPageState extends State<MapPage> {
                                                 painter: _MapPainter(
                                                   open: [for (var i = 0; i < continents.length; i++) c.whyNotTravel(i) == null],
                                                   selected: _wildPick == null && _placePick == null && _dungeonPick == null ? _pick : -1,
-                                                  delves: [for (final d in dungeons) if (c.whyNotTravel(d.land) == null) (d, c.dungeonOpen(d), s.dungeonsDone.contains(d.id), s.dungeon == d.id)],
+                                                  // Every dungeon and place is on the map from the start (the far ones locked
+                                                  // and dim until their land opens), so there's always somewhere to aim for.
+                                                  delves: [for (final d in dungeons) (d, c.whyNotTravel(d.land) == null && c.dungeonOpen(d), s.dungeonsDone.contains(d.id), s.dungeon == d.id)],
                                                   delvePicked: _dungeonPick,
-                                                  pins: [for (final p in places) if (c.placeShown(p)) (p, s.explored.contains(p.id), c.whyNotExplore(p.id) == null)],
+                                                  pins: [for (final p in places) if (c.placeShown(p) || (!p.hidden && p.relic == null)) (p, s.explored.contains(p.id), c.whyNotExplore(p.id) == null)],
                                                   pinPicked: _placePick,
+                                                  lockedLands: {for (var i = 0; i < continents.length; i++) if (c.whyNotTravel(i) != null) i},
+                                                  nameLand: focus,
+                                                  allNames: close,
                                                   beaten: s.bossesDown,
                                                   cleared: {for (var i = 0; i < continents.length; i++) if (c.engine.landCleared(i)) i},
                                                   wildsOpen: [for (var a = 0; a < wildAreas.length; a++) c.wildOpen(a)],
@@ -312,14 +348,23 @@ class _MapPageState extends State<MapPage> {
                                                 ),
                                               ),
                                             ),
+                                            // Where to go next: a slow gold pulse round it.
+                                            if (next != null)
+                                              Positioned(
+                                                left: (next.dx - 70) * k,
+                                                top: (next.dy - 60) * k,
+                                                width: 140 * k,
+                                                height: 120 * k,
+                                                child: const IgnorePointer(child: _NextPulse()),
+                                              ),
                                             for (var i = 0; i < continents.length; i++) _hotspot(_spots[i] + const Offset(0, -10), _blobSize(i).width - 20, _blobSize(i).height, k, continents[i].name, () => _enter(i)),
                                             for (final p in places)
-                                              if (c.placeShown(p)) _hotspot(Offset(p.x, p.y + 6), math.max(46, 40 / k), math.max(46, 40 / k), k, p.name, () => setState(() {
+                                              if (c.placeShown(p) || (!p.hidden && p.relic == null)) _hotspot(Offset(p.x, p.y + 6), math.max(46, 40 / k), math.max(46, 40 / k), k, p.name, () => setState(() {
                                                 _placePick = p.id;
                                                 _dungeonPick = null;
                                               })),
                                             for (final d in dungeons)
-                                              if (c.whyNotTravel(d.land) == null) _hotspot(Offset(d.x, d.y), math.max(46, 40 / k), math.max(46, 40 / k), k, d.name, () => setState(() {
+                                              _hotspot(Offset(d.x, d.y), math.max(46, 40 / k), math.max(46, 40 / k), k, d.name, () => setState(() {
                                                 _dungeonPick = d.id;
                                                 _placePick = null;
                                                 _wildPick = null;
@@ -331,7 +376,9 @@ class _MapPageState extends State<MapPage> {
                                       }
 
                                       if (isPhone(context)) {
-                                        final tall = (MediaQuery.sizeOf(context).height * .48).clamp(260.0, 520.0);
+                                        // As tall as the screen allows with the panel still showing under it.
+                                        final screen = MediaQuery.sizeOf(context).height - MediaQuery.paddingOf(context).vertical;
+                                        final tall = (screen - 330).clamp(300.0, 640.0);
                                         return SizedBox(height: tall, child: _PhoneMap(focus: _spots[_pick], builder: mapAt));
                                       }
                                       return AspectRatio(aspectRatio: 1000 / _mapH, child: LayoutBuilder(builder: (context, box) => mapAt(box.maxWidth)));
@@ -341,7 +388,7 @@ class _MapPageState extends State<MapPage> {
                                 if (isPhone(context) && s.knight.level < 3)
                                   Padding(
                                     padding: const EdgeInsets.only(top: 4),
-                                    child: Text('Drag the map to look around; pinch to zoom.', textAlign: TextAlign.center, style: Txt.label(size: 12, color: Palette.parch2)),
+                                    child: Text('Drag to look around · pinch in to see every name', textAlign: TextAlign.center, style: Txt.label(size: 12, color: Palette.parch2)),
                                   ),
                                 const SizedBox(height: 10),
                                 if (dungeonById(_dungeonPick) case final d?)
@@ -649,7 +696,17 @@ class _WildPanel extends StatelessWidget {
 const _done = Color(0xFF9BE27A);
 
 class _MapPainter extends CustomPainter {
-  _MapPainter({required this.open, required this.selected, required this.beaten, this.cleared = const {}, required this.wildsOpen, this.wildPicked, this.trip, this.pins = const [], this.pinPicked, this.delves = const [], this.delvePicked});
+  _MapPainter({required this.open, required this.selected, required this.beaten, this.cleared = const {}, required this.wildsOpen, this.wildPicked, this.trip, this.pins = const [], this.pinPicked, this.delves = const [], this.delvePicked, this.lockedLands = const {}, this.nameLand, this.allNames = true});
+
+  /// Lands you can't reach yet: their spots are small, dim and nameless (a hint of what's out there,
+  /// not a wall of padlocks).
+  final Set<int> lockedLands;
+
+  /// Whose spots are named: every open land's ([allNames], on a big screen or zoomed in), or just
+  /// [nameLand]'s (the land you're looking at, on a phone), plus whatever's picked.
+  final int? nameLand;
+  final bool allNames;
+
 
   /// Dungeons shown: each with whether it's open, whether its boss is beaten, and whether you're
   /// down in it now.
@@ -777,12 +834,13 @@ class _MapPainter extends CustomPainter {
     // The Inn: a little house with a tankard sign, where it all starts.
     _inn(canvas, _innSpot);
     // Places to explore: a red orb on a pin (dim once explored, with a tick).
+    bool named(int land, bool picked) => picked || (!lockedLands.contains(land) && (allNames || land == nameLand));
     for (final (p, done, ready) in pins) {
-      _pin(canvas, Offset(p.x, p.y), p.name, done, ready, p.id == pinPicked);
+      _pin(canvas, Offset(p.x, p.y), p.name, done, ready, p.id == pinPicked, locked: lockedLands.contains(p.land), named: named(p.land, p.id == pinPicked));
     }
     // Dungeons: a stair down into the dark, under a stone arch.
     for (final (d, open, done, here) in delves) {
-      _delve(canvas, Offset(d.x, d.y), d.name, open, done, here, d.id == delvePicked);
+      _delve(canvas, Offset(d.x, d.y), d.name, open, done, here, d.id == delvePicked, locked: lockedLands.contains(d.land), named: named(d.land, d.id == delvePicked));
     }
     // Their names last, each in the first free spot round its marker, so none lands on another.
     for (final (tp, at, gap) in _queued) {
@@ -966,8 +1024,15 @@ class _MapPainter extends CustomPainter {
     }
   }
 
-  void _pin(Canvas c, Offset at, String name, bool done, bool ready, bool picked) {
+  void _pin(Canvas c, Offset at, String name, bool done, bool ready, bool picked, {bool locked = false, bool named = true}) {
     if (picked) c.drawCircle(at, 15, strokePaint(const Color(0xFFFFE6A0), 3));
+    if (locked && !picked) {
+      // Out of reach yet: a small, faded ember of what's waiting.
+      c.drawCircle(at, 6, Paint()..color = const Color(0xFFB0141A).withValues(alpha: .38));
+      c.drawCircle(at, 6, strokePaint(const Color(0xFF2A1A0E).withValues(alpha: .35), 1.2));
+      _taken.add(Rect.fromCircle(center: at, radius: 8));
+      return;
+    }
     c.drawCircle(at + const Offset(1.5, 2), 10, Paint()..color = const Color(0x55000000));
     final orb = Rect.fromCircle(center: at, radius: 10);
     c.drawCircle(
@@ -988,6 +1053,7 @@ class _MapPainter extends CustomPainter {
       if (!ready) _padlock(c, at + const Offset(10, 4), .45);
     }
     _taken.add(Rect.fromCircle(center: at, radius: 12));
+    if (!named) return;
     _queued.add((
       TextPainter(
         text: TextSpan(text: name, style: Txt.inkLabel(size: 13, color: done ? const Color(0xFF6A5A44) : const Color(0xFF2A1A0E))),
@@ -1000,8 +1066,8 @@ class _MapPainter extends CustomPainter {
 
   /// A dungeon's mouth: a stone arch over steps going down into the dark, a glow if you're down
   /// there now, a star once its boss is beaten.
-  void _delve(Canvas c, Offset at, String name, bool open, bool done, bool here, bool picked) {
-    final a = open ? 1.0 : .45;
+  void _delve(Canvas c, Offset at, String name, bool open, bool done, bool here, bool picked, {bool locked = false, bool named = true}) {
+    final a = open ? 1.0 : (locked && !picked ? .3 : .45);
     if (picked) c.drawCircle(at, 19, strokePaint(const Color(0xFFFFE6A0), 3));
     if (here) c.drawCircle(at, 20, Paint()..color = const Color(0xFFFFB04A).withValues(alpha: .45)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8));
     final arch = Path()
@@ -1031,10 +1097,11 @@ class _MapPainter extends CustomPainter {
       }
       c.drawPath(star..close(), Paint()..color = const Color(0xFFE3A548));
       c.drawPath(star, strokePaint(const Color(0xFF3A2614), 1));
-    } else if (!open) {
+    } else if (!open && !locked) {
       _padlock(c, at + const Offset(15, 6), .45);
     }
     _taken.add(Rect.fromCenter(center: at + const Offset(2, -2), width: 36, height: 30));
+    if (!named) return;
     _queued.add((
       TextPainter(
         text: TextSpan(text: name, style: Txt.inkLabel(size: 13, color: open ? const Color(0xFF2A1A0E) : const Color(0xFF6A5A44))),
@@ -1236,6 +1303,9 @@ class _MapPainter extends CustomPainter {
       old.pins.length != pins.length ||
       old.pins.where((p) => p.$2).length != pins.where((p) => p.$2).length ||
       old.trip != trip ||
+      old.nameLand != nameLand ||
+      old.allNames != allNames ||
+      old.lockedLands.length != lockedLands.length ||
       old.wildsOpen.toString() != wildsOpen.toString();
 }
 
@@ -1251,3 +1321,52 @@ Widget _panel(BuildContext context, Widget art, Widget info, Widget button) => i
         ],
       )
     : Row(children: [art, const SizedBox(width: 12), Expanded(child: info), const SizedBox(width: 12), SizedBox(width: 170, child: button)]);
+
+/// A slow gold ring breathing round the next land to aim for.
+class _NextPulse extends StatefulWidget {
+  const _NextPulse();
+
+  @override
+  State<_NextPulse> createState() => _NextPulseState();
+}
+
+class _NextPulseState extends State<_NextPulse> with SingleTickerProviderStateMixin {
+  late final _t = AnimationController(vsync: this, duration: const Duration(milliseconds: 1800))..repeat();
+
+  @override
+  void dispose() {
+    _t.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => RepaintBoundary(
+    child: AnimatedBuilder(
+      animation: _t,
+      builder: (context, _) => CustomPaint(painter: _PulsePainter(_t.value)),
+    ),
+  );
+}
+
+class _PulsePainter extends CustomPainter {
+  _PulsePainter(this.t);
+  final double t;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = size.center(Offset.zero), r = size.shortestSide / 2;
+    for (final phase in const [0.0, .5]) {
+      final p = (t + phase) % 1;
+      canvas.drawOval(
+        Rect.fromCenter(center: c, width: size.width * (.75 + .3 * p), height: size.height * (.75 + .3 * p)),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = math.max(2, r * .05)
+          ..color = const Color(0xFFF2C14E).withValues(alpha: (1 - p) * .85),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_PulsePainter old) => old.t != t;
+}

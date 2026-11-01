@@ -565,7 +565,39 @@ int startingMana(Knight k) => 1 + (k.loadout.cape?.special == 'manawell' ? 1 : 0
 bool hasShield(Knight k) => _hasShield(k);
 
 /// The knight's skill: a Shield Bash with a shield, a Mighty Blow with anything else.
-String skillName(Knight k) => _hasShield(k) ? 'Shield Bash' : 'Mighty Blow';
+String skillName(Knight k) => suitArtFor(k)?.skill ?? (_hasShield(k) ? 'Shield Bash' : 'Mighty Blow');
+
+/// A questline suit's arts: wear all five pieces and your attack and your bash become the order's
+/// own, with its colour, its name, and a signature on the bash (on top of the stun): [word] is
+/// what flashes up, [desc] says what it does.
+class SuitArt {
+  const SuitArt(this.skill, this.attack, this.word, this.argb, this.desc);
+  final String skill, attack, word, desc;
+  final int argb;
+}
+
+const suitArts = <String, SuitArt>{
+  'ashen': SuitArt('Cinder Slam', 'Ashen Cut', 'IGNITE', 0xFFFF6A2A, 'Sets it ablaze'),
+  'nightblood': SuitArt('Blood Rend', 'Crimson Cut', 'DRINK', 0xFFE0405A, 'Heals you a quarter of the blow'),
+  'moonfang': SuitArt('Savage Maul', 'Moonfang Rake', 'BLEED', 0xFFC8C4BC, 'Opens a bleeding wound'),
+  'silverleaf': SuitArt('Moonlit Feint', 'Silver Cut', 'WEAKEN', 0xFFE8E0B0, 'It hits softer for 2 turns'),
+  'deepforge': SuitArt('Anvil Strike', 'Runed Cut', 'STUN', 0xFFE8C060, 'Always stuns, bosses too'),
+  'faceless': SuitArt('Mask Breaker', 'Faceless Cut', 'EXPOSE', 0xFFE8E2D8, 'It takes more harm for 2 turns'),
+  'sunscale': SuitArt('Fang Strike', 'Scaled Cut', 'VENOM', 0xFF9BE27A, 'Two doses of venom'),
+  'tidecaller': SuitArt('Undertow Crash', 'Tide Cut', 'SLOW', 0xFF6AC0E8, 'Half its blows miss for 2 turns'),
+  'changeling': SuitArt('Mimic Strike', 'Shifting Cut', 'TWICE', 0xFFC8A0F0, 'Strikes again for 40%'),
+  'skyborn': SuitArt('Skyfall', 'Gale Cut', 'SKYFALL', 0xFFB8E0FF, '+20% more, +50% against fliers'),
+  'bushido': SuitArt('Iaido Draw', 'Katana Cut', 'IAIDO', 0xFFFF5A4A, 'Always a critical hit'),
+  'drakesworn': SuitArt('Dragon\'s Breath', 'Wyrm Cut', 'BREATH', 0xFFFF8A3A, 'A gout of dragonfire on top'),
+};
+
+/// The questline suit worn whole (all five pieces), if any.
+String? suitWorn(Knight k) => activeSets(k.setGear).where((e) => suitArts.containsKey(e.$1.id) && e.$2 >= e.$1.pieces).map((e) => e.$1.id).firstOrNull;
+
+SuitArt? suitArtFor(Knight k) => suitArts[suitWorn(k)];
+
+/// Your attack's name: the suit's own cut, or a plain attack.
+String attackName(Knight k) => suitArtFor(k)?.attack ?? 'Attack';
 
 /// What a crossbow bolt deals, as a share of an attack.
 double crossbowShare(Knight k) => crossbows[k.crossbow.clamp(0, crossbows.length - 1)].$2;

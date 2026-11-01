@@ -223,6 +223,10 @@ class SwingResult {
   /// The knight's Shield Bash left the foe dazed (it skips its blow).
   bool stunned = false;
 
+  /// A whole suit's signature on the bash (its word: IGNITE, DRINK…), and what it dealt and healed.
+  String? art;
+  int artHit = 0, artHeal = 0;
+
   /// The foe's blow this turn was a heavy one it wound up; and it's winding up another.
   bool heavy = false, windup = false;
 
@@ -555,9 +559,10 @@ class GameEngine {
     if (p == null) return 'No such place';
     if (state.explored.contains(id)) return 'Explored';
     if (state.inBattle) return 'Not mid-fight';
-    if (!placeShown(p)) return 'Not found yet';
+    // (A place in a land you can't reach yet says why: the boss to beat first.)
     final travel = whyNotTravel(p.land);
     if (travel != null) return travel;
+    if (!placeShown(p)) return 'Not found yet';
     final foe = p.foe;
     if (foe != null && state.day && foeAt(lookIndex(foe.$1, p.land)).night) return 'Its guard only comes out at night';
     return null;
@@ -1683,7 +1688,7 @@ class GameEngine {
     final bushido = activeSets(k.setGear).any((e) => e.$1.bushido && e.$2 >= e.$1.full) ? 1 + math.min(bushidoCap, (state.turn - 1) * bushidoStep) : 1.0;
     final mult = reach * edge * train * song * wolf * updraft * bushido * (adapted ? adaptBoost : 1) * (bash ? bashMult : (shooting ? crossbowShare(k) * aim : (casting && cape == 'starweave' ? 1.3 : 1.0)));
     final d = striking
-        ? swingDamage(state, _rng.nextDouble(), special: fire, ammo: shot, spell: cast, hitRoll: _rng.nextDouble(), mult: mult, sureCrit: state.turn == 1 && activeSets(k.setGear).any((e) => e.$1.firstCrit && e.$2 >= e.$1.full))
+        ? swingDamage(state, _rng.nextDouble(), special: fire, ammo: shot, spell: cast, hitRoll: _rng.nextDouble(), mult: mult, sureCrit: (state.turn == 1 && activeSets(k.setGear).any((e) => e.$1.firstCrit && e.$2 >= e.$1.full)) || (bash && suitWorn(k) == 'bushido'))
         : const SwingDamage();
     // Attacks and shots can miss now and then. Specials, rites and the bash always land.
     final miss = (action == BattleAction.attack || (shooting && aim <= 1)) && fire?.sure != true && _rng.nextDouble() < missChance;
@@ -1738,6 +1743,7 @@ class GameEngine {
         _command(r);
       case BattleAction.attack || BattleAction.skill || BattleAction.cast || BattleAction.shoot:
         _strike(r, fire, cast, foeName);
+        if (bash) _suitArt(r, foe, foeName);
     }
     if (shot != null && !r.miss && state.foeHp > 0) _shotTakes(shot, r, foe, foeName);
     // A clean kill: the bolt itself brought it down (not your companion, the dead or a burn after).
@@ -1848,6 +1854,58 @@ class GameEngine {
       ..skillWait = math.max(0, state.skillWait - 1)
       ..petWait = math.max(0, state.petWait - 1);
     return r;
+  }
+
+  /// A whole suit's signature, on top of the bash's stun (see suitArts).
+  void _suitArt(SwingResult r, FoeType foe, String foeName) {
+    final k = state.knight, id = suitWorn(k), art = suitArts[id];
+    if (art == null || r.miss) return;
+    r.art = art.word;
+    final base = r.damage.base;
+    void extra(int n) {
+      if (n <= 0 || state.foeHp <= 0) return;
+      r.artHit = math.min(state.foeHp, n);
+      state.foeHp -= r.artHit;
+    }
+
+    switch (id) {
+      case 'ashen':
+        if (foe.element != 'burn' && state.foeHp > 0) {
+          state
+            ..foeBurn = math.max(state.foeBurnTurns > 0 ? state.foeBurn : 0, burnTick(k.level))
+            ..foeBurnTurns = burnTurns;
+          _note('$foeName goes up in cinders.', EntryKind.damage);
+        }
+      case 'nightblood':
+        final before = k.hp;
+        k.hp = math.min(maxHp(k), k.hp + (r.dealt * .25).round());
+        r.artHeal = k.hp - before;
+        if (r.artHeal > 0) _note('You drink deep: +${r.artHeal} HP.', EntryKind.good);
+      case 'moonfang':
+        if (state.foeHp > 0) {
+          state
+            ..foeBleed = math.max(state.foeBleedTurns > 0 ? state.foeBleed : 0, math.max(1, (base * .12).round()))
+            ..foeBleedTurns = bleedTurns;
+          _note('$foeName is torn open, and bleeds.', EntryKind.damage);
+        }
+      case 'silverleaf':
+        state.foeWeakened = math.max(state.foeWeakened, 3);
+      case 'faceless':
+        state.foeExposed = math.max(state.foeExposed, 3);
+      case 'sunscale':
+        if (!foe.venomous && foe.element != 'poison') state.foeVenom += 2;
+      case 'tidecaller':
+        state.foeSlowed = math.max(state.foeSlowed, 3);
+      case 'changeling':
+        extra((base * .4).round());
+      case 'skyborn':
+        extra((base * (foe.aloft ? .5 : .2)).round());
+      case 'drakesworn':
+        extra((base * .3 * elementEdgeOn(foe, 'burn')).round());
+      default:
+        break;
+    }
+    if (r.artHit > 0) _note('${art.skill}: +${r.artHit} more.', EntryKind.damage);
   }
 
   /// What a special shot leaves behind: a burning shot sets the foe ablaze, a venom shot adds a
@@ -2155,7 +2213,7 @@ class GameEngine {
       _note(text);
     }
 
-    if (bashed && (!foe.boss || _rng.nextBool())) {
+    if (bashed && (!foe.boss || suitWorn(k) == 'deepforge' || _rng.nextBool())) {
       r.stunned = true;
       spared(Guard.stunned, '$foeName is seeing stars and can\'t hit back.');
       return;

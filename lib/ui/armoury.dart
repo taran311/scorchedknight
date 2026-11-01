@@ -11,7 +11,9 @@ import '../art/poses.dart';
 import '../art/rig.dart';
 import '../game/classes.dart';
 import '../game/loot.dart';
+import '../game/crafting.dart' show setPieceSlots;
 import '../game/models.dart';
+import '../game/rules.dart' show suitArts;
 import 'hero_view.dart';
 import 'theme.dart';
 
@@ -92,8 +94,52 @@ class ArmouryPreview extends StatelessWidget {
     );
   }
 
+  /// ?armoury&suits: every questline suit, all five pieces worn, with its two arts.
+  Widget _suits() {
+    final loot = LootTable(math.Random(4));
+    Widget suit(String id) {
+      final l = Loadout.starter(HeroClass.knight);
+      GearItem? ring;
+      for (final slot in setPieceSlots) {
+        final g = loot.setPiece(id, slot, HeroClass.knight, 40);
+        switch (slot) {
+          case GearSlot.armour:
+            l.armour = g.art;
+          case GearSlot.ring:
+            ring = g;
+          default:
+            l.put(g);
+        }
+      }
+      l.weapon = GearItem(id: 'w', name: 'w', slot: GearSlot.weapon, art: id == 'bushido' ? 'katana' : (id == 'drakesworn' ? 'wyrmblade' : 'longsword'), rarity: Rarity.epic, level: 40, heroClass: HeroClass.knight, value: 0, stats: const {});
+      final art = suitArts[id]!, set = gearSetById(id)!;
+      return Container(
+        margin: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          border: Border.all(color: Color(art.argb).withValues(alpha: .6)),
+          gradient: const RadialGradient(center: Alignment(0, .2), colors: [Color(0xFF6A5E52), Color(0xFF2A2420)]),
+        ),
+        child: Column(
+          children: [
+            Padding(padding: const EdgeInsets.only(top: 4), child: Text(set.name.toUpperCase(), style: Txt.label(size: 15, color: Color(art.argb), weight: FontWeight.w900))),
+            Expanded(child: HeroFigure(look: lookFor(HeroClass.knight, l, ring: ring))),
+            Text(armourTierById(l.armour).name, style: Txt.label(size: 11, color: Palette.cream)),
+            Text('${art.attack} · ${art.skill}', style: Txt.label(size: 11, color: Color(art.argb))),
+            Padding(padding: const EdgeInsets.only(bottom: 4), child: Text(art.desc, style: Txt.label(size: 10, color: Palette.parch2))),
+          ],
+        ),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF15100C),
+      body: GridView.count(crossAxisCount: int.tryParse(Uri.base.queryParameters['cols'] ?? '') ?? 6, childAspectRatio: .62, children: [for (final id in suitArts.keys) suit(id)]),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (Uri.base.queryParameters.containsKey('suits')) return _suits();
     if (Uri.base.queryParameters.containsKey('weapons')) return _allWeapons();
     if (Uri.base.queryParameters.containsKey('new')) return _newKit();
     final tiers = [for (final t in tiersFor(HeroClass.knight)) if (!t.dropOnly) t];
