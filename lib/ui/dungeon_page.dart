@@ -12,6 +12,7 @@ import '../game/controller.dart';
 import '../game/dungeons.dart';
 import '../game/rules.dart';
 import 'battle_screen.dart';
+import 'fill_column.dart';
 import 'hud.dart';
 import 'loot_window.dart';
 import 'theme.dart';
@@ -83,7 +84,7 @@ class _DungeonPageState extends State<DungeonPage> {
     builder: (context, _) {
       final s = c.state, d = c.dungeonNow;
       if (d == null) return const Scaffold(body: SizedBox.shrink());
-      final k = s.knight, col = Color(d.argb), cleared = c.dungeonCleared, doors = c.dungeonDoors;
+      final k = s.knight, col = Color(d.argb), cleared = c.dungeonCleared, doors = c.dungeonDoors, phone = isPhone(context);
       return MusicZone(
         track: 'travel',
         child: Scaffold(
@@ -91,14 +92,15 @@ class _DungeonPageState extends State<DungeonPage> {
             children: [
               SizedBox(height: MediaQuery.paddingOf(context).top),
               Expanded(
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(12, 12, 12, 20 + MediaQuery.paddingOf(context).bottom),
+                child: LayoutBuilder(builder: (context, viewport) {
+                  final pad = EdgeInsets.fromLTRB(12, 12, 12, (phone ? 12 : 20) + MediaQuery.paddingOf(context).bottom);
+                  return SingleChildScrollView(
+                  padding: pad,
                   child: RepaintBoundary(child: Center(
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 760),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
+                      // On a phone the wall grows to fill the screen, so the room feels like a room.
+                      child: fillOnPhone(phone, viewport.maxHeight - pad.vertical, [
                           Row(
                             children: [
                               InnBackButton(label: 'Map', icon: Icons.public, onPressed: () => Navigator.of(context).pop()),
@@ -108,10 +110,10 @@ class _DungeonPageState extends State<DungeonPage> {
                           ),
                           const SizedBox(height: 10),
                           // The wall and its doors (or, the boss down, the hoard).
-                          Stone(
+                          Grow(min: 250, max: 640, child: Stone(
                             padding: const EdgeInsets.all(3),
                             child: SizedBox(
-                              height: 250,
+                              height: phone ? null : 250,
                               child: Stack(
                                 children: [
                                   Positioned.fill(child: CustomPaint(painter: _WallPainter(colour: col, seed: s.dungeonRoom + d.id.length * 7, hoard: cleared))),
@@ -128,12 +130,16 @@ class _DungeonPageState extends State<DungeonPage> {
                                   if (!cleared && !s.inBattle)
                                     Positioned.fill(
                                       top: 30,
-                                      child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                        children: [
-                                          for (var i = 0; i < doors.length; i++) _Door(clue: doors[i], locked: doors[i] == DoorClue.locked && !s.dungeonKey, onTap: () => _open(i)),
-                                        ],
-                                      ),
+                                      // A taller wall (a phone with room to spare): bigger doors, so long as they fit side by side.
+                                      child: LayoutBuilder(builder: (context, box) {
+                                        final scale = math.min((box.maxHeight - 10) / 200, box.maxWidth / (doors.length * 122)).clamp(1.0, 1.6);
+                                        return Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                          children: [
+                                            for (var i = 0; i < doors.length; i++) _Door(clue: doors[i], locked: doors[i] == DoorClue.locked && !s.dungeonKey, onTap: () => _open(i), scale: scale),
+                                          ],
+                                        );
+                                      }),
                                     ),
                                   if (s.inBattle)
                                     Center(
@@ -142,7 +148,7 @@ class _DungeonPageState extends State<DungeonPage> {
                                 ],
                               ),
                             ),
-                          ),
+                          )),
                           const SizedBox(height: 8),
                           // The way you came.
                           SizedBox(height: 46, child: CustomPaint(painter: _PathPainter(path: [for (final p in s.dungeonPath) RoomKind.values.byName(p)], at: s.dungeonRoom, cleared: cleared, colour: col))),
@@ -181,11 +187,11 @@ class _DungeonPageState extends State<DungeonPage> {
                             tone: cleared ? ButtonTone.amber : ButtonTone.stone,
                             onPressed: s.inBattle ? null : _leave,
                           ),
-                        ],
-                      ),
+                      ]),
                     ),
                   )),
-                ),
+                );
+                }),
               ),
             ],
           ),
@@ -197,10 +203,13 @@ class _DungeonPageState extends State<DungeonPage> {
 
 /// One door: an arched oak door in the wall, with what you can hear or see from behind it.
 class _Door extends StatefulWidget {
-  const _Door({required this.clue, required this.locked, required this.onTap});
+  const _Door({required this.clue, required this.locked, required this.onTap, this.scale = 1});
   final DoorClue clue;
   final bool locked;
   final VoidCallback onTap;
+
+  /// Bigger in a taller wall.
+  final double scale;
 
   @override
   State<_Door> createState() => _DoorState();
@@ -235,7 +244,7 @@ class _DoorState extends State<_Door> with SingleTickerProviderStateMixin {
               children: [
                 AnimatedBuilder(
                   animation: _glow,
-                  builder: (context, child) => CustomPaint(size: Size(boss ? 150 : 104, 168), painter: _DoorPainter(clue: widget.clue, locked: widget.locked, pulse: _glow.value, lit: _hover)),
+                  builder: (context, child) => CustomPaint(size: Size((boss ? 150 : 104) * widget.scale, 168 * widget.scale), painter: _DoorPainter(clue: widget.clue, locked: widget.locked, pulse: _glow.value, lit: _hover)),
                 ),
                 const SizedBox(height: 2),
                 Text(widget.clue.label, style: Txt.label(size: 14, color: widget.locked ? Palette.parch2 : Palette.cream)),

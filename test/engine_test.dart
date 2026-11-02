@@ -548,6 +548,26 @@ void main() {
     expect(gold, lessThan(6000));
   });
 
+  test('combat feats: earned in the fight, told once, then claimable', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(5));
+    final s = e.state;
+    for (var i = 0; i < 20 && !s.inBattle; i++) {
+      e.explore();
+    }
+    expect(s.inBattle, isTrue);
+    // One blow finishes it, before it can hit back: untouched and swift.
+    s.foeHp = 1;
+    e.takeTurn(BattleAction.attack);
+    expect(s.inBattle, isFalse);
+    expect(s.did, containsAll(['feat:untouched', 'feat:swift']));
+    expect(e.taskDone(taskById('feat:untouched')!), isTrue);
+    expect(e.taskDone(taskById('feat:flawless')!), isFalse, reason: 'not a boss');
+    expect(e.claimTask('feat:untouched'), isNotNull);
+    expect(featTasks.map((t) => t.id).toSet().length, featTasks.length);
+    final gold = featTasks.fold<int>(0, (n, t) => n + t.reward.gold);
+    expect(gold, lessThan(15000));
+  });
+
   test('bolts can be swapped any time, plain ones in between', () {
     final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(2));
     final k = e.state.knight;

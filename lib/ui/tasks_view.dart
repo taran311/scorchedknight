@@ -12,6 +12,9 @@ import 'theme.dart';
 
 const _taskGold = Color(0xFFF2C14E);
 
+/// The feat tiers' colours, easy to master.
+const _tierColours = [Color(0xFFB8A27A), Color(0xFF9BE27A), Color(0xFF6AC0E8), Color(0xFFC8A0F0), Color(0xFFFF8A3A)];
+
 /// What a task pays, as icons and numbers.
 class TaskRewardChips extends StatelessWidget {
   const TaskRewardChips({super.key, required this.controller, required this.reward, this.size = 14});
@@ -20,9 +23,16 @@ class TaskRewardChips extends StatelessWidget {
   final double size;
 
   Widget _bit(Widget icon, String text) => Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [icon, const SizedBox(width: 3), Text(text, style: Txt.label(size: size - 1, color: Palette.cream))],
-      );
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      icon,
+      const SizedBox(width: 3),
+      Text(
+        text,
+        style: Txt.label(size: size - 1, color: Palette.cream),
+      ),
+    ],
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -84,13 +94,22 @@ class TaskCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(done ? 'TASK DONE${more > 0 ? ' · +$more more' : ''}' : 'TASK', style: Txt.label(size: 11, color: done ? _taskGold : Palette.parch2)),
-                Text(t.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.label(size: 14.5, color: Palette.cream, weight: FontWeight.w800)),
+                Text(
+                  t.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Txt.label(size: 14.5, color: Palette.cream, weight: FontWeight.w800),
+                ),
                 const SizedBox(height: 2),
                 TaskRewardChips(controller: c, reward: t.reward, size: 13),
               ],
             ),
           ),
-          if (done) SizedBox(width: 88, child: StoneButton(title: 'Claim', compact: true, tone: ButtonTone.amber, onPressed: () => _claim(context, c, t))),
+          if (done)
+            SizedBox(
+              width: 88,
+              child: StoneButton(title: 'Claim', compact: true, tone: ButtonTone.amber, onPressed: () => _claim(context, c, t)),
+            ),
         ],
       ),
     );
@@ -123,6 +142,14 @@ class TaskList extends StatelessWidget {
           Text('Wear all five pieces of a suit once', style: Txt.onStone(size: 12)),
           const SizedBox(height: 6),
           for (final t in suitTasks) _row(c, t),
+          const SizedBox(height: 12),
+          Text('Combat feats · ${featTasks.where((t) => s.tasksClaimed.contains(t.id)).length} / ${featTasks.length}', style: Txt.label(size: 15, color: Palette.amber)),
+          Text('Ways of winning, not just winning: done in the fight itself', style: Txt.onStone(size: 12)),
+          for (var tier = 0; tier < featTiers.length; tier++) ...[
+            const SizedBox(height: 8),
+            Text(featTiers[tier].toUpperCase(), style: Txt.label(size: 12, color: _tierColours[tier])),
+            for (final t in featTasks.where((t) => t.tier == tier)) _row(c, t),
+          ],
         ],
       ),
     );
@@ -137,14 +164,21 @@ class TaskList extends StatelessWidget {
           opacity: got ? .45 : 1,
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 4),
-            decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Colors.black.withValues(alpha: .35)))),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: Colors.black.withValues(alpha: .35))),
+            ),
             child: Row(
               children: [
                 Icon(got ? Icons.check_circle : (done ? Icons.check_circle_outline : Icons.radio_button_unchecked), size: 18, color: got || done ? _taskGold : Palette.stone3),
                 const SizedBox(width: 8),
-                Expanded(child: Text(t.title, style: Txt.onStone(size: 14, color: Palette.cream))),
+                Expanded(
+                  child: Text(t.title, style: Txt.onStone(size: 14, color: Palette.cream)),
+                ),
                 if (done && !got)
-                  SizedBox(width: 80, child: StoneButton(title: 'Claim', compact: true, tone: ButtonTone.amber, onPressed: () => _claim(context, c, t)))
+                  SizedBox(
+                    width: 80,
+                    child: StoneButton(title: 'Claim', compact: true, tone: ButtonTone.amber, onPressed: () => _claim(context, c, t)),
+                  )
                 else
                   TaskRewardChips(controller: c, reward: t.reward, size: 12),
               ],

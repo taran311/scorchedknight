@@ -20,6 +20,7 @@ import '../game/rules.dart';
 import '../audio/audio.dart';
 import 'battle_screen.dart';
 import 'encounter_window.dart';
+import 'fill_column.dart';
 import 'hud.dart';
 import 'item_icons.dart';
 import 'stat_icons.dart' show InfoChip;
@@ -84,14 +85,15 @@ class _TrailPageState extends State<TrailPage> {
           children: [
             SizedBox(height: MediaQuery.paddingOf(context).top),
             Expanded(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.fromLTRB(12, 12, 12, 16 + MediaQuery.paddingOf(context).bottom),
+              child: LayoutBuilder(builder: (context, viewport) {
+                final pad = EdgeInsets.fromLTRB(12, 12, 12, 16 + MediaQuery.paddingOf(context).bottom);
+                return SingleChildScrollView(
+                padding: pad,
                 child: RepaintBoundary(child: Center(
                   child: ConstrainedBox(
                     constraints: BoxConstraints(maxWidth: fitWidth(context, aspect: 1000 / 530, below: 330)),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
+                    // On a phone the page reaches the bottom of the screen: the last card grows.
+                    child: fillOnPhone(phone, viewport.maxHeight - pad.vertical, [
                         // On a phone: you, the land's name and the way back above the scene, not on it.
                         if (phone) ...[
                           Row(
@@ -227,12 +229,12 @@ class _TrailPageState extends State<TrailPage> {
                         ] else
                           _NextStop(controller: c, land: land, onGo: _go),
                         const SizedBox(height: 10),
-                        _Lurking(controller: c, land: land),
-                      ],
-                    ),
+                        Grow(child: _Lurking(controller: c, land: land)),
+                    ]),
                   ),
                 )),
-              ),
+              );
+              }),
             ),
           ],
         ),

@@ -14,6 +14,7 @@ import '../game/models.dart';
 import '../game/rules.dart';
 import '../game/wilds.dart';
 import 'battle_screen.dart';
+import 'fill_column.dart';
 import 'hud.dart';
 import '../game/loot.dart';
 import 'hero_view.dart';
@@ -144,22 +145,23 @@ class _WildsPageState extends State<WildsPage> {
             children: [
               SizedBox(height: MediaQuery.paddingOf(context).top),
               Expanded(
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(12, 12, 12, 20 + MediaQuery.paddingOf(context).bottom),
+                child: LayoutBuilder(builder: (context, viewport) {
+                  final pad = EdgeInsets.fromLTRB(12, 12, 12, 20 + MediaQuery.paddingOf(context).bottom);
+                  return SingleChildScrollView(
+                  padding: pad,
                   child: RepaintBoundary(child: Center(
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 760),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
+                      // Out on a trip on a phone, the trail grows to fill the screen.
+                      child: fillOnPhone(isPhone(context) && a != null, viewport.maxHeight - pad.vertical, [
                           Align(alignment: Alignment.centerLeft, child: (widget.fromTown ? InnBackButton(label: 'Town', onPressed: () => Navigator.of(context).pop()) : InnBackButton(label: 'Map', icon: Icons.public, onPressed: () => Navigator.of(context).pop()))),
                           const SizedBox(height: 10),
-                          a == null ? _picker() : _trip(a),
-                        ],
-                      ),
+                          if (a == null) _picker() else ..._trip(a),
+                      ]),
                     ),
                   )),
-                ),
+                );
+                }),
               ),
             ],
           ),
@@ -197,18 +199,18 @@ class _WildsPageState extends State<WildsPage> {
 
   // ---------------- out in the wilds ----------------
 
-  Widget _trip(int a) {
+  List<Widget> _trip(int a) {
     final s = c.state, area = wildAreas[a], k = s.knight, col = Color(area.argb), d = s.wildDepth, e = c.wildEvent;
     final next = nextWaystone(d), at = isWaystone(d);
     final log = s.journal.length > _logFrom ? s.journal.sublist(_logFrom) : const <JournalEntry>[];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // Where you are: the path behind you, the waystones ahead, fog over the rest.
-        Stone(
+    final phone = isPhone(context);
+    return [
+        // Where you are: the path behind you, the waystones ahead, fog over the rest (on a phone,
+        // taller when there's room).
+        Grow(min: 170, max: 340, child: Stone(
           padding: const EdgeInsets.all(3),
           child: SizedBox(
-            height: 170,
+            height: phone ? null : 170,
             child: Stack(
               children: [
                 Positioned.fill(child: CustomPaint(painter: _PathPainter(depth: d, colour: col, best: s.wildBest[a] ?? 0, alert: s.wildAlert))),
@@ -257,7 +259,7 @@ class _WildsPageState extends State<WildsPage> {
               ],
             ),
           ),
-        ),
+        )),
         const SizedBox(height: 10),
         // What to do next, right under the trail: press on, or head for home.
         _actions(),
@@ -351,8 +353,7 @@ class _WildsPageState extends State<WildsPage> {
             ),
           ),
         ],
-      ],
-    );
+    ];
   }
 
   Widget _actions() {

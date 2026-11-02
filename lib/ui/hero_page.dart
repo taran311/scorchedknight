@@ -15,6 +15,7 @@ import '../game/models.dart' show Knight;
 import '../game/mounts.dart';
 import '../game/rules.dart';
 import '../game/spells.dart';
+import 'fill_column.dart';
 import 'hero_view.dart';
 import 'item_icons.dart';
 import 'journal_panel.dart' show fmt;
@@ -51,15 +52,15 @@ class _HeroPageState extends State<HeroPage> {
       (_Tab.journey, Icons.map, c.tasksReady > 0 ? 'Journey · ${c.tasksReady}' : 'Journey'),
     ];
     final tab = tabs.any((t) => t.$1 == _tab) ? _tab : _Tab.gear;
-    return SingleChildScrollView(
-      // (Clear of the phone's navigation bar at the bottom.)
-      padding: EdgeInsets.fromLTRB(12, 8, 12, 24 + MediaQuery.paddingOf(context).bottom),
+    // (Clear of the phone's navigation bar at the bottom.)
+    final phone = isPhone(context), pad = EdgeInsets.fromLTRB(12, 8, 12, (phone ? 12 : 24) + MediaQuery.paddingOf(context).bottom);
+    return LayoutBuilder(builder: (context, viewport) => SingleChildScrollView(
+      padding: pad,
       child: RepaintBoundary(child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 820),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+          // On a phone the tab's card reaches the bottom of the screen.
+          child: fillOnPhone(phone, viewport.maxHeight - pad.vertical, [
               if (c.nextLoot != null) ...[
                 _LootBanner(controller: c),
                 const SizedBox(height: 10),
@@ -77,15 +78,8 @@ class _HeroPageState extends State<HeroPage> {
                 ],
               ),
               const SizedBox(height: 8),
-              switch (tab) {
-                _Tab.gear => Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (unspentPoints(k) > 0) ...[_Training(controller: c), const SizedBox(height: 10)],
-                    _PaperDoll(controller: c),
-                    if (unspentPoints(k) == 0) ...[const SizedBox(height: 10), _Training(controller: c)],
-                  ],
-                ),
+              if (tab == _Tab.gear) _gear(c, k) else Grow(child: switch (tab) {
+                _Tab.gear => const SizedBox(),
                 _Tab.rites => _Spellbook(controller: c),
                 _Tab.companions => Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -97,13 +91,21 @@ class _HeroPageState extends State<HeroPage> {
                 _Tab.satchel => _Satchel(controller: c),
                 _Tab.home => _Home(controller: c),
                 _Tab.journey => _Journey(controller: c),
-              },
-            ],
-          ),
+              }),
+            ]),
         ),
       )),
-    );
+    ));
   }
+
+  Widget _gear(GameController c, Knight k) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      if (unspentPoints(k) > 0) ...[_Training(controller: c), const SizedBox(height: 10)],
+      _PaperDoll(controller: c),
+      if (unspentPoints(k) == 0) ...[const SizedBox(height: 10), _Training(controller: c)],
+    ],
+  );
 }
 
 class _TabButton extends StatelessWidget {
@@ -148,6 +150,9 @@ class _PaperDoll extends StatelessWidget {
     final c = controller, s = c.state, k = s.knight, tier = armourTierById(k.armour), h = heroStats(k), ds = dragonStage(k);
     // (Tighter on a phone, so the knight, the slots and the totals fit one screen.)
     final phone = isPhone(context), box = phone ? 56.0 : 68.0;
+    // A taller phone: a taller knight and the slots spread to match, so the page reaches the
+    // bottom of the screen rather than stopping two-thirds down.
+    final mq = MediaQuery.of(context), tall = phone ? (mq.size.height - mq.padding.vertical - 700).clamp(0.0, 170.0) : 0.0;
     Widget slot(GearSlot gs, String empty) {
       final g = k.equipped(gs);
       final idle = gs == GearSlot.offhand && g != null && k.loadout.activeOffhand == null;
@@ -207,7 +212,7 @@ class _PaperDoll extends StatelessWidget {
       OffhandKind.wand => 'Wand',
       null => 'Off-hand',
     };
-    Widget column(List<Widget> slots) => Column(children: [for (final (i, w) in slots.indexed) ...[if (i > 0) SizedBox(height: phone ? 4 : 10), w]]);
+    Widget column(List<Widget> slots) => Column(children: [for (final (i, w) in slots.indexed) ...[if (i > 0) SizedBox(height: phone ? 4 + tall / 4 : 10), w]]);
 
     // The totals as chips: a symbol and a number, the name in the tooltip.
     final chip = ds == null || ds.chip == 0 ? 0 : ds.chip + k.level ~/ 5 + h.dragonkin;
@@ -246,7 +251,7 @@ class _PaperDoll extends StatelessWidget {
                   children: [
                     Text(s.settings.name, style: Txt.label(size: 20, color: Palette.cream, weight: FontWeight.w800)),
                     Text('Level ${k.level} knight', style: Txt.label(size: 13, color: Palette.amber)),
-                    SizedBox(height: phone ? 220 : 300, child: HeroFigure(look: heroLook(k))),
+                    SizedBox(height: phone ? 220 + tall : 300, child: HeroFigure(look: heroLook(k))),
                     // The armour you wear, under your feet.
                     Tooltip(
                       message: '${tier.name}: −${(tier.reduction * 100).round()}% damage taken${k.loadout.armourEnchant == null ? '' : ' · ${k.loadout.armourEnchant!.title}: ${k.loadout.armourEnchant!.describe}'}',
@@ -586,10 +591,10 @@ class _Satchel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 6),
-          if (k.stash.isEmpty)
-            Text('Empty', style: Txt.onStone(size: 13))
-          else
-            Wrap(
+          // The chest as its slots, filled or not, like a bag in any RPG, spread across the card.
+          LayoutBuilder(builder: (context, box) {
+            final cols = ((box.maxWidth + 6) / 70).floor().clamp(4, 12), cell = (box.maxWidth - (cols - 1) * 6) / cols;
+            return Wrap(
               spacing: 6,
               runSpacing: 6,
               children: [
@@ -601,8 +606,8 @@ class _Satchel extends StatelessWidget {
                       child: MouseRegion(
                         cursor: SystemMouseCursors.click,
                         child: Container(
-                          width: 60,
-                          height: 60,
+                          width: cell,
+                          height: cell,
                           decoration: BoxDecoration(
                             gradient: const RadialGradient(colors: [Color(0xFF3A3128), Color(0xFF15110C)]),
                             border: Border.all(color: rarityColour(g.rarity), width: 1.5),
@@ -619,8 +624,15 @@ class _Satchel extends StatelessWidget {
                       ),
                     ),
                   ),
+                for (var i = k.stash.length; i < c.stashCap; i++)
+                  Container(
+                    width: cell,
+                    height: cell,
+                    decoration: BoxDecoration(color: const Color(0x33000000), border: Border.all(color: Palette.stone3.withValues(alpha: .6)), borderRadius: BorderRadius.circular(5)),
+                  ),
               ],
-            ),
+            );
+          }),
           const Divider(color: Palette.stone3, height: 22),
           group('Belt', belt, ''),
           group('For the forge and the tower', craft, 'Nothing yet'),
@@ -676,7 +688,44 @@ class _Spellbook extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = controller, k = c.state.knight;
     final list = [...spells]..sort((a, b) => a.level.compareTo(b.level));
-    return Stone(
+    // Your hotbar, each rite with what it does (on a phone there's no pointer to hover for it).
+    final hotbar = [
+      const Divider(color: Palette.stone3, height: 18),
+      Text('YOUR HOTBAR', style: Txt.label(size: 12, color: Palette.amber)),
+      for (var i = 0; i < riteSlots; i++)
+        Builder(builder: (context) {
+          final sp = i < k.rites.length ? spells.where((x) => x.id == k.rites[i]).firstOrNull : null, col = sp == null ? Palette.stone3 : Color(sp.argb);
+          return Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(color: Palette.stone0, borderRadius: BorderRadius.circular(4), border: Border.all(color: col, width: sp == null ? 1 : 2)),
+                  child: sp == null ? Center(child: Text('${i + 1}', style: Txt.label(size: 15, color: Palette.parch2))) : Icon(Icons.local_fire_department, size: 26, color: col),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: sp == null
+                      ? Text('Empty · tap a rite above', style: Txt.onStone(size: 13))
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(sp.name, style: Txt.label(size: 14.5, color: Palette.cream, weight: FontWeight.w800)),
+                            Text(sp.desc, maxLines: 2, overflow: TextOverflow.ellipsis, style: Txt.onStone(size: 12.5)),
+                          ],
+                        ),
+                ),
+                if (sp != null)
+                  for (var j = 0; j < sp.cost; j++)
+                    Container(width: 7, height: 7, margin: const EdgeInsets.only(left: 3), decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF6AC8FF))),
+              ],
+            ),
+          );
+        }),
+    ];
+    return LayoutBuilder(builder: (context, room) => Stone(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -783,9 +832,12 @@ class _Spellbook extends StatelessWidget {
               );
             },
           ),
+          // Given the room (a tall phone): the hotbar sits at the foot of the card.
+          if (room.hasBoundedHeight) const Spacer(),
+          ...hotbar,
         ],
       ),
-    );
+    ));
   }
 }
 
@@ -987,7 +1039,47 @@ class _Home extends StatelessWidget {
         ],
       ),
     );
-    return Column(
+    // The way up, tent to keep: what each gives, built or not. Last, so on a tall phone it takes
+    // the room that's left (given a height, it spreads out to fill it).
+    const extras = ['a campfire', 'a herb garden', 'an armoury'], icons = [Icons.holiday_village, Icons.cottage, Icons.castle];
+    final ladder = Stone(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          Text('THE WAY UP', style: Txt.label(size: 12, color: Palette.amber)),
+          for (final (i, h) in homes.indexed)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Opacity(
+                opacity: i <= s.home ? 1 : .55,
+                child: Row(
+                  children: [
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(color: Palette.stone0, borderRadius: BorderRadius.circular(4), border: Border.all(color: i == s.home ? Palette.amber : Palette.stone3, width: i == s.home ? 2 : 1)),
+                      child: Icon(icons[i], size: 32, color: i <= s.home ? Palette.amber : Palette.parch2),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(h.name, style: Txt.label(size: 16, color: Palette.cream, weight: FontWeight.w800)),
+                          Text('${h.chest}-piece chest · ${extras[i]}', style: Txt.onStone(size: 13)),
+                        ],
+                      ),
+                    ),
+                    Icon(i <= s.home ? Icons.check_circle : (i == s.home + 1 ? Icons.arrow_upward : Icons.lock), color: i <= s.home ? const Color(0xFF9BE27A) : Palette.parch2, size: 22),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+    return LayoutBuilder(builder: (context, box) => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Stone(
@@ -1084,8 +1176,10 @@ class _Home extends StatelessWidget {
             ),
           ),
         ],
+        const SizedBox(height: 10),
+        if (box.hasBoundedHeight) Expanded(child: ladder) else ladder,
       ],
-    );
+    ));
   }
 }
 

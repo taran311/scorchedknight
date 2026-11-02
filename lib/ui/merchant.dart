@@ -823,8 +823,10 @@ Future<void> _showShop(BuildContext context, GameController c, {required String 
       constraints: const BoxConstraints(maxWidth: 480),
       child: Stone(
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+        // On a phone the shop takes the whole screen, the same size whichever section is open
+        // (no jumping about as you switch), with Done always at the foot.
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: isPhone(context) ? MainAxisSize.max : MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
@@ -883,6 +885,7 @@ Future<void> _showShop(BuildContext context, GameController c, {required String 
             ),
             const SizedBox(height: 4),
             Flexible(
+              fit: isPhone(context) ? FlexFit.tight : FlexFit.loose,
               child: SingleChildScrollView(
                 key: ValueKey(tab),
                 child: RepaintBoundary(child: ListenableBuilder(listenable: c, builder: (context, _) => wares(tab))),

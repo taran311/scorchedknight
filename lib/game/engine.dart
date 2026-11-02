@@ -263,6 +263,10 @@ class GameEngine {
 
   /// The bolt just loosed brought the foe down (see [cleanKillGold]); and the special bolt it was.
   bool _cleanKill = false;
+
+  /// This fight so far, for the combat feats: hits taken, potions drunk, rites cast and bolts
+  /// shot. A fight picked up again after the game was closed counts as already hurt (unknown).
+  int _fightHits = 1, _fightPotions = 0, _fightRites = 0, _fightBolts = 0;
   AmmoType? _cleanBolt;
   final LootTable loot;
 
@@ -1420,6 +1424,10 @@ class GameEngine {
 
   void _begin(int foe, Rare? rare, {int above = 0}) {
     final k = state.knight, level = foeLevelFor(realmAt(rare?.base ?? foe), k.level) + above;
+    _fightHits = 0;
+    _fightPotions = 0;
+    _fightRites = 0;
+    _fightBolts = 0;
     state
       ..inBattle = true
       ..foe = foe
@@ -1676,6 +1684,8 @@ class GameEngine {
     // The full Changeling set: a change of style lands harder.
     final adapted = style != null && state.lastStyle != null && style.name != state.lastStyle && activeSets(k.setGear).any((e) => e.$1.adapt && e.$2 >= e.$1.full);
     if (style != null) state.lastStyle = style.name;
+    if (style == AttackStyle.rite) _fightRites++;
+    if (style == AttackStyle.bolt) _fightBolts++;
     final edge = triangle(foe.kind, style) * (braced ? mimicBrace : 1);
     final cape = k.loadout.cape?.special;
     final bash = action == BattleAction.skill;
@@ -1705,6 +1715,7 @@ class GameEngine {
       case BattleAction.potion:
         k.potions--;
         state.potionsDrunk++;
+        _fightPotions++;
         final before = k.hp;
         k.hp = math.min(maxHp(k), k.hp + potionHeal(k));
         r.potion = k.hp - before;
@@ -2290,6 +2301,7 @@ class GameEngine {
         r.reflected = full;
       }
       k.hp = math.max(0, k.hp - hurt);
+      if (hurt > 0) _fightHits++;
       if (blocked && k.hp > 0 && activeSets(k.setGear).any((e) => e.$1.forgeheart && e.$2 >= e.$1.full)) {
         // Deepforge: the block rings like an anvil, and you feel it in your bones.
         final before = k.hp;
@@ -2680,6 +2692,7 @@ class GameEngine {
     }
     state.foesFelled++;
     if (rare != null) state.raresFelled++;
+    _feats(f, rare, c, clean);
     final won = firstBoss && c == mainLands - 1;
     // The Ashen Order, Ravenmoor's vampires and the Weald's werewolves leave trophies, and now and
     // then a blueprint for their set (their bosses and Sir Malric always leave one you lack).
@@ -3641,6 +3654,37 @@ class GameEngine {
 
   /// Notes a first that the tasks look for (see GameState.did).
   void mark(String what) => state.did.add(what);
+
+  /// The combat feats this win earned (see featTasks), each marked and told once.
+  void _feats(FoeType f, Rare? rare, int c, bool clean) {
+    final k = state.knight, s = state, turns = s.turn, boss = f.boss && rare == null, risen = boss && s.heroicFight;
+    final king = boss && !s.wildFight && !risen && c == mainLands - 1, untouched = _fightHits == 0, dry = _fightPotions == 0, last = s.lastStyle;
+    final over = s.foeLevel - k.level;
+    final earned = <String>[
+      if (untouched) 'untouched',
+      if (turns <= 2) 'swift',
+      if (clean) 'clean',
+      if (rare?.pack == true) 'pack',
+      if (boss && dry) 'dry',
+      if (boss && turns <= 6) 'bossSwift',
+      if (boss && last == AttackStyle.rite.name) 'riteBoss',
+      if (boss && last == AttackStyle.bolt.name) 'boltBoss',
+      if (over >= 3) 'over3',
+      if (boss && dry && _fightRites == 0 && _fightBolts == 0) 'bladeBoss',
+      if (boss && untouched) 'flawless',
+      if (over >= 6) 'over6',
+      if (k.hp > 0 && k.hp < maxHp(k) / 10) 'brink',
+      if (risen && dry) 'risenDry',
+      if (risen && untouched) 'risenFlawless',
+      if (king && dry) 'kingDry',
+      if (king && turns <= 10) 'kingSwift',
+      if (king && untouched) 'kingFlawless',
+      if (king && s.ng > 0) 'ngKing',
+    ];
+    for (final id in earned) {
+      if (s.did.add('feat:$id')) _note('Combat feat: ${taskById('feat:$id')?.title ?? id}!', EntryKind.gold);
+    }
+  }
 
   /// Whether task [t] is done (a region task: whether its region is cleared).
   bool taskDone(GameTask t) => t.land != null ? landCleared(t.land!) : t.done(state);

@@ -19,7 +19,7 @@ class TaskReward {
 }
 
 class GameTask {
-  const GameTask(this.id, this.title, this.done, this.reward, {this.land});
+  const GameTask(this.id, this.title, this.done, this.reward, {this.land, this.tier});
   final String id, title;
   final bool Function(GameState s) done;
   final TaskReward reward;
@@ -28,6 +28,10 @@ class GameTask {
   /// GameEngine.landCleared), for the region tasks. Those are never offered as "next": you clear
   /// regions in your own order; they turn up to claim once done.
   final int? land;
+
+  /// A combat feat's tier (0 easy … 4 master): a feat is done in a fight, not asked of you, so,
+  /// like a region, it only turns up on the square once you've done it.
+  final int? tier;
 }
 
 /// The tasks, easiest first. Rewards are kept small on purpose: a nudge to try something, not a
@@ -78,6 +82,42 @@ final suitTasks = <GameTask>[
     GameTask('suit:$id', 'Wear the whole ${gearSets.firstWhere((g) => g.id == id).name}', (s) => s.did.contains('suit:$id') || suitWorn(s.knight) == id, const TaskReward(gold: 250, scrolls: 1)),
 ];
 
-final allTasks = [...gameTasks, ...regionTasks, ...suitTasks];
+/// Combat feats, like a combat achievement list: a way of winning a fight, not just winning it.
+/// Done in the fight itself (the engine marks 'feat:id' as it happens) or read from the save.
+const featTiers = ['Easy', 'Medium', 'Hard', 'Elite', 'Master'];
+const _featGold = [50, 150, 400, 800, 1500];
+
+GameTask _feat(int tier, String id, String title, {bool Function(GameState s)? by, int keys = 0}) =>
+    GameTask('feat:$id', title, by ?? (s) => s.did.contains('feat:$id'), TaskReward(gold: _featGold[tier], keys: keys), tier: tier);
+
+final featTasks = <GameTask>[
+  _feat(0, 'untouched', 'Win a fight without taking a hit'),
+  _feat(0, 'swift', 'Win a fight in 2 turns or fewer'),
+  _feat(0, 'clean', 'Make a clean kill with the crossbow'),
+  _feat(0, 'rare', 'Defeat a rare foe', by: (s) => s.raresFelled >= 1),
+  _feat(0, 'pack', 'Defeat a pack'),
+  _feat(0, 'dry', 'Beat a boss without drinking a potion'),
+  _feat(1, 'bossSwift', 'Beat a boss in 6 turns or fewer'),
+  _feat(1, 'riteBoss', 'Finish a boss with a rite'),
+  _feat(1, 'boltBoss', 'Finish a boss with a crossbow bolt'),
+  _feat(1, 'over3', 'Defeat a foe 3 levels above you'),
+  _feat(1, 'rares10', 'Defeat 10 rare foes', by: (s) => s.raresFelled >= 10),
+  _feat(1, 'wilds10', 'Reach step 10 in the Wilds', by: (s) => s.wildBest.values.any((d) => d >= 10)),
+  _feat(2, 'bladeBoss', 'Beat a boss with your blade alone (no rites, bolts or potions)', keys: 1),
+  _feat(2, 'flawless', 'Beat a boss without taking a hit', keys: 1),
+  _feat(2, 'over6', 'Defeat a foe 6 levels above you', keys: 1),
+  _feat(2, 'brink', 'Win a fight with less than a tenth of your HP left', keys: 1),
+  _feat(2, 'risenDry', 'Beat a risen boss without drinking a potion', keys: 1),
+  _feat(2, 'wilds25', 'Reach step 25 in the Wilds', by: (s) => s.wildBest.values.any((d) => d >= 25), keys: 1),
+  _feat(3, 'risenFlawless', 'Beat a risen boss without taking a hit', keys: 1),
+  _feat(3, 'kingDry', 'Slay the Ember King without drinking a potion', keys: 1),
+  _feat(3, 'kingSwift', 'Slay the Ember King in 10 turns or fewer', keys: 1),
+  _feat(3, 'rares100', 'Defeat 100 rare foes', by: (s) => s.raresFelled >= 100, keys: 1),
+  _feat(4, 'kingFlawless', 'Slay the Ember King without taking a hit', keys: 2),
+  _feat(4, 'allRisen', 'Beat every risen boss on the road', by: (s) => s.risenDown.where((c) => c < mainLands).length >= mainLands, keys: 2),
+  _feat(4, 'ngKing', 'Slay the Ember King on New Game+', keys: 2),
+];
+
+final allTasks = [...gameTasks, ...regionTasks, ...suitTasks, ...featTasks];
 
 GameTask? taskById(String id) => allTasks.where((t) => t.id == id).firstOrNull;

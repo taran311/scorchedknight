@@ -33,12 +33,18 @@ Future<void> main() async {
     Audio.unlock();
     return false;
   });
-  // Phones: dark status and navigation bars to match the game.
+  // Phones: the game drawn edge to edge, under clear status and navigation bars with light icons
+  // (no grey see-through band behind the buttons). The app itself keeps every screen above the
+  // navigation bar: see the SafeArea in the app's builder.
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Color(0x00000000),
     statusBarIconBrightness: Brightness.light,
-    systemNavigationBarColor: Color(0xFF14110D),
+    statusBarBrightness: Brightness.dark,
+    systemNavigationBarColor: Color(0x00000000),
+    systemNavigationBarDividerColor: Color(0x00000000),
     systemNavigationBarIconBrightness: Brightness.light,
+    systemNavigationBarContrastEnforced: false,
   ));
   // Cloud saves, if this build has Firebase set up (otherwise this quietly does nothing); and
   // every face of the game's fonts, fetched before the first frame. (They used to load as they
@@ -143,10 +149,20 @@ class _ScorchedKnightAppState extends State<ScorchedKnightApp> {
   Widget _app(BuildContext context) => MaterialApp(
     navigatorKey: _nav,
     title: 'Scorched Knight',
-    // Phones have no hover: every little tip in the game opens with a tap instead.
-    builder: (context, child) => isPhone(context)
-        ? TooltipTheme(data: TooltipTheme.of(context).copyWith(triggerMode: TooltipTriggerMode.tap, showDuration: const Duration(seconds: 3)), child: child!)
-        : child!,
+    builder: (context, child) {
+      // Phones have no hover: every little tip in the game opens with a tap instead.
+      final app = isPhone(context)
+          ? TooltipTheme(data: TooltipTheme.of(context).copyWith(triggerMode: TooltipTriggerMode.tap, showDuration: const Duration(seconds: 3)), child: child!)
+          : child!;
+      // Every screen, dialog and sheet ends flush on top of the phone's navigation bar (three
+      // buttons or the thin gesture bar alike, whatever height it is), never underneath it; the
+      // strip behind the bar is the game's own dark ground. The SafeArea takes the bar's height
+      // out of what each page sees, so no page pads for it twice.
+      return ColoredBox(
+        color: Palette.ground,
+        child: SafeArea(top: false, left: false, right: false, child: app),
+      );
+    },
     debugShowCheckedModeBanner: false,
     navigatorObservers: [townRoutes],
     theme: buildTheme(),

@@ -28,6 +28,7 @@ import '../game/models.dart';
 import '../game/rules.dart';
 import 'account_panel.dart';
 import 'cadence.dart';
+import 'fill_column.dart';
 import 'battle_screen.dart';
 import 'hero_page.dart';
 import 'class_picker.dart' show HeroOrHeroine;
@@ -43,6 +44,7 @@ import 'quest_dialog.dart';
 import '../services/cloud.dart';
 import 'theme.dart';
 import 'wilds_page.dart';
+import 'trail_data.dart' show trailAt;
 import 'trail_page.dart';
 
 class InnPage extends StatefulWidget {
@@ -119,6 +121,22 @@ class _InnPageState extends State<InnPage> with RouteAware {
 
   Future<void> _showStory() async {
     await showDialog<void>(context: context, builder: (_) => const _StoryWindow());
+  }
+
+  /// The next land on the road whose boss still stands (null: the road is done).
+  int? _roadLand() {
+    for (var i = 0; i < mainLands; i++) {
+      if (!c.state.bossesDown.contains(i)) return i;
+    }
+    return null;
+  }
+
+  /// Onto the road: straight to that land's trail when it's open, else the map (which says why not).
+  Future<void> _goRoad(int land) async {
+    if (c.state.inBattle) return _resume();
+    if (c.whyNotTravel(land) != null) return _openMap();
+    c.travel(land);
+    await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => TrailPage(controller: c, land: land)));
   }
 
   /// Talk to Hob: take his job, check on it, or hand it in.
@@ -200,14 +218,16 @@ class _InnPageState extends State<InnPage> with RouteAware {
           children: [
             SizedBox(height: MediaQuery.paddingOf(context).top),
             Expanded(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.fromLTRB(12, 12, 12, 20 + MediaQuery.paddingOf(context).bottom),
+              child: LayoutBuilder(builder: (context, viewport) {
+                final pad = EdgeInsets.fromLTRB(12, 12, 12, (phone ? 12 : 20) + MediaQuery.paddingOf(context).bottom);
+                return SingleChildScrollView(
+                padding: pad,
                 child: RepaintBoundary(child: Center(
                   child: ConstrainedBox(
                     constraints: BoxConstraints(maxWidth: fitWidth(context, aspect: 2, below: 230, chrome: 130)),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
+                    // On a phone the square fills the screen: the place buttons and the log grow
+                    // into whatever room the cards leave.
+                    child: fillOnPhone(phone, viewport.maxHeight - pad.vertical, [
                         if (phone) ...[
                           Row(
                             children: [
@@ -239,22 +259,29 @@ class _InnPageState extends State<InnPage> with RouteAware {
                         if (phone) ...[
                           const SizedBox(height: 8),
                           // The six places as big buttons under the scene, where thumbs reach.
-                          GridView.count(
-                            // (No padding: by default a grid pads itself by the phone's status and
-                            // navigation bars, which left big empty bands round the buttons on
-                            // Android.)
-                            padding: EdgeInsets.zero,
-                            crossAxisCount: 2,
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            mainAxisSpacing: 8,
-                            crossAxisSpacing: 8,
-                            // (Shorter on a phone, so the whole square fits the screen without scrolling.)
-                            childAspectRatio: 3.7,
-                            children: [
-                              for (final spot in const [TownSpot.gate, TownSpot.inn, TownSpot.stall, TownSpot.forge, TownSpot.enchanter, TownSpot.tent])
-                                _PlaceButton(icon: _TownSquareState._icons[spot]!, label: labels[spot]!, onTap: taps[spot], hot: spot == TownSpot.gate, accent: _placeAccent[spot], ready: (spot == TownSpot.forge && c.engine.forgeReady) || (spot == TownSpot.enchanter && c.engine.gemsWaiting)),
-                            ],
+                          // The six places, two to a row, taller when there's room.
+                          Grow(
+                            min: 3 * 50 + 16,
+                            max: 3 * 82 + 16,
+                            weight: 2,
+                            child: Column(
+                              children: [
+                                for (final (i, row) in const [[TownSpot.gate, TownSpot.inn], [TownSpot.stall, TownSpot.forge], [TownSpot.enchanter, TownSpot.tent]].indexed) ...[
+                                  if (i > 0) const SizedBox(height: 8),
+                                  Expanded(
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                                      children: [
+                                        for (final (j, spot) in row.indexed) ...[
+                                          if (j > 0) const SizedBox(width: 8),
+                                          Expanded(child: _PlaceButton(icon: _TownSquareState._icons[spot]!, label: labels[spot]!, onTap: taps[spot], hot: spot == TownSpot.gate, accent: _placeAccent[spot], ready: (spot == TownSpot.forge && c.engine.forgeReady) || (spot == TownSpot.enchanter && c.engine.gemsWaiting))),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
                           ),
                         ],
                         const SizedBox(height: 10),
@@ -265,6 +292,28 @@ class _InnPageState extends State<InnPage> with RouteAware {
                         // The Ember King is down: go round again, harder.
                         if (s.won) ...[
                           _NewGamePlusCard(controller: c),
+                          const SizedBox(height: 10),
+                        ],
+                        // Hob's job first: the story's quest outranks the side task below it.
+                        if (offered) ...[
+                          _TalkBanner(onTap: _talk),
+                          const SizedBox(height: 10),
+                        ],
+                        if (job) ...[
+                          _QuestCard(
+                            compact: phone,
+                            timber: s.timber,
+                            iron: s.ironScrap,
+                            ready: ready,
+                            onTap: ready ? _talk : _hunt,
+                            onOpen: _talk,
+                            nudge: ready || (s.wins[0] == 0 && s.timber == 0),
+                          ),
+                          const SizedBox(height: 10),
+                        ],
+                        // The road: the next land's boss, so there's always a way on.
+                        if (_roadLand() case final land? when !(job && land == 0)) ...[
+                          _RoadCard(controller: c, land: land, onGo: () => _goRoad(land)),
                           const SizedBox(height: 10),
                         ],
                         // The next task: something to try, and a little for trying it.
@@ -286,33 +335,17 @@ class _InnPageState extends State<InnPage> with RouteAware {
                           ),
                           const SizedBox(height: 10),
                         ],
-                        if (offered) ...[
-                          _TalkBanner(onTap: _talk),
-                          const SizedBox(height: 10),
-                        ],
-                        if (job) ...[
-                          _QuestCard(
-                            compact: phone,
-                            timber: s.timber,
-                            iron: s.ironScrap,
-                            ready: ready,
-                            onTap: ready ? _talk : _hunt,
-                            onOpen: _talk,
-                            nudge: ready || (s.wins[0] == 0 && s.timber == 0),
-                          ),
-                          const SizedBox(height: 10),
-                        ],
                         if (c.nextLoot != null) ...[
                           _Banner(icon: Icons.inventory_2, text: c.nextLoot!.name, button: 'Open', onTap: () => resolvePendingLoot(context, c)),
                           const SizedBox(height: 10),
                         ],
                         const SizedBox(height: 12),
-                        _LogPanel(entries: s.journal, onStory: _showStory),
-                      ],
-                    ),
+                        Grow(min: 56, weight: 3, child: _LogPanel(entries: s.journal, onStory: _showStory, fill: phone)),
+                    ]),
                   ),
                 )),
-              ),
+              );
+              }),
             ),
           ],
         ),
@@ -676,9 +709,13 @@ class _ActionTileState extends State<_ActionTile> {
 
 /// The adventure log, folded to its latest line until opened.
 class _LogPanel extends StatefulWidget {
-  const _LogPanel({required this.entries, required this.onStory});
+  const _LogPanel({required this.entries, required this.onStory, this.fill = false});
   final List<JournalEntry> entries;
   final VoidCallback onStory;
+
+  /// Given a set height (a phone's square): open, its latest lines filling the room, when there's
+  /// room for a line or two; folded to one line when there isn't.
+  final bool fill;
   @override
   State<_LogPanel> createState() => _LogPanelState();
 }
@@ -687,6 +724,56 @@ class _LogPanelState extends State<_LogPanel> {
   bool _open = false;
   @override
   Widget build(BuildContext context) {
+    if (widget.fill) {
+      return LayoutBuilder(builder: (context, box) => box.maxHeight >= 90 ? _filled() : Align(alignment: Alignment.topCenter, child: _panel()));
+    }
+    return _panel();
+  }
+
+  Widget _filled() {
+    final list = widget.entries.reversed.toList();
+    return Parchment(
+      padding: const EdgeInsets.fromLTRB(10, 2, 4, 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.history_edu, color: Palette.inkSoft, size: 22),
+              const SizedBox(width: 8),
+              Expanded(child: Text('Adventure log', style: Txt.inkLabel(size: 15))),
+              IconButton(tooltip: 'The story so far', onPressed: widget.onStory, icon: const Icon(Icons.menu_book, color: Palette.blood, size: 20)),
+            ],
+          ),
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.only(right: 6),
+              itemCount: list.length,
+              itemBuilder: (context, i) {
+                final e = list[i];
+                return Container(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0x66AE9A72)))),
+                  child: Text(
+                    e.text,
+                    style: switch (e.kind) {
+                      EntryKind.damage => Txt.body(size: 14, color: const Color(0xFF7A1D14)),
+                      EntryKind.gold => Txt.body(size: 14, color: Palette.goldText),
+                      EntryKind.good => Txt.body(size: 14, color: Palette.good),
+                      EntryKind.day => Txt.inkLabel(size: 14),
+                      EntryKind.plain => Txt.body(size: 14, color: i == 0 ? Palette.ink : Palette.inkSoft),
+                    },
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _panel() {
     final last = widget.entries.isEmpty ? null : widget.entries.last;
     return Parchment(
       padding: const EdgeInsets.fromLTRB(10, 4, 4, 4),
@@ -1288,12 +1375,14 @@ class _PlaceButton extends StatelessWidget {
                   ),
                   boxShadow: const [BoxShadow(color: Colors.black, offset: Offset(0, 2))],
                 ),
-          child: Row(
+          child: LayoutBuilder(builder: (context, box) {
+            final big = box.maxHeight >= 64;
+            return Row(
             children: [
-              Icon(icon, size: 24, color: hot ? const Color(0xFFFFE0C0) : (accent ?? Palette.amber), shadows: accent == null || hot ? null : [Shadow(color: accent!.withValues(alpha: .6), blurRadius: 8)]),
+              Icon(icon, size: big ? 30 : 24, color: hot ? const Color(0xFFFFE0C0) : (accent ?? Palette.amber), shadows: accent == null || hot ? null : [Shadow(color: accent!.withValues(alpha: .6), blurRadius: 8)]),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(label, maxLines: 2, overflow: TextOverflow.ellipsis, style: Txt.label(size: 14, color: Palette.cream, weight: FontWeight.w800)),
+                child: Text(label, maxLines: 2, overflow: TextOverflow.ellipsis, style: Txt.label(size: big ? 15.5 : 14, color: Palette.cream, weight: FontWeight.w800)),
               ),
               if (ready)
                 Container(
@@ -1302,7 +1391,8 @@ class _PlaceButton extends StatelessWidget {
                   decoration: BoxDecoration(shape: BoxShape.circle, color: Palette.amber, boxShadow: [BoxShadow(color: Palette.amber.withValues(alpha: .7), blurRadius: 6)]),
                 ),
             ],
-          ),
+          );
+          }),
         ),
       ),
     ),
@@ -1671,5 +1761,68 @@ class _VaultCard extends StatelessWidget {
       ),
     );
     if (context.mounted && c.nextLoot != null) await resolvePendingLoot(context, c, title: find.piece ? 'From the Ember Vault' : 'The vault\'s spoils', line: find.item?.lore ?? 'Dusty, but none the worse for it.');
+  }
+}
+
+/// The road on: the next land's boss, how far along its trail you are, and a button straight there
+/// (or, while the way's still shut, what opens it).
+class _RoadCard extends StatelessWidget {
+  const _RoadCard({required this.controller, required this.land, required this.onGo});
+  final GameController controller;
+  final int land;
+  final VoidCallback onGo;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = controller.state, l = continents[land], blocked = controller.whyNotTravel(land), at = trailAt(s, land), col = Color(l.argb);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: Color.lerp(Palette.stone3, col, .5)!, width: 1.4),
+        gradient: LinearGradient(begin: Alignment.centerLeft, end: Alignment.centerRight, colors: [Color.lerp(const Color(0xFF2A1A12), col, .18)!, const Color(0xFF18120D)], stops: const [0, .6]),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(color: Palette.stone0, border: Border.all(color: Colors.black), borderRadius: BorderRadius.circular(3)),
+            child: Padding(padding: const EdgeInsets.all(2), child: TypePortrait(type: l.boss)),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('THE ROAD · ${land + 1} / $mainLands', style: Txt.label(size: 11, color: Palette.parch2)),
+                Text('Beat ${l.boss.name}', maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.label(size: 14.5, color: Palette.cream, weight: FontWeight.w800)),
+                const SizedBox(height: 3),
+                if (blocked != null)
+                  Text(blocked, maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.label(size: 12, color: const Color(0xFFE0A070)))
+                else
+                  Row(
+                    children: [
+                      Flexible(child: Text(l.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.label(size: 12, color: Palette.amber))),
+                      const SizedBox(width: 8),
+                      // The trail's stops, one pip each, then the lair.
+                      for (var i = 0; i < winsForBoss; i++)
+                        Container(
+                          width: 7,
+                          height: 7,
+                          margin: const EdgeInsets.only(right: 3),
+                          decoration: BoxDecoration(shape: BoxShape.circle, color: i < at ? col : Colors.transparent, border: Border.all(color: i < at ? col : Palette.stone3)),
+                        ),
+                      Icon(Icons.castle, size: 13, color: at >= winsForBoss ? col : Palette.stone3),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(width: 76, child: StoneButton(title: blocked == null ? 'Go' : 'Map', compact: true, tone: blocked == null ? ButtonTone.blood : ButtonTone.stone, onPressed: onGo)),
+        ],
+      ),
+    );
   }
 }
