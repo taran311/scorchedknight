@@ -4,6 +4,7 @@
 
 import 'package:flutter/material.dart';
 
+import '../game/catalog.dart' show continents;
 import '../game/crafting.dart';
 
 enum MatShape { ore, bar, gem, bottle, fang, pelt, scroll, leaf, core, mask, scale, coral, skin, feather }
@@ -18,6 +19,10 @@ class MatIcon extends StatelessWidget {
   factory MatIcon.bar(Metal m, {double size = 24}) => MatIcon(MatShape.bar, Color(m.argb), size: size);
   factory MatIcon.gem(Gem g, {double size = 24}) => MatIcon(MatShape.gem, Color(g.argb), size: size);
   factory MatIcon.brew(Color colour, {double size = 24}) => MatIcon(MatShape.bottle, colour, size: size);
+
+  /// A land's herb (the reagent for its ward and Mags' brews): the same leaf, in the land's own
+  /// colour, everywhere it's shown.
+  factory MatIcon.herb(int land, {double size = 24}) => MatIcon(MatShape.leaf, Color(continents[land].argb), size: size);
   factory MatIcon.trophy(Trophy t, {double size = 24}) => MatIcon(switch (t) {
     Trophy.ashenSteel => MatShape.bar,
     Trophy.fang => MatShape.fang,

@@ -16,6 +16,7 @@ import 'gear_glance.dart';
 import 'hud.dart';
 import 'stat_icons.dart' show InfoChip;
 import 'loot_window.dart' show resolvePendingLoot;
+import 'material_icons.dart';
 import 'theme.dart';
 import 'trail_data.dart';
 import 'trail_page.dart';
@@ -220,7 +221,7 @@ class _MapPageState extends State<MapPage> {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    const Icon(Icons.shield_moon, color: Color(0xFF9ADFFF), size: 20),
+                    MatIcon.herb(land - 1, size: 20),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(

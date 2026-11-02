@@ -50,7 +50,7 @@ class ChestFind {
 }
 
 class KillResult {
-  const KillResult(this.foeIndex, this.name, this.xp, this.coins, this.levelUps, this.loot, {this.egg = false, this.orkGear, this.entGear, this.runeGear, this.prize, this.foe, this.chest, this.companion, this.opened = const [], this.trophy, this.blueprint, this.boss = false, this.won = false, this.reagents = 0, this.jobFind, this.potion = false, this.relicPart, this.packGold = 0, this.packed = const [], this.junkGold = 0, this.jackpot = 0, this.hoard = const [], this.finds = const [], this.breathed = 0, this.key = false, this.clean = false, this.bounty = 0, this.boltBack});
+  const KillResult(this.foeIndex, this.name, this.xp, this.coins, this.levelUps, this.loot, {this.egg = false, this.orkGear, this.entGear, this.runeGear, this.prize, this.foe, this.chest, this.companion, this.opened = const [], this.trophy, this.blueprint, this.boss = false, this.won = false, this.reagents = 0, this.reagentLand = 0, this.jobFind, this.potion = false, this.relicPart, this.packGold = 0, this.packed = const [], this.junkGold = 0, this.jackpot = 0, this.hoard = const [], this.finds = const [], this.breathed = 0, this.key = false, this.clean = false, this.bounty = 0, this.boltBack});
 
   /// A lucky purse: extra gold on top of the usual (already counted in [coins]).
   final int jackpot;
@@ -103,6 +103,9 @@ class KillResult {
 
   /// Reagents gathered from this win (for the next continent's ward).
   final int reagents;
+
+  /// The land whose herb [reagents] are.
+  final int reagentLand;
 
   /// For Hob's job: what this foe was carrying ('Charred Timber' or 'Iron Scrap').
   final String? jobFind;
@@ -2918,7 +2921,7 @@ class GameEngine {
     }
     if (ups > 0) _note('You reached level ${k.level}. ${shineLine(k.level)}', EntryKind.gold);
     final junkGold = _sellJunk(loot0);
-    return KillResult(i, f.name, r.xp, r.coins + jackpot + bounty, ups, breathed: breathed, key: key, clean: clean, bounty: bounty, boltBack: boltBack, jackpot: jackpot, drop, junkGold: junkGold, egg: egg, orkGear: orkPrize, entGear: entPrize, runeGear: rune, prize: prize, foe: f, chest: chest, companion: companion, opened: opened, trophy: trophies > 0 ? '${trophies > 1 ? '$trophies× ' : ''}${trophy!.label}' : null, blueprint: blueprint, boss: f.boss && rare == null, won: won, reagents: reagents, jobFind: jobFind, potion: flask, relicPart: relicPart, packGold: packGold, packed: packed, hoard: hoard, finds: [
+    return KillResult(i, f.name, r.xp, r.coins + jackpot + bounty, ups, breathed: breathed, key: key, clean: clean, bounty: bounty, boltBack: boltBack, jackpot: jackpot, drop, junkGold: junkGold, egg: egg, orkGear: orkPrize, entGear: entPrize, runeGear: rune, prize: prize, foe: f, chest: chest, companion: companion, opened: opened, trophy: trophies > 0 ? '${trophies > 1 ? '$trophies× ' : ''}${trophy!.label}' : null, blueprint: blueprint, boss: f.boss && rare == null, won: won, reagents: reagents, reagentLand: c, jobFind: jobFind, potion: flask, relicPart: relicPart, packGold: packGold, packed: packed, hoard: hoard, finds: [
       if (gem != null) ('gem', gem.name),
       if (pearl) ('gem', Gem.pearl.name),
       if (elemental != null) ('core', elemental.name),

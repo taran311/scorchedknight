@@ -577,7 +577,7 @@ class _Satchel extends StatelessWidget {
       if (!s.innRepaired && s.timber > 0) _Slot(tooltip: 'Charred timber for Hob: ${s.timber}/$timberNeeded', badge: '${s.timber}', child: const ItemIcon(Item.timber)),
       if (!s.innRepaired && s.ironScrap > 0) _Slot(tooltip: 'Iron scrap for Hob: ${s.ironScrap}/$ironNeeded', badge: '${s.ironScrap}', child: const ItemIcon(Item.iron)),
       for (var l = 0; l < continents.length; l++)
-        if (s.reagents[l] > 0) _Slot(tooltip: '${s.reagents[l]}× ${continents[l].reagent}: Old Wick makes wards from them', badge: '${s.reagents[l]}', child: MatIcon(MatShape.leaf, Color(continents[l].argb))),
+        if (s.reagents[l] > 0) _Slot(tooltip: '${s.reagents[l]}× ${continents[l].reagent}: Old Wick makes wards from them', badge: '${s.reagents[l]}', child: MatIcon.herb(l)),
       for (final e in s.relicParts.entries)
         if (relics[e.key] case final r? when e.value > 0 && !s.forged.contains(e.key))
           for (var i = 0; i < r.parts.length; i++)

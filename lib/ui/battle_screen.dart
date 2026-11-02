@@ -1343,7 +1343,7 @@ class _Result extends StatelessWidget {
             if (k.potion || chest?.potion == true) const _Spoil(ItemIcon(Item.potion, size: 18), 'Potion', Color(0xFFE88A70)),
             if (k.jobFind != null)
               _Spoil(ItemIcon(k.jobFind!.contains('Timber') ? Item.timber : Item.iron, size: 18), k.jobFind!.contains('Timber') ? 'Timber ${s.timber}/$timberNeeded' : 'Iron ${s.ironScrap}/$ironNeeded', Palette.cream, tip: 'For Hob\'s repairs'),
-            if (k.reagents > 0) _Spoil(const Icon(Icons.local_florist, size: 17, color: Color(0xFFE0A0D0)), '+${k.reagents} ${continents[s.continent].reagent}', const Color(0xFFE0A0D0), tip: 'For Old Wick\'s wards (${s.reagents[s.continent]} now)'),
+            if (k.reagents > 0) _Spoil(MatIcon.herb(k.reagentLand, size: 17), '+${k.reagents} ${continents[k.reagentLand].reagent}', Color(continents[k.reagentLand].argb), tip: 'For Old Wick\'s wards and Mags\' brews (${s.reagents[k.reagentLand]} now)'),
             if (chest != null) _Spoil(const Icon(Icons.inventory_2, size: 17, color: _gold), chest.tier.label, _gold),
             for (final g in [...?chest?.items, if (k.wild) ...k.packed]) _Spoil(const Icon(Icons.shield_outlined, size: 17), g.name, Color(g.rarity.argb), tip: '${g.rarity.label} ${g.slot.label.toLowerCase()}'),
             // Bolts: a find worth noticing (they load themselves onto your crossbow).
