@@ -159,7 +159,8 @@ class _LootWindowState extends State<_LootWindow> {
     final k = controller.state.knight, old = controller.engine.equippedFor(item), col = rarityColour(item.rarity);
     final cant = controller.engine.whyNotWear(item);
     final stowed = old != null && old.slot == GearSlot.offhand && !offhandWorksWith(k.loadouts[item.heroClass ?? k.heroClass]!.weapon, old);
-    final better = cant == null && (item.slot == GearSlot.armour ? armourTierById(item.art).reduction > armourTierById(k.loadouts[item.heroClass ?? k.heroClass]!.armour).reduction : old == null || item.score > old.score);
+    // (Never "Upgrade!" over one of a kind you're wearing: the stats say which suits you.)
+    final better = cant == null && !(old != null && isKeepsake(old)) && (item.slot == GearSlot.armour ? armourTierById(item.art).reduction > armourTierById(k.loadouts[item.heroClass ?? k.heroClass]!.armour).reduction : old == null || item.score > old.score);
     return PopScope(
       canPop: false,
       child: Dialog(
@@ -253,7 +254,7 @@ class _LootWindowState extends State<_LootWindow> {
                         child: StoneButton(
                           title: cant == null ? 'Equip' : 'Can\'t',
                           icon: cant == null ? _equipIcon(item.slot) : const Icon(Icons.block, size: 22, color: Color(0xFFFF8A70)),
-                          caption: cant ?? (better ? 'Upgrade!' : (old == null ? 'Fill the slot' : (controller.stashFull ? 'Old one sells' : 'Old to chest'))),
+                          caption: cant ?? (better ? 'Upgrade!' : (old == null ? 'Fill the slot' : isKeepsake(old) ? '${old.name} to chest' : (controller.stashFull ? 'Old one sells' : 'Old to chest'))),
                           tone: better ? ButtonTone.blood : ButtonTone.stone,
                           onPressed: cant != null ? null : () => Navigator.of(context).pop('equip'),
                         ),
