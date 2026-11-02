@@ -2086,11 +2086,21 @@ class _ScenePainter extends CustomPainter {
       drawHound(canvas, pet.$1 == Pet.hellhound ? hellhoundLook : wolfLook, Offset(x, _groundY + 4), .7 + stage * .17, t, pounce: run > .15 ? .02 + (t / 900) % .1 : p, still: still);
       if (run > .15) canvas.restore();
     } else if (ds != null) {
+      // Your dragon (or its egg, tucked under your arm as it were) comes with you when you run,
+      // turned for home, rather than staying behind with the foe.
+      final run = fx['flee']!;
+      canvas.save();
+      canvas.translate(-run * 540, 0);
+      if (run > .15) {
+        canvas.translate(256, 0);
+        canvas.scale(-1, 1);
+      }
       if (ds.name == 'Egg') {
         drawEgg(canvas, const Offset(128, _groundY - 2));
       } else {
         drawDragon(canvas, ds.name, t, breathing: fx['fire']! > 0, still: still);
       }
+      canvas.restore();
     }
 
 
@@ -2839,7 +2849,19 @@ class _ScenePainter extends CustomPainter {
       if (fading) canvas.saveLayer(pill.outerRect.inflate(4), Paint()..color = Color.fromRGBO(0, 0, 0, a));
       canvas.drawRRect(pill, Paint()..color = Colors.black.withValues(alpha: .62));
       canvas.drawRRect(pill, strokePaint(colour.withValues(alpha: .7), 1.5));
-      tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
+      if (icon == null) {
+        tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
+      } else {
+        // As on the chips: icon and words each centred on the middle line.
+        final ip = _laidOut('di:${icon.codePoint}:${colour.toARGB32()}', () => TextPainter(
+          text: TextSpan(text: String.fromCharCode(icon.codePoint), style: TextStyle(fontFamily: icon.fontFamily, package: icon.fontPackage, fontSize: 22, height: 1, color: colour)),
+          textDirection: TextDirection.ltr,
+        )..layout());
+        final xp = _laidOut('dt:${d.text}:${colour.toARGB32()}', () => TextPainter(text: TextSpan(text: d.text, style: Txt.label(size: 26, color: colour, weight: FontWeight.w900)), textDirection: TextDirection.ltr)..layout());
+        final total = ip.width + 6 + xp.width;
+        ip.paint(canvas, Offset(-total / 2, -ip.height / 2));
+        xp.paint(canvas, Offset(-total / 2 + ip.width + 6, -xp.height / 2));
+      }
       if (fading) canvas.restore();
       canvas.restore();
     }
@@ -3093,7 +3115,21 @@ class _ScenePainter extends CustomPainter {
     final cs = m.colours.isEmpty ? const [Colors.white, Colors.grey] : (m.colours.length == 2 ? m.colours : [m.colours.first, m.colours.last]);
     canvas.drawPath(path, Paint()..shader = ui.Gradient.linear(Offset(0, -h / 2), Offset(0, h / 2), cs));
     canvas.drawPath(path, strokePaint(Colors.black.withValues(alpha: .6), 1.5));
-    tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
+    if (m.icon == null) {
+      tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
+    } else {
+      // The icon and the words each centred on the chip's middle line: in one line of text the
+      // icon font sits high, its glyph all above the baseline, so it hugged the top edge.
+      final icon = m.icon!;
+      final ip = _laidOut('mi:${icon.codePoint}', () => TextPainter(
+        text: TextSpan(text: String.fromCharCode(icon.codePoint), style: TextStyle(fontFamily: icon.fontFamily, package: icon.fontPackage, fontSize: 26, height: 1, color: Colors.white)),
+        textDirection: TextDirection.ltr,
+      )..layout());
+      final xp = _laidOut('mt:${m.text}', () => _markText(m.text));
+      final gap = m.text.isEmpty ? 0.0 : 6.0, total = ip.width + gap + (m.text.isEmpty ? 0 : xp.width);
+      ip.paint(canvas, Offset(-total / 2, -ip.height / 2));
+      if (m.text.isNotEmpty) xp.paint(canvas, Offset(-total / 2 + ip.width + gap, -xp.height / 2));
+    }
     if (fading) canvas.restore();
     canvas.restore();
   }

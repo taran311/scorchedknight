@@ -12,6 +12,7 @@ import '../game/catalog.dart';
 import '../game/controller.dart';
 import '../audio/audio.dart';
 import 'battle_screen.dart' show openBattle, BattleStart, BattleExit;
+import 'gear_glance.dart';
 import 'hud.dart';
 import 'stat_icons.dart' show InfoChip;
 import 'loot_window.dart' show resolvePendingLoot;
@@ -112,8 +113,11 @@ class _PhoneMapState extends State<_PhoneMap> {
 }
 
 class MapPage extends StatefulWidget {
-  const MapPage({super.key, required this.controller});
+  const MapPage({super.key, required this.controller, this.place, this.dungeon});
   final GameController controller;
+
+  /// A place or dungeon to open on, picked (the Road card's "explore this" or "delve into that").
+  final String? place, dungeon;
 
   @override
   State<MapPage> createState() => _MapPageState();
@@ -121,16 +125,16 @@ class MapPage extends StatefulWidget {
 
 class _MapPageState extends State<MapPage> {
   GameController get c => widget.controller;
-  late int _pick = c.state.continent;
+  late int _pick = placeById(widget.place)?.land ?? dungeonById(widget.dungeon)?.land ?? c.state.continent;
 
   /// A wild area picked on the map (shown in the panel instead of a land).
   int? _wildPick;
 
   /// A place picked on the map (shown in the panel instead of a land).
-  String? _placePick;
+  late String? _placePick = widget.place;
 
   /// A dungeon picked on the map (shown in the panel instead of a land).
-  String? _dungeonPick;
+  late String? _dungeonPick = widget.dungeon;
 
   /// Down into a dungeon (or back to the run under way in it).
   Future<void> _delve(Dungeon d) async {
@@ -319,7 +323,7 @@ class _MapPageState extends State<MapPage> {
                                 ...[
                                   Row(
                                     children: [
-                                      Expanded(child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: HeroCard(controller: c))),
+                                      Expanded(child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: GestureDetector(onTap: () => showGearGlance(context, c), child: Tooltip(message: 'Your gear', child: HeroCard(controller: c))))),
                                       const SizedBox(width: 8),
                                       InnBackButton(label: 'Town', onPressed: _home),
                                     ],

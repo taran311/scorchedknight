@@ -831,12 +831,19 @@ class _Spellbook extends StatelessWidget {
                                       Positioned(
                                         left: 4,
                                         top: 4,
+                                        // Dark disc, the rite's colour round it, a bold white number: it reads
+                                        // over any rite's glow.
                                         child: Container(
-                                          width: 20,
-                                          height: 20,
+                                          width: 24,
+                                          height: 24,
                                           alignment: Alignment.center,
-                                          decoration: BoxDecoration(shape: BoxShape.circle, color: col, border: Border.all(color: const Color(0xFF15110C), width: 1.5)),
-                                          child: Text('${slotAt + 1}', style: Txt.label(size: 12, color: const Color(0xFF15110C), weight: FontWeight.w900)),
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: const Color(0xFF15110C),
+                                            border: Border.all(color: col, width: 2),
+                                            boxShadow: const [BoxShadow(color: Colors.black, blurRadius: 4)],
+                                          ),
+                                          child: Text('${slotAt + 1}', style: const TextStyle(fontSize: 14, height: 1, color: Colors.white, fontWeight: FontWeight.w900)),
                                         ),
                                       ),
                                   ],

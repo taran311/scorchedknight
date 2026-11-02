@@ -707,14 +707,16 @@ class _BattleScreenState extends State<BattleScreen> {
         return [
           Expanded(
             flex: 3,
+            // On a phone, one word big and the rest small under it, so neither button wraps.
             child: StoneButton(
-              title: waiting ? 'Choose your spoils' : onward,
+              title: waiting ? 'Choose your spoils' : (isPhone(context) && onward.startsWith('Onward to ') ? 'Onward' : onward),
+              caption: !waiting && isPhone(context) && onward.startsWith('Onward to ') ? onward.substring(10) : null,
               tone: ButtonTone.blood,
               onPressed: waiting ? () => resolvePendingLoot(context, c).then((_) => mounted ? setState(() {}) : null) : _fightOn,
             ),
           ),
           const SizedBox(width: 8),
-          Expanded(flex: 2, child: StoneButton(title: 'Back to the trail', onPressed: waiting ? null : () => _close(BattleExit.map))),
+          Expanded(flex: 2, child: StoneButton(title: isPhone(context) ? 'Back' : 'Back to the trail', caption: isPhone(context) ? 'to the trail' : null, onPressed: waiting ? null : () => _close(BattleExit.map))),
         ];
       case Outcome.fled:
         // You ran: all the way home to the village.

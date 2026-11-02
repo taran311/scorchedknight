@@ -372,6 +372,42 @@ class GameEngine {
     );
   }
 
+  /// The road's next step, for the square's Road card. Mostly the next land's boss; but while that
+  /// land is still shut (a level to reach first), something worth doing at your level meanwhile:
+  /// a place to explore, then a dungeon, then a Heroic trail (and the relic part at its end), or
+  /// at worst a few more fights to grow stronger. Null once the Ember King is down.
+  RoadStep? roadStep() {
+    final k = state.knight;
+    final next = [for (var i = 0; i < mainLands; i++) i].where((i) => !state.bossesDown.contains(i)).firstOrNull;
+    if (next == null) return null;
+    final boss = RoadStep(RoadKind.boss, 'Beat ${continents[next].boss.name}', continents[next].name, next);
+    final shut = whyNotTravel(next);
+    if (shut == null) return boss;
+    // Only the level holds it back (the way's open): find something to do meanwhile.
+    final need = continents[next].minLevel;
+    if (k.level >= need) return boss.blocked(shut);
+    final reachable = [for (var i = 0; i < continents.length; i++) if (whyNotTravel(i) == null) i];
+    final meanwhile = 'Meanwhile · ${continents[next].name} at level $need';
+    for (final p in [...places]..sort((a, b) => a.land.compareTo(b.land))) {
+      if (reachable.contains(p.land) && placeShown(p) && whyNotExplore(p.id) == null) {
+        return RoadStep(RoadKind.place, 'Explore ${p.name}', meanwhile, p.land, id: p.id);
+      }
+    }
+    for (final d in dungeons) {
+      if (reachable.contains(d.land) && !state.dungeonsDone.contains(d.id) && whyNotDungeon(d.id) == null) {
+        return RoadStep(RoadKind.dungeon, 'Delve into ${d.name}', meanwhile, d.land, id: d.id);
+      }
+    }
+    for (final c in reachable) {
+      if (heroicOpen(c) && !heroicCleared(c) && k.level >= continents[c].minLevel + 4) {
+        final part = [for (final (r, i) in relicPartsOn(c)) if (relics[r]!.parts[i].risen && !hasRelicPart(state.relicParts, r, i) && !state.forged.contains(r)) relics[r]!.parts[i].name].firstOrNull;
+        return RoadStep(RoadKind.heroic, 'Beat ${continents[c].boss.name}, risen${part == null ? '' : ' · $part'}', meanwhile, c);
+      }
+    }
+    final home = reachable.where((i) => i < mainLands).fold(0, math.max);
+    return RoadStep(RoadKind.train, 'Grow stronger: reach level $need', 'Patrol ${continents[home].name}', home);
+  }
+
   /// Region [c] is cleared: its boss down, every place and dungeon done, every relic part found.
   bool landCleared(int c) {
     final p = landProgress(c);
@@ -4131,3 +4167,21 @@ String shineLine(int level) => switch (level) {
   >= 10 => 'Some of the soot has finally washed off.',
   _ => 'You brush a little soot off your shoulders.',
 };
+
+enum RoadKind { boss, place, dungeon, heroic, train }
+
+/// One step on the road (see GameEngine.roadStep): what, a line under it, and where.
+class RoadStep {
+  const RoadStep(this.kind, this.title, this.sub, this.land, {this.id, this.why});
+  final RoadKind kind;
+  final String title, sub;
+  final int land;
+
+  /// The place or dungeon, for those steps.
+  final String? id;
+
+  /// What still keeps you out (a boss step you can't take yet).
+  final String? why;
+
+  RoadStep blocked(String why) => RoadStep(kind, title, sub, land, id: id, why: why);
+}

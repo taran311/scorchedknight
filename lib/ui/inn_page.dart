@@ -23,6 +23,7 @@ import '../game/vault.dart';
 import '../game/catalog.dart';
 import '../game/events.dart';
 import '../game/controller.dart';
+import '../game/engine.dart' show RoadStep, RoadKind;
 import '../game/crafting.dart' show smithName, mageName;
 import '../game/models.dart';
 import '../game/rules.dart';
@@ -32,6 +33,7 @@ import 'fill_column.dart';
 import 'battle_screen.dart';
 import 'class_picker.dart' show HeroOrHeroine;
 import 'frames.dart';
+import 'gear_glance.dart';
 import 'hud.dart';
 import 'errands_view.dart';
 import 'task_routes.dart';
@@ -124,20 +126,21 @@ class _InnPageState extends State<InnPage> with RouteAware {
     await showDialog<void>(context: context, builder: (_) => const _StoryWindow());
   }
 
-  /// The next land on the road whose boss still stands (null: the road is done).
-  int? _roadLand() {
-    for (var i = 0; i < mainLands; i++) {
-      if (!c.state.bossesDown.contains(i)) return i;
-    }
-    return null;
-  }
-
-  /// Onto the road: straight to that land's trail when it's open, else the map (which says why not).
-  Future<void> _goRoad(int land) async {
+  /// Onto the road's next step: a land's trail (its boss, its Heroic trail, or patrols to grow
+  /// stronger), or the map with the place or dungeon picked; the map too when the way's shut.
+  Future<void> _goRoad(RoadStep step) async {
     if (c.state.inBattle) return _resume();
-    if (c.whyNotTravel(land) != null) return _openMap();
-    c.travel(land);
-    await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => TrailPage(controller: c, land: land)));
+    final nav = Navigator.of(context);
+    switch (step.kind) {
+      case RoadKind.place:
+        await nav.push(MaterialPageRoute<void>(builder: (_) => MapPage(controller: c, place: step.id)));
+      case RoadKind.dungeon:
+        await nav.push(MaterialPageRoute<void>(builder: (_) => MapPage(controller: c, dungeon: step.id)));
+      case RoadKind.boss || RoadKind.heroic || RoadKind.train:
+        if (c.whyNotTravel(step.land) != null) return _openMap();
+        c.travel(step.land);
+        await nav.push(MaterialPageRoute<void>(builder: (_) => TrailPage(controller: c, land: step.land)));
+    }
   }
 
   /// Whether a place in the square is still shut (see GameEngine.whyShut).
@@ -216,7 +219,7 @@ class _InnPageState extends State<InnPage> with RouteAware {
                         if (phone) ...[
                           Row(
                             children: [
-                              Expanded(child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: HeroCard(controller: c))),
+                              Expanded(child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: GestureDetector(onTap: () => showGearGlance(context, c), child: Tooltip(message: 'Your gear', child: HeroCard(controller: c))))),
                               IconButton(
                                 tooltip: 'Settings',
                                 onPressed: () => showDialog<void>(context: context, builder: (_) => _SettingsWindow(controller: c)),
@@ -228,7 +231,7 @@ class _InnPageState extends State<InnPage> with RouteAware {
                         ],
                         _TownSquare(
                           compact: phone,
-                          hud: HeroCard(controller: c),
+                          hud: GestureDetector(onTap: () => showGearGlance(context, c), child: Tooltip(message: 'Your gear', child: HeroCard(controller: c))),
                           onSettings: () => showDialog<void>(context: context, builder: (_) => _SettingsWindow(controller: c)),
                           look: heroLook(k),
                           repaired: s.innRepaired,
@@ -297,8 +300,8 @@ class _InnPageState extends State<InnPage> with RouteAware {
                           const SizedBox(height: 10),
                         ],
                         // The road: the next land's boss, so there's always a way on.
-                        if (_roadLand() case final land? when !(job && land == 0)) ...[
-                          _RoadCard(controller: c, land: land, onGo: () => _goRoad(land)),
+                        if (c.engine.roadStep() case final step? when !(job && step.land == 0)) ...[
+                          _RoadCard(controller: c, step: step, onGo: () => _goRoad(step)),
                           const SizedBox(height: 10),
                         ],
                         // The next task: something to try, and a little for trying it.
@@ -1791,14 +1794,21 @@ class _VaultCard extends StatelessWidget {
 /// The road on: the next land's boss, how far along its trail you are, and a button straight there
 /// (or, while the way's still shut, what opens it).
 class _RoadCard extends StatelessWidget {
-  const _RoadCard({required this.controller, required this.land, required this.onGo});
+  const _RoadCard({required this.controller, required this.step, required this.onGo});
   final GameController controller;
-  final int land;
+  final RoadStep step;
   final VoidCallback onGo;
 
   @override
   Widget build(BuildContext context) {
-    final s = controller.state, l = continents[land], blocked = controller.whyNotTravel(land), at = trailAt(s, land), col = Color(l.argb);
+    final s = controller.state, l = continents[step.land], at = trailAt(s, step.land), col = Color(l.argb), boss = step.kind == RoadKind.boss;
+    final road = [for (var i = 0; i < mainLands; i++) i].where((i) => !s.bossesDown.contains(i)).firstOrNull ?? mainLands - 1;
+    final art = switch (step.kind) {
+      RoadKind.boss || RoadKind.heroic => SizedBox.expand(child: TypePortrait(type: l.boss)),
+      RoadKind.place => const Icon(Icons.place, color: Palette.amber, size: 30),
+      RoadKind.dungeon => const Icon(Icons.stairs, color: Palette.amber, size: 30),
+      RoadKind.train => const Icon(Icons.trending_up, color: Palette.amber, size: 30),
+    };
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
       decoration: BoxDecoration(
@@ -1812,18 +1822,20 @@ class _RoadCard extends StatelessWidget {
             width: 50,
             height: 50,
             decoration: BoxDecoration(color: Palette.stone0, border: Border.all(color: Colors.black), borderRadius: BorderRadius.circular(3)),
-            child: Padding(padding: const EdgeInsets.all(2), child: TypePortrait(type: l.boss)),
+            child: Padding(padding: const EdgeInsets.all(2), child: Center(child: art)),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('THE ROAD · ${land + 1} / $mainLands', style: Txt.label(size: 11, color: Palette.parch2)),
-                Text('Beat ${l.boss.name}', maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.label(size: 14.5, color: Palette.cream, weight: FontWeight.w800)),
+                Text(boss ? 'THE ROAD · ${road + 1} / $mainLands' : 'ON THE WAY · ${road + 1} / $mainLands', style: Txt.label(size: 11, color: Palette.parch2)),
+                Text(step.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.label(size: 14.5, color: Palette.cream, weight: FontWeight.w800)),
                 const SizedBox(height: 3),
-                if (blocked != null)
-                  Text(blocked, maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.label(size: 12, color: const Color(0xFFE0A070)))
+                if (step.why != null)
+                  Text(step.why!, maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.label(size: 12, color: const Color(0xFFE0A070)))
+                else if (!boss)
+                  Text(step.sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.label(size: 12, color: Palette.amber))
                 else
                   Row(
                     children: [
@@ -1844,7 +1856,7 @@ class _RoadCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          SizedBox(width: 76, child: StoneButton(title: blocked == null ? 'Go' : 'Map', compact: true, tone: blocked == null ? ButtonTone.blood : ButtonTone.stone, onPressed: onGo)),
+          SizedBox(width: 76, child: StoneButton(title: step.why == null ? 'Go' : 'Map', compact: true, tone: step.why == null ? ButtonTone.blood : ButtonTone.stone, onPressed: onGo)),
         ],
       ),
     );

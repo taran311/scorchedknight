@@ -608,6 +608,25 @@ void main() {
     expect(k.mount, 'hellsteed');
   });
 
+  test('the road: the next boss, or while its land waits on a level, something to do meanwhile', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(4));
+    final s = e.state, k = s.knight;
+    expect(e.roadStep()!.kind, RoadKind.boss);
+    expect(e.roadStep()!.land, 0);
+    s.bossesDown.add(0);
+    k.level = continents[1].minLevel - 1;
+    final step = e.roadStep()!;
+    expect(step.kind, isNot(RoadKind.boss), reason: 'the Gloomfen waits on a level');
+    expect(step.sub, contains('level ${continents[1].minLevel}'));
+    // With nothing left to explore or delve, at worst: grow stronger.
+    s.explored.addAll(places.map((p) => p.id));
+    s.dungeonsDone.addAll(dungeons.map((d) => d.id));
+    expect(e.roadStep()!.kind, isIn([RoadKind.heroic, RoadKind.train]));
+    k.level = continents[1].minLevel;
+    expect(e.roadStep()!.kind, RoadKind.boss);
+    expect(e.roadStep()!.land, 1);
+  });
+
   test('bolts can be swapped any time, plain ones in between', () {
     final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(2));
     final k = e.state.knight;

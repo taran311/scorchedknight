@@ -21,6 +21,7 @@ import '../audio/audio.dart';
 import 'battle_screen.dart';
 import 'encounter_window.dart';
 import 'fill_column.dart';
+import 'gear_glance.dart';
 import 'hud.dart';
 import 'item_icons.dart';
 import 'stat_icons.dart' show InfoChip;
@@ -98,7 +99,7 @@ class _TrailPageState extends State<TrailPage> {
                         if (phone) ...[
                           Row(
                             children: [
-                              Expanded(child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: HeroCard(controller: c, compact: true))),
+                              Expanded(child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: GestureDetector(onTap: () => showGearGlance(context, c), child: Tooltip(message: 'Your gear', child: HeroCard(controller: c, compact: true))))),
                               const SizedBox(width: 8),
                               InnBackButton(label: 'World', icon: Icons.public, onPressed: () => Navigator.of(context).pop()),
                             ],
