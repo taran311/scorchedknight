@@ -151,6 +151,7 @@ class _MapPageState extends State<MapPage> {
   /// Explores a place: its guard's fight, or what's there at once.
   Future<void> _explore(Place p) async {
     if (c.whyNotExplore(p.id) != null) return;
+    if (!await headHomeFirst(context, c) || !mounted) return;
     // A place out in a hazard land bites like the land itself: the same warning first.
     if (!await _wardCheck(p.land) || !mounted) return;
     final out = c.explorePlace(p.id);

@@ -3020,7 +3020,13 @@ class GameEngine {
 
   /// A night by the fire at the Soot & Kettle: full health. Free (the innkeeper owes you one).
   /// Why you can't rest yet (null if you can).
-  String? get whyNotRest => state.innRepaired ? null : 'The roof is still smouldering. Hob needs timber and iron before anyone sleeps here.';
+  String? get whyNotRest => !state.innRepaired
+      ? 'The roof is still smouldering. Hob needs timber and iron before anyone sleeps here.'
+      // (A bed at the inn mid-trip, then back out at the same depth on full health, would take the
+      // risk out of the wilds.)
+      : state.wild != null
+      ? "You're still out in ${wildAreas[state.wild!].name}: head home first"
+      : null;
 
   /// On Hob's job: the inn needs patching up, and Cindervale has only goblins in it until it is.
   bool get onHobsJob => !state.innRepaired && state.jobTaken;

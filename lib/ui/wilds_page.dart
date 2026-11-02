@@ -821,3 +821,32 @@ class _PathPainter extends CustomPainter {
   @override
   bool shouldRepaint(_PathPainter old) => old.depth != depth || old.best != best || old.alert != alert || old.colour != colour;
 }
+
+/// Off somewhere else (a trail, a boss, a place on the map) while a trip into the wilds is under
+/// way: that means heading home from the wilds first, by the same rules as leaving from there (free
+/// from a waystone, a share of the pack dropped otherwise). The trip ends; next time the wilds start
+/// again from the edge. True if you're clear to go (no trip, or you headed home).
+Future<bool> headHomeFirst(BuildContext context, GameController c) async {
+  final s = c.state;
+  if (s.wild == null || s.inBattle) return true;
+  final share = c.leaveShare, area = wildAreas[s.wild!].name, carrying = s.packGold > 0 || s.pack.isNotEmpty;
+  final (gold, items) = lossOf(share, s.packGold, s.pack.length);
+  final go = await showDialog<bool>(
+    context: context,
+    builder: (_) => _Confirm(
+      title: 'Head home from $area?',
+      text:
+          'You\'re still out in $area, ${s.wildDepth} step${s.wildDepth == 1 ? '' : 's'} in. To go anywhere else you head home first, and next time the wilds start again from the edge.\n\n${!carrying ? 'Your pack is empty: nothing to lose.' : share == 0 ? 'You\'re at a waystone: your pack comes home safe.' : 'You\'re between waystones, so bandits will snatch about ${(share * 100).round()}% of your pack on the way: $gold gold${items > 0 ? ' and $items piece${items == 1 ? '' : 's'} of gear' : ''}.'}',
+      yes: 'Head home',
+      no: 'Stay out there',
+    ),
+  );
+  if (go != true || !context.mounted) return false;
+  final exit = c.leaveWild();
+  if (exit == null) return false;
+  if (exit.gold > 0 || exit.items > 0 || !exit.lost.none) {
+    Audio.play(exit.safe ? Sfx.coins : Sfx.flee);
+    await showDialog<void>(context: context, builder: (_) => _Haul(exit: exit));
+  }
+  return context.mounted;
+}

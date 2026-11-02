@@ -55,6 +55,8 @@ class _TrailPageState extends State<TrailPage> {
 
   /// Setting out badly hurt with no potion to drink: a word first, since a knock-out costs you.
   Future<bool> _readyToFight() async {
+    // Out in the wilds still: home from there first.
+    if (!await headHomeFirst(context, c) || !mounted) return false;
     final k = c.state.knight;
     // (Only when there's something to be done about it: a bed at the inn, or gold for a potion.)
     final canMend = c.whyNotRest == null || k.coins >= c.engine.priceOf('potion');
