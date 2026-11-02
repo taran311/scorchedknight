@@ -1699,6 +1699,7 @@ class _VaultCard extends StatelessWidget {
                     ],
                   ),
                   if (s.keys > 0 && c.whyNotVault != null) Text(c.whyNotVault!, style: Txt.onStone(size: 11.5, color: const Color(0xFFE8B070))),
+                  if (nextVaultPieceLevel(found.length, s.knight.level) case final at?) Text('Its next piece stirs at level $at', style: Txt.onStone(size: 11.5)),
                 ],
               ),
             ),

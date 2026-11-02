@@ -183,10 +183,20 @@ void main() {
     s.keys = 0;
     expect(e.whyNotVault, isNotNull);
     expect(e.openVault(), isNull);
-    // Plenty of keys: every piece, each found once before any repeats.
+    // Low down, the vault keeps most of its pieces back however many keys you bring.
+    s.keys = 40;
+    k.level = 7;
+    final kinds = <String>{};
+    for (var i = 0; i < 40; i++) {
+      final f = e.openVault()!;
+      kinds.add(f.piece ? 'piece' : (f.item != null ? 'gear' : 'gold'));
+      s.pendingLoot.clear();
+    }
+    expect(s.vaultFound.length, vaultPiecesOpen(7));
+    expect(nextVaultPieceLevel(s.vaultFound.length, 7), 13);
+    // Plenty of keys, high enough: every piece, each found once before any repeats.
     s.keys = 400;
-    k.level = 30;
-    var kinds = <String>{};
+    k.level = 40;
     for (var i = 0; i < 400 && s.vaultFound.length < vaultPieces.length; i++) {
       final f = e.openVault()!;
       expect(f.gold, greaterThan(0));

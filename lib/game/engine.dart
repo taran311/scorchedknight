@@ -2764,7 +2764,8 @@ class GameEngine {
     }
     final chest = f.boss || _rng.nextDouble() < (single ? rareChestChance : chestChance) ? openChest(rare: single ? rare : null, grand: f.boss) : null;
     // Now and then a Cinder key for the Ember Vault: likelier the tougher the foe was.
-    final over = state.foeLevel - k.level;
+    // (A Heroic trail's foes are lifted above you by design: that lift doesn't count as tougher.)
+    final over = state.foeLevel - k.level - (state.heroicFight ? heroicLevels : 0);
     final key = _rng.nextDouble() < (f.boss ? keyChanceBoss : keyChance[over >= 6 ? 2 : (over >= 3 ? 1 : 0)]);
     if (key) {
       state.keys++;
@@ -3603,9 +3604,12 @@ class GameEngine {
     final gold = (25 * k.level + 40) * (1 + heroStats(k).fortune / 100) * (.8 + _rng.nextDouble() * .4);
     final roll = _rng.nextDouble();
     VaultFind find;
+    // Only as many of the vault's own pieces as your level has opened: past that, a piece's roll
+    // brings good gear instead.
+    final open = s.vaultFound.length < vaultPiecesOpen(k.level);
     final unfound = [for (final p in vaultPieces) if (!s.vaultFound.contains(p.name)) p];
-    final sure = unfound.isNotEmpty && s.vaultDry >= vaultSure;
-    if (sure || roll < vaultPieceChance) {
+    final sure = open && unfound.isNotEmpty && s.vaultDry >= vaultSure;
+    if (sure || (roll < vaultPieceChance && (open || unfound.isEmpty))) {
       s.vaultDry = 0;
       final pool = unfound.isEmpty ? vaultPieces : unfound;
       final piece = pool[_rng.nextInt(pool.length)];
@@ -3795,6 +3799,7 @@ class GameEngine {
     }
     state.knight.coins -= recipe.gold;
     state.knight.loadouts[tier.heroClass]!.armour = tier.id;
+    state.knight.hp = math.min(state.knight.hp, maxHp(state.knight));
     _note('Dunstan hammers the bars into shape: ${tier.name}! Damage taken −${(tier.reduction * 100).round()}%.', EntryKind.gold);
     return true;
   }

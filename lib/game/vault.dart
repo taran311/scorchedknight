@@ -10,11 +10,21 @@ const keyChance = [.04, .09, .16], keyChanceBoss = .4;
 
 /// From one key: the chance it's one of the vault's own pieces (else good gear and gold, else
 /// just gold).
-const vaultPieceChance = .35, vaultGearChance = .4;
+const vaultPieceChance = .5, vaultGearChance = .3;
+
+/// The vault gives up its own pieces slowly, one more every few levels (a lucky run of keys
+/// early on brings gold and gear, not the whole set at level 7): one from the start, then one
+/// more at levels 7, 13, 19, 25 and 31.
+const vaultPieceEvery = 6;
+int vaultPiecesOpen(int level) => (1 + (level - 1) ~/ vaultPieceEvery).clamp(1, vaultPieces.length);
+
+/// The level the next of the vault's pieces can be found at, with [found] of them found (null:
+/// one can be found now, or all have been).
+int? nextVaultPieceLevel(int found, int level) => found >= vaultPieces.length || found < vaultPiecesOpen(level) ? null : found * vaultPieceEvery + 1;
 
 /// Bad luck has a floor: after this many keys in a row without one of the vault's own pieces,
 /// the next one is sure to be one (while any are left to find).
-const vaultSure = 3;
+const vaultSure = 2;
 
 /// One of the six pieces only the vault holds: each carries a stat no ordinary piece of its kind
 /// ever rolls (dodge on a pendant, crit on boots, block on gauntlets, guard on a ring, lifesteal

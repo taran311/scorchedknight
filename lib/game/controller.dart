@@ -16,7 +16,7 @@ import 'loot.dart';
 import 'tasks.dart';
 import 'models.dart';
 import 'events.dart';
-import 'rules.dart' show Trait, suitWorn;
+import 'rules.dart' show Trait, suitWorn, maxHp;
 import 'spells.dart' show spellById;
 import 'tarot.dart';
 import 'vault.dart';
@@ -239,6 +239,10 @@ class GameController extends ChangeNotifier {
     // A whole faction suit worn once counts for its task, even after you take a piece off.
     final suit = suitWorn(state.knight);
     if (suit != null) engine.mark('suit:$suit');
+    // Gear changed out of a fight (a piece swapped, armour reforged): never more HP than the new
+    // most.
+    final k = state.knight;
+    if (!state.inBattle && k.hp > maxHp(k)) k.hp = maxHp(k);
     _save();
     notifyListeners();
   }
