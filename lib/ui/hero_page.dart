@@ -1,6 +1,8 @@
 // Kit & spells (opened from your hero at camp): your painted hero, class, equipped gear, totals and satchel. Gear changes only
 // through the spoils of victory (equip or sell) and the merchant.
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../art/looks.dart';
@@ -16,6 +18,7 @@ import '../game/mounts.dart';
 import '../game/rules.dart';
 import '../game/spells.dart';
 import '../game/tasks.dart' show GameTask;
+import 'errands_view.dart';
 import 'fill_column.dart';
 import 'hero_view.dart';
 import 'item_icons.dart';
@@ -83,7 +86,7 @@ class _HeroPageState extends State<HeroPage> {
                 ],
               ),
               const SizedBox(height: 8),
-              if (tab == _Tab.gear) _gear(c, k) else Grow(child: switch (tab) {
+              if (tab == _Tab.gear) ..._gear(c, k) else Grow(child: switch (tab) {
                 _Tab.gear => const SizedBox(),
                 _Tab.rites => _Spellbook(controller: c),
                 _Tab.companions => Column(
@@ -103,14 +106,12 @@ class _HeroPageState extends State<HeroPage> {
     ));
   }
 
-  Widget _gear(GameController c, Knight k) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      if (unspentPoints(k) > 0) ...[_Training(controller: c), const SizedBox(height: 10)],
-      _PaperDoll(controller: c),
-      if (unspentPoints(k) == 0) ...[const SizedBox(height: 10), _Training(controller: c)],
-    ],
-  );
+  /// The gear tab, as parts of the page's column: the paper doll grows into the screen's spare room.
+  List<Widget> _gear(GameController c, Knight k) => [
+    if (unspentPoints(k) > 0) ...[_Training(controller: c), const SizedBox(height: 10)],
+    Grow(child: _PaperDoll(controller: c)),
+    if (unspentPoints(k) == 0) ...[const SizedBox(height: 10), _Training(controller: c)],
+  ];
 }
 
 class _TabButton extends StatelessWidget {
@@ -155,9 +156,6 @@ class _PaperDoll extends StatelessWidget {
     final c = controller, s = c.state, k = s.knight, tier = armourTierById(k.armour), h = heroStats(k), ds = dragonStage(k);
     // (Tighter on a phone, so the knight, the slots and the totals fit one screen.)
     final phone = isPhone(context), box = phone ? 56.0 : 68.0;
-    // A taller phone: a taller knight and the slots spread to match, so the page reaches the
-    // bottom of the screen rather than stopping two-thirds down.
-    final mq = MediaQuery.of(context), tall = phone ? (mq.size.height - mq.padding.vertical - 700).clamp(0.0, 170.0) : 0.0;
     Widget slot(GearSlot gs, String empty) {
       final g = k.equipped(gs);
       final idle = gs == GearSlot.offhand && g != null && k.loadout.activeOffhand == null;
@@ -217,7 +215,12 @@ class _PaperDoll extends StatelessWidget {
       OffhandKind.wand => 'Wand',
       null => 'Off-hand',
     };
-    Widget column(List<Widget> slots) => Column(children: [for (final (i, w) in slots.indexed) ...[if (i > 0) SizedBox(height: phone ? 4 + tall / 4 : 10), w]]);
+    // On a phone given the screen's height (see FillColumn), the knight grows into whatever room is
+    // left and the slots spread to match, so the whole page (stats too) fits one screen; asked for
+    // its own height, it's at its most compact.
+    Widget column(List<Widget> slots, bool fill) => fill
+        ? Column(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: slots)
+        : Column(children: [for (final (i, w) in slots.indexed) ...[if (i > 0) SizedBox(height: phone ? 4 : 10), w]]);
 
     // The totals as chips: a symbol and a number, the name in the tooltip.
     final chip = ds == null || ds.chip == 0 ? 0 : ds.chip + k.level ~/ 5 + h.dragonkin;
@@ -244,19 +247,19 @@ class _PaperDoll extends StatelessWidget {
     ];
 
     return Stone(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      child: LayoutBuilder(builder: (context, room) {
+        final fill = phone && room.hasBoundedHeight;
+        final figure = HeroFigure(look: heroLook(k));
+        final top = Row(
+            crossAxisAlignment: fill ? CrossAxisAlignment.stretch : CrossAxisAlignment.start,
             children: [
-              column([slot(GearSlot.helm, 'Head'), slot(GearSlot.cape, 'Cape'), slot(GearSlot.gloves, 'Hands'), slot(GearSlot.boots, 'Feet')]),
+              column([slot(GearSlot.helm, 'Head'), slot(GearSlot.cape, 'Cape'), slot(GearSlot.gloves, 'Hands'), slot(GearSlot.boots, 'Feet')], fill),
               Expanded(
                 child: Column(
                   children: [
                     Text(s.settings.name, style: Txt.label(size: 20, color: Palette.cream, weight: FontWeight.w800)),
                     Text('Level ${k.level} knight', style: Txt.label(size: 13, color: Palette.amber)),
-                    SizedBox(height: phone ? 220 + tall : 300, child: HeroFigure(look: heroLook(k))),
+                    if (fill) Expanded(child: figure) else SizedBox(height: phone ? 200 : 300, child: figure),
                     // The armour you wear, under your feet.
                     Tooltip(
                       message: '${tier.name}: −${(tier.reduction * 100).round()}% damage taken${k.loadout.armourEnchant == null ? '' : ' · ${k.loadout.armourEnchant!.title}: ${k.loadout.armourEnchant!.describe}'}',
@@ -277,9 +280,13 @@ class _PaperDoll extends StatelessWidget {
                   ],
                 ),
               ),
-              column([slot(GearSlot.weapon, 'Weapon'), slot(GearSlot.offhand, offName), slot(GearSlot.ring, 'Ring'), slot(GearSlot.trinket, 'Trinket')]),
+              column([slot(GearSlot.weapon, 'Weapon'), slot(GearSlot.offhand, offName), slot(GearSlot.ring, 'Ring'), slot(GearSlot.trinket, 'Trinket')], fill),
             ],
-          ),
+          );
+        return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (fill) Expanded(child: top) else top,
           // Sets and cape abilities, when they apply.
           for (final (set, n) in activeSets(k.setGear))
             Padding(padding: const EdgeInsets.only(top: 8), child: SetChips(set: set, dense: true, worn: n)),
@@ -295,7 +302,8 @@ class _PaperDoll extends StatelessWidget {
                 Tooltip(
                   message: tip,
                   child: Container(
-                    width: phone ? 60 : 78,
+                    // On a phone, seven to a row so the totals take two rows, not three.
+                    width: phone ? math.min(60.0, (room.maxWidth - 6 * 4) / 7).floorToDouble() : 78,
                     padding: EdgeInsets.symmetric(vertical: phone ? 3 : 6),
                     decoration: BoxDecoration(color: const Color(0x55000000), border: Border.all(color: Palette.stone3), borderRadius: BorderRadius.circular(4)),
                     child: Column(
@@ -312,7 +320,8 @@ class _PaperDoll extends StatelessWidget {
             ],
           ),
         ],
-      ),
+      );
+      }),
     );
   }
 }
@@ -789,12 +798,14 @@ class _Spellbook extends StatelessWidget {
                                       child: Opacity(
                                         opacity: known ? 1 : .4,
                                         // Shrinks to the tile on a narrow phone rather than spill out of it.
-                                        child: FittedBox(
+                                        child: Padding(
+                                          padding: const EdgeInsets.fromLTRB(4, 8, 4, 6),
+                                          child: FittedBox(
                                           fit: BoxFit.scaleDown,
                                           child: Column(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            Icon(known ? Icons.local_fire_department : Icons.lock, size: 34, color: col),
+                                            Icon(known ? Icons.local_fire_department : Icons.lock, size: 34, color: col, shadows: const [Shadow(color: Colors.black, offset: Offset(1, 2))]),
                                             const SizedBox(height: 4),
                                             Padding(
                                               padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -811,18 +822,21 @@ class _Spellbook extends StatelessWidget {
                                           ],
                                         ),
                                         ),
+                                        ),
                                       ),
                                     ),
                                     if (!known) Positioned(right: 5, top: 4, child: Text('Lv ${sp.level}', style: Txt.label(size: 11, color: Palette.parch2))),
+                                    // On the hotbar: its slot number in a small round badge in the corner.
                                     if (prepared)
                                       Positioned(
-                                        left: 0,
-                                        right: 0,
-                                        top: 0,
+                                        left: 4,
+                                        top: 4,
                                         child: Container(
-                                          padding: const EdgeInsets.symmetric(vertical: 1),
-                                          decoration: BoxDecoration(color: col, borderRadius: const BorderRadius.vertical(top: Radius.circular(4))),
-                                          child: Text('SLOT ${slotAt + 1}', textAlign: TextAlign.center, style: Txt.label(size: 10, color: const Color(0xFF15110C))),
+                                          width: 20,
+                                          height: 20,
+                                          alignment: Alignment.center,
+                                          decoration: BoxDecoration(shape: BoxShape.circle, color: col, border: Border.all(color: const Color(0xFF15110C), width: 1.5)),
+                                          child: Text('${slotAt + 1}', style: Txt.label(size: 12, color: const Color(0xFF15110C), weight: FontWeight.w900)),
                                         ),
                                       ),
                                   ],
@@ -1047,7 +1061,7 @@ class _Home extends StatelessWidget {
     );
     // The way up, tent to keep: what each gives, built or not. Last, so on a tall phone it takes
     // the room that's left (given a height, it spreads out to fill it).
-    const extras = ['a campfire', 'a herb garden', 'an armoury'], icons = [Icons.holiday_village, Icons.cottage, Icons.castle];
+    const extras = ['a campfire', 'herbs, and Wren\'s errands', 'an armoury, and the ruins'], icons = [Icons.holiday_village, Icons.cottage, Icons.castle];
     final ladder = Stone(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1115,6 +1129,7 @@ class _Home extends StatelessWidget {
             ],
           ),
         ),
+        if (s.home >= 1) ...[const SizedBox(height: 10), ErrandsPanel(controller: c)],
         if (next != null) ...[
           const SizedBox(height: 10),
           Stone(
@@ -1243,15 +1258,21 @@ class _Training extends StatelessWidget {
                             borderRadius: BorderRadius.circular(4),
                             onTap: free > 0 ? () => c.train(t) : null,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 6),
+                              padding: const EdgeInsets.symmetric(vertical: 4),
                               decoration: BoxDecoration(borderRadius: BorderRadius.circular(4), border: Border.all(color: free > 0 ? _colours[t]!.withValues(alpha: .7) : Palette.stone3)),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
+                              child: Column(
                                 children: [
-                                  Icon(_icons[t], color: _colours[t], size: 18),
-                                  const SizedBox(width: 4),
-                                  Text('${trained(k, t)}', style: Txt.label(size: 15, color: _colours[t]!, weight: FontWeight.w800)),
-                                  if (free > 0) Text(' +', style: Txt.label(size: 15, color: Palette.cream, weight: FontWeight.w800)),
+                                  // Its name, one word, over the icon and points.
+                                  Text(t.label, maxLines: 1, style: Txt.label(size: 11.5, color: Palette.parch)),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(_icons[t], color: _colours[t], size: 18),
+                                      const SizedBox(width: 4),
+                                      Text('${trained(k, t)}', style: Txt.label(size: 15, color: _colours[t]!, weight: FontWeight.w800)),
+                                      if (free > 0) Text(' +', style: Txt.label(size: 15, color: Palette.cream, weight: FontWeight.w800)),
+                                    ],
+                                  ),
                                 ],
                               ),
                             ),

@@ -3,7 +3,7 @@
 // the Gloomfen's gift, and a tamed wyvern is won in the Cinderreach.
 
 class Mount {
-  const Mount(this.id, this.name, this.desc, this.charge, {this.price = 0, this.mend = 0, this.burn = false, this.flying = false});
+  const Mount(this.id, this.name, this.desc, this.charge, {this.price = 0, this.mend = 0, this.burn = false, this.flying = false, this.level = 0, this.cores = 0});
   final String id, name, desc;
 
   /// The Charge's damage as a share of an attack.
@@ -21,12 +21,17 @@ class Mount {
   /// Swoops from the sky instead of galloping (the wyvern).
   final bool flying;
 
+  /// Level you need to buy it, and Ember cores (from the fire elementals) Mags needs to bring one
+  /// to heel: the Hellsteed, the stable's last step.
+  final int level, cores;
+
   bool get dropOnly => price == 0;
 }
 
 const mounts = <Mount>[
   Mount('pony', 'Sturdy pony', 'Small, stubborn and surprisingly brave. Opens every fight by riding the foe down: a free charge worth 30% of a blow', .3, price: 180),
   Mount('warhorse', 'Warhorse', 'A barded destrier trained for the lists. Opens every fight by riding the foe down: a free charge worth 50% of a blow', .5, price: 700),
+  Mount('hellsteed', 'Hellsteed', 'Bred in the Caldera\'s smoke and broken with ember cores in its feed. Opens every fight by riding the foe down: a free charge worth 68% of a blow, and the foe burns', .68, price: 3500, burn: true, level: 28, cores: 2),
   Mount('unicorn', 'Unicorn', 'Tamed in the Thornwild, very politely. Opens every fight by riding the foe down: a free charge worth 55% of a blow, and its horn mends 8% of your health', .55, mend: .08),
   Mount('nightmare', 'Nightmare', 'A ghostly black horse from the Bone Colossus\'s ribcage. It snorts embers. Opens every fight by riding the foe down: a free charge worth 60% of a blow, and the foe burns', .6, burn: true),
   Mount('wyvern', 'Tamed wyvern', 'It swoops rather than gallops, and it bites. Opens every fight by riding the foe down: a free charge worth 65% of a blow', .65, flying: true),

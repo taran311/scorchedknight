@@ -379,11 +379,24 @@ void _bottle(Canvas c, Offset base, String kind, Color col, double t) {
 }
 
 /// Your home on the right of the square: the tent, then a cottage, then a keep.
-void paintHome(Canvas c, double t, int home) => switch (home) {
-  0 => paintTent(c, t),
-  1 => _cottage(c, t),
-  _ => _keep(c, t),
-};
+void paintHome(Canvas c, double t, int home) {
+  if (home == 0) return paintTent(c, t);
+  c.save();
+  if (home == 1) {
+    // The cottage a fifth bigger than drawn, its back corner running off the edge of the scene:
+    // a real house beside the inn, not a doll's one. (Still lower than the inn: it's one storey.)
+    c.translate(1010, _ground);
+    c.scale(1.22);
+    c.translate(-1010, -_ground);
+    _cottage(c, t);
+  } else {
+    // The keep: a step in from the edge so its gate and torches show; its tower rises above the
+    // inn's roof and runs off the side of the scene.
+    c.translate(-22, 0);
+    _keep(c, t);
+  }
+  c.restore();
+}
 
 /// A cottage: stone below, a thick thatch above, a lit window with a flower box, a chimney with
 /// smoke, and the herb garden out front.
@@ -450,8 +463,8 @@ void _keep(Canvas c, double t) {
   for (var x = 818.0; x < 960; x += 14) {
     c.drawRect(Rect.fromLTWH(x, 400, 8, 12), Paint()..color = stone);
   }
-  // The tower.
-  const tower = Rect.fromLTRB(866, 260, 940, _ground);
+  // The tower: tall and broad, taller than the inn, running off the edge of the scene.
+  const tower = Rect.fromLTRB(884, 150, 1010, _ground);
   c.drawRect(tower, Paint()..color = stone);
   for (var y = tower.top + 16; y < tower.bottom; y += 16) {
     c.drawLine(Offset(tower.left, y), Offset(tower.right, y), strokePaint(const Color(0xFF0C0908), 1));
@@ -460,27 +473,31 @@ void _keep(Canvas c, double t) {
     c.drawRect(Rect.fromLTWH(x, tower.top - 14, 10, 15), Paint()..color = stone);
   }
   c.drawLine(tower.topLeft, tower.bottomLeft, strokePaint(lip, 1.4));
-  // Arrow slits and a lit window high up.
-  for (final y in const [300.0, 360.0]) {
-    c.drawRect(Rect.fromLTWH(900, y, 5, 18), Paint()..color = const Color(0xFF050404));
+  // Arrow slits and lit windows up the tower.
+  for (final y in const [250.0, 330.0, 390.0]) {
+    c.drawRect(Rect.fromLTWH(908, y, 5, 18), Paint()..color = const Color(0xFF050404));
   }
-  const win = Rect.fromLTWH(892, 278, 20, 16);
+  const low = Rect.fromLTWH(934, 300, 18, 22);
+  c.drawCircle(low.center, 22, Paint()..color = _lamp.withValues(alpha: .18)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10));
+  c.drawRRect(RRect.fromRectAndCorners(low, topLeft: const Radius.circular(8), topRight: const Radius.circular(8)), Paint()..color = const Color(0xFFFFC870));
+  const win = Rect.fromLTWH(930, 176, 22, 18);
   c.drawCircle(win.center, 26, Paint()..color = _lamp.withValues(alpha: .22)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10));
   c.drawRRect(RRect.fromRectAndCorners(win, topLeft: const Radius.circular(8), topRight: const Radius.circular(8)), Paint()..color = const Color(0xFFFFC870));
   // The banner: your flame on red, rippling.
-  c.drawRect(const Rect.fromLTWH(901, 200, 3, 46), Paint()..color = stone);
+  const pole = 908.0, top = 90.0;
+  c.drawRect(const Rect.fromLTWH(pole, top, 3, 50), Paint()..color = stone);
   final wave = math.sin(t / 280) * 3;
   c.drawPath(
     Path()
-      ..moveTo(904, 204)
-      ..quadraticBezierTo(920, 200 + wave, 940, 206)
-      ..lineTo(936, 216)
-      ..lineTo(940, 226)
-      ..quadraticBezierTo(920, 222 - wave, 904, 226)
+      ..moveTo(pole + 3, top + 4)
+      ..quadraticBezierTo(pole + 19, top + wave, pole + 39, top + 6)
+      ..lineTo(pole + 35, top + 16)
+      ..lineTo(pole + 39, top + 26)
+      ..quadraticBezierTo(pole + 19, top + 22 - wave, pole + 3, top + 26)
       ..close(),
     Paint()..color = const Color(0xFF8E2117),
   );
-  c.drawCircle(Offset(918, 215 + wave * .3), 3, Paint()..color = const Color(0xFFFFB04A));
+  c.drawCircle(Offset(pole + 17, top + 15 + wave * .3), 3, Paint()..color = const Color(0xFFFFB04A));
   // The gate, with torches either side.
   final gate = Path()
     ..moveTo(830, _ground)

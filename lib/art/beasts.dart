@@ -34,6 +34,7 @@ const warhorseLook = HorseLook(coat: [Color(0xFF6A4A36), Color(0xFF3A2618), Colo
 const unicornLook = HorseLook(coat: [Color(0xFFFFFFFF), Color(0xFFD8DCE8), Color(0xFF7A80A0)], mane: Color(0xFFE8D8FF), hoof: Color(0xFFE8C060), eye: Color(0xFF3A6AB8), horn: Color(0xFFF6E2A0), glow: Color(0xFFE8D8FF));
 const moonhornLook = HorseLook(coat: [Color(0xFFE8F0FF), Color(0xFFA8B8E0), Color(0xFF3A4A7A)], mane: Color(0xFF9AD8FF), hoof: Color(0xFFC8D8F0), eye: Color(0xFF9ADFFF), horn: Color(0xFFCFF0FF), glow: Color(0xFF9ADFFF));
 const nightmareLook = HorseLook(coat: [Color(0xFF4A3A3E), Color(0xFF1E1418), Color(0xFF060304)], mane: Color(0xFFFF6A1A), hoof: Color(0xFFFF8A2A), eye: Color(0xFFFFD24A), fire: true, saddle: Color(0xFF2A1A1A));
+const hellsteedLook = HorseLook(coat: [Color(0xFF5A1E14), Color(0xFF2A0A08), Color(0xFF0A0202)], mane: Color(0xFFFF3A12), hoof: Color(0xFFFFA23A), eye: Color(0xFFFF2A0A), fire: true, barding: Color(0xFF2A2420), saddle: Color(0xFF1A0E0A), glow: Color(0xFFFF5A1A));
 const spectralLook = HorseLook(coat: [Color(0xFFE8FAFF), Color(0xFF9AD8F0), Color(0xFF3A7A9A)], mane: Color(0xFFCFF4FF), hoof: Color(0xFF9AD8F0), eye: Color(0xFFFFFFFF), ghost: true, glow: Color(0xFF9ADFFF));
 const centaurLook = HorseLook(coat: [Color(0xFFB08458), Color(0xFF6E4A2A), Color(0xFF2A1A0E)], mane: Color(0xFF3A2A1A));
 const centaurChiefLook = HorseLook(coat: [Color(0xFF7A7A80), Color(0xFF3E3E44), Color(0xFF141418)], mane: Color(0xFFE8E4DA), barding: Color(0xFF2E4A2A));
@@ -43,6 +44,7 @@ HorseLook horseFor(String id) => switch (id) {
   'pony' => ponyLook,
   'unicorn' => unicornLook,
   'nightmare' => nightmareLook,
+  'hellsteed' => hellsteedLook,
   _ => warhorseLook,
 };
 

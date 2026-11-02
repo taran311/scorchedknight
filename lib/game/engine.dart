@@ -14,6 +14,7 @@ import 'classes.dart';
 import 'loot.dart';
 import 'models.dart';
 import 'mounts.dart';
+import 'errands.dart';
 import 'spells.dart';
 import 'tarot.dart';
 import 'vault.dart';
@@ -315,6 +316,7 @@ class GameEngine {
       for (final sp in spells.where((sp) => sp.level == k.level)) {
         if (k.rites.length < riteSlots && !k.rites.contains(sp.id)) {
           k.rites.add(sp.id);
+          state.did.add('hotbar:${sp.id}');
           _note('You learn ${sp.name}. It\'s on your hotbar.', EntryKind.gold);
         } else {
           _note('You learn ${sp.name}. Swap it onto your hotbar in your tent.', EntryKind.gold);
@@ -2552,6 +2554,7 @@ class GameEngine {
       state.struggle.remove(c);
       if (firstBoss) {
         state.bossesDown.add(c);
+        if (c == 0) _note('Up the lane, Old Wick\'s tower door creaks open at last. "Is that one-eyed brute gone? Good. Come in, come in."', EntryKind.good);
         companion = land.companionText;
         switch (land.companion) {
           case Companion.wolf:
@@ -2962,6 +2965,7 @@ class GameEngine {
     state.knight.hp = maxHp(state.knight);
     _note('Hob hammers the last plank into place and lights the fire. "Rooms are free for you, forever. And here, for your trouble." +$innRepairReward gold and $innRepairPotions potions.', EntryKind.gold);
     _note('With the goblins scattered, the rest of Cindervale\'s troubles come out of the ash: bandits, looters, wolves and worse.', EntryKind.plain);
+    _note('Dunstan climbs down off the roof, dusts off his apron and stokes his forge. It\'s open.', EntryKind.good);
     return true;
   }
 
@@ -3320,10 +3324,119 @@ class GameEngine {
     if ((mountById(k.mount)?.charge ?? 0) < m.charge) k.mount = id;
   }
 
+  /// Why a place in the square is still shut (null: open). The square opens up as you go: Mags
+  /// from the start, Dunstan once he's done helping Hob mend the inn, Old Wick once Gorbo falls
+  /// (just before the Gloomfen, where you first need one of his wards).
+  String? whyShut(String place) => switch (place) {
+    'forge' when !state.innRepaired => 'Dunstan\'s up on Hob\'s roof. Mend the Soot & Kettle first',
+    'tower' when !state.bossesDown.contains(0) => 'Old Wick won\'t open his door while Gorbo\'s about. Beat Gorbo first',
+    _ => null,
+  };
+
+  // ---------------- Wren's errands ----------------
+
+  /// Why Wren can't go on [id] now (null: she can).
+  String? whyNotErrand(String id) {
+    final e = errandById(id);
+    if (e == null) return 'No such errand';
+    if (state.home < 1) return 'Build the cottage first';
+    if (state.home < e.home) return 'Build the keep first';
+    if (state.errand != null) return '$retainerName is already out';
+    if (state.knight.coins < e.feeAt(state.knight.level)) return 'Needs ${e.feeAt(state.knight.level)} gold';
+    return null;
+  }
+
+  /// Sends Wren off on [id], paying her fee.
+  bool sendErrand(String id) {
+    if (whyNotErrand(id) != null) return false;
+    final e = errandById(id)!;
+    state.knight.coins -= e.feeAt(state.knight.level);
+    state
+      ..errand = id
+      ..errandAt = state.foesFelled;
+    state.did.add('errand');
+    _note('$retainerName sets out to ${e.name.toLowerCase()}. She\'ll be back in ${e.fights} fights.');
+    return true;
+  }
+
+  /// Fights left before Wren is back (0: she's back, with her finds).
+  int get errandLeft {
+    final e = errandById(state.errand);
+    return e == null ? 0 : math.max(0, e.fights - (state.foesFelled - state.errandAt));
+  }
+
+  bool get errandBack => state.errand != null && errandLeft == 0;
+
+  /// Takes what Wren brought back: each find as a line to show. Gear goes to your pending loot.
+  List<String> collectErrand() {
+    final e = errandById(state.errand);
+    if (e == null || !errandBack) return const [];
+    final k = state.knight, got = <String>[];
+    void mat(String key, int n, String name) {
+      if (n <= 0) return;
+      state.addMat(key, n);
+      got.add('$n× $name');
+    }
+    switch (e.id) {
+      case 'fields':
+        final timber = 1 + _rng.nextInt(2), iron = _rng.nextInt(2);
+        state.timber += timber;
+        state.ironScrap += iron;
+        got.add('$timber charred timber');
+        if (iron > 0) got.add('$iron iron scrap');
+        // Herbs for the wards of lands you can reach.
+        final lands = [for (var l = 0; l < continents.length; l++) if (whyNotTravel(l) == null && continents[l].reagent.isNotEmpty) l];
+        if (lands.isNotEmpty) {
+          final l = lands[_rng.nextInt(lands.length)], n = 1 + _rng.nextInt(2);
+          state.reagents[l] += n;
+          got.add('$n× ${continents[l].reagent}');
+        }
+      case 'wilds':
+        final g = Gem.values[_rng.nextInt(Gem.values.length)];
+        mat(gemKey(g), 1, g.label);
+        final metal = k.level >= 25 && _rng.nextDouble() < .2 ? Metal.obsidian : (_rng.nextDouble() < .3 ? Metal.gold : Metal.iron);
+        mat(oreKey(metal), 1 + _rng.nextInt(2), metal.ore);
+        if (_rng.nextDouble() < .15) {
+          final el = Elemental.values[_rng.nextInt(Elemental.values.length)];
+          mat(coreKey(el), 1, el.core);
+        }
+      case 'ruins':
+        final purse = 80 + 8 * k.level + _rng.nextInt(40 + 4 * k.level);
+        k.coins += purse;
+        got.add('$purse gold');
+        if (_rng.nextDouble() < .6) {
+          final item = loot.roll(k.heroClass, k.level, wielding: k.loadout.weapon);
+          state.pendingLoot.add(item);
+          got.add(item.name);
+        }
+        if (_rng.nextDouble() < .15) {
+          state.keys++;
+          got.add('a Cinder key');
+        }
+    }
+    state.errand = null;
+    _note('$retainerName is back from the errand with ${got.join(', ')}.', EntryKind.gold);
+    return got;
+  }
+
+  /// What else Mags needs before she'll sell [id] (null: just the gold).
+  String? whyNotBuy(String id) {
+    final m = id.startsWith('mount:') ? mountById(id.substring(6)) : null;
+    if (m == null) return null;
+    if (state.knight.level < m.level) return 'Reach level ${m.level}';
+    final have = state.mat(coreKey(Elemental.ember));
+    if (have < m.cores) return 'Needs ${m.cores} Ember cores ($have)';
+    return null;
+  }
+
   bool purchase(String id) {
     final k = state.knight, price = priceOf(id);
-    if (state.inBattle || k.coins < price || owns(id) || !engineSells(id)) return false;
+    if (state.inBattle || k.coins < price || owns(id) || !engineSells(id) || whyNotBuy(id) != null) return false;
     k.coins -= price;
+    if (id.startsWith('mount:')) {
+      final cores = mountById(id.substring(6))!.cores;
+      if (cores > 0) state.addMat(coreKey(Elemental.ember), -cores);
+    }
     String what;
     final ammo = id.startsWith('ammo:') ? ammoById(id.substring(5)) : null;
     if (ammo != null) {
@@ -3335,6 +3448,7 @@ class GameEngine {
     final mount = id.startsWith('mount:') ? mountById(id.substring(6)) : null;
     if (mount != null) {
       _gainMount(mount.id);
+      state.did.add('steed');
       _note('You buy ${withArticle(mount.name.toLowerCase())} for $price gold. Every fight now opens with a charge.', EntryKind.gold);
       return true;
     }

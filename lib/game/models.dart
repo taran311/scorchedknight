@@ -455,6 +455,8 @@ class GameState {
     this.knockouts = 0,
     this.flees = 0,
     this.ng = 0,
+    this.errand,
+    this.errandAt = 0,
     Set<String>? did,
     Set<String>? tasksClaimed,
   }) : did = did ?? {},
@@ -692,6 +694,10 @@ class GameState {
   /// through). Each one makes the foes tougher and legendaries likelier.
   int ng;
 
+  /// Wren's errand under way (null: she's home), and how many foes you'd felled when she set out.
+  String? errand;
+  int errandAt;
+
   /// Firsts you've done that the game can't otherwise tell from your save ('brew', 'deal',
   /// 'temper'…), for the tasks; and the tasks whose rewards you've claimed.
   final Set<String> did, tasksClaimed;
@@ -817,6 +823,8 @@ class GameState {
     'kos': knockouts,
     'flees': flees,
     if (ng > 0) 'ng': ng,
+    if (errand != null) 'errand': errand,
+    if (errand != null) 'errandAt': errandAt,
     if (did.isNotEmpty) 'did': did.toList(),
     if (tasksClaimed.isNotEmpty) 'tasks': tasksClaimed.toList(),
   };
@@ -950,6 +958,8 @@ class GameState {
       knockouts: n('kos'),
       flees: n('flees'),
       ng: n('ng'),
+      errand: j['errand'] as String?,
+      errandAt: n('errandAt'),
       did: {...((j['did'] as List?) ?? const []).whereType<String>()},
       tasksClaimed: {...((j['tasks'] as List?) ?? const []).whereType<String>()},
     );

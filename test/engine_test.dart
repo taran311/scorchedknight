@@ -21,6 +21,7 @@ import 'package:scorchedknight/game/tarot.dart';
 import 'package:scorchedknight/game/vault.dart';
 import 'package:scorchedknight/game/wilds.dart';
 import 'package:scorchedknight/game/dungeons.dart';
+import 'package:scorchedknight/game/errands.dart';
 
 /// Fights the current foe with plain attacks (and potions when low) until it's over.
 SwingResult fightOut(GameEngine e) {
@@ -566,6 +567,45 @@ void main() {
     expect(featTasks.map((t) => t.id).toSet().length, featTasks.length);
     final gold = featTasks.fold<int>(0, (n, t) => n + t.reward.gold);
     expect(gold, lessThan(15000));
+  });
+
+  test('Wren: errands from the cottage, paid up front, back after a few fights with finds', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(3));
+    final s = e.state, k = s.knight;
+    k.coins = 5000;
+    expect(e.whyNotErrand('fields'), isNotNull, reason: 'no cottage yet');
+    s.home = 1;
+    expect(e.whyNotErrand('ruins'), isNotNull, reason: 'the ruins wait for the keep');
+    expect(e.sendErrand('fields'), isTrue);
+    expect(k.coins, 5000 - errandById('fields')!.feeAt(k.level));
+    expect(e.whyNotErrand('wilds'), isNotNull, reason: 'one errand at a time');
+    expect(e.errandBack, isFalse);
+    expect(e.collectErrand(), isEmpty);
+    s.foesFelled += errandById('fields')!.fights;
+    expect(e.errandBack, isTrue);
+    final timber = s.timber;
+    expect(e.collectErrand(), isNotEmpty);
+    expect(s.timber, greaterThan(timber));
+    expect(s.errand, isNull);
+    expect(s.did, contains('errand'));
+    // Saved mid-errand and loaded.
+    e.sendErrand('wilds');
+    final back = GameState.fromJson(jsonDecode(jsonEncode(s.toJson())) as Map<String, dynamic>);
+    expect(back.errand, 'wilds');
+    expect(back.errandAt, s.errandAt);
+  });
+
+  test('the stable: the Hellsteed needs level 28 and two Ember cores as well as gold', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(3));
+    final s = e.state, k = s.knight;
+    k.coins = 99999;
+    expect(e.purchase('mount:hellsteed'), isFalse);
+    k.level = 28;
+    expect(e.whyNotBuy('mount:hellsteed'), contains('Ember cores'));
+    s.addMat(coreKey(Elemental.ember), 2);
+    expect(e.purchase('mount:hellsteed'), isTrue);
+    expect(s.mat(coreKey(Elemental.ember)), 0);
+    expect(k.mount, 'hellsteed');
   });
 
   test('bolts can be swapped any time, plain ones in between', () {

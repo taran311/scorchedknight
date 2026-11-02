@@ -33,6 +33,7 @@ import 'battle_screen.dart';
 import 'class_picker.dart' show HeroOrHeroine;
 import 'frames.dart';
 import 'hud.dart';
+import 'errands_view.dart';
 import 'task_routes.dart';
 import 'tasks_view.dart';
 import 'item_icons.dart';
@@ -139,6 +140,18 @@ class _InnPageState extends State<InnPage> with RouteAware {
     await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => TrailPage(controller: c, land: land)));
   }
 
+  /// Whether a place in the square is still shut (see GameEngine.whyShut).
+  bool _shutSpot(TownSpot spot) => switch (spot) {
+    TownSpot.forge => c.whyShut('forge') != null,
+    TownSpot.enchanter => c.whyShut('tower') != null,
+    _ => false,
+  };
+
+  /// A shut place, tapped: why, and what opens it.
+  void _shut(String why) => ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+    SnackBar(behavior: SnackBarBehavior.floating, backgroundColor: Palette.stone2, duration: const Duration(seconds: 3), content: Text('🔒 $why', style: Txt.label(size: 13, color: Palette.cream))),
+  );
+
   /// Talk to Hob: take his job, check on it, or hand it in.
   Future<void> _talk() => talkToHob(context, c, onHunt: _hunt);
 
@@ -182,8 +195,8 @@ class _InnPageState extends State<InnPage> with RouteAware {
                             TownSpot.stall: s.inBattle ? null : () => showMerchantWindow(context, c),
                             TownSpot.inn: () => visitInn(context, c, onHunt: _hunt),
                             TownSpot.tent: _openKit,
-                            TownSpot.forge: s.inBattle ? null : () => showForgeWindow(context, c),
-                            TownSpot.enchanter: s.inBattle ? null : () => showEnchanterWindow(context, c),
+                            TownSpot.forge: s.inBattle ? null : () => c.whyShut('forge') == null ? showForgeWindow(context, c) : _shut(c.whyShut('forge')!),
+                            TownSpot.enchanter: s.inBattle ? null : () => c.whyShut('tower') == null ? showEnchanterWindow(context, c) : _shut(c.whyShut('tower')!),
                           };
       return Scaffold(
         body: Column(
@@ -246,7 +259,7 @@ class _InnPageState extends State<InnPage> with RouteAware {
                                       children: [
                                         for (final (j, spot) in row.indexed) ...[
                                           if (j > 0) const SizedBox(width: 8),
-                                          Expanded(child: _PlaceButton(icon: _TownSquareState._icons[spot]!, label: labels[spot]!, onTap: taps[spot], hot: spot == TownSpot.gate, accent: _placeAccent[spot], ready: (spot == TownSpot.forge && c.engine.forgeReady) || (spot == TownSpot.enchanter && c.engine.gemsWaiting))),
+                                          Expanded(child: _PlaceButton(icon: _TownSquareState._icons[spot]!, label: labels[spot]!, onTap: taps[spot], hot: spot == TownSpot.gate, accent: _placeAccent[spot], locked: _shutSpot(spot), ready: !_shutSpot(spot) && ((spot == TownSpot.forge && c.engine.forgeReady) || (spot == TownSpot.enchanter && c.engine.gemsWaiting)))),
                                         ],
                                       ],
                                     ),
@@ -291,6 +304,11 @@ class _InnPageState extends State<InnPage> with RouteAware {
                         // The next task: something to try, and a little for trying it.
                         if (c.nextTask != null) ...[
                           TaskCard(controller: c, onGo: (t) => goToTask(context, c, t)),
+                          const SizedBox(height: 10),
+                        ],
+                        // Wren, your housekeeper (from the cottage): out on an errand, back, or idle.
+                        if (s.home >= 1) ...[
+                          WrenCard(controller: c, onOpen: () => openTent(context, c, tab: 'home')),
                           const SizedBox(height: 10),
                         ],
                         // Hob's cellar: once you've a Cinder key (or have ever opened it).
@@ -697,7 +715,9 @@ class _LogPanelState extends State<_LogPanel> {
   @override
   Widget build(BuildContext context) {
     if (widget.fill) {
-      return LayoutBuilder(builder: (context, box) => box.maxHeight >= 90 ? _filled() : Align(alignment: Alignment.topCenter, child: _panel()));
+      // (Clipped: it never spills past the room it's given, over the navigation bar. Folded, it
+      // opens as a sheet instead of growing down the screen.)
+      return LayoutBuilder(builder: (context, box) => ClipRect(child: box.maxHeight >= 90 ? _filled() : Align(alignment: Alignment.topCenter, child: _panel(sheet: true))));
     }
     return _panel();
   }
@@ -745,31 +765,59 @@ class _LogPanelState extends State<_LogPanel> {
     );
   }
 
-  Widget _panel() {
-    final last = widget.entries.isEmpty ? null : widget.entries.last;
+  /// The whole log in a sheet from the bottom, for a phone's square with no room to open it.
+  void _sheet() => showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: Colors.transparent,
+    isScrollControlled: true,
+    builder: (context) => ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .6),
+      child: Parchment(
+        padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.history_edu, color: Palette.inkSoft, size: 22),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Adventure log', style: Txt.inkLabel(size: 15))),
+                IconButton(tooltip: 'Close', onPressed: () => Navigator.of(context).pop(), icon: const Icon(Icons.expand_more, color: Palette.inkSoft)),
+              ],
+            ),
+            Flexible(child: JournalEntryList(entries: widget.entries)),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  Widget _panel({bool sheet = false}) {
+    final last = widget.entries.isEmpty ? null : widget.entries.last, open = _open && !sheet;
     return Parchment(
       padding: const EdgeInsets.fromLTRB(10, 4, 4, 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           InkWell(
-            onTap: () => setState(() => _open = !_open),
+            onTap: sheet ? _sheet : () => setState(() => _open = !_open),
             child: Row(
               children: [
                 const Icon(Icons.history_edu, color: Palette.inkSoft, size: 22),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: _open
+                  child: open
                       ? Text('Adventure log', style: Txt.inkLabel(size: 15))
                       : Text(last?.text ?? 'Nothing yet', maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.body(size: 14, color: Palette.inkSoft)),
                 ),
                 IconButton(tooltip: 'The story so far', onPressed: widget.onStory, icon: const Icon(Icons.menu_book, color: Palette.blood, size: 20)),
-                Icon(_open ? Icons.expand_less : Icons.expand_more, color: Palette.inkSoft),
+                Icon(open ? Icons.expand_less : Icons.expand_more, color: Palette.inkSoft),
                 const SizedBox(width: 6),
               ],
             ),
           ),
-          if (_open) Padding(padding: const EdgeInsets.only(right: 6, bottom: 6), child: JournalEntryList(entries: widget.entries)),
+          if (open) Padding(padding: const EdgeInsets.only(right: 6, bottom: 6), child: JournalEntryList(entries: widget.entries)),
         ],
       ),
     );
@@ -1308,7 +1356,10 @@ const _placeAccent = <TownSpot, Color>{
 
 /// One of the town's places as a big button (on a phone, under the scene).
 class _PlaceButton extends StatelessWidget {
-  const _PlaceButton({required this.icon, required this.label, this.onTap, this.hot = false, this.ready = false, this.accent});
+  const _PlaceButton({required this.icon, required this.label, this.onTap, this.hot = false, this.ready = false, this.accent, this.locked = false});
+
+  /// Not open yet: dimmed, with a padlock (tapping says what opens it).
+  final bool locked;
   final IconData icon;
   final String label;
   final VoidCallback? onTap;
@@ -1325,7 +1376,7 @@ class _PlaceButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Opacity(
-    opacity: onTap == null ? .5 : 1,
+    opacity: onTap == null || locked ? .5 : 1,
     child: Material(
       color: Colors.transparent,
       child: InkWell(
@@ -1362,6 +1413,7 @@ class _PlaceButton extends StatelessWidget {
                   height: 10,
                   decoration: BoxDecoration(shape: BoxShape.circle, color: Palette.amber, boxShadow: [BoxShadow(color: Palette.amber.withValues(alpha: .7), blurRadius: 6)]),
                 ),
+              if (locked) const Icon(Icons.lock, size: 18, color: Palette.parch2),
             ],
           );
           }),

@@ -56,6 +56,13 @@ const spells = <Spell>[
   Spell('undeadhorde', 'Raise the Horde', 'Three skeletons claw out of the earth and fight for 3 turns', 15, 5, SpellKind.summon, 0xFF8A5AC0, summons: 3, turns: 3),
   Spell('lifedrain', 'Life Drain', 'Drain the foe\'s life: 1.8x damage, and you heal half of it', 18, 4, SpellKind.drain, 0xFF8BE05A, mult: 1.8),
   Spell('healinglight', 'Healing Light', 'A column of golden light: an attack that also mends 30% of your health', 9, 4, SpellKind.heal, 0xFFFFE27A, mend: .3),
+  // The late rites, for the long road to the Ember King: each a stronger turn on one you know,
+  // at full mana, so none of them makes an earlier one pointless before it's earned its place.
+  Spell('emberstorm', 'Ember Storm', 'A storm of cinders leaps from foe to ground to foe: 2.6x damage', 22, 5, SpellKind.chain, 0xFFFF9A4A, mult: 2.6),
+  Spell('ashenhex', 'Ashen Hex', 'Choking ash in its lungs: its counters hit 40% softer for 6 turns', 26, 3, SpellKind.weaken, 0xFFA89C8C, hex: 6),
+  Spell('phoenix', 'Phoenix Flame', 'Wings of fire fold round you: an attack that also mends 45% of your health', 30, 5, SpellKind.heal, 0xFFFFB04A, mend: .45),
+  Spell('bonelegion', 'Bone Legion', 'Four skeletons in rusted mail rise and fight for 3 turns', 35, 5, SpellKind.summon, 0xFF9A7AD0, summons: 4, turns: 3),
+  Spell('cataclysm', 'Cataclysm', 'The sky splits and the ash comes down burning: 3x damage plus fire', 40, 5, SpellKind.dragon, 0xFFFF5A2A, mult: 3, element: Stat.burn),
 ];
 
 Spell? spellById(String? id) => spells.where((s) => s.id == id).firstOrNull;

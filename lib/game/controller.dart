@@ -17,6 +17,7 @@ import 'tasks.dart';
 import 'models.dart';
 import 'events.dart';
 import 'rules.dart' show Trait, suitWorn;
+import 'spells.dart' show spellById;
 import 'tarot.dart';
 import 'vault.dart';
 import 'wilds.dart';
@@ -647,6 +648,9 @@ class GameController extends ChangeNotifier {
 
   bool equipFromStash(String id) {
     final ok = engine.equipFromStash(id);
+    // Something found and kept in the chest counts for "Wear something you found"; the gear you
+    // set out with, taken off and put back on, doesn't.
+    if (ok && !id.startsWith('starter-')) engine.mark('equip');
     if (ok) _changed();
     return ok;
   }
@@ -786,6 +790,8 @@ class GameController extends ChangeNotifier {
 
   void applyEnchant(EnchantSlot slot, EnchantRoll roll) {
     engine.applyEnchant(slot, roll);
+    // Marked as it's done, so taking the enchanted piece off later doesn't undo the task.
+    engine.mark(slot == EnchantSlot.weapon ? 'runeWeapon' : 'runeArmour');
     _changed();
   }
 
@@ -801,8 +807,13 @@ class GameController extends ChangeNotifier {
 
   /// Puts a rite on the hotbar or takes it off.
   void prepareSpell(String id) {
+    final had = state.knight.rites.contains(id), fresh = !had && !state.did.contains('hotbar:$id') && (spellById(id)?.level ?? 0) > 3;
     engine.toggleRite(id);
-    if (state.knight.rites.contains(id)) engine.mark('rite');
+    final on = state.knight.rites.contains(id);
+    if (on) engine.mark('hotbar:$id');
+    // The task: a rite you've learned but never had on the hotbar, swapped on by hand. (The first
+    // three, levels 1 to 3, go on by themselves; taking one off and putting it back isn't new.)
+    if (fresh && on) engine.mark('rite');
     _changed();
   }
 
@@ -884,6 +895,25 @@ class GameController extends ChangeNotifier {
 
   GameTask? get nextTask => engine.nextTask;
   bool taskDone(GameTask t) => engine.taskDone(t);
+
+  String? whyShut(String place) => engine.whyShut(place);
+
+  // Wren's errands.
+  String? whyNotErrand(String id) => engine.whyNotErrand(id);
+  int get errandLeft => engine.errandLeft;
+  bool get errandBack => engine.errandBack;
+
+  bool sendErrand(String id) {
+    final ok = engine.sendErrand(id);
+    if (ok) _changed();
+    return ok;
+  }
+
+  List<String> collectErrand() {
+    final got = engine.collectErrand();
+    if (got.isNotEmpty) _changed();
+    return got;
+  }
   int get tasksReady => engine.tasksReady;
 
   List<String>? claimTask(String id) {
@@ -899,7 +929,7 @@ class GameController extends ChangeNotifier {
 
   int equipLoot(String id) {
     final sold = engine.equipLoot(id);
-    engine.mark('equip');
+    // (Not the "wear something" task: that one's for your tent, so you learn the chest and slots.)
     _changed();
     return sold;
   }

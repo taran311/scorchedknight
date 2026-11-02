@@ -2185,10 +2185,11 @@ class _ScenePainter extends CustomPainter {
     final summons = c.shownSummons;
     if (summons > 0) {
       final bone = foeLooks['skeleton']!;
-      for (var i = 0; i < summons.clamp(0, 3); i++) {
+      for (var i = 0; i < summons.clamp(0, 4); i++) {
         // At rest a little ahead of you; on their turn they rush to the foe, near enough that the
-        // swing's lunge carries the blade into it.
-        final home = _knightX + 150 - i * 50.0, target = _foeX - 230 - i * 34.0;
+        // swing's lunge carries the blade into it. (A Bone Legion's fourth stands a step tighter.)
+        final gap = summons > 3 ? 40.0 : 50.0;
+        final home = _knightX + 150 - i * gap, target = _foeX - 230 - i * 34.0;
         final x = home + (target - home) * fx['bones']!;
         final idle = idlePose(bone.stance, t, phase: i * 1.3, still: still);
         final pose = still ? idle : (sampleClip(idle, swingClip, t - s._bonesAt - i * 70) ?? idle);

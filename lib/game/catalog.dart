@@ -259,8 +259,8 @@ class HomeTier {
 
 const homes = [
   HomeTier('Tent', stashSize, 'A chest for $stashSize pieces of gear, and a fire to sit by.'),
-  HomeTier('Cottage', 40, 'A chest for 40 pieces, and a herb garden: a free health potion every morning you wake here.', gold: 900, timber: 6, iron: 3, after: 0),
-  HomeTier('Keep', 80, 'A chest for 80 pieces, and an armoury: save two sets of gear and swap into either in one tap.', gold: 4500, timber: 10, iron: 8, after: 2),
+  HomeTier('Cottage', 40, 'A chest for 40 pieces, a herb garden (a free health potion every morning you wake here), and Wren, who keeps house and runs errands for you.', gold: 900, timber: 6, iron: 3, after: 0),
+  HomeTier('Keep', 80, 'A chest for 80 pieces, an armoury (save two sets of gear and swap into either in one tap), and Wren can search the old ruins.', gold: 4500, timber: 10, iron: 8, after: 2),
 ];
 
 /// Heroic trails: once a land's boss falls, its trail can be walked again the hard way. Every foe

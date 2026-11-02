@@ -295,7 +295,8 @@ class MerchantWares extends StatelessWidget {
             ),
         ],
         if (on('kit')) ...[
-        x.heading('Crossbow'),
+        // Each line one step at a time, the next upgrade only: tier n of all of them.
+        x.heading('Crossbow · ${math.min(k.crossbow + 2, crossbows.length)} of ${crossbows.length}'),
         x.ware(
           const Icon(Icons.gps_fixed, color: Color(0xFFC8A070), size: 26),
           k.crossbow + 1 < crossbows.length ? crossbows[k.crossbow + 1].$1 : crossbows.last.$1,
@@ -306,7 +307,7 @@ class MerchantWares extends StatelessWidget {
         ),
         if (upgrades.isNotEmpty) ...[
           x.heading('${k.heroClass.label} armour'),
-          for (final t in bought) x.ware(armourIcon(t), t.name, '−${(t.reduction * 100).round()}% damage taken · now −${(armourTierById(k.armour).reduction * 100).round()}%', x.buy(t.id)),
+          for (final t in bought.take(1)) x.ware(armourIcon(t), t.name, '−${(t.reduction * 100).round()}% damage taken · now −${(armourTierById(k.armour).reduction * 100).round()}%', x.buy(t.id)),
           if (bought.length < upgrades.length) Text('Better armour: forged at $smithName\'s', style: Txt.onStone(size: 12.5)),
         ],
         ],
@@ -345,10 +346,21 @@ class MerchantWares extends StatelessWidget {
         // would never leave the stable.
         if (on('kit')) ...() {
           final best = [for (final id in k.mounts) mountById(id)?.charge ?? 0].fold(0.0, math.max);
-          final better = [for (final m in mounts) if (!m.dropOnly && !k.mounts.contains(m.id) && m.charge > best) m];
+          final sold = [for (final m in mounts) if (!m.dropOnly) m]..sort((a, b) => a.charge.compareTo(b.charge));
+          final next = sold.where((m) => !k.mounts.contains(m.id) && m.charge > best).firstOrNull;
+          if (next == null) return const <Widget>[];
+          final why = e.whyNotBuy('mount:${next.id}'), cores = c.state.mat(coreKey(Elemental.ember));
           return [
-            if (better.isNotEmpty) x.heading('Stable'),
-            for (final m in better) x.ware(MountIcon(m.id), m.name, 'Opening charge: ${(m.charge * 100).round()}% of a blow', x.buy('mount:${m.id}')),
+            x.heading('Stable · ${sold.indexOf(next) + 1} of ${sold.length}'),
+            x.ware(
+              MountIcon(next.id),
+              next.name,
+              'Opening charge: ${(next.charge * 100).round()}% of a blow${next.burn ? ', and the foe burns' : ''} · now ${(best * 100).round()}%',
+              why == null ? x.buy('mount:${next.id}') : Text(why, textAlign: TextAlign.right, style: Txt.label(size: 12, color: Palette.parch2)),
+              extra: next.cores > 0
+                  ? Wrap(spacing: 10, children: [x.have(MatIcon.core(const Color(0xFFFF7A2A), size: 16), cores, next.cores), Text('Level ${next.level}+', style: Txt.label(size: 12, color: k.level >= next.level ? Palette.cream : Palette.parch2))])
+                  : null,
+            ),
           ];
         }(),
       ],

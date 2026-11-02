@@ -571,6 +571,9 @@ class _BattleScreenState extends State<BattleScreen> {
               _SlotInfo(sp.name, Color(sp.argb), lines),
               badgeArt: _ManaCost(spellCost(k, sp)),
               figure: figure,
+              // Short of mana: how many more strikes (attacks, bashes, shots: a mana each) until
+              // it's ready, like a cooldown. (A potion doesn't bring it closer.)
+              wait: math.max(0, spellCost(k, sp) - s.mana),
               glow: riteEdge > 1,
               tint: const Color(0xFF1E2A44),
               rite: sp.id,

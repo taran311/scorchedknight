@@ -34,7 +34,7 @@ enum _Place { mags, forge, wick, tent, map, trail, wilds }
     'runeWeapon' || 'runeArmour' => (_Place.wick, 'runes'),
     'equip' || 'train' || 'suit' => (_Place.tent, 'gear'),
     'rite' => (_Place.tent, 'rites'),
-    'cottage' || 'keep' => (_Place.tent, 'home'),
+    'cottage' || 'keep' || 'errand' => (_Place.tent, 'home'),
     'mend' => (_Place.trail, '0'),
     'wilds' => (_Place.wilds, null),
     'win' || 'explore' || 'gorbo' || 'delve' || 'heroic' || 'king' => (_Place.map, null),
@@ -56,8 +56,10 @@ Future<void> goToTask(BuildContext context, GameController c, GameTask t, {void 
     case _Place.mags:
       if (!c.state.inBattle) await showMerchantWindow(context, c, tab: arg);
     case _Place.forge:
+      if (c.whyShut('forge') case final why?) return _shut(context, why);
       if (!c.state.inBattle) await showForgeWindow(context, c, tab: arg);
     case _Place.wick:
+      if (c.whyShut('tower') case final why?) return _shut(context, why);
       if (!c.state.inBattle) await showEnchanterWindow(context, c, tab: arg);
     case _Place.tent:
       if (tent != null) {
@@ -80,6 +82,10 @@ Future<void> goToTask(BuildContext context, GameController c, GameTask t, {void 
       }
   }
 }
+
+void _shut(BuildContext context, String why) => ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+  SnackBar(behavior: SnackBarBehavior.floating, backgroundColor: Palette.stone2, duration: const Duration(seconds: 3), content: Text('🔒 $why', style: Txt.label(size: 13, color: Palette.cream))),
+);
 
 /// Your tent (or cottage, or keep): your gear, rites, satchel, home and journey, opened at [tab].
 Future<void> openTent(BuildContext context, GameController c, {String? tab}) => Navigator.of(context).push(
