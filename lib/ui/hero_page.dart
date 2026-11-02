@@ -9,6 +9,7 @@ import '../art/looks.dart';
 import '../audio/audio.dart';
 import '../game/ammo.dart';
 import '../game/catalog.dart';
+import '../game/errands.dart' show retainerName;
 import '../game/crafting.dart';
 import '../game/classes.dart';
 import '../game/controller.dart';
@@ -1238,6 +1239,12 @@ class _Home extends StatelessWidget {
                     cost(const ItemIcon(Item.iron, size: 22), s.ironScrap, next.iron),
                   ],
                 ),
+                // Where the building stock comes from, so a shortfall says what to do about it.
+                if (s.timber < next.timber || s.ironScrap < next.iron)
+                  Text(
+                    'Foes drop it now and then: timber in ${[for (final l in timberLands) continents[l].name].join(' and ')}, iron in ${[for (final l in ironLands) continents[l].name].join(' and ')}${s.home >= 1 ? '. $retainerName brings some back from the fields' : ''}.',
+                    style: Txt.onStone(size: 12.5),
+                  ),
                 if (next.after >= 0) ...[
                   const SizedBox(height: 4),
                   Text(

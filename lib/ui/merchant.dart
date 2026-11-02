@@ -295,7 +295,8 @@ class MerchantWares extends StatelessWidget {
             x.ware(
               MatIcon.brew(Color(b.argb), size: 28),
               b.label,
-              '',
+              // Where its herbs come from, so a shortfall says where to go.
+              '${b.ingredient} · from ${continents[b.land].name}',
               CostButton(
                 label: b == Brew.reaperbane && brewOn(k, b) ? 'In you' : ((k.brews[b.name] ?? 0) >= brewFights ? 'Full' : (brewOn(k, b) ? 'Top up' : 'Brew & drink')),
                 onTap: c.whyNotBrew(b) == null
@@ -311,7 +312,7 @@ class MerchantWares extends StatelessWidget {
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   InfoChip(icon: Icon(brewIcon(b), size: 14, color: Color(b.argb)), text: b.short, colour: Color(b.argb), dense: true),
-                  Tooltip(message: b.ingredient, child: x.have(const Icon(Icons.eco, size: 15, color: Color(0xFF9BE27A)), c.state.reagents[b.land], b.reagents)),
+                  Tooltip(message: '${b.ingredient}, from ${continents[b.land].name}', child: x.have(MatIcon(MatShape.leaf, Color(continents[b.land].argb), size: 15), c.state.reagents[b.land], b.reagents)),
                   x.have(const ItemIcon(Item.coins, size: 14), k.coins, b.fee(k.level)),
                   if (brewOn(k, b) && b != Brew.reaperbane) InfoChip(icon: const Icon(Icons.hourglass_bottom, size: 14, color: _Shop.ok), text: '${k.brews[b.name]} left', colour: _Shop.ok, dense: true),
                 ],
