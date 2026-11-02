@@ -3473,12 +3473,18 @@ class GameEngine {
         state.ironScrap += iron;
         got.add('$timber charred timber');
         if (iron > 0) got.add('$iron iron scrap');
-        // Herbs for the wards of lands you can reach.
+        // Herbs from a land you can reach: the one you're shortest of among those you still have a
+        // use for (a ward not yet made, or one of Mags' brews), so she brings what you need.
         final lands = [for (var l = 0; l < continents.length; l++) if (whyNotTravel(l) == null && continents[l].reagent.isNotEmpty) l];
-        if (lands.isNotEmpty) {
-          final l = lands[_rng.nextInt(lands.length)], n = 1 + _rng.nextInt(2);
+        bool useful(int l) => Brew.values.any((b) => b.land == l) || (l + 1 < mainLands && !state.warded.contains(l + 1));
+        final wanted = lands.where(useful).toList();
+        final pool = wanted.isEmpty ? lands : wanted;
+        if (pool.isNotEmpty) {
+          final least = pool.map((l) => state.reagents[l]).reduce(math.min);
+          final short = pool.where((l) => state.reagents[l] == least).toList();
+          final l = short[_rng.nextInt(short.length)], n = 1 + _rng.nextInt(2);
           state.reagents[l] += n;
-          got.add('$n× ${continents[l].reagent}');
+          got.add('$n× ${continents[l].reagent} from ${continents[l].name}${wanted.isEmpty ? '' : ' (you were short)'}');
         }
       case 'wilds':
         final g = Gem.values[_rng.nextInt(Gem.values.length)];

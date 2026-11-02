@@ -23,7 +23,7 @@ class Errand {
 }
 
 const errands = <Errand>[
-  Errand('fields', 'Forage the fields', 'Timber, iron scrap and herbs for Old Wick\'s wards', fee: 40, perLevel: 3, fights: 4, home: 1),
+  Errand('fields', 'Forage the fields', 'Timber, iron scrap, and the herbs you\'re shortest of', fee: 40, perLevel: 3, fights: 4, home: 1),
   Errand('wilds', 'Scavenge the Ashen Wilds', 'Gems and ore, and now and then a core', fee: 120, perLevel: 6, fights: 6, home: 1),
   Errand('ruins', 'Search the old ruins', 'A purse, a piece of gear, perhaps a Cinder key', fee: 260, perLevel: 10, fights: 8, home: 2),
 ];
