@@ -49,25 +49,25 @@ class Spell {
 
 const spells = <Spell>[
   Spell('arcanebolt', 'Arcane Bolt', 'A crackling bolt: 1.8x damage', 1, 2, SpellKind.blast, 0xFF9ADFFF, mult: 1.8),
-  Spell('sloth', 'Hex of Sloth', 'The foe moves as if through tar: half its counters miss for 4 turns', 2, 2, SpellKind.slow, 0xFF6ABF9A, hex: 4),
+  Spell('sloth', 'Hex of Sloth', 'The foe moves as if through tar: half its counters miss for 3 turns', 2, 3, SpellKind.slow, 0xFF6ABF9A, hex: 3),
   Spell('raisedead', 'Summon Undead', 'Raise a skeleton warrior that fights beside you for 4 turns', 3, 3, SpellKind.summon, 0xFFB07AFF, summons: 1, turns: 4),
-  Spell('enfeeble', 'Enfeeble', 'Sap the foe\'s strength: its counters hit 40% softer for 4 turns', 4, 2, SpellKind.weaken, 0xFFB8A0D8, hex: 4),
+  Spell('enfeeble', 'Enfeeble', 'Sap the foe\'s strength: its counters hit 40% softer for 3 turns', 4, 3, SpellKind.weaken, 0xFFB8A0D8, hex: 3),
   Spell('frostnova', 'Frost Nova', 'A burst of ice: 1.5x damage plus frost, and the foe is frozen and can\'t hit back', 5, 3, SpellKind.nova, 0xFF9ADFFF, mult: 1.5, element: Stat.frost),
-  Spell('bloodbolt', 'Blood Siphon', 'A crimson bolt that drinks: 1.5x damage, and you heal a third of it', 6, 3, SpellKind.drain, 0xFFB0302A, mult: 1.5, drain: .33),
-  Spell('arcaneward', 'Arcane Ward', 'A shimmering ward that absorbs the next 3 counters', 7, 3, SpellKind.ward, 0xFF7FB8E8, wards: 3),
-  Spell('sunder', 'Sunder Armour', 'Crack the foe\'s defences: your hits deal 25% more for 4 turns', 8, 3, SpellKind.expose, 0xFFE0A050, hex: 4),
-  Spell('dragonfire', 'Summon Dragonfire', 'Call a dragon from the sky to breathe a fireball: 2.2x damage plus fire', 9, 5, SpellKind.dragon, 0xFFFF7A2A, mult: 2.2, element: Stat.burn),
-  Spell('slumber', 'Slumber', 'Lull the foe to sleep: it sleeps through its next 3 blows (bosses and giants shake it off after 1)', 10, 3, SpellKind.sleep, 0xFFB8A0E8, hex: 3),
+  Spell('bloodbolt', 'Blood Siphon', 'A crimson bolt that drinks: 1.5x damage, and you heal a quarter of it', 6, 3, SpellKind.drain, 0xFFB0302A, mult: 1.5, drain: .25),
+  Spell('arcaneward', 'Arcane Ward', 'A shimmering ward that absorbs the next 2 counters', 7, 3, SpellKind.ward, 0xFF7FB8E8, wards: 2),
+  Spell('sunder', 'Sunder Armour', 'A cracking blow (1.2x), and the foe\'s defences give: your hits deal 25% more for 4 turns', 8, 3, SpellKind.expose, 0xFFE0A050, mult: 1.2, hex: 4),
+  Spell('dragonfire', 'Summon Dragonfire', 'Call a dragon from the sky to breathe a fireball: 2.2x damage plus fire', 9, 4, SpellKind.dragon, 0xFFFF7A2A, mult: 2.2, element: Stat.burn),
+  Spell('slumber', 'Slumber', 'Lull the foe to sleep: it sleeps through its next 3 blows (bosses shake it off after 1, and a foe lulled again in the same fight sleeps through just 1)', 10, 3, SpellKind.sleep, 0xFFB8A0E8, hex: 3),
   Spell('spectralcharge', 'Spectral Charge', 'A ghostly warhorse thunders out of the mist and tramples the foe: double damage', 11, 3, SpellKind.charge, 0xFF9ADFFF, mult: 2),
   Spell('chainlightning', 'Chain Lightning', 'Lightning leaps three times: 2.2x damage', 12, 4, SpellKind.chain, 0xFFE8F4FF, mult: 2.2),
-  Spell('mirrorward', 'Mirror Ward', 'A shimmering mirror for the next 3 blows: you take half, and the foe takes the whole blow back', 13, 3, SpellKind.reflect, 0xFFCFE8F8, wards: 3),
+  Spell('mirrorward', 'Mirror Ward', 'A shimmering mirror for the next 2 blows: you take half, and the foe takes the whole blow back', 13, 3, SpellKind.reflect, 0xFFCFE8F8, wards: 2),
   Spell('undeadhorde', 'Raise the Horde', 'Three skeletons claw out of the earth and fight for 3 turns', 15, 5, SpellKind.summon, 0xFF8A5AC0, summons: 3, turns: 3),
-  Spell('lifedrain', 'Life Drain', 'Drain the foe\'s life: 1.8x damage, and you heal half of it', 18, 4, SpellKind.drain, 0xFF8BE05A, mult: 1.8),
-  Spell('healinglight', 'Healing Light', 'A column of golden light: an attack that also mends 30% of your health', 9, 4, SpellKind.heal, 0xFFFFE27A, mend: .3),
+  Spell('lifedrain', 'Life Drain', 'Drain the foe\'s life: 1.8x damage, and you heal 40% of it', 18, 4, SpellKind.drain, 0xFF8BE05A, mult: 1.8, drain: .4),
+  Spell('healinglight', 'Healing Light', 'A column of golden light: an attack that also mends 25% of your health', 9, 4, SpellKind.heal, 0xFFFFE27A, mend: .25),
   // The late rites, for the long road to the Ember King: each a stronger turn on one you know,
   // at full mana, so none of them makes an earlier one pointless before it's earned its place.
   Spell('emberstorm', 'Ember Storm', 'A storm of cinders leaps from foe to ground to foe: 2.6x damage', 22, 5, SpellKind.chain, 0xFFFF9A4A, mult: 2.6),
-  Spell('ashenhex', 'Ashen Hex', 'Choking ash in its lungs: its counters hit 40% softer for 6 turns', 26, 3, SpellKind.weaken, 0xFFA89C8C, hex: 6),
+  Spell('ashenhex', 'Ashen Hex', 'Choking ash in its lungs: its counters hit 40% softer for 4 turns', 26, 3, SpellKind.weaken, 0xFFA89C8C, hex: 4),
   Spell('phoenix', 'Phoenix Flame', 'Wings of fire fold round you: an attack that also mends 45% of your health', 30, 5, SpellKind.heal, 0xFFFFB04A, mend: .45),
   Spell('bonelegion', 'Bone Legion', 'Four skeletons in rusted mail rise and fight for 3 turns', 35, 5, SpellKind.summon, 0xFF9A7AD0, summons: 4, turns: 3),
   Spell('cataclysm', 'Cataclysm', 'The sky splits and the ash comes down burning: 3x damage plus fire', 40, 5, SpellKind.dragon, 0xFFFF5A2A, mult: 3, element: Stat.burn),
@@ -81,9 +81,9 @@ const spells = <Spell>[
   // The Blood Knight (Nightblood): drain and sustain.
   Spell('crimsonthirst', 'Crimson Thirst', 'Your blade drinks: 1.6x damage, and you heal half of it', 1, 3, SpellKind.drain, 0xFFC8303A, mult: 1.6, drain: .5, order: 'nightblood', rank: 1),
   Spell('bloodpact', 'Blood Pact', 'Pay 15% of your health for a terrible blow: 2.6x damage', 1, 3, SpellKind.blast, 0xFF8A1020, mult: 2.6, selfHurt: .15, order: 'nightblood', rank: 4),
-  Spell('nightveil', 'Night Veil', 'Shadows wrap you: half its blows miss for 3 turns', 1, 2, SpellKind.slow, 0xFF6A4A8A, hex: 3, order: 'nightblood', rank: 7),
+  Spell('nightveil', 'Night Veil', 'Shadows wrap you: half its blows miss for 3 turns', 1, 3, SpellKind.slow, 0xFF6A4A8A, hex: 3, order: 'nightblood', rank: 7),
   // The Forge Knight (Deepforge): guard and stun.
-  Spell('anvilward', 'Anvil Ward', 'Runes of iron ring round you: the next 3 blows are stopped dead', 1, 3, SpellKind.ward, 0xFFE8C060, wards: 3, order: 'deepforge', rank: 1),
+  Spell('anvilward', 'Anvil Ward', 'Runes of iron ring round you: the next 3 blows are stopped dead', 1, 4, SpellKind.ward, 0xFFE8C060, wards: 3, order: 'deepforge', rank: 1),
   Spell('moltenhammer', 'Molten Hammer', 'A white-hot blow: 2x damage, and it hits 40% softer for 3 turns', 1, 4, SpellKind.weaken, 0xFFFF8A3A, mult: 2, hex: 3, order: 'deepforge', rank: 4),
   Spell('earthshaker', 'Earthshaker', 'You split the ground under it: 1.4x, and it can\'t hit back this turn', 1, 4, SpellKind.nova, 0xFFB08A5A, mult: 1.4, order: 'deepforge', rank: 7),
 ];
@@ -97,7 +97,7 @@ const maxMana = 5;
 const riteSlots = 3;
 
 /// A summoned skeleton's blow each swing at [level].
-int summonHit(int level) => 4 + (level * 1.5).round();
+// (A skeleton's blow: see summonHit in rules.dart, half of one of yours.)
 
 
 /// Spells known at [level].

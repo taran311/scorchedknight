@@ -381,13 +381,25 @@ class GameController extends ChangeNotifier {
   /// Plays out the waiting wandering encounter.
   String resolveEncounter(int choice) {
     final out = engine.resolveEncounter(choice);
-    // The strongbox was bait: straight into the fight it sprang.
+    // The strongbox was bait: a fight's coming, but it doesn't start (on the stage behind) until
+    // the die has landed and you've read what happened: see [springAmbush].
     if (state.inBattle) {
-      _arrive(say: 'Ambush!');
+      ambushPending = true;
+      _save();
       return out;
     }
     _changed();
     return out;
+  }
+
+  /// A strongbox's ambush, waiting for the encounter window to close.
+  bool ambushPending = false;
+
+  /// Into the ambush the strongbox sprang.
+  void springAmbush() {
+    if (!ambushPending) return;
+    ambushPending = false;
+    if (state.inBattle) _arrive(say: 'Ambush!');
   }
 
   int get bardFee => engine.bardFee;

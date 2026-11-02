@@ -271,7 +271,7 @@ class GameEngine {
 
   /// This fight so far, for the combat feats: hits taken, potions drunk, rites cast and bolts
   /// shot. A fight picked up again after the game was closed counts as already hurt (unknown).
-  int _fightHits = 1, _fightPotions = 0, _fightRites = 0, _fightBolts = 0;
+  int _fightHits = 1, _fightPotions = 0, _fightRites = 0, _fightBolts = 0, _fightSlumbers = 0;
 
   /// The Blood Knight's Undying, spent this fight.
   bool _undyingUsed = false;
@@ -1477,6 +1477,7 @@ class GameEngine {
     rankUp = null;
     _fightPotions = 0;
     _fightRites = 0;
+    _fightSlumbers = 0;
     _fightBolts = 0;
     state
       ..inBattle = true
@@ -1841,7 +1842,7 @@ class GameEngine {
       _bite(r);
       // Summoned skeletons strike with you until their time is up.
       if (state.summons > 0) {
-        final hit = state.summons * summonHit(k.level);
+        final hit = state.summons * summonHit(k);
         state.foeHp -= hit;
         r
           ..summonHit = hit
@@ -2121,9 +2122,12 @@ class GameEngine {
           r.mendedFrom = 'Mend';
           _note('Golden light mends ${k.hp - before} HP.', EntryKind.good);
         case SpellKind.sleep:
-          final big = foeIn(state).boss;
-          state.foeAsleep = big ? 1 : cast.hex;
-          _note(big ? '$foeName nods off, but it won\'t sleep long.' : '$foeName falls into a deep sleep.');
+          // A foe sleeps deeply only the first time: lulled again in the same fight, it dozes
+          // through a single blow (so Slumber opens a fight, rather than keeping a foe down).
+          final big = foeIn(state).boss, light = big || _fightSlumbers > 0;
+          _fightSlumbers++;
+          state.foeAsleep = light ? 1 : cast.hex;
+          _note(big ? '$foeName nods off, but it won\'t sleep long.' : (light ? '$foeName nods off again, but lightly now.' : '$foeName falls into a deep sleep.'));
         case SpellKind.reflect:
           state.mirror = cast.wards;
           _note('A shimmering mirror rises before you.');

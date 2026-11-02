@@ -26,6 +26,8 @@ Future<void> showEncounter(BuildContext context, GameController c) async {
   if (e == null) return;
   Audio.play(Sfx.quest);
   await showDialog<void>(context: context, barrierDismissible: false, builder: (_) => _EncounterWindow(controller: c, encounter: e));
+  // A strongbox that was bait: the fight starts now, once the die's landed and the window's shut.
+  c.springAmbush();
   if (context.mounted && c.nextLoot != null) await resolvePendingLoot(context, c);
 }
 

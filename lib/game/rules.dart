@@ -233,6 +233,10 @@ DragonStage? dragonStage(Knight k) {
 /// Damage of one plain attack before effects and crits.
 int fullSwing(Knight k) => 8 + 2 * k.level + heroStats(k).damage;
 
+/// A summoned skeleton's blow: half of one of yours (so the rites that raise them keep pace with
+/// your gear, not just your level).
+int summonHit(Knight k) => (fullSwing(k) * .5).round();
+
 /// The level of the foes you meet in [continent]: never below the continent's own level, and they
 /// keep pace with you above it.
 int foeLevelFor(int continent, int heroLevel) => math.max(heroLevel, continents[continent].minLevel);

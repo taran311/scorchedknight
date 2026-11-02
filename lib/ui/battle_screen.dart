@@ -508,7 +508,7 @@ class _BattleScreenState extends State<BattleScreen> {
           SpellKind.sleep => [('💤', 'Sleeps through ${sp.hex} blows', plain), ('👑', 'Bosses wake after 1', soft)],
           SpellKind.ward => [('✨', 'Blocks the next ${sp.wards} hits', plain)],
           SpellKind.reflect => [('🪞', 'Next ${sp.wards} hits: half to you, all back', plain)],
-          SpellKind.summon => [('💀', '${sp.summons} skeleton${sp.summons == 1 ? '' : 's'} · ${turns(sp.turns)}', plain), ('⚔️', '~${summonHit(k.level)} damage each a turn', plain)],
+          SpellKind.summon => [('💀', '${sp.summons} skeleton${sp.summons == 1 ? '' : 's'} · ${turns(sp.turns)}', plain), ('⚔️', '~${summonHit(k)} damage each a turn', plain)],
           _ => const <(String, String, Color)>[],
         },
         if (hits && riteEdge != 1) edgeLine(riteEdge, 'rites'),
