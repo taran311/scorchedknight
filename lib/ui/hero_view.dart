@@ -15,6 +15,7 @@ import '../art/rig.dart';
 import '../game/catalog.dart' show sweepingWeapons;
 import '../game/classes.dart';
 import '../game/loot.dart';
+import '../game/vault.dart' show isKeepsake;
 import '../game/models.dart' show Loadout;
 import '../game/rules.dart' show dualStrikeShare;
 import 'item_icons.dart';
@@ -373,8 +374,14 @@ class SetChips extends StatelessWidget {
 /// Whether [item] would be an upgrade (1), a downgrade (-1) or about the same (0) on a hero
 /// whose [kit] it joins, against [worn] (what's in that slot now). Armour goes by how much damage
 /// it takes off; anything else by its overall worth (within 5% counts as the same). 2: an
-/// off-hand your weapon leaves no hand free for (no use to you as you are).
+/// off-hand your weapon leaves no hand free for (no use to you as you are). 3: one of a kind.
 int upgradeVerdict(GearItem item, GearItem? worn, Loadout kit) {
+  // One of a kind (the vault's, a relic, a trophy): yours to keep, so no better-or-worse arrow
+  // nudging you to part with it, just its own mark.
+  if (isKeepsake(item)) return 3;
+  // Against one of a kind you're wearing (it grows with you, carries a set, can't be found
+  // again): a plain score can't say which is better, so no arrow either way.
+  if (worn != null && isKeepsake(worn)) return 4;
   if (item.slot == GearSlot.offhand && !offhandWorksWith(kit.weapon, item)) return 2;
   // A stowed off-hand (your weapon has no use for it) counts as nothing worn.
   if (worn != null && worn.slot == GearSlot.offhand && !offhandWorksWith(kit.weapon, worn)) worn = null;
@@ -397,13 +404,15 @@ class UpgradeBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (icon, colour) = switch (verdict) {
+      3 => (Icons.auto_awesome, const Color(0xFFFFC94A)),
+      4 => (Icons.compare_arrows_rounded, const Color(0xFF9A9286)),
       2 => (Icons.block_rounded, const Color(0xFF9A9286)),
       > 0 => (Icons.arrow_upward_rounded, const Color(0xFF6FD04A)),
       < 0 => (Icons.arrow_downward_rounded, const Color(0xFFE0503A)),
       _ => (Icons.drag_handle_rounded, const Color(0xFF9A9286)),
     };
     return Tooltip(
-      message: verdict == 2 ? 'No use with your weapon' : (verdict > 0 ? 'An upgrade' : (verdict < 0 ? 'A downgrade' : 'About the same as yours')),
+      message: verdict == 3 ? 'One of a kind: yours to keep' : verdict == 4 ? 'You\'re wearing one of a kind here: compare the stats' : verdict == 2 ? 'No use with your weapon' : (verdict > 0 ? 'An upgrade' : (verdict < 0 ? 'A downgrade' : 'About the same as yours')),
       child: Container(
         width: size,
         height: size,
