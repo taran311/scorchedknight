@@ -22,6 +22,7 @@ import '../game/classes.dart';
 import '../game/crafting.dart';
 import '../game/loot.dart';
 import '../game/controller.dart';
+import '../game/knight_classes.dart' show knightClassById;
 import '../game/rules.dart' show potionHeal;
 import 'item_icons.dart';
 import 'loot_window.dart' show resolvePendingLoot;
@@ -216,7 +217,30 @@ class MerchantWares extends StatelessWidget {
           const ItemIcon(Item.potion),
           'Health potion',
           '',
-          x.buy('potion'),
+          // With room for a few, fill the belt in one go.
+          (() {
+            final room = potionBelt - k.potions, each = e.priceOf('potion');
+            if (room < 2) return x.buy('potion');
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                x.buy('potion'),
+                const SizedBox(height: 4),
+                CostButton(
+                  label: 'Fill belt · ${room * each}',
+                  onTap: k.coins >= room * each
+                      ? () {
+                          for (var i = 0; i < room; i++) {
+                            c.purchase('potion');
+                          }
+                          Audio.play(Sfx.coins);
+                        }
+                      : null,
+                ),
+              ],
+            );
+          })(),
           extra: Wrap(
             spacing: 5,
             runSpacing: 4,
@@ -457,6 +481,12 @@ class ForgeWares extends StatelessWidget {
           if (s.mat(trophyKey(f.trophy)) > 0 || setPieceSlots.any((slot) => s.mat(blueprintKey(f.id, slot)) > 0)) ...[
             x.heading('${gearSetById(f.id)!.name} set · blueprints from ${f.from}'),
             SetChips(set: gearSetById(f.id)!, dense: true, named: false),
+            // An order's suit is a class: say so, and what kind of knight it makes you.
+            if (knightClassById(f.id) case final cls?)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text('All five pieces: you become the ${cls.name} (${cls.focus.toLowerCase()}), with rites of its own', style: Txt.label(size: 12.5, color: Color(cls.argb))),
+              ),
             const SizedBox(height: 4),
             for (final slot in setPieceSlots)
               if (s.mat(blueprintKey(f.id, slot)) > 0)
@@ -492,6 +522,31 @@ class ForgeWares extends StatelessWidget {
                   const SizedBox(),
                 ),
           ],
+        // The suits not begun yet: what there is to find, and who carries it.
+        if (forgedSets.any((f) => !(s.mat(trophyKey(f.trophy)) > 0 || setPieceSlots.any((slot) => s.mat(blueprintKey(f.id, slot)) > 0)))) ...[
+          x.heading('Still to find'),
+          for (final f in forgedSets)
+            if (!(s.mat(trophyKey(f.trophy)) > 0 || setPieceSlots.any((slot) => s.mat(blueprintKey(f.id, slot)) > 0)))
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Opacity(opacity: .45, child: MatIcon.trophy(f.trophy, size: 20)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text.rich(
+                        TextSpan(children: [
+                          TextSpan(text: gearSetById(f.id)!.name, style: Txt.label(size: 13.5, color: Palette.cream)),
+                          if (knightClassById(f.id) case final cls?) TextSpan(text: '  ${cls.name}', style: Txt.label(size: 12, color: Color(cls.argb))),
+                          TextSpan(text: '\nfrom ${f.from}', style: Txt.onStone(size: 12)),
+                        ]),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+        ],
         // Relics: a blueprint and its parts, forged into a legend.
         if (relics.keys.any((l) => c.heroicOpen(l) && !s.forged.contains(l))) x.heading('Relics'),
         for (final e in relics.entries)

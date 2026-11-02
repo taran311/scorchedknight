@@ -137,8 +137,35 @@ class ArmouryPreview extends StatelessWidget {
     );
   }
 
+  /// ?armoury&helms: every questline suit's helm (and its other pieces) as icons, large.
+  Widget _helms() {
+    final loot = LootTable(math.Random(4));
+    final slots = (Uri.base.queryParameters['slots'] ?? 'helm').split(',');
+    return Scaffold(
+      backgroundColor: const Color(0xFF4A4038),
+      body: Wrap(
+        children: [
+          for (final id in suitArts.keys)
+            Padding(
+              padding: const EdgeInsets.all(4),
+              child: Column(
+                children: [
+                  Row(mainAxisSize: MainAxisSize.min, children: [
+                    for (final sl in setPieceSlots.where((x) => slots.contains(x.name)))
+                      GearIcon(item: loot.setPiece(id, sl, HeroClass.knight, 40), size: double.tryParse(Uri.base.queryParameters['size'] ?? '') ?? 180, heroClass: HeroClass.knight),
+                  ]),
+                  Text(id, style: Txt.label(size: 12, color: Palette.cream)),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (Uri.base.queryParameters.containsKey('helms')) return _helms();
     if (Uri.base.queryParameters.containsKey('suits')) return _suits();
     if (Uri.base.queryParameters.containsKey('weapons')) return _allWeapons();
     if (Uri.base.queryParameters.containsKey('new')) return _newKit();

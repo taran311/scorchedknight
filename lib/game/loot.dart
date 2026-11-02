@@ -56,7 +56,7 @@ const capeChance = .06;
 // ------------------------------------------------------------------ gear sets
 
 /// A set of gloves, boots and a ring that steers a build. Wear two pieces for the first bonus,
-/// all three for the second as well.
+/// all three for the second as well (a forged suit's second bonus wants four of its five).
 class GearSet {
   const GearSet(this.id, this.name, this.two, this.three, this.twoText, this.threeText, {this.heroClass, this.cheaperSpells = false, this.forged = false, this.bloodthirst = false, this.longWolf = false, this.firstMiss = false, this.forgeheart = false, this.firstCrit = false, this.regrowth = false, this.undertow = false, this.adapt = false, this.updraft = false, this.bushido = false, this.dragonhide = false, this.perk});
   final String id, name, twoText, threeText;
@@ -131,7 +131,7 @@ const _setPower = <String, double>{
   'tidecaller': 1.03,
   'changeling': 1.1,
   'skyborn': 1.6,
-  'bushido': 1.25,
+  'bushido': 1.0,
   'drakesworn': 1.045,
 };
 
@@ -1789,9 +1789,11 @@ class LootTable {
       ('deepforge', GearSlot.gloves) => (Stat.damage, Stat.guard, Stat.block),
       ('deepforge', GearSlot.boots) => (Stat.guard, Stat.block, Stat.vigour),
       ('deepforge', _) => (Stat.block, Stat.guard, Stat.thorns),
-      ('faceless', GearSlot.gloves) => (Stat.damage, Stat.crit, Stat.parry),
-      ('faceless', GearSlot.boots) => (Stat.parry, Stat.dodge, Stat.crit),
-      ('faceless', _) => (Stat.crit, Stat.parry, Stat.damage),
+      // (The duellists' suits lean on damage and vigour: parry and crit both run into their caps
+      // fast, so a suit made of them alone would waste half its worth.)
+      ('faceless', GearSlot.gloves) => (Stat.damage, Stat.crit, Stat.vigour),
+      ('faceless', GearSlot.boots) => (Stat.parry, Stat.vigour, Stat.dodge),
+      ('faceless', _) => (Stat.damage, Stat.crit, Stat.vigour),
       ('sunscale', GearSlot.gloves) => (Stat.damage, Stat.thorns, Stat.vigour),
       ('sunscale', GearSlot.boots) => (Stat.vigour, Stat.regen, Stat.dodge),
       ('sunscale', _) => (Stat.regen, Stat.vigour, Stat.thorns),
@@ -1804,9 +1806,9 @@ class LootTable {
       ('skyborn', GearSlot.gloves) => (Stat.crit, Stat.damage, Stat.dodge),
       ('skyborn', GearSlot.boots) => (Stat.dodge, Stat.vigour, Stat.crit),
       ('skyborn', _) => (Stat.dodge, Stat.crit, Stat.fortune),
-      ('bushido', GearSlot.gloves) => (Stat.damage, Stat.parry, Stat.crit),
-      ('bushido', GearSlot.boots) => (Stat.parry, Stat.vigour, Stat.crit),
-      ('bushido', _) => (Stat.crit, Stat.parry, Stat.damage),
+      ('bushido', GearSlot.gloves) => (Stat.damage, Stat.crit, Stat.vigour),
+      ('bushido', GearSlot.boots) => (Stat.parry, Stat.vigour, Stat.damage),
+      ('bushido', _) => (Stat.damage, Stat.vigour, Stat.crit),
       ('drakesworn', GearSlot.gloves) => (Stat.damage, Stat.burn, Stat.crit),
       ('drakesworn', GearSlot.boots) => (Stat.vigour, Stat.guard, Stat.burn),
       ('drakesworn', _) => (Stat.burn, Stat.guard, Stat.vigour),
@@ -1869,7 +1871,7 @@ class LootTable {
         _ => 0xFF8A94A8,
       },
       heroClass: slot == GearSlot.ring ? null : heroClass,
-      lore: 'Forged by Dunstan from a blueprint. ${set.twoText} with two pieces; ${set.threeText[0].toLowerCase()}${set.threeText.substring(1)} with all three.',
+      lore: 'Forged by Dunstan from a blueprint. ${set.twoText} with two pieces; ${set.threeText[0].toLowerCase()}${set.threeText.substring(1)} with ${set.full == 4 ? 'four' : 'all three'}.',
       value: _value(level, rarity, slot),
       stats: stats,
     );

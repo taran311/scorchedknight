@@ -167,7 +167,24 @@ void _features(Canvas c, Setting s, BattlegroundSpec sp, SeededRandom r, double 
       for (final x in spots(near ? 4 : 9)) {
         _bigTree(c, x, base + 4, (near ? 150 : 70) * (.7 + r.next() * .4), fill, r);
       }
-    case Setting.elderwood || Setting.heartgrove || Setting.jungle:
+    case Setting.jungle:
+      // The Sunscale Jungle: a stepped ziggurat over the canopy, palms close by, vines hanging.
+      if (!near) {
+        _ziggurat(c, 620, base + 4, 170, fill, lit);
+        for (final x in spots(9)) {
+          _bigTree(c, x, base + 4, 80 * (.7 + r.next() * .4), fill, r);
+        }
+      } else {
+        for (final x in spots(5, 70)) {
+          _palm(c, x, base + 4, 190 * (.75 + r.next() * .35), fill, r);
+        }
+        // Vines hanging into the edges of the scene, from a canopy just out of sight.
+        for (var i = 0; i < 8; i++) {
+          final x = i < 4 ? 10 + i * 34 + r.next() * 14 : 820 + (i - 4) * 34 + r.next() * 14;
+          _vine(c, x, 110 + r.next() * 170, fill);
+        }
+      }
+    case Setting.elderwood || Setting.heartgrove:
       for (final x in spots(near ? 5 : 11)) {
         _bigTree(c, x, base + 4, (near ? 200 : 90) * (.7 + r.next() * .5), fill, r);
       }
@@ -204,7 +221,25 @@ void _features(Canvas c, Setting s, BattlegroundSpec sp, SeededRandom r, double 
           _pine(c, x, base + 4, 120 * (.7 + r.next() * .5), fill);
         }
       }
-    case Setting.warcamp || Setting.orkcamp:
+    case Setting.orkcamp:
+      // The orks' camp: hide huts, a crude watchtower, and skulls on spikes along the front.
+      if (!near) {
+        _orkTower(c, 700, base + 4, 190, fill, lit);
+        for (final x in spots(7, 50)) {
+          _hut(c, x, base + 4, 50 * (.8 + r.next() * .4), fill);
+        }
+      } else {
+        for (final x in spots(3, 60)) {
+          _hut(c, x, base + 4, 95 * (.8 + r.next() * .3), fill);
+        }
+        for (final x in spots(8, 40)) {
+          _skullPole(c, x, base + 8, 80 + r.next() * 50, fill);
+        }
+        for (final x in spots(2, 80)) {
+          _brazier(c, x, base + 4, 1.2, fill, lit);
+        }
+      }
+    case Setting.warcamp:
       for (final x in spots(near ? 4 : 8, 50)) {
         _tent(c, x, base + 4, (near ? 90 : 50) * (.8 + r.next() * .4), fill);
       }
@@ -215,7 +250,19 @@ void _features(Canvas c, Setting s, BattlegroundSpec sp, SeededRandom r, double 
       for (final x in spots(near ? 2 : 3, 80)) {
         _brazier(c, x, base + 4, near ? 1.2 : .7, fill, lit);
       }
-    case Setting.ruins || Setting.shiftisle:
+    case Setting.shiftisle:
+      // The Changeling Isle: stones that won't keep their shape, bent and swollen, a few torn
+      // loose and hanging in the air.
+      for (final x in spots(near ? 5 : 9, 50)) {
+        _twisted(c, x, base + 4, (near ? 230 : 120) * (.6 + r.next() * .5), fill, r);
+      }
+      if (!near) {
+        for (var i = 0; i < 6; i++) {
+          final x = 80 + r.next() * 800, y = 150 + r.next() * 120, w = 14 + r.next() * 26;
+          c.drawPath(poly([Offset(x - w, y), Offset(x - w * .3, y - w * .6), Offset(x + w, y - w * .2), Offset(x + w * .4, y + w * .7), Offset(x - w * .5, y + w * .5)]), fill);
+        }
+      }
+    case Setting.ruins:
       for (final x in spots(near ? 5 : 9, 50)) {
         _column(c, x, base + 4, (near ? 150 : 80) * (.5 + r.next() * .6), fill, r);
       }
@@ -234,7 +281,22 @@ void _features(Canvas c, Setting s, BattlegroundSpec sp, SeededRandom r, double 
         _spike(c, x, base + 4, (near ? 90 : 50) * (.5 + r.next() * .7), (near ? 36 : 20) * (.7 + r.next() * .5), fill);
       }
       if (near) _lava(c, base + 12);
-    case Setting.coast || Setting.fogshore:
+    case Setting.fogshore:
+      // The Isle of Mists: a dead lighthouse far out in the fog, and masks on stakes along the
+      // shore, blank faces turned to the sea.
+      if (!near) {
+        c.drawRect(Rect.fromLTWH(0, base - 30, 960, 60), Paint()..color = col);
+        _lighthouse(c, 760, base - 8, 200, fill, lit);
+        _rock(c, 760, base - 4, 60, fill, r);
+      } else {
+        for (final x in spots(5, 60)) {
+          _rock(c, x, base + 6, 50 + r.next() * 40, fill, r);
+        }
+        for (final x in spots(7, 50)) {
+          _maskStake(c, x, base + 8, 90 + r.next() * 50, fill, lit);
+        }
+      }
+    case Setting.coast:
       if (!near) {
         // The sea: a flat horizon with the sky's glow laid across it.
         c.drawRect(Rect.fromLTWH(0, base - 30, 960, 60), Paint()..color = col);
@@ -324,7 +386,25 @@ void _features(Canvas c, Setting s, BattlegroundSpec sp, SeededRandom r, double 
           _stalagmite(c, x, base + 6, 260, fill);
         }
       }
-    case Setting.crypt || Setting.lair || Setting.deepforge:
+    case Setting.deepforge:
+      // Deepforge Hold: a great carved gate far back with the forge glowing through it, square
+      // pillars banded with runes, and an anvil on the floor.
+      if (!near) {
+        _dwarfGate(c, 480, base + 4, 260, fill, lit);
+        for (final x in [130.0, 830.0]) {
+          _runePillar(c, x, base + 4, 280, fill, lit * .6);
+        }
+      } else {
+        for (final x in [40.0, 920.0]) {
+          _runePillar(c, x, base + 6, 360, fill, lit);
+        }
+        _anvil(c, 500, base + 10, 1.1, fill);
+        for (final x in [380.0, 600.0]) {
+          _brazier(c, x, base - 120, 1, fill, lit, wall: true);
+        }
+        _lava(c, base + 12);
+      }
+    case Setting.crypt || Setting.lair:
       // Indoors: great arches or cave mouths framing the fight, torches between.
       if (!near) {
         for (final x in [120.0, 480.0, 840.0]) {
@@ -702,4 +782,174 @@ void _tombDoor(Canvas c, double x, double base, double h, Paint p, double lit) {
   c.drawRect(Rect.fromLTWH(x - w * .9, base - h - 16, w * 1.8, 16), p);
   c.drawCircle(Offset(x, base - h * .45), 26, Paint()..color = const Color(0xFF7AF0A8).withValues(alpha: .18 * lit)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14));
   c.drawCircle(Offset(x, base - h * .45), 7, Paint()..color = const Color(0xFF7AF0A8).withValues(alpha: .55 * lit));
+}
+
+// ---- The faction lands' own landmarks ----
+
+/// A palm: a leaning, ringed trunk and a crown of drooping fronds.
+void _palm(Canvas c, double x, double base, double h, Paint p, SeededRandom r) {
+  final lean = (r.next() - .5) * h * .35, top = Offset(x + lean, base - h);
+  c.drawPath(
+    Path()
+      ..moveTo(x - h * .04, base)
+      ..quadraticBezierTo(x + lean * .2, base - h * .5, top.dx - h * .02, top.dy)
+      ..lineTo(top.dx + h * .02, top.dy)
+      ..quadraticBezierTo(x + lean * .2 + h * .05, base - h * .5, x + h * .04, base)
+      ..close(),
+    p,
+  );
+  for (var i = 0; i < 7; i++) {
+    final a = -math.pi + i * math.pi / 6 + (r.next() - .5) * .2, len = h * (.38 + r.next() * .1);
+    final tip = top + Offset(math.cos(a) * len, math.sin(a) * len * .5 + len * .35);
+    final mid = top + Offset(math.cos(a) * len * .5, -len * .12);
+    c.drawPath(
+      Path()
+        ..moveTo(top.dx, top.dy - 3)
+        ..quadraticBezierTo(mid.dx, mid.dy - 6, tip.dx, tip.dy)
+        ..quadraticBezierTo(mid.dx, mid.dy + 6, top.dx, top.dy + 3)
+        ..close(),
+      p,
+    );
+  }
+}
+
+/// A vine hanging from above the scene.
+void _vine(Canvas c, double x, double len, Paint p) {
+  final path = Path()..moveTo(x, -4);
+  for (var y = 0.0; y < len; y += 18) {
+    path.quadraticBezierTo(x + (y % 36 == 0 ? 8 : -8), y + 9, x, y + 18);
+  }
+  c.drawPath(path, Paint()..color = p.color..style = PaintingStyle.stroke..strokeWidth = 3);
+  for (var y = 14.0; y < len; y += 26) {
+    c.drawOval(Rect.fromCenter(center: Offset(x + 6, y), width: 12, height: 6), p);
+  }
+}
+
+/// A stepped ziggurat with a lit shrine on top.
+void _ziggurat(Canvas c, double x, double base, double h, Paint p, double lit) {
+  const steps = 5;
+  for (var i = 0; i < steps; i++) {
+    final w = h * 1.5 * (1 - i / (steps + 1)), y = base - h * (i + 1) / steps;
+    c.drawRect(Rect.fromLTWH(x - w / 2, y, w, h / steps + 1), p);
+  }
+  c.drawRect(Rect.fromLTWH(x - h * .08, base - h, h * .16, h + 1), p);
+  final shrine = Rect.fromLTWH(x - h * .14, base - h - h * .16, h * .28, h * .16);
+  c.drawRect(shrine, p);
+  _window(c, Rect.fromCenter(center: shrine.center + const Offset(0, 3), width: h * .08, height: h * .1), lit);
+}
+
+/// A round hide hut with poles poking out of its top.
+void _hut(Canvas c, double x, double base, double h, Paint p) {
+  c.drawPath(
+    Path()
+      ..moveTo(x - h * .75, base)
+      ..quadraticBezierTo(x - h * .75, base - h * .9, x, base - h)
+      ..quadraticBezierTo(x + h * .75, base - h * .9, x + h * .75, base)
+      ..close(),
+    p,
+  );
+  for (final dx in [-.12, .05, .18]) {
+    c.drawLine(Offset(x + h * dx * .4, base - h * .95), Offset(x + h * dx * 1.6, base - h * 1.3), Paint()..color = p.color..strokeWidth = 3);
+  }
+}
+
+/// A skull on a spike.
+void _skullPole(Canvas c, double x, double base, double h, Paint p) {
+  c.drawRect(Rect.fromLTWH(x - 2.5, base - h, 5, h), p);
+  c.drawCircle(Offset(x, base - h - 6), 9, p);
+  c.drawRect(Rect.fromLTWH(x - 5, base - h + 1, 10, 6), p);
+  for (final dx in [-4.0, 4.0]) {
+    c.drawCircle(Offset(x + dx, base - h - 6), 2.4, Paint()..color = const Color(0x55FFB04A));
+  }
+}
+
+/// A crude watchtower of lashed poles with a hide roof and a fire on top.
+void _orkTower(Canvas c, double x, double base, double h, Paint p, double lit) {
+  final w = h * .28;
+  for (final dx in [-1.0, 1.0]) {
+    c.drawLine(Offset(x + dx * w, base), Offset(x + dx * w * .55, base - h * .8), Paint()..color = p.color..strokeWidth = 7);
+  }
+  c.drawLine(Offset(x - w * .9, base - h * .35), Offset(x + w * .9, base - h * .45), Paint()..color = p.color..strokeWidth = 4);
+  c.drawLine(Offset(x - w * .9, base - h * .45), Offset(x + w * .9, base - h * .35), Paint()..color = p.color..strokeWidth = 4);
+  c.drawRect(Rect.fromLTWH(x - w * .7, base - h * .86, w * 1.4, h * .1), p);
+  c.drawPath(poly([Offset(x - w * .85, base - h * .86), Offset(x, base - h), Offset(x + w * .85, base - h * .86)]), p);
+  _brazier(c, x + w * .5, base - h * .84, .6, p, lit, wall: true);
+}
+
+/// A bent, swollen standing stone that has forgotten its shape.
+void _twisted(Canvas c, double x, double base, double h, Paint p, SeededRandom r) {
+  final w = h * .2, bend = (r.next() - .5) * h * .5, bulge = .7 + r.next() * .5;
+  c.drawPath(
+    Path()
+      ..moveTo(x - w, base)
+      ..cubicTo(x - w * (1 + bulge), base - h * .4, x + bend - w * .2, base - h * .7, x + bend * 1.3, base - h)
+      ..cubicTo(x + bend + w * .7, base - h * .75, x + w * (1 + bulge * .6), base - h * .35, x + w, base)
+      ..close(),
+    p,
+  );
+  // A knot where it swells, and a hole right through.
+  c.drawCircle(Offset(x + bend * .45, base - h * .45), w * .9 * bulge, p);
+  c.drawCircle(Offset(x + bend * .5, base - h * .62), w * .28, Paint()..color = const Color(0x22D8B0FF));
+}
+
+/// A lighthouse, long dark, a faint lamp still burning at the top.
+void _lighthouse(Canvas c, double x, double base, double h, Paint p, double lit) {
+  final w = h * .13;
+  c.drawPath(poly([Offset(x - w, base), Offset(x - w * .6, base - h * .82), Offset(x + w * .6, base - h * .82), Offset(x + w, base)]), p);
+  c.drawRect(Rect.fromLTWH(x - w * .85, base - h * .86, w * 1.7, h * .05), p);
+  final lamp = Rect.fromLTWH(x - w * .45, base - h * .96, w * .9, h * .1);
+  c.drawCircle(lamp.center, h * .25, Paint()..color = const Color(0xFFE8F0FF).withValues(alpha: .12 * lit)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18));
+  c.drawRect(lamp, Paint()..color = Color.lerp(p.color, const Color(0xFFE8F0E0), .55 * lit)!);
+  c.drawPath(poly([Offset(x - w * .6, base - h * .96), Offset(x, base - h * 1.06), Offset(x + w * .6, base - h * .96)]), p);
+}
+
+/// A blank, pale mask on a stake, staring out to sea.
+void _maskStake(Canvas c, double x, double base, double h, Paint p, double lit) {
+  c.drawRect(Rect.fromLTWH(x - 2.5, base - h, 5, h), p);
+  final face = Rect.fromCenter(center: Offset(x, base - h - 4), width: 18, height: 25);
+  c.drawOval(face, Paint()..color = Color.lerp(p.color, const Color(0xFFE8E2D8), .45 * lit)!);
+  c.drawOval(face, strokePaint(p.color, 1.4));
+}
+
+/// The gate of a dwarf hold: a square doorway under a stepped lintel, carved with a great face,
+/// the forge glowing in the dark beyond.
+void _dwarfGate(Canvas c, double x, double base, double h, Paint p, double lit) {
+  final w = h * .7;
+  final door = Rect.fromLTWH(x - w * .3, base - h * .62, w * .6, h * .62);
+  c.drawRect(door, Paint()..shader = ui.Gradient.linear(door.bottomCenter, door.topCenter, [Color.fromRGBO(255, 120, 40, .55 * lit), Color.fromRGBO(255, 120, 40, .08 * lit)]));
+  final frame = Path()
+    ..fillType = PathFillType.evenOdd
+    ..addRect(Rect.fromLTWH(x - w / 2, base - h * .78, w, h * .78))
+    ..addRect(door);
+  c.drawPath(frame, p);
+  for (var i = 0; i < 3; i++) {
+    final ww = w * (1.05 - i * .2);
+    c.drawRect(Rect.fromLTWH(x - ww / 2, base - h * (.78 + (i + 1) * .07), ww, h * .07 + 1), p);
+  }
+  // The carved face over the door: a heavy brow and a braided beard of stone.
+  c.drawPath(poly([Offset(x - w * .18, base - h * .76), Offset(x + w * .18, base - h * .76), Offset(x + w * .1, base - h * .64), Offset(x, base - h * .6), Offset(x - w * .1, base - h * .64)]), Paint()..color = Color.lerp(p.color, const Color(0xFF000000), .4)!);
+}
+
+/// A square pillar banded with glowing runes.
+void _runePillar(Canvas c, double x, double base, double h, Paint p, double lit) {
+  final w = h * .13;
+  c.drawRect(Rect.fromLTWH(x - w / 2, base - h, w, h), p);
+  c.drawRect(Rect.fromLTWH(x - w * .8, base - h - 16, w * 1.6, 16), p);
+  c.drawRect(Rect.fromLTWH(x - w * .8, base - 14, w * 1.6, 14), p);
+  final rune = strokePaint(Color.fromRGBO(255, 170, 70, .75 * lit), 2)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.2);
+  for (final y in [.3, .55]) {
+    final cy = base - h * y;
+    for (final dx in [-.25, .05, .3]) {
+      final o = Offset(x + w * dx, cy);
+      c.drawLine(o + const Offset(0, -6), o + const Offset(0, 6), rune);
+      c.drawLine(o + const Offset(-4, -4), o + const Offset(4, 3), rune);
+    }
+  }
+}
+
+/// An anvil on its block.
+void _anvil(Canvas c, double x, double base, double k, Paint p) {
+  c.drawRect(Rect.fromLTWH(x - 16 * k, base - 26 * k, 32 * k, 26 * k), p);
+  c.drawPath(poly([Offset(x - 30 * k, base - 40 * k), Offset(x + 22 * k, base - 40 * k), Offset(x + 48 * k, base - 46 * k), Offset(x + 24 * k, base - 52 * k), Offset(x - 34 * k, base - 52 * k), Offset(x - 40 * k, base - 46 * k)]), p);
+  c.drawRect(Rect.fromLTWH(x - 10 * k, base - 41 * k, 20 * k, 15 * k), p);
 }

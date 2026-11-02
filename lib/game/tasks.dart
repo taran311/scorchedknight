@@ -4,6 +4,7 @@
 // the save, so nothing can be missed. Pure Dart.
 
 import 'catalog.dart';
+import 'knight_classes.dart';
 import 'loot.dart' show gearSets;
 import 'models.dart';
 import 'rules.dart';
@@ -66,6 +67,8 @@ final gameTasks = <GameTask>[
   GameTask('keep', 'Build the keep', (s) => s.home >= 2, const TaskReward(gold: 500)),
   GameTask('relic', 'Forge a relic', (s) => s.forged.isNotEmpty, const TaskReward(xp: .5, scrolls: 2)),
   GameTask('suit', 'Wear a whole faction suit', (s) => suitWorn(s.knight) != null || s.did.any((d) => d.startsWith('suit:')), const TaskReward(gold: 600, keys: 1)),
+  GameTask('rank5', 'Reach rank 5 as a class knight', (s) => s.knight.classWins.values.any((w) => w >= rankWins[4]), const TaskReward(gold: 400, scrolls: 1)),
+  GameTask('master', 'Master a class: rank 10', (s) => s.knight.classWins.values.any((w) => w >= rankWins.last), const TaskReward(gold: 1000, keys: 1)),
   GameTask('king', 'Slay the Ember King', (s) => s.won, const TaskReward(gold: 1000)),
 ];
 
@@ -80,7 +83,7 @@ final regionTasks = <GameTask>[
 /// rune for the new kit); the suit itself is the real prize.
 final suitTasks = <GameTask>[
   for (final id in suitArts.keys)
-    GameTask('suit:$id', 'Wear the whole ${gearSets.firstWhere((g) => g.id == id).name}', (s) => s.did.contains('suit:$id') || suitWorn(s.knight) == id, const TaskReward(gold: 250, scrolls: 1)),
+    GameTask('suit:$id', knightClassById(id) == null ? 'Wear the whole ${gearSets.firstWhere((g) => g.id == id).name}' : 'Become the ${knightClassById(id)!.name}: wear the whole ${gearSets.firstWhere((g) => g.id == id).name}', (s) => s.did.contains('suit:$id') || suitWorn(s.knight) == id, const TaskReward(gold: 250, scrolls: 1)),
 ];
 
 /// Combat feats, like a combat achievement list: a way of winning a fight, not just winning it.

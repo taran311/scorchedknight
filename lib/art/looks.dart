@@ -17,6 +17,8 @@ enum HeadKind {
   bare,
   nasal,
   greathelm,
+  // A faction suit's helm: the great helm under its order's crest ([Look.order] says which).
+  orderhelm,
   sallet,
   wizardhat,
   cowl,
@@ -269,6 +271,7 @@ class Look {
     this.bandaged = false,
     this.usekh = false,
     this.feathered = false,
+    this.order,
   });
 
   /// The same foe as a veteran of many fights, for one well above you (tier 1 tough, 2 deadly):
@@ -426,6 +429,9 @@ class Look {
   /// Enchanted or high-tier wyrmscale glows softly in its dragon's colour.
   final Color? armourGlow;
 
+  /// The order whose crest an [HeadKind.orderhelm] wears (a faction suit's id).
+  final String? order;
+
   /// A heroine: longer hair (a braid under a helm), lashes and no beard.
   final bool female;
 
@@ -485,8 +491,12 @@ const _knightMetals = <String, List<Color>>{
 const _robes = <String, int>{'apprentice': 0xFF6E6252, 'arcane': 0xFF2F4F86, 'archmage': 0xFF5A2E7A, 'astral': 0xFF1C2448, 'bonerobe': 0xFFCFC3A6, 'verdantrobe': 0xFF3E6A3A, 'oathrobe': 0xFFE8DCC0, 'emberweave': 0xFF4A1A22, 'embroidered': 0xFF6A2E3A, 'thornweave': 0xFF3A4A2A, 'warded': 0xFF2E5A6A, 'sagerobe': 0xFF8A7A5A, 'starweave': 0xFF22305A, 'voidrobe': 0xFF1A1424, 'onmyoji': 0xFFE8E4DA};
 const _leathers = <String, int>{'woodsman': 0xFF7A5233, 'studded': 0xFF5E4026, 'brigandine': 0xFF3E5232, 'shadowweave': 0xFF2C2834, 'dragonhide': 0xFF2F6A46, 'bonescale': 0xFFBFB396, 'verdantleather': 0xFF4E7A3A, 'oathleather': 0xFF9A7A4A, 'emberhide': 0xFF3A2228, 'scalejerkin': 0xFF6A6A4A, 'brigandcoat': 0xFF5A2A22, 'huntleathers': 0xFF6A5030, 'wardenmail': 0xFF4A5A4A, 'nightleathers': 0xFF22222E, 'stormhide': 0xFF3A4A5E, 'shinobi': 0xFF1E2230};
 
+/// The faction suits whose helms wear their order's crest (the rest have helms of their own).
+const orderCrests = {'nightblood', 'moonfang', 'silverleaf', 'deepforge', 'faceless', 'sunscale', 'tidecaller', 'changeling', 'skyborn'};
+
 HeadKind _headFor(HeroClass c, GearItem? helm) {
   if (helm == null) return c == HeroClass.knight ? HeadKind.coif : HeadKind.bare;
+  if (c == HeroClass.knight && orderCrests.contains(helm.gearSet)) return HeadKind.orderhelm;
   return switch (helm.art) {
     'nasal' => HeadKind.nasal,
     'sallet' => HeadKind.sallet,
@@ -685,6 +695,7 @@ Look lookFor(HeroClass c, Loadout l, {String dye = 'crimson', bool gloves = fals
         head: head,
         helm: _wyrmHelm(l.helm) ?? (head == HeadKind.kabuto ? _lacquer : null) ?? (livery != null && helmRarity != Rarity.legendary ? _toward(helmSteel, Color(livery.metal), .55) : null) ?? ((plate || blackIron) && head != HeadKind.nasal ? (blackIron ? _knightMetals['plate']! : m) : helmSteel),
         plume: head == HeadKind.greathelm || head == HeadKind.sallet ? dyeCol : null,
+        order: head == HeadKind.orderhelm ? l.helm?.gearSet : null,
         armourGlow: _wyrmGlow(l),
         wyrmHorns: wyrmTierOfArmour(l.armour) != null || (livery?.horns ?? false),
         wyrmGloves: _wyrmOf(l.gloves) != null,
@@ -1575,19 +1586,23 @@ Look _merrow({String rank = 'raider'}) {
 Look _shifter({String rank = 'changeling'}) {
   final hulk = rank == 'hulk', sly = rank == 'sly', boss = rank == 'thousandfold';
   final skin = ramp(boss ? 0xFF6A5A8A : 0xFF8A7AA0, .3, .55);
+  // Half-made, and made of other things: pieces of whatever they last wore (a lizard's scaled
+  // forearms, a wolf's grey legs, an elf's pale hands) grown in patches over their own violet.
+  final lizard = ramp(0xFF5A8A44, .3, .5), wolf = ramp(0xFF8A847A, .3, .5), elf = ramp(0xFFE8D8C0, .2, .45);
   return Look(
     build: hulk || boss ? 'brute' : 'lean',
     scale: boss ? 1.3 : (hulk ? 1.2 : 1),
     stance: sly ? Stance.rogue : Stance.zombie,
     skin: skin,
-    torso: skin,
-    torsoKind: TorsoKind.plain,
+    torso: hulk ? wolf : skin,
+    torsoKind: hulk ? TorsoKind.fur : TorsoKind.plain,
     upper: skin,
-    fore: skin,
-    hand: ramp(boss ? 0xFF4A3A6A : 0xFF6A5A80, .3, .5),
-    thigh: skin,
-    shin: skin,
-    boot: skin,
+    fore: sly ? skin : lizard,
+    hand: sly ? elf : ramp(boss ? 0xFF4A3A6A : 0xFF6A5A80, .3, .5),
+    thigh: boss ? lizard : skin,
+    shin: sly ? skin : wolf,
+    boot: sly ? skin : wolf,
+    talons: !sly,
     belt: shade(Color(boss ? 0xFF6A5A8A : 0xFF8A7AA0), -.45),
     head: HeadKind.shifter,
     eyeGlow: const Color(0xFFA0F0E0),

@@ -15,6 +15,7 @@ import 'loot.dart';
 import 'models.dart';
 import 'mounts.dart';
 import 'errands.dart';
+import 'knight_classes.dart';
 import 'spells.dart';
 import 'tarot.dart';
 import 'vault.dart';
@@ -268,6 +269,12 @@ class GameEngine {
   /// This fight so far, for the combat feats: hits taken, potions drunk, rites cast and bolts
   /// shot. A fight picked up again after the game was closed counts as already hurt (unknown).
   int _fightHits = 1, _fightPotions = 0, _fightRites = 0, _fightBolts = 0;
+
+  /// The Blood Knight's Undying, spent this fight.
+  bool _undyingUsed = false;
+
+  /// The last win took you up a rank in your class, as 'Dragon Knight rank 4' (for the spoils).
+  String? rankUp;
   AmmoType? _cleanBolt;
   final LootTable loot;
 
@@ -313,7 +320,7 @@ class GameEngine {
       k.level++;
       ups++;
       // A rite learned at this level goes straight onto the hotbar, if there's room.
-      for (final sp in spells.where((sp) => sp.level == k.level)) {
+      for (final sp in spells.where((sp) => sp.order == null && sp.level == k.level)) {
         if (k.rites.length < riteSlots && !k.rites.contains(sp.id)) {
           k.rites.add(sp.id);
           state.did.add('hotbar:${sp.id}');
@@ -1463,6 +1470,8 @@ class GameEngine {
   void _begin(int foe, Rare? rare, {int above = 0}) {
     final k = state.knight, level = foeLevelFor(realmAt(rare?.base ?? foe), k.level) + above;
     _fightHits = 0;
+    _undyingUsed = false;
+    rankUp = null;
     _fightPotions = 0;
     _fightRites = 0;
     _fightBolts = 0;
@@ -1617,7 +1626,7 @@ class GameEngine {
   /// Why the rite [id] can't be cast right now (null if it can).
   String? whyNotRite(String id) {
     final k = state.knight, sp = spellById(id);
-    if (sp == null || sp.level > k.level) return 'Prepare a rite first';
+    if (sp == null || !riteKnown(k, sp)) return sp?.order != null ? 'Wear the whole ${knightClassById(sp!.order)!.name}\'s suit' : 'Prepare a rite first';
     final cost = spellCost(k, sp);
     return state.mana >= cost ? null : 'Needs $cost mana';
   }
@@ -1626,16 +1635,20 @@ class GameEngine {
   /// hotbar full, the newest rite takes the last slot.
   void toggleRite(String id) {
     final k = state.knight, sp = spellById(id);
-    if (sp == null || sp.level > k.level) return;
+    if (sp == null || !riteKnown(k, sp)) return;
+    // (Rites you can't use right now, a class's out of its suit, are kept but take no slot: put
+    // the suit back on and they're on the hotbar again.)
+    bool usable(String r) => spellById(r) != null && riteKnown(k, spellById(r)!);
     k.rites.removeWhere((r) => spellById(r) == null);
+    final active = k.rites.where(usable).toList();
     if (k.rites.contains(id)) {
-      if (k.rites.length > 1) k.rites.remove(id);
-    } else if (k.rites.length < riteSlots) {
+      if (active.length > 1) k.rites.remove(id);
+    } else if (active.length < riteSlots) {
       k.rites.add(id);
     } else {
-      k.rites[riteSlots - 1] = id;
+      k.rites[k.rites.indexOf(active.last)] = id;
     }
-    if (!k.rites.contains(k.preparedSpell)) k.preparedSpell = k.rites.first;
+    if (!k.rites.contains(k.preparedSpell) || !usable(k.preparedSpell)) k.preparedSpell = k.rites.where(usable).firstOrNull ?? k.preparedSpell;
   }
 
   /// Takes your turn, then (if it's still standing and you're still here) the foe's.
@@ -1735,7 +1748,12 @@ class GameEngine {
     final wolf = state.wolfTurns > 0 ? wolfDamage : 1.0;
     final updraft = foe.aloft && activeSets(k.setGear).any((e) => e.$1.updraft && e.$2 >= e.$1.full) ? updraftBoost : 1.0;
     final bushido = activeSets(k.setGear).any((e) => e.$1.bushido && e.$2 >= e.$1.full) ? 1 + math.min(bushidoCap, (state.turn - 1) * bushidoStep) : 1.0;
-    final mult = reach * edge * train * song * wolf * updraft * bushido * (adapted ? adaptBoost : 1) * (bash ? bashMult : (shooting ? crossbowShare(k) * aim : (casting && cape == 'starweave' ? 1.3 : 1.0)));
+    // The Dragon Knight's Draconic Blood (rank 10): every third attack breathes fire. The Forge
+    // Knight's iron bolts punch through.
+    final draconic = action == BattleAction.attack && state.turn % 3 == 0 && classPassive(k, 'drakesworn');
+    if (draconic) _note('Draconic blood: you breathe fire with the blow!', EntryKind.damage);
+    final ironBolt = shooting && classOf(k)?.id == 'deepforge' ? 1.25 : 1.0;
+    final mult = (draconic ? 1.5 : 1.0) * ironBolt * reach * edge * train * song * wolf * updraft * bushido * (adapted ? adaptBoost : 1) * (bash ? bashMult : (shooting ? crossbowShare(k) * aim : (casting && cape == 'starweave' ? 1.3 : 1.0)));
     final d = striking
         ? swingDamage(state, _rng.nextDouble(), special: fire, ammo: shot, spell: cast, hitRoll: _rng.nextDouble(), mult: mult, sureCrit: (state.turn == 1 && activeSets(k.setGear).any((e) => e.$1.firstCrit && e.$2 >= e.$1.full)) || (bash && suitWorn(k) == 'bushido'))
         : const SwingDamage();
@@ -2065,6 +2083,13 @@ class GameEngine {
     final k = state.knight, d = r.damage;
     if (cast != null) {
       _note('You cast ${cast.name}!', EntryKind.gold);
+      if (cast.selfHurt > 0) {
+        // The Blood Pact takes its price as you strike.
+        final before = k.hp;
+        k.hp = math.max(1, k.hp - (maxHp(k) * cast.selfHurt).round());
+        r.selfHurt = before - k.hp;
+        _note('The pact takes its price: −${r.selfHurt} HP.', EntryKind.damage);
+      }
       switch (cast.kind) {
         case SpellKind.summon:
           state.summons = math.max(state.summons, cast.summons);
@@ -2111,6 +2136,20 @@ class GameEngine {
     }
     final hit = d.base + d.effects;
     state.foeHp -= hit;
+    // A class's own bolts: the Dragon Knight's set it burning, the Blood Knight's feed you.
+    if (shooting) {
+      final cls = classOf(k)?.id;
+      if (cls == 'drakesworn' && foeIn(state).element != 'burn' && state.foeHp > 0) {
+        state
+          ..foeBurn = math.max(state.foeBurnTurns > 0 ? state.foeBurn : 0, burnTick(k.level))
+          ..foeBurnTurns = burnTurns;
+      } else if (cls == 'nightblood') {
+        final before = k.hp;
+        k.hp = math.min(maxHp(k), k.hp + (hit / 5).round());
+        r.mended += k.hp - before;
+        r.mendedFrom = 'Blood bolt';
+      }
+    }
     final extras = [
       if (d.poison > 0) '${d.poison} poison',
       if (d.burn > 0) '${d.burn} fire',
@@ -2340,6 +2379,12 @@ class GameEngine {
       }
       k.hp = math.max(0, k.hp - hurt);
       if (hurt > 0) _fightHits++;
+      if (blocked && full > hurt && classPassive(k, 'deepforge')) {
+        // The Forge Knight's Living Steel: a fifth of what the block stopped rings back into it.
+        final back = math.max(1, ((full - hurt) * .2).round());
+        state.foeHp -= back;
+        r.reflected += back;
+      }
       if (blocked && k.hp > 0 && activeSets(k.setGear).any((e) => e.$1.forgeheart && e.$2 >= e.$1.full)) {
         // Deepforge: the block rings like an anvil, and you feel it in your bones.
         final before = k.hp;
@@ -2380,7 +2425,13 @@ class GameEngine {
       _note('$foeName strikes. $how${thorns > 0 ? ' Your thorns bite for $thorns.' : ''}${r.reflected > 0 ? ' Your mirror hurls ${r.reflected} back!' : ''}', hurt > 0 ? EntryKind.damage : EntryKind.plain);
       if (thorns > 0 || r.reflected > 0) r.kill = _checkKill();
       if (r.kill == null && k.hp <= 0) {
-        if (brewOn(k, Brew.reaperbane)) {
+        if (!_undyingUsed && classPassive(k, 'nightblood')) {
+          // The Blood Knight's Undying: the blood won't let you fall, once a fight.
+          _undyingUsed = true;
+          k.hp = 1;
+          r.cheatedDeath = true;
+          _note('Undying: the blood in your veins refuses to stop. You stand on 1 HP.', EntryKind.good);
+        } else if (brewOn(k, Brew.reaperbane)) {
           // Reaper's Bane: he comes for you, and his scythe goes right through you.
           k.brews.remove(Brew.reaperbane.name);
           k.hp = math.max(1, (maxHp(k) * reaperbaneHp).round());
@@ -2732,6 +2783,7 @@ class GameEngine {
     state.foesFelled++;
     if (rare != null) state.raresFelled++;
     _feats(f, rare, c, clean);
+    _classWin();
     final won = firstBoss && c == mainLands - 1;
     // The Ashen Order, Ravenmoor's vampires and the Weald's werewolves leave trophies, and now and
     // then a blueprint for their set (their bosses and Sir Malric always leave one you lack).
@@ -3804,6 +3856,28 @@ class GameEngine {
 
   /// Notes a first that the tasks look for (see GameState.did).
   void mark(String what) => state.did.add(what);
+
+  /// A win in a class's suit counts towards its rank; a new rank can bring a rite (straight onto
+  /// the hotbar if there's room) or, at the top, the class's passive.
+  void _classWin() {
+    final k = state.knight, cls = classOf(k);
+    if (cls == null) return;
+    final before = classRank(k, cls.id);
+    k.classWins[cls.id] = (k.classWins[cls.id] ?? 0) + renownFor(continents[state.continent].minLevel);
+    final now = classRank(k, cls.id);
+    if (now == before) return;
+    rankUp = '${cls.name} rank $now';
+    final rite = cls.rites.where((sp) => sp.rank == now).firstOrNull;
+    if (rite != null) {
+      final active = k.rites.where((r) => spellById(r) != null && riteKnown(k, spellById(r)!)).length;
+      if (!k.rites.contains(rite.id) && active < riteSlots) k.rites.add(rite.id);
+      _note('${cls.name}, rank $now! You learn ${rite.name}${k.rites.contains(rite.id) ? ': it\'s on your hotbar' : '. Swap it onto your hotbar in your tent'}.', EntryKind.gold);
+    } else if (now == maxRank) {
+      _note('${cls.name}, rank $now: a master of the order! ${cls.passive}: ${cls.passiveText.toLowerCase()}.', EntryKind.gold);
+    } else {
+      _note('${cls.name}, rank $now!', EntryKind.gold);
+    }
+  }
 
   /// The combat feats this win earned (see featTasks), each marked and told once.
   void _feats(FoeType f, Rare? rare, int c, bool clean) {

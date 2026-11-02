@@ -297,6 +297,14 @@ class _HobDialogState extends State<_HobDialog> {
   int _page = 0, _shown = 0;
   Timer? _typing;
 
+  // When the choices came up. They ignore taps for a moment after, so a tap meant for Skip (where
+  // they now sit) can't buy a reading or pick for you by accident.
+  DateTime? _choicesAt;
+  bool get _settled => _choicesAt != null && DateTime.now().difference(_choicesAt!) > const Duration(milliseconds: 450);
+  VoidCallback _guard(VoidCallback f) => () {
+    if (_settled) f();
+  };
+
   bool get _typed => _shown >= widget.pages[_page].length;
   bool get _last => _page == widget.pages.length - 1;
 
@@ -312,7 +320,10 @@ class _HobDialogState extends State<_HobDialog> {
     _typing = Timer.periodic(const Duration(milliseconds: 22), (t) {
       if (!mounted) return t.cancel();
       setState(() => _shown += 1);
-      if (_typed) t.cancel();
+      if (_typed) {
+        t.cancel();
+        if (_last) _choicesAt ??= DateTime.now();
+      }
     });
   }
 
@@ -320,6 +331,7 @@ class _HobDialogState extends State<_HobDialog> {
     if (!_typed) {
       _typing?.cancel();
       setState(() => _shown = widget.pages[_page].length);
+      if (_last) _choicesAt ??= DateTime.now();
     } else if (!_last) {
       setState(() => _page++);
       _type();
@@ -415,16 +427,16 @@ class _HobDialogState extends State<_HobDialog> {
                           children: [
                             if (widget.quest != null) ...[widget.quest!, const SizedBox(height: 12)],
                             if (widget.extra != null) ...[
-                              StoneButton(title: widget.extra!, caption: widget.extraCaption, tone: ButtonTone.amber, onPressed: widget.extraOn ? () => Navigator.of(context).pop('extra') : null),
+                              StoneButton(title: widget.extra!, caption: widget.extraCaption, tone: ButtonTone.amber, onPressed: widget.extraOn ? _guard(() => Navigator.of(context).pop('extra')) : null),
                               const SizedBox(height: 10),
                             ],
                             Row(
                               children: [
                                 if (widget.decline != null) ...[
-                                  Expanded(child: StoneButton(title: widget.decline!, onPressed: () => Navigator.of(context).pop(false))),
+                                  Expanded(child: StoneButton(title: widget.decline!, onPressed: _guard(() => Navigator.of(context).pop(false)))),
                                   const SizedBox(width: 10),
                                 ],
-                                Expanded(flex: 2, child: StoneButton(title: widget.accept, tone: widget.acceptTone, onPressed: () => Navigator.of(context).pop(true))),
+                                Expanded(flex: 2, child: StoneButton(title: widget.accept, tone: widget.acceptTone, onPressed: _guard(() => Navigator.of(context).pop(true)))),
                               ],
                             ),
                           ],

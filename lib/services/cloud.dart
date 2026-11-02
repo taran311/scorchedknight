@@ -217,6 +217,30 @@ class CloudSave extends ChangeNotifier implements SaveCloud {
     notifyListeners();
   }
 
+  /// Deletes the account and its cloud save for good (the hero on this device stays). Play asks
+  /// that any app you can make an account in lets you delete it from inside the app. Firebase may
+  /// want a fresh sign-in first; then this says so and leaves everything as it was.
+  Future<bool> deleteAccount() async {
+    final u = user, doc = _doc;
+    if (!available || u == null || doc == null) return false;
+    try {
+      await doc.delete();
+      await u.delete();
+    } on FirebaseAuthException catch (e) {
+      problem = e.code == 'requires-recent-login' ? 'For safety, sign out and back in, then delete the account.' : 'Couldn\'t delete the account (${e.code}).';
+      notifyListeners();
+      return false;
+    } catch (e) {
+      problem = 'Couldn\'t delete the account (you may be offline).';
+      notifyListeners();
+      return false;
+    }
+    await signOut();
+    notice = 'Your account and cloud save are deleted. Your hero is still on this device.';
+    notifyListeners();
+    return true;
+  }
+
   DocumentReference<Map<String, dynamic>>? get _doc => user == null ? null : FirebaseFirestore.instance.collection('players').doc(user!.uid);
 
   /// The save in the cloud, if there is one.

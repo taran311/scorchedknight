@@ -76,11 +76,14 @@ class _ReadingState extends State<_Reading> with SingleTickerProviderStateMixin 
                       child: CustomPaint(painter: showFace ? TarotFace(card) : const _TarotBack()),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 26),
                   Opacity(
                     opacity: words,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 320),
+                    child: Container(
+                      constraints: const BoxConstraints(maxWidth: 340),
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+                      // (On a dark panel of its own, so the square behind never shows through the words.)
+                      decoration: BoxDecoration(color: const Color(0xF0120D0A), borderRadius: BorderRadius.circular(6), border: Border.all(color: const Color(0xFF5A4630))),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [

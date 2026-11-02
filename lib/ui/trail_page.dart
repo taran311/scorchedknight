@@ -53,8 +53,34 @@ class _TrailPageState extends State<TrailPage> {
   GameController get c => widget.controller;
   int get land => widget.land;
 
+  /// Setting out badly hurt with no potion to drink: a word first, since a knock-out costs you.
+  Future<bool> _readyToFight() async {
+    final k = c.state.knight;
+    // (Only when there's something to be done about it: a bed at the inn, or gold for a potion.)
+    final canMend = c.whyNotRest == null || k.coins >= c.engine.priceOf('potion');
+    if (c.state.inBattle || k.potions > 0 || k.hp >= maxHp(k) * .35 || !canMend) return true;
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Palette.stone2,
+        title: Text('Badly hurt', style: Txt.label(size: 19, color: const Color(0xFFE88A70))),
+        content: Text(
+          'You\'re on ${k.hp} of ${maxHp(k)} HP with no potions on your belt. ${c.whyNotRest == null ? 'A rest at the Soot & Kettle puts you back to full${k.coins >= c.engine.priceOf('potion') ? ', and Mags sells potions' : ''}.' : 'Mags sells potions.'}',
+          style: Txt.onStone(size: 14.5, color: Palette.cream),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text('Back to town', style: Txt.label(size: 14, color: Palette.amber))),
+          TextButton(onPressed: () => Navigator.of(context).pop(true), child: Text('Fight anyway', style: Txt.label(size: 14, color: Palette.parch2))),
+        ],
+      ),
+    );
+    if (go == false && mounted) Navigator.of(context).popUntil((r) => r.isFirst);
+    return go == true;
+  }
+
   Future<void> _go() async {
     final s = c.state;
+    if (!await _readyToFight() || !mounted) return;
     c.travel(land);
     final how = s.inBattle ? BattleStart.resume : (trailStep(s, land) == TrailStep.lair ? BattleStart.boss : BattleStart.explore);
     final exit = await openBattle(context, c, how);
@@ -69,6 +95,7 @@ class _TrailPageState extends State<TrailPage> {
 
   /// Onto the land's Heroic trail.
   Future<void> _goHeroic() async {
+    if (!await _readyToFight() || !mounted) return;
     c.travel(land);
     final exit = await openBattle(context, c, c.state.inBattle ? BattleStart.resume : BattleStart.heroic);
     if (!mounted) return;
@@ -713,16 +740,24 @@ Offset _target(TrailStep step, int at) => switch (step) {
 class _GoBadge extends StatelessWidget {
   const _GoBadge();
   @override
-  Widget build(BuildContext context) => Container(
-    width: 46,
-    height: 46,
-    decoration: BoxDecoration(
-      shape: BoxShape.circle,
-      color: Palette.bloodDeep,
-      border: Border.all(color: const Color(0xFFFFD98A), width: 2),
-      boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 4, offset: Offset(0, 2))],
-    ),
-    child: const Center(child: ItemIcon(Item.swords, size: 26)),
+  // (Labelled, so it's plain that this is the button: the whole card fights, too.)
+  Widget build(BuildContext context) => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(
+        width: 46,
+        height: 46,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Palette.bloodDeep,
+          border: Border.all(color: const Color(0xFFFFD98A), width: 2),
+          boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 4, offset: Offset(0, 2))],
+        ),
+        child: const Center(child: ItemIcon(Item.swords, size: 26)),
+      ),
+      const SizedBox(height: 3),
+      Text('FIGHT', style: Txt.label(size: 11.5, color: const Color(0xFFFFD98A))),
+    ],
   );
 }
 

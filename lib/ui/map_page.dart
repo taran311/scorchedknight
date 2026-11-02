@@ -235,6 +235,8 @@ class _MapPageState extends State<MapPage> {
                   const SizedBox(height: 6),
                 ],
                 StoneButton(title: 'Go in anyway', compact: true, onPressed: () => Navigator.of(context).pop('go')),
+                const SizedBox(height: 2),
+                TextButton(onPressed: () => Navigator.of(context).pop(), child: Text('Not now', style: Txt.label(size: 14, color: Palette.parch2))),
               ],
             ),
           ),
@@ -847,7 +849,7 @@ class _MapPainter extends CustomPainter {
     // Places to explore: a red orb on a pin (dim once explored, with a tick).
     bool named(int land, bool picked) => picked || (!lockedLands.contains(land) && (allNames || land == nameLand));
     for (final (p, done, ready) in pins) {
-      _pin(canvas, Offset(p.x, p.y), p.name, done, ready, p.id == pinPicked, locked: lockedLands.contains(p.land), named: named(p.land, p.id == pinPicked));
+      _pin(canvas, Offset(p.x, p.y), p.name, p.kind, done, ready, p.id == pinPicked, locked: lockedLands.contains(p.land), named: named(p.land, p.id == pinPicked));
     }
     // Dungeons: a stair down into the dark, under a stone arch.
     for (final (d, open, done, here) in delves) {
@@ -1035,7 +1037,7 @@ class _MapPainter extends CustomPainter {
     }
   }
 
-  void _pin(Canvas c, Offset at, String name, bool done, bool ready, bool picked, {bool locked = false, bool named = true}) {
+  void _pin(Canvas c, Offset at, String name, PlaceKind kind, bool done, bool ready, bool picked, {bool locked = false, bool named = true}) {
     if (picked) c.drawCircle(at, 15, strokePaint(const Color(0xFFFFE6A0), 3));
     if (locked && !picked) {
       // Out of reach yet: a small, faded ember of what's waiting.
@@ -1052,7 +1054,14 @@ class _MapPainter extends CustomPainter {
       Paint()
         ..shader = RadialGradient(
           center: const Alignment(-.35, -.4),
-          colors: done ? const [Color(0xFFB8A890), Color(0xFF7A6A54), Color(0xFF3A3024)] : const [Color(0xFFFF8A7A), Color(0xFFB0141A), Color(0xFF4A0608)],
+          // Each kind of place in its own colour: a fight red, a hidden cache gold, a shrine blue.
+          colors: done
+              ? const [Color(0xFFB8A890), Color(0xFF7A6A54), Color(0xFF3A3024)]
+              : switch (kind) {
+                  PlaceKind.guarded => const [Color(0xFFFF8A7A), Color(0xFFB0141A), Color(0xFF4A0608)],
+                  PlaceKind.cache => const [Color(0xFFFFE6A0), Color(0xFFC8902A), Color(0xFF5A3A0A)],
+                  PlaceKind.shrine => const [Color(0xFFC8E8FF), Color(0xFF3A7AB8), Color(0xFF102A4A)],
+                },
           stops: const [0, .55, 1],
         ).createShader(orb),
     );
@@ -1060,7 +1069,30 @@ class _MapPainter extends CustomPainter {
     if (done) {
       c.drawPath(Path()..moveTo(at.dx - 4.5, at.dy)..lineTo(at.dx - 1, at.dy + 4)..lineTo(at.dx + 5, at.dy - 4), strokePaint(const Color(0xFFF2EAD2), 2.2)..strokeCap = StrokeCap.round);
     } else {
-      c.drawCircle(at + const Offset(-3, -3.5), 2.6, Paint()..color = const Color(0xCCFFFFFF));
+      // And its mark: crossed blades, a chest, or a star.
+      final ink = strokePaint(const Color(0xF2FFF6E0), 1.8)..strokeCap = StrokeCap.round;
+      switch (kind) {
+        case PlaceKind.guarded:
+          c.drawLine(at + const Offset(-4.5, 4.5), at + const Offset(4.5, -4.5), ink);
+          c.drawLine(at + const Offset(-4.5, -4.5), at + const Offset(4.5, 4.5), ink);
+        case PlaceKind.cache:
+          c.drawRect(Rect.fromCenter(center: at + const Offset(0, 1), width: 10, height: 7), ink..strokeWidth = 1.5);
+          c.drawLine(at + const Offset(-5, -1), at + const Offset(5, -1), ink);
+        case PlaceKind.shrine:
+          c.drawPath(
+            Path()
+              ..moveTo(at.dx, at.dy - 6)
+              ..lineTo(at.dx + 1.6, at.dy - 1.6)
+              ..lineTo(at.dx + 6, at.dy)
+              ..lineTo(at.dx + 1.6, at.dy + 1.6)
+              ..lineTo(at.dx, at.dy + 6)
+              ..lineTo(at.dx - 1.6, at.dy + 1.6)
+              ..lineTo(at.dx - 6, at.dy)
+              ..lineTo(at.dx - 1.6, at.dy - 1.6)
+              ..close(),
+            Paint()..color = const Color(0xF2FFF6E0),
+          );
+      }
       if (!ready) _padlock(c, at + const Offset(10, 4), .45);
     }
     _taken.add(Rect.fromCircle(center: at, radius: 12));

@@ -138,8 +138,10 @@ void paintGearIcon(Canvas canvas, Size size, GearItem item, HeroClass heroClass,
       final b = builds[look.build]!;
       final sk = Skeleton.solve(b, Pose.of({}));
       final hasHat = item.art == 'wizardhat' || item.art == 'scoutcap';
-      canvas.translate(s / 2, s * (hasHat ? .62 : .55));
-      canvas.scale(s / (b.head * (hasHat ? 4.4 : 3.2)));
+      // An order's crest (wings, a fin, a wolf's head) stands well clear of the helm: step back.
+      final crest = look.head == HeadKind.orderhelm;
+      canvas.translate(s * (crest ? .56 : .5), s * (hasHat ? .62 : (crest ? .6 : .55)));
+      canvas.scale(s / (b.head * (hasHat ? 4.4 : (crest ? 4.6 : 3.2))));
       canvas.translate(-sk.head.dx, -sk.head.dy);
       drawHead(canvas, sk, look, 0, still: true);
     case GearSlot.armour:
@@ -164,7 +166,9 @@ void paintGearIcon(Canvas canvas, Size size, GearItem item, HeroClass heroClass,
     case GearSlot.trinket || GearSlot.ring:
       canvas.translate(s / 2, s / 2);
       canvas.scale(s / 40);
-      _trinket(canvas, item.art, glow ?? (item.tint != null && (item.art == 'dragonbonering' || item.art == 'fangamulet') ? _boneGem(item.tint!) : rarity));
+      // A suit's signet carries its order's colour in the stone.
+      final livery = setLiveries[item.gearSet];
+      _trinket(canvas, item.art, glow ?? (item.tint != null && (item.art == 'dragonbonering' || item.art == 'fangamulet') ? _boneGem(item.tint!) : (livery != null ? Color(livery.trim) : rarity)));
     case GearSlot.gloves:
       canvas.translate(s / 2, s / 2);
       canvas.scale(s / 44);

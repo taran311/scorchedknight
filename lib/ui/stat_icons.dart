@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 
 import '../game/loot.dart';
+import '../game/spells.dart';
 import 'item_icons.dart';
 import 'theme.dart';
 
@@ -257,3 +258,22 @@ class DeltaPill extends StatelessWidget {
     );
   }
 }
+
+/// Each kind of rite its own picture, so the hotbar and the rite list read at a glance: a flame for
+/// a blast, a shield for a ward, a drop of blood for a drain, and so on.
+IconData riteIcon(Spell sp) => switch (sp.kind) {
+  SpellKind.blast => sp.element == Stat.frost ? Icons.ac_unit : Icons.local_fire_department,
+  SpellKind.summon => Icons.groups,
+  SpellKind.dragon => Icons.whatshot,
+  SpellKind.nova => Icons.ac_unit,
+  SpellKind.ward => Icons.shield,
+  SpellKind.chain => Icons.bolt,
+  SpellKind.drain => Icons.water_drop,
+  SpellKind.slow => Icons.hourglass_bottom,
+  SpellKind.weaken => Icons.trending_down,
+  SpellKind.expose => Icons.gps_fixed,
+  SpellKind.heal => Icons.favorite,
+  SpellKind.charge => Icons.keyboard_double_arrow_right,
+  SpellKind.reflect => Icons.flip,
+  SpellKind.sleep => Icons.bedtime,
+};

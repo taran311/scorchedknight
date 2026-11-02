@@ -22,6 +22,8 @@ void drawHead(Canvas c, Skeleton sk, Look look, double t, {bool still = false}) 
       _headwear(c, r, look, t, still);
     case HeadKind.greathelm:
       _greatHelm(c, r, look, t, still);
+    case HeadKind.orderhelm:
+      _orderHelm(c, r, look, t, still, look.order ?? '');
     case HeadKind.sallet:
       _helm(c, r, look, t, still);
     case HeadKind.goblin || HeadKind.goblinChief:
@@ -825,7 +827,7 @@ void _heroineHair(Canvas c, double r, Look look) {
           strand,
         );
       }
-    case HeadKind.coif || HeadKind.nasal || HeadKind.greathelm || HeadKind.sallet || HeadKind.wyrmhelm:
+    case HeadKind.coif || HeadKind.nasal || HeadKind.greathelm || HeadKind.orderhelm || HeadKind.sallet || HeadKind.wyrmhelm:
       // A braid falling from under the helm, tied off with a band.
       for (var i = 0; i < 5; i++) {
         final ctr = Offset(-r * (.95 + i * .07), r * (.55 + i * .3));
@@ -2514,5 +2516,243 @@ void _yetiHead(Canvas c, double r, Look look) {
   c.drawPath(poly([Offset(r * 1.0, r * .42), Offset(r * .35, r * .45), Offset(r * .85, r * .68)]), Paint()..color = const Color(0xFF14101A));
   for (final x in const [.48, .9]) {
     c.drawPath(poly([Offset(r * x - 2.4, r * .43), Offset(r * x + .5, r * .15), Offset(r * x + 2.4, r * .44)]), Paint()..color = const Color(0xFFF2EEE0));
+  }
+}
+
+/// The faction suits' helms: the great helm, dressed in its order's crest, so each suit reads as its
+/// own at a glance (and the three class suits most of all). [order] is the suit's id.
+void _orderHelm(Canvas c, double r, Look look, double t, bool still, String order) {
+  final sway = still ? 0.0 : math.sin(t / 650);
+  // What sits behind the shell.
+  switch (order) {
+    case 'nightblood':
+      // A bat's wings, swept up and back from the temples, the membrane between the fingers.
+      for (final (dx, s, a) in [(-.55, 1.3, .55), (-.15, 1.55, 1.0)]) {
+        final o = Offset(r * dx, -r * .75);
+        final tip1 = o + Offset(-r * 1.7 * s, -r * (1.55 + sway * .05) * s), tip2 = o + Offset(-r * 2.15 * s, -r * .55 * s), tip3 = o + Offset(-r * 1.75 * s, r * .3 * s);
+        final wing = Path()
+          ..moveTo(o.dx, o.dy)
+          ..lineTo(tip1.dx, tip1.dy)
+          ..quadraticBezierTo(o.dx - r * 1.55 * s, o.dy - r * .7 * s, tip2.dx, tip2.dy)
+          ..quadraticBezierTo(o.dx - r * 1.45 * s, o.dy - r * .05 * s, tip3.dx, tip3.dy)
+          ..quadraticBezierTo(o.dx - r * .8 * s, o.dy + r * .1 * s, o.dx + r * .1, o.dy + r * .35)
+          ..close();
+        fillPath(c, wing, [Color.lerp(const Color(0xFF8A2A34), const Color(0xFF000000), 1 - a)!, Color.lerp(const Color(0xFF5A1620), const Color(0xFF000000), 1 - a)!, const Color(0xFF240A0E)], o + Offset(-r * 2, -r), o, width: 1.2);
+        for (final tip in [tip1, tip2, tip3]) {
+          c.drawLine(o, tip, strokePaint(const Color(0xFF1A0608), 1.3));
+        }
+      }
+    case 'moonfang':
+      // A wolf's pelt over the helm: the fur hanging down the back.
+      final fur = Path()
+        ..moveTo(-r * .2, -r * 1.35)
+        ..quadraticBezierTo(-r * 1.6, -r * 1.2, -r * 1.75 + sway * r * .05, r * .6)
+        ..lineTo(-r * 1.5, r * .35)
+        ..lineTo(-r * 1.55, r * 1.05)
+        ..lineTo(-r * 1.25, r * .7)
+        ..lineTo(-r * 1.1, r * 1.2)
+        ..lineTo(-r * .9, r * .2)
+        ..close();
+      fillPath(c, fur, ramp(0xFF8A8478), Offset(-r * 1.6, 0), Offset(-r * .4, 0), width: 1.2);
+    case 'silverleaf':
+      // Three long silver leaves, swept back off the crown like a crest.
+      for (var i = 0; i < 3; i++) {
+        final base = Offset(r * (.3 - i * .35), -r * (1.35 - i * .05));
+        final tip = base + Offset(-r * (1.9 + i * .2) + sway * r * .06, -r * (1.25 - i * .45));
+        final mid = Offset.lerp(base, tip, .5)!, n = Offset(-(tip - base).dy, (tip - base).dx) * .18;
+        final leaf = Path()
+          ..moveTo(base.dx, base.dy)
+          ..quadraticBezierTo(mid.dx + n.dx, mid.dy + n.dy, tip.dx, tip.dy)
+          ..quadraticBezierTo(mid.dx - n.dx, mid.dy - n.dy, base.dx, base.dy)
+          ..close();
+        fillPath(c, leaf, ramp(i == 1 ? 0xFFB8D8C0 : 0xFF8FC09C), base, tip, width: 1.1);
+        c.drawLine(base, tip, strokePaint(const Color(0x8CFFFFFF), .9));
+      }
+    case 'sunscale':
+      // A lizard's frill: spines along the crown, webbed between, in jungle green and gold.
+      final frill = Path()..moveTo(r * .6, -r * 1.3);
+      for (var i = 0; i < 6; i++) {
+        final a = -.15 - i * .32, len = r * (1.05 - (i - 2).abs() * .08);
+        final root = Offset(r * (.45 - i * .3), -r * (1.38 - i * .06));
+        final tip = root + Offset(math.sin(a) * len * .9, -math.cos(a) * len * .8);
+        frill
+          ..lineTo(tip.dx, tip.dy)
+          ..lineTo(root.dx - r * .15, root.dy + r * .05);
+      }
+      frill
+        ..lineTo(-r * 1.0, -r * .5)
+        ..close();
+      fillPath(c, frill, ramp(0xFF4E9A44), Offset(0, -r * 2.3), Offset(0, -r), width: 1.2);
+    case 'tidecaller':
+      // A dorsal fin for a crest, curving back like a shark's.
+      final fin = Path()
+        ..moveTo(r * .55, -r * 1.35)
+        ..quadraticBezierTo(r * .1, -r * 2.2, -r * 1.05 + sway * r * .04, -r * 2.55)
+        ..quadraticBezierTo(-r * .75, -r * 1.8, -r * .95, -r * 1.05)
+        ..close();
+      fillPath(c, fin, ramp(0xFF2E8A9A), Offset(0, -r * 2.5), Offset(0, -r), width: 1.2);
+      for (var i = 1; i <= 3; i++) {
+        c.drawLine(Offset(r * (.4 - i * .35), -r * 1.35), Offset(r * (.1 - i * .4), -r * (1.55 + i * .22)), strokePaint(const Color(0x66E8FFFF), .9));
+      }
+    case 'skyborn':
+      // A white wing at each temple, the feathers swept up and back.
+      for (final (dx, s, back) in [(-.6, .85, true), (-.25, 1.0, false)]) {
+        final o = Offset(r * dx, -r * .55);
+        for (var f = 0; f < 5; f++) {
+          final a = (-.35 - f * .27) + sway * .03;
+          final len = r * (1.9 - f * .22) * s;
+          final tip = o + Offset(math.sin(a) * len, -math.cos(a) * len);
+          final n = Offset(-(tip - o).dy, (tip - o).dx) * .12;
+          final feather = Path()
+            ..moveTo(o.dx, o.dy)
+            ..quadraticBezierTo((o.dx + tip.dx) / 2 + n.dx, (o.dy + tip.dy) / 2 + n.dy, tip.dx, tip.dy)
+            ..quadraticBezierTo((o.dx + tip.dx) / 2 - n.dx, (o.dy + tip.dy) / 2 - n.dy, o.dx, o.dy)
+            ..close();
+          fillPath(c, feather, back ? ramp(0xFFB8BCC4) : ramp(0xFFF2F0EA, .2, .35), o, tip, width: 1);
+        }
+      }
+  }
+  _greatHelm(c, r, look, t, still);
+  // What goes over the shell.
+  switch (order) {
+    case 'nightblood':
+      // The eye slits burning red, and two fangs bared under the visor.
+      for (final x in const [.82, 1.08]) {
+        c.drawPath(poly([Offset(r * (x - .07), r * .02), Offset(r * x, r * .3), Offset(r * (x + .07), r * .02)]), Paint()..color = const Color(0xFFF2ECDE));
+        c.drawPath(poly([Offset(r * (x - .07), r * .02), Offset(r * x, r * .3), Offset(r * (x + .07), r * .02)]), strokePaint(outline, .8));
+      }
+      final pulse = still ? .85 : .7 + .3 * math.sin(t / 380);
+      c.drawLine(Offset(r * .5, -r * .335), Offset(r * 1.22, -r * .335), strokePaint(const Color(0xFFFF3040).withValues(alpha: .55 * pulse), 4)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5));
+      c.drawLine(Offset(r * .5, -r * .335), Offset(r * 1.22, -r * .335), strokePaint(const Color(0xFFFF6070), 1.2));
+    case 'deepforge':
+      // The dwarves' iron beard: a braided guard of brass hanging from the jaw, and runes along
+      // the brow band, banked like coals.
+      final beard = Path()
+        ..moveTo(r * .35, r * .8)
+        ..quadraticBezierTo(r * .9, r * 1.0, r * 1.3, r * .6)
+        ..lineTo(r * 1.45, r * 1.15)
+        ..quadraticBezierTo(r * 1.5, r * 1.7, r * 1.25, r * 2.0)
+        ..quadraticBezierTo(r * 1.05, r * 1.55, r * .55, r * 1.35)
+        ..close();
+      fillPath(c, beard, ramp(0xFFD8A040), Offset(0, r * .7), Offset(0, r * 2.0), width: 1.3);
+      for (var i = 0; i < 3; i++) {
+        final x = r * (.7 + i * .22);
+        c.drawLine(Offset(x, r * (.95 - i * .05)), Offset(x + r * .18, r * (1.45 + i * .12)), strokePaint(const Color(0x995A3A10), 1.2));
+      }
+      final glow = still ? .9 : .7 + .3 * math.sin(t / 520);
+      final rune = strokePaint(Color.fromRGBO(255, 190, 90, glow), 1.1);
+      for (final x in const [-.55, -.05, .35, .85]) {
+        final o = Offset(r * x, -r * .56);
+        c.drawLine(o + Offset(0, -r * .045), o + Offset(0, r * .045), rune);
+        c.drawLine(o + Offset(-r * .05, -r * .04), o + Offset(r * .05, r * .04), rune);
+      }
+      // An anvil for a crest, its horn to the front and its face still glowing from the forge.
+      final anvil = poly([
+        Offset(-r * .55, -r * 1.36),
+        Offset(r * .5, -r * 1.36),
+        Offset(r * .3, -r * 1.6),
+        Offset(r * .55, -r * 1.7),
+        Offset(r * 1.45, -r * 1.78),
+        Offset(r * .65, -r * 2.0),
+        Offset(-r * .8, -r * 2.0),
+        Offset(-r * .95, -r * 1.78),
+        Offset(-r * .45, -r * 1.7),
+        Offset(-r * .3, -r * 1.6),
+      ]);
+      fillPath(c, anvil, ramp(0xFF5E636C), Offset(0, -r * 2), Offset(0, -r * 1.3), width: 1.3);
+      c.drawLine(Offset(-r * .75, -r * 1.97), Offset(r * .6, -r * 1.97), strokePaint(Color.fromRGBO(255, 150, 60, glow), 1.6));
+    case 'moonfang':
+      // The wolf's head worn over the crown: ears pricked, the muzzle over the brow, fangs down.
+      final head = Path()
+        ..moveTo(-r * .9, -r * .9)
+        ..quadraticBezierTo(-r * .7, -r * 1.75, r * .25, -r * 1.65)
+        ..lineTo(r * 1.25, -r * 1.25)
+        ..lineTo(r * 1.55, -r * .9)
+        ..lineTo(r * 1.2, -r * .72)
+        ..quadraticBezierTo(r * .2, -r * .95, -r * .9, -r * .9)
+        ..close();
+      for (final (ex, s) in [(-.35, .85), (.05, 1.0)]) {
+        fillPath(c, poly([Offset(r * ex, -r * 1.55), Offset(r * (ex - .2), -r * (1.55 + .7 * s)), Offset(r * (ex + .3), -r * 1.62)]), ramp(0xFF8A8478), Offset(0, -r * 2.2), Offset(0, -r * 1.5), width: 1.1);
+      }
+      fillPath(c, head, ramp(0xFF9A948A), Offset(0, -r * 1.7), Offset(0, -r * .7), width: 1.2);
+      c.drawCircle(Offset(r * .72, -r * 1.3), r * .07, Paint()..color = const Color(0xFFE8D060));
+      for (final x in const [.95, 1.25]) {
+        c.drawPath(poly([Offset(r * (x - .06), -r * .78), Offset(r * x, -r * .55), Offset(r * (x + .06), -r * .8)]), Paint()..color = const Color(0xFFF0EAD8));
+      }
+      c.drawCircle(Offset(r * 1.52, -r * .95), r * .07, Paint()..color = const Color(0xFF1A1614));
+    case 'silverleaf':
+      // A leaf etched in silver across the cheek.
+      final leaf = Path()
+        ..moveTo(-r * .55, r * .7)
+        ..quadraticBezierTo(-r * .45, -r * .05, r * .15, -r * .2)
+        ..quadraticBezierTo(r * .0, r * .5, -r * .55, r * .7)
+        ..close();
+      c.drawPath(leaf, Paint()..color = const Color(0x55D8F0DC));
+      c.drawPath(leaf, strokePaint(const Color(0xCCE8FFF0), 1));
+    case 'faceless':
+      // A porcelain mask over the face: smooth, blank and pale, no eyes at all.
+      final mask = Path()
+        ..moveTo(r * .3, -r * 1.05)
+        ..quadraticBezierTo(r * 1.3, -r * 1.0, r * 1.38, -r * .1)
+        ..quadraticBezierTo(r * 1.35, r * .85, r * .55, r * 1.05)
+        ..quadraticBezierTo(r * .22, r * .1, r * .3, -r * 1.05)
+        ..close();
+      fillPath(c, mask, ramp(0xFFFAF6EE, .1, .22), Offset(r * .3, 0), Offset(r * 1.4, 0), width: 1.3);
+      // Mended with gold where it once cracked.
+      final crack = Path()
+        ..moveTo(r * .62, -r * 1.0)
+        ..lineTo(r * .88, -r * .62)
+        ..lineTo(r * .78, -r * .3)
+        ..lineTo(r * 1.05, r * .05)
+        ..lineTo(r * .95, r * .45);
+      c.drawPath(crack, strokePaint(const Color(0xFF7A5A1A), 2.2));
+      c.drawPath(crack, strokePaint(const Color(0xFFF2CC5A), 1.1));
+      _ellipse(c, Offset(r * .95, -r * .55), r * .18, r * .35, Paint()..color = const Color(0x40FFFFFF), .2);
+    case 'tidecaller':
+      // A spiral shell over the ear.
+      final o = Offset(-r * .35, r * .15);
+      c.drawCircle(o, r * .42, Paint()..color = const Color(0xFFE8C8A8));
+      c.drawCircle(o, r * .42, strokePaint(outline, 1.2));
+      final spiral = Path()..moveTo(o.dx + r * .38, o.dy);
+      for (var a = 0.0; a < math.pi * 4; a += .3) {
+        final rr = r * .38 * (1 - a / (math.pi * 4.4));
+        spiral.lineTo(o.dx + math.cos(a) * rr, o.dy + math.sin(a) * rr);
+      }
+      c.drawPath(spiral, strokePaint(const Color(0xFF9A6A4A), 1.1));
+    case 'changeling':
+      // Half the helm shifting into something else: a ragged seam, the back half gone violet, and
+      // an eye opening where no eye should be.
+      final back = Path()
+        ..moveTo(-r * 1.1, -r * 1.3)
+        ..lineTo(r * .05, -r * 1.45)
+        ..lineTo(-r * .2, -r * .9)
+        ..lineTo(r * .1, -r * .5)
+        ..lineTo(-r * .25, -r * .05)
+        ..lineTo(r * .05, r * .45)
+        ..lineTo(-r * .2, r * 1.2)
+        ..lineTo(-r * 1.1, r * 1.1)
+        ..close();
+      c.save();
+      c.clipPath(back);
+      c.drawRect(Rect.fromLTRB(-r * 1.3, -r * 1.6, r * .2, r * 1.4), Paint()..color = const Color(0x997A3AA8));
+      c.restore();
+      c.drawPath(
+        Path()
+          ..moveTo(r * .05, -r * 1.45)
+          ..lineTo(-r * .2, -r * .9)
+          ..lineTo(r * .1, -r * .5)
+          ..lineTo(-r * .25, -r * .05)
+          ..lineTo(r * .05, r * .45)
+          ..lineTo(-r * .2, r * 1.2),
+        strokePaint(const Color(0xFFD8A8FF), 1.2),
+      );
+      final blink = still ? 1.0 : (math.sin(t / 900) > .9 ? .2 : 1.0);
+      final eye = Rect.fromCenter(center: Offset(-r * .6, -r * .25), width: r * .45, height: r * .22 * blink);
+      c.drawOval(eye.inflate(1.5), Paint()..color = const Color(0x99C080FF)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3));
+      c.drawOval(eye, Paint()..color = const Color(0xFFF2E0FF));
+      c.drawCircle(eye.center, r * .07 * blink, Paint()..color = const Color(0xFF3A1060));
+    case 'sunscale':
+      // Slit-pupilled gold eyes behind the visor.
+      c.drawLine(Offset(r * .55, -r * .335), Offset(r * 1.2, -r * .335), strokePaint(const Color(0xCCE8C040), 1.6));
   }
 }

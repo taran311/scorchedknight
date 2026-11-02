@@ -193,6 +193,12 @@ class _InnPageState extends State<InnPage> with RouteAware {
                             TownSpot.forge: '$smithName\'s Forge',
                             TownSpot.enchanter: '$mageName\'s Tower',
                           };
+      // A word under a place's name, on a phone: what's waiting there.
+      final notes = <TownSpot, String>{
+        if (s.raid == 'stall') TownSpot.stall: 'Raided! Go and help',
+        if ((hurt || !s.day) && c.whyNotRest == null && !job && !offered) TownSpot.inn: hurt ? 'Rest and heal' : 'Sleep till morning',
+        if (unspentPoints(k) > 0) TownSpot.tent: '${unspentPoints(k)} point${unspentPoints(k) == 1 ? '' : 's'} to train',
+      };
       final taps = <TownSpot, VoidCallback?>{
                             TownSpot.gate: s.inBattle ? _resume : (offered ? _talk : (s.wild != null ? _openWilds : _openMap)),
                             TownSpot.stall: s.inBattle ? null : () => showMerchantWindow(context, c),
@@ -262,7 +268,7 @@ class _InnPageState extends State<InnPage> with RouteAware {
                                       children: [
                                         for (final (j, spot) in row.indexed) ...[
                                           if (j > 0) const SizedBox(width: 8),
-                                          Expanded(child: _PlaceButton(icon: _TownSquareState._icons[spot]!, label: labels[spot]!, onTap: taps[spot], hot: spot == TownSpot.gate, accent: _placeAccent[spot], locked: _shutSpot(spot), ready: !_shutSpot(spot) && ((spot == TownSpot.forge && c.engine.forgeReady) || (spot == TownSpot.enchanter && c.engine.gemsWaiting)))),
+                                          Expanded(child: _PlaceButton(icon: _TownSquareState._icons[spot]!, label: notes[spot] == null ? labels[spot]! : _plainLabel(spot, s.home), note: notes[spot], onTap: taps[spot], hot: spot == TownSpot.gate, accent: _placeAccent[spot], locked: _shutSpot(spot), ready: !_shutSpot(spot) && ((spot == TownSpot.forge && c.engine.forgeReady) || (spot == TownSpot.enchanter && c.engine.gemsWaiting)))),
                                         ],
                                       ],
                                     ),
@@ -1225,6 +1231,9 @@ class _SettingsWindowState extends State<_SettingsWindow> {
   late final _name = TextEditingController(text: widget.controller.state.settings.name);
   late Settings _s = widget.controller.state.settings.copy();
 
+  /// Saved (or starting over) already: closing the window needn't save again.
+  bool _done = false;
+
   @override
   void dispose() {
     _name.dispose();
@@ -1274,6 +1283,7 @@ class _SettingsWindowState extends State<_SettingsWindow> {
       ),
     );
     if (sure != true || !mounted) return;
+    _done = true;
     Navigator.of(context).pop();
     await c.newAdventure();
   }
@@ -1281,7 +1291,16 @@ class _SettingsWindowState extends State<_SettingsWindow> {
   @override
   Widget build(BuildContext context) {
     final c = widget.controller, k = c.state.knight;
-    return Dialog(
+    // Closed by tapping outside or Back (the usual way on a phone): keep what was changed, rather
+    // than quietly throwing it away.
+    return PopScope(
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop || _done) return;
+        _done = true;
+        c.applySettings(_s);
+        c.setName(_name.text);
+      },
+      child: Dialog(
       backgroundColor: Colors.transparent,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
@@ -1325,6 +1344,7 @@ class _SettingsWindowState extends State<_SettingsWindow> {
                 title: 'Save',
                 tone: ButtonTone.blood,
                 onPressed: () {
+                  _done = true;
                   c.applySettings(_s);
                   c.setName(_name.text);
                   Navigator.of(context).pop();
@@ -1343,6 +1363,7 @@ class _SettingsWindowState extends State<_SettingsWindow> {
           ),
         ),
       ),
+      ),
     );
   }
 }
@@ -1358,8 +1379,19 @@ const _placeAccent = <TownSpot, Color>{
 };
 
 /// One of the town's places as a big button (on a phone, under the scene).
+/// A place's plain name, for a button that says what's waiting on a line of its own.
+String _plainLabel(TownSpot spot, int home) => switch (spot) {
+  TownSpot.stall => 'Mags\' Stall',
+  TownSpot.inn => 'Soot & Kettle',
+  TownSpot.tent => 'Your ${homes[home].name}',
+  _ => '',
+};
+
 class _PlaceButton extends StatelessWidget {
-  const _PlaceButton({required this.icon, required this.label, this.onTap, this.hot = false, this.ready = false, this.accent, this.locked = false});
+  const _PlaceButton({required this.icon, required this.label, this.note, this.onTap, this.hot = false, this.ready = false, this.accent, this.locked = false});
+
+  /// A line under the name: what's waiting there (points to train, a rest).
+  final String? note;
 
   /// Not open yet: dimmed, with a padlock (tapping says what opens it).
   final bool locked;
@@ -1408,7 +1440,16 @@ class _PlaceButton extends StatelessWidget {
               Icon(icon, size: big ? 30 : 24, color: hot ? const Color(0xFFFFE0C0) : (accent ?? Palette.amber), shadows: accent == null || hot ? null : [Shadow(color: accent!.withValues(alpha: .6), blurRadius: 8)]),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(label, maxLines: 2, overflow: TextOverflow.ellipsis, style: Txt.label(size: big ? 15.5 : 14, color: Palette.cream, weight: FontWeight.w800)),
+                child: note == null
+                    ? Text(label, maxLines: 2, overflow: TextOverflow.ellipsis, style: Txt.label(size: big ? 15.5 : 14, color: Palette.cream, weight: FontWeight.w800))
+                    : Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.label(size: big ? 15.5 : 14, color: Palette.cream, weight: FontWeight.w800)),
+                          Text(note!, maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.label(size: big ? 12.5 : 11.5, color: Palette.amber)),
+                        ],
+                      ),
               ),
               if (ready)
                 Container(
@@ -1477,6 +1518,28 @@ class _CloudSection extends StatelessWidget {
                     const SizedBox(width: 8),
                     Expanded(child: StoneButton(title: 'Sign out', compact: true, onPressed: cloud.signOut)),
                   ],
+                ),
+              // Deleting the account (Play requires it be possible from inside the app).
+              if (cloud.signedIn)
+                Center(
+                  child: TextButton(
+                    onPressed: () async {
+                      final yes = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          backgroundColor: Palette.stone2,
+                          title: Text('Delete your account?', style: Txt.label(size: 17, color: Palette.cream)),
+                          content: Text('Your account and your cloud save are deleted for good. Your hero stays on this device.', style: Txt.onStone(size: 14)),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text('Keep it', style: Txt.label(size: 14, color: Palette.parch))),
+                            TextButton(onPressed: () => Navigator.of(context).pop(true), child: Text('Delete', style: Txt.label(size: 14, color: const Color(0xFFE0604A)))),
+                          ],
+                        ),
+                      );
+                      if (yes == true) await cloud.deleteAccount();
+                    },
+                    child: Text('Delete account', style: Txt.label(size: 12.5, color: Palette.parch2)),
+                  ),
                 )
               else
                 const AccountPanel(compact: true),
@@ -1741,6 +1804,9 @@ class _VaultCard extends StatelessWidget {
 
   Future<void> _open(BuildContext context) async {
     final c = controller;
+    // (This card is gone the moment the key turns, when the last key's used: carry on from the
+    // navigator's context, so "Look closer" still opens the find.)
+    final nav = Navigator.of(context).context;
     final wasSworn = guardianSworn(c.state.vaultFound);
     final find = c.openVault();
     if (find == null || !context.mounted) return;
@@ -1787,7 +1853,7 @@ class _VaultCard extends StatelessWidget {
         ),
       ),
     );
-    if (context.mounted && c.nextLoot != null) await resolvePendingLoot(context, c, title: find.piece ? 'From the Ember Vault' : 'The vault\'s spoils', line: find.item?.lore ?? 'Dusty, but none the worse for it.');
+    if (nav.mounted && c.nextLoot != null) await resolvePendingLoot(nav, c, title: find.piece ? 'From the Ember Vault' : 'The vault\'s spoils', line: find.item?.lore ?? 'Dusty, but none the worse for it.');
   }
 }
 

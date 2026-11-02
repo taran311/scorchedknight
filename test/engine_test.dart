@@ -22,6 +22,8 @@ import 'package:scorchedknight/game/vault.dart';
 import 'package:scorchedknight/game/wilds.dart';
 import 'package:scorchedknight/game/dungeons.dart';
 import 'package:scorchedknight/game/errands.dart';
+import 'package:scorchedknight/game/knight_classes.dart';
+import 'package:scorchedknight/game/spells.dart';
 
 /// Fights the current foe with plain attacks (and potions when low) until it's over.
 SwingResult fightOut(GameEngine e) {
@@ -513,7 +515,7 @@ void main() {
     // All of them together: a small share of a game's ~70k gold, and a couple of levels of XP.
     final gold = gameTasks.fold<int>(0, (n, t) => n + t.reward.gold);
     final xp = gameTasks.fold<double>(0, (n, t) => n + t.reward.xp);
-    expect(gold, lessThan(5000));
+    expect(gold, lessThan(7000));
     expect(xp, lessThan(3.5));
     expect(gameTasks.map((t) => t.id).toSet().length, gameTasks.length);
   });
@@ -625,6 +627,88 @@ void main() {
     k.level = continents[1].minLevel;
     expect(e.roadStep()!.kind, RoadKind.boss);
     expect(e.roadStep()!.land, 1);
+  });
+
+  test('classes: a whole order suit makes you its knight, with ranks, rites and a passive', () {
+    GameEngine suited(String set, int seed) {
+      final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(seed));
+      final k = e.state.knight..level = 30;
+      for (final slot in setPieceSlots) {
+        final g = e.loot.setPiece(set, slot, k.heroClass, k.level);
+        switch (slot) {
+          case GearSlot.armour:
+            k.loadout.armour = g.art;
+          case GearSlot.ring:
+            k.ring = g;
+          default:
+            k.loadout.put(g);
+        }
+      }
+      k.hp = maxHp(k);
+      return e;
+    }
+
+    void win(GameEngine e) {
+      final s = e.state;
+      for (var i = 0; i < 20 && !s.inBattle; i++) {
+        e.explore();
+      }
+      s.foeHp = 1;
+      e.takeTurn(BattleAction.attack);
+      while (s.inBattle) {
+        s.foeHp = 1;
+        e.takeTurn(BattleAction.attack);
+      }
+      s.pendingLoot.clear();
+      s.knight.hp = maxHp(s.knight);
+    }
+
+    final e = suited('drakesworn', 3);
+    final s = e.state, k = s.knight;
+    expect(classOf(k)!.name, 'Dragon Knight');
+    expect(classRank(k, 'drakesworn'), 1);
+    // Rank 1: the first rite is known; the rank 4 one isn't yet.
+    expect(riteKnown(k, spellById('wyrmflame')!), isTrue);
+    expect(riteKnown(k, spellById('scaleward')!), isFalse);
+    expect(spellsKnown(40).any((sp) => sp.order != null), isFalse, reason: 'class rites aren\'t learned by level');
+    // Winning in the suit ranks it up, and a new rank's rite goes on the hotbar.
+    while (classRank(k, 'drakesworn') < 4) {
+      win(e);
+    }
+    expect(riteKnown(k, spellById('scaleward')!), isTrue);
+    expect(k.rites, contains('scaleward'));
+    // Out of the suit: a knight again, the class's rites set aside but kept.
+    final ring = k.ring;
+    k.ring = null;
+    expect(classOf(k), isNull);
+    expect(riteKnown(k, spellById('scaleward')!), isFalse);
+    expect(e.whyNotRite('scaleward'), isNotNull);
+    k.ring = ring;
+    expect(classRank(k, 'drakesworn'), 4, reason: 'the rank is kept');
+    // Saved and loaded with the rank.
+    final back = GameState.fromJson(jsonDecode(jsonEncode(s.toJson())) as Map<String, dynamic>);
+    expect(back.knight.classWins['drakesworn'], k.classWins['drakesworn']);
+    // The Blood Knight at rank 10: a killing blow once a fight leaves you on 1 HP.
+    final b = suited('nightblood', 5), bk = b.state.knight;
+    bk.classWins['nightblood'] = rankWins.last;
+    expect(classPassive(bk, 'nightblood'), isTrue);
+    for (var i = 0; i < 20 && !b.state.inBattle; i++) {
+      b.explore();
+    }
+    b.state
+      ..foeHp = 1 << 20
+      ..foeMax = 1 << 20;
+    var saved = false;
+    for (var i = 0; i < 40 && b.state.inBattle && !saved; i++) {
+      bk.hp = 1;
+      final r = b.takeTurn(BattleAction.attack);
+      saved = r.cheatedDeath;
+    }
+    expect(saved, isTrue);
+    // Only rites of the class you wear: the Forge Knight can't cast the Dragon Knight's.
+    final f = suited('deepforge', 6);
+    expect(riteKnown(f.state.knight, spellById('anvilward')!), isTrue);
+    expect(riteKnown(f.state.knight, spellById('wyrmflame')!), isFalse);
   });
 
   test('bolts can be swapped any time, plain ones in between', () {

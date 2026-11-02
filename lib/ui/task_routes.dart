@@ -33,7 +33,7 @@ enum _Place { mags, forge, wick, tent, map, trail, wilds }
     'bolts' => (_Place.wick, 'bolts'),
     'runeWeapon' || 'runeArmour' => (_Place.wick, 'runes'),
     'equip' || 'train' || 'suit' => (_Place.tent, 'gear'),
-    'rite' => (_Place.tent, 'rites'),
+    'rite' || 'rank5' || 'master' => (_Place.tent, 'rites'),
     'cottage' || 'keep' || 'errand' => (_Place.tent, 'home'),
     'mend' => (_Place.trail, '0'),
     'wilds' => (_Place.wilds, null),

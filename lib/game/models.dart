@@ -160,6 +160,7 @@ class Knight {
     List<String>? rites,
     Map<String, int>? training,
     Map<String, int>? pets,
+    Map<String, int>? classWins,
     this.activePet,
     List<String>? mounts,
     this.mount,
@@ -169,6 +170,7 @@ class Knight {
     List<GearItem>? stash,
   }) : stash = stash ?? [],
        rites = rites ?? [preparedSpell],
+       classWins = classWins ?? {},
        training = training ?? {},
        ammo = ammo ?? {},
        brews = brews ?? {},
@@ -222,6 +224,9 @@ class Knight {
   /// Companions besides the dragon, with their XP, and which companion fights ('dragon' or a Pet
   /// name). Null means the dragon if you have one, otherwise your first companion.
   final Map<String, int> pets;
+
+  /// Fights won wearing each class's whole suit (by suit id): its rank (see knight_classes).
+  final Map<String, int> classWins;
   String? activePet;
 
   /// Mounts owned (ids in mounts.dart) and the one you ride (null: on foot).
@@ -280,6 +285,7 @@ class Knight {
     'rites': rites,
     'training': training,
     'pets': pets,
+    if (classWins.isNotEmpty) 'cw': classWins,
     'activePet': activePet,
     if (mounts.isNotEmpty) 'mounts': mounts,
     if (mount != null) 'mount': mount,
@@ -322,6 +328,7 @@ class Knight {
       rites: (j['rites'] as List?)?.whereType<String>().toList() ?? [j['spell'] as String? ?? 'arcanebolt'],
       training: {for (final e in ((j['training'] as Map?) ?? const {}).entries) e.key as String: (e.value as num).toInt()},
       pets: {for (final e in ((j['pets'] as Map?) ?? {}).entries) e.key as String: (e.value as num).toInt()},
+      classWins: {for (final e in ((j['cw'] as Map?) ?? {}).entries) e.key as String: (e.value as num).toInt()},
       activePet: j['activePet'] as String?,
       mounts: (j['mounts'] as List?)?.cast<String>().toList(),
       mount: j['mount'] as String?,

@@ -50,6 +50,9 @@ void _manifest() => _edit('android/app/src/main/AndroidManifest.xml', (s) {
 void _gradle() => _edit('android/app/build.gradle.kts', (s) {
   // Firebase's Android libraries need Android 7.0 (API 24) or later.
   s = s.replaceFirst(RegExp(r'minSdk\s*=\s*flutter\.minSdkVersion'), 'minSdk = maxOf(24, flutter.minSdkVersion)');
+  // Play wants new apps to target Android 16 (API 36) or later.
+  s = s.replaceFirst(RegExp(r'compileSdk\s*=\s*flutter\.compileSdkVersion'), 'compileSdk = maxOf(36, flutter.compileSdkVersion)');
+  s = s.replaceFirst(RegExp(r'targetSdk\s*=\s*flutter\.targetSdkVersion'), 'targetSdk = maxOf(36, flutter.targetSdkVersion)');
   if (!s.contains('key.properties')) {
     // Release signing: from android/key.properties when it's there (see FIREBASE_SETUP.md, "Play
     // Store"), otherwise the debug key so `flutter run --release` still works.

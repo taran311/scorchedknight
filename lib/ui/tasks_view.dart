@@ -67,6 +67,24 @@ Future<void> _claim(BuildContext context, GameController c, GameTask t) async {
   );
 }
 
+/// Every finished task claimed at once.
+void _claimAll(BuildContext context, GameController c) {
+  var n = 0;
+  for (final t in allTasks) {
+    if (!c.state.tasksClaimed.contains(t.id) && c.taskDone(t) && c.claimTask(t.id) != null) n++;
+  }
+  if (n == 0) return;
+  Audio.play(Sfx.coins);
+  ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+    SnackBar(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: Palette.stone2,
+      duration: const Duration(seconds: 2),
+      content: Text('✓ $n tasks claimed', style: Txt.label(size: 13, color: _taskGold)),
+    ),
+  );
+}
+
 /// The next task, as one row in the square: what to do and what it pays, and a Claim button
 /// (glowing) once it's done.
 class TaskCard extends StatelessWidget {
@@ -138,7 +156,13 @@ class TaskList extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Tasks · $claimed / ${gameTasks.length}', style: Txt.label(size: 15, color: Palette.amber)),
+          Row(
+            children: [
+              Expanded(child: Text('Tasks · $claimed / ${gameTasks.length}', style: Txt.label(size: 15, color: Palette.amber))),
+              if (c.tasksReady >= 2)
+                Builder(builder: (context) => SizedBox(width: 128, child: StoneButton(title: 'Claim all · ${c.tasksReady}', compact: true, tone: ButtonTone.amber, onPressed: () => _claimAll(context, c)))),
+            ],
+          ),
           const SizedBox(height: 6),
           for (final t in gameTasks) _row(c, t),
           const SizedBox(height: 12),

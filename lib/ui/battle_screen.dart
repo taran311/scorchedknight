@@ -16,6 +16,7 @@ import '../game/engine.dart';
 import '../game/loot.dart' show specialChanceAt, Stat, RarityInfo, GearSlotLabel;
 import '../game/models.dart';
 import '../game/rules.dart';
+import '../game/knight_classes.dart' show riteKnown;
 import '../game/spells.dart';
 import '../game/wilds.dart';
 import '../game/dungeons.dart' show dungeonRooms;
@@ -168,7 +169,8 @@ class _BattleScreenState extends State<BattleScreen> {
   ];
 
   /// The rites on your hotbar that you know.
-  List<Spell> get _rites => [for (final id in c.state.knight.rites) spellById(id)].whereType<Spell>().where((sp) => sp.level <= c.state.knight.level).toList();
+  // (A class's rites only while you wear its suit.)
+  List<Spell> get _rites => [for (final id in c.state.knight.rites) spellById(id)].whereType<Spell>().where((sp) => riteKnown(c.state.knight, sp)).take(riteSlots).toList();
 
   /// What each hotbar slot does, in order (the number keys follow it).
   List<VoidCallback> _hotbar() => [
@@ -566,7 +568,7 @@ class _BattleScreenState extends State<BattleScreen> {
             final (figure, lines) = riteDetail(sp);
             return slot(
               BattleAction.cast,
-              Icon(Icons.local_fire_department, size: 40, color: Color(sp.argb)),
+              Icon(riteIcon(sp), size: 40, color: Color(sp.argb)),
               sp.name,
               _SlotInfo(sp.name, Color(sp.argb), lines),
               badgeArt: _ManaCost(spellCost(k, sp)),
@@ -704,6 +706,8 @@ class _BattleScreenState extends State<BattleScreen> {
           Expanded(flex: 2, child: StoneButton(title: 'Rest in town', onPressed: () => _close(BattleExit.inn))),
         ];
       case Outcome.won:
+        // Badly hurt with nothing to drink: home to rest becomes the lit button, not onward.
+        final kn = c.state.knight, low = !waiting && kn.potions == 0 && kn.hp < maxHp(kn) * .35 && (c.whyNotRest == null || kn.coins >= c.engine.priceOf('potion'));
         return [
           Expanded(
             flex: 3,
@@ -711,12 +715,17 @@ class _BattleScreenState extends State<BattleScreen> {
             child: StoneButton(
               title: waiting ? 'Choose your spoils' : (isPhone(context) && onward.startsWith('Onward to ') ? 'Onward' : onward),
               caption: !waiting && isPhone(context) && onward.startsWith('Onward to ') ? onward.substring(10) : null,
-              tone: ButtonTone.blood,
+              tone: low ? ButtonTone.stone : ButtonTone.blood,
               onPressed: waiting ? () => resolvePendingLoot(context, c).then((_) => mounted ? setState(() {}) : null) : _fightOn,
             ),
           ),
           const SizedBox(width: 8),
-          Expanded(flex: 2, child: StoneButton(title: isPhone(context) ? 'Back' : 'Back to the trail', caption: isPhone(context) ? 'to the trail' : null, onPressed: waiting ? null : () => _close(BattleExit.map))),
+          Expanded(
+            flex: 2,
+            child: low
+                ? StoneButton(title: 'To town', caption: 'Low on health', tone: ButtonTone.blood, onPressed: () => _close(BattleExit.inn))
+                : StoneButton(title: isPhone(context) ? 'Back' : 'Back to the trail', caption: isPhone(context) ? 'to the trail' : null, onPressed: waiting ? null : () => _close(BattleExit.map)),
+          ),
         ];
       case Outcome.fled:
         // You ran: all the way home to the village.
@@ -1321,6 +1330,7 @@ class _Result extends StatelessWidget {
           final chest = k.chest;
           spoils.addAll([
             if (k.levelUps > 0) _Spoil(const Icon(Icons.arrow_upward, size: 18, color: _green), 'Level ${s.knight.level}!', _green, big: true),
+            if (c.engine.rankUp case final up?) _Spoil(const Icon(Icons.military_tech, size: 18, color: Color(0xFFFFB04A)), up, const Color(0xFFFFB04A), big: true),
             _Spoil(const Icon(Icons.auto_awesome, size: 17, color: Color(0xFFB8D8FF)), '+${fmt(k.xp)} XP', const Color(0xFFB8D8FF)),
             if (k.wild)
               _Spoil(const ItemIcon(Item.coins, size: 18), '+${fmt(k.packGold)} to your pack', _gold, tip: 'Gold and gear in your pack are only yours once you get them home')

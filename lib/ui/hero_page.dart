@@ -16,6 +16,7 @@ import '../game/loot.dart';
 import '../game/models.dart' show Knight;
 import '../game/mounts.dart';
 import '../game/rules.dart';
+import '../game/knight_classes.dart';
 import '../game/spells.dart';
 import '../game/tasks.dart' show GameTask;
 import 'errands_view.dart';
@@ -28,6 +29,7 @@ import 'material_icons.dart';
 import 'merchant.dart';
 import 'task_routes.dart';
 import 'tasks_view.dart';
+import 'stat_icons.dart';
 import 'theme.dart';
 
 /// The tabs inside your tent.
@@ -258,7 +260,7 @@ class _PaperDoll extends StatelessWidget {
                 child: Column(
                   children: [
                     Text(s.settings.name, style: Txt.label(size: 20, color: Palette.cream, weight: FontWeight.w800)),
-                    Text('Level ${k.level} knight', style: Txt.label(size: 13, color: Palette.amber)),
+                    Text(classOf(k) == null ? 'Level ${k.level} knight' : 'Level ${k.level} ${classOf(k)!.name} · Rank ${classRank(k, classOf(k)!.id)}', style: Txt.label(size: 13, color: classOf(k) == null ? Palette.amber : Color(classOf(k)!.argb))),
                     if (fill) Expanded(child: figure) else SizedBox(height: phone ? 200 : 300, child: figure),
                     // The armour you wear, under your feet.
                     Tooltip(
@@ -686,7 +688,14 @@ class _Slot extends StatelessWidget {
         ],
       ),
     );
-    if (onTap != null) box = InkWell(onTap: onTap, child: box);
+    // (A phone has no pointer to hover with: a tap on a plain slot says what's in it.)
+    final tap = onTap ??
+        (tooltip == null
+            ? null
+            : () => ScaffoldMessenger.of(context)
+              ..hideCurrentSnackBar()
+              ..showSnackBar(SnackBar(content: Text(tooltip!), duration: const Duration(seconds: 3))));
+    if (tap != null) box = InkWell(onTap: tap, child: box);
     if (tooltip != null) box = Tooltip(message: tooltip!, child: box);
     return Semantics(button: onTap != null, label: tooltip, child: box);
   }
@@ -700,15 +709,89 @@ class _Spellbook extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = controller, k = c.state.knight;
-    final list = [...spells]..sort((a, b) => a.level.compareTo(b.level));
+    final c = controller, k = c.state.knight, cls = classOf(k);
+    // The rites anyone learns by level; a class's own come below, while you wear its suit.
+    final list = [for (final sp in spells) if (sp.order == null) sp]..sort((a, b) => a.level.compareTo(b.level));
+    final active = [for (final id in k.rites) if (spellById(id) case final sp? when riteKnown(k, sp)) sp].take(riteSlots).toList();
+    // A class rite: its tile, lit when it's yours (on the hotbar: its slot), locked till its rank.
+    Widget classTile(Spell sp) {
+      final known = riteKnown(k, sp), slotAt = active.indexOf(sp), col = Color(sp.argb);
+      return Expanded(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 3),
+          child: GestureDetector(
+            onTap: known ? () => c.prepareSpell(sp.id) : null,
+            child: Container(
+              height: 86,
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+              decoration: BoxDecoration(
+                gradient: RadialGradient(center: const Alignment(0, -.3), colors: [known ? col.withValues(alpha: .3) : const Color(0xFF2A241E), const Color(0xFF15110C)]),
+                border: Border.all(color: slotAt >= 0 ? col : (known ? const Color(0xFF6A5640) : Palette.stone2), width: slotAt >= 0 ? 2.5 : 1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Stack(
+                children: [
+                  Center(
+                    child: Opacity(
+                      opacity: known ? 1 : .45,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(known ? riteIcon(sp) : Icons.lock, size: 28, color: col),
+                            const SizedBox(height: 3),
+                            Text(sp.name, style: Txt.label(size: 13, color: Palette.cream)),
+                            Text(known ? '${sp.cost} mana' : 'Rank ${sp.rank}', style: Txt.label(size: 11, color: known ? const Color(0xFF9ADFFF) : Palette.parch2)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (slotAt >= 0)
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      child: Container(
+                        width: 22,
+                        height: 22,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0xFF15110C), border: Border.all(color: col, width: 2)),
+                        child: Text('${slotAt + 1}', style: const TextStyle(fontSize: 13, height: 1, color: Colors.white, fontWeight: FontWeight.w900)),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    final classSection = <Widget>[
+      const Divider(color: Palette.stone3, height: 18),
+      if (cls == null)
+        Text('Wear a whole faction suit of an order to fight as its knight: the Dragon Knight, the Blood Knight or the Forge Knight, each with rites of their own.', style: Txt.onStone(size: 12.5))
+      else ...[
+        Row(
+          children: [
+            Expanded(child: Text('${cls.name.toUpperCase()} RITES · RANK ${classRank(k, cls.id)}', style: Txt.label(size: 12, color: Color(cls.argb)))),
+            Text(classRank(k, cls.id) >= maxRank ? 'Mastered' : '${winsToNextRank(k, cls.id)} renown to rank ${classRank(k, cls.id) + 1}', style: Txt.label(size: 11.5, color: Palette.parch2)),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Row(children: [for (final sp in cls.rites) classTile(sp)]),
+        const SizedBox(height: 6),
+        Text('${cls.passive} (rank $maxRank): ${cls.passiveText}${classPassive(k, cls.id) ? ' ✓' : ''}', style: Txt.onStone(size: 12, color: classPassive(k, cls.id) ? Color(cls.argb) : Palette.parch2)),
+        if (classRank(k, cls.id) < maxRank) Text('Every win in the suit earns renown: 2 in the middle lands, 3 in the far ones.', style: Txt.onStone(size: 11.5, color: Palette.parch2)),
+      ],
+    ];
     // Your hotbar, each rite with what it does (on a phone there's no pointer to hover for it).
     final hotbar = [
       const Divider(color: Palette.stone3, height: 18),
       Text('YOUR HOTBAR', style: Txt.label(size: 12, color: Palette.amber)),
       for (var i = 0; i < riteSlots; i++)
         Builder(builder: (context) {
-          final sp = i < k.rites.length ? spells.where((x) => x.id == k.rites[i]).firstOrNull : null, col = sp == null ? Palette.stone3 : Color(sp.argb);
+          final sp = i < active.length ? active[i] : null, col = sp == null ? Palette.stone3 : Color(sp.argb);
           return Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Row(
@@ -717,7 +800,7 @@ class _Spellbook extends StatelessWidget {
                   width: 42,
                   height: 42,
                   decoration: BoxDecoration(color: Palette.stone0, borderRadius: BorderRadius.circular(4), border: Border.all(color: col, width: sp == null ? 1 : 2)),
-                  child: sp == null ? Center(child: Text('${i + 1}', style: Txt.label(size: 15, color: Palette.parch2))) : Icon(Icons.local_fire_department, size: 26, color: col),
+                  child: sp == null ? Center(child: Text('${i + 1}', style: Txt.label(size: 15, color: Palette.parch2))) : Icon(riteIcon(sp), size: 26, color: col),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -745,7 +828,7 @@ class _Spellbook extends StatelessWidget {
         children: [
           Row(
             children: [
-              Expanded(child: Text('Pick up to $riteSlots rites for your hotbar (${k.rites.length}/$riteSlots)', style: Txt.label(size: 15, color: Palette.amber))),
+              Expanded(child: Text('Pick up to $riteSlots rites for your hotbar (${active.length}/$riteSlots)', style: Txt.label(size: 15, color: Palette.amber))),
               Tooltip(
                 message: 'Every attack, bash or shot gathers 1 mana; you start a fight with ${startingMana(k)}',
                 child: Row(
@@ -778,7 +861,7 @@ class _Spellbook extends StatelessWidget {
                   for (final sp in list)
                     Builder(
                       builder: (context) {
-                        final known = sp.level <= k.level, slotAt = k.rites.indexOf(sp.id), prepared = slotAt >= 0, col = Color(sp.argb);
+                        final known = riteKnown(k, sp), slotAt = active.indexOf(sp), prepared = slotAt >= 0, col = Color(sp.argb);
                         return Tooltip(
                           message: known ? '${sp.name}: ${sp.desc}${prepared ? ' (tap to take it off your hotbar)' : ' (tap to put it on your hotbar)'}' : '${sp.name}: learned at level ${sp.level}',
                           child: GestureDetector(
@@ -805,7 +888,7 @@ class _Spellbook extends StatelessWidget {
                                           child: Column(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            Icon(known ? Icons.local_fire_department : Icons.lock, size: 34, color: col, shadows: const [Shadow(color: Colors.black, offset: Offset(1, 2))]),
+                                            Icon(known ? riteIcon(sp) : Icons.lock, size: 34, color: col, shadows: const [Shadow(color: Colors.black, offset: Offset(1, 2))]),
                                             const SizedBox(height: 4),
                                             Padding(
                                               padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -858,6 +941,7 @@ class _Spellbook extends StatelessWidget {
               );
             },
           ),
+          ...classSection,
           // Given the room (a tall phone): the hotbar sits at the foot of the card.
           if (room.hasBoundedHeight) const Spacer(),
           ...hotbar,

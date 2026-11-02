@@ -750,7 +750,8 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         _at(d0 + hit, () => _spark('fire', _foeChest, 16, speed: 6, life: 700, radius: 11, lift: 1, gravity: -.02));
         _at(d0 + hit + 500, () => _tween('wyrm', 0, 600, ease: easeIn));
       case SpellKind.nova:
-        _at(d0 + hit, () => _spark('rime', _foeChest, 34, speed: 6, life: 900, radius: 4, gravity: 0));
+        // (The Forge Knight's Earthshaker throws up grit and stone, not frost.)
+        _at(d0 + hit, () => _spark(spell.id == 'earthshaker' ? 'grit' : 'rime', _foeChest, 34, speed: 6, life: 900, radius: 4, gravity: 0));
       case SpellKind.ward:
         _at(d0 + castReleaseMs, () {
           _tween('ward', 1, 200);
@@ -767,7 +768,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         }
         if (r.drained > 0) _at(d0 + hit + 500, () => _heart(r.drained, const Offset(_knightX + 10, _groundY - 270)));
       case SpellKind.blast:
-        _at(d0 + hit, () => _spark('bolt', _foeChest, 18, speed: 5.5, life: 500, radius: 4));
+        _at(d0 + hit, () => _spark(spell.element == Stat.burn ? 'fire' : 'bolt', _foeChest, 18, speed: 5.5, life: 500, radius: 4));
       case SpellKind.sleep:
         // Drifting motes of sleep settle on the foe.
         _at(d0 + hit, () {
