@@ -21,6 +21,7 @@ import 'journal_panel.dart' show fmt;
 import 'loot_window.dart';
 import 'material_icons.dart';
 import 'merchant.dart';
+import 'tasks_view.dart';
 import 'theme.dart';
 
 /// The tabs inside your tent.
@@ -47,7 +48,7 @@ class _HeroPageState extends State<HeroPage> {
       if (hasFriends) (_Tab.companions, Icons.pets, 'Allies'),
       (_Tab.satchel, Icons.backpack, 'Satchel'),
       (_Tab.home, Icons.cottage, 'Home'),
-      (_Tab.journey, Icons.map, 'Journey'),
+      (_Tab.journey, Icons.map, c.tasksReady > 0 ? 'Journey · ${c.tasksReady}' : 'Journey'),
     ];
     final tab = tabs.any((t) => t.$1 == _tab) ? _tab : _Tab.gear;
     return SingleChildScrollView(
@@ -806,7 +807,12 @@ class _Journey extends StatelessWidget {
       ('Knocked out', s.knockouts == 0 ? 'never' : '${s.knockouts} ${s.knockouts == 1 ? 'time' : 'times'}'),
       ('Ran away', s.flees == 0 ? 'never' : '${s.flees} ${s.flees == 1 ? 'time' : 'times'}'),
     ];
-    return Stone(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TaskList(controller: controller),
+        const SizedBox(height: 10),
+        Stone(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -827,6 +833,8 @@ class _Journey extends StatelessWidget {
             ),
         ],
       ),
+    ),
+      ],
     );
   }
 }

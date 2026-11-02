@@ -13,6 +13,7 @@ import 'package:scorchedknight/game/encounters.dart';
 import 'package:scorchedknight/game/enchants.dart';
 import 'package:scorchedknight/game/engine.dart';
 import 'package:scorchedknight/game/loot.dart';
+import 'package:scorchedknight/game/tasks.dart';
 import 'package:scorchedknight/game/models.dart';
 import 'package:scorchedknight/game/mounts.dart';
 import 'package:scorchedknight/game/rules.dart';
@@ -486,6 +487,65 @@ void main() {
       ..foeHp = 1 << 20
       ..foeMax = 1 << 20;
     expect(b.takeTurn(BattleAction.skill).damage.crit, isTrue);
+  });
+
+  test('tasks: done straight from the save, claimed once, easiest first, rewards kept small', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(2));
+    final s = e.state, k = s.knight;
+    expect(e.nextTask!.id, 'win');
+    expect(e.claimTask('win'), isNull, reason: 'not done yet');
+    s.foesFelled = 1;
+    final coins = k.coins;
+    expect(e.claimTask('win'), isNotNull);
+    expect(k.coins, coins + 25);
+    expect(e.claimTask('win'), isNull, reason: 'once only');
+    // A first the save can't show by itself is marked.
+    expect(taskById('brew')!.done(s), isFalse);
+    e.mark('brew');
+    expect(taskById('brew')!.done(s), isTrue);
+    // The next one shown is a done one waiting to be claimed, before any still to do.
+    expect(e.nextTask!.id, 'brew');
+    // Saved and loaded.
+    final back = GameState.fromJson(jsonDecode(jsonEncode(s.toJson())) as Map<String, dynamic>);
+    expect(back.tasksClaimed, contains('win'));
+    expect(back.did, contains('brew'));
+    // All of them together: a small share of a game's ~70k gold, and a couple of levels of XP.
+    final gold = gameTasks.fold<int>(0, (n, t) => n + t.reward.gold);
+    final xp = gameTasks.fold<double>(0, (n, t) => n + t.reward.xp);
+    expect(gold, lessThan(5000));
+    expect(xp, lessThan(3.5));
+    expect(gameTasks.map((t) => t.id).toSet().length, gameTasks.length);
+  });
+
+  test('region tasks: claimable once a region is cleared, never shown as next before', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(2));
+    final s = e.state;
+    expect(regionTasks.length, continents.length);
+    expect(e.nextTask!.land, isNull, reason: 'the main tasks lead');
+    s.bossesDown.add(0);
+    s.risenDown.add(0);
+    for (final p in places.where((p) => p.land == 0)) {
+      s.explored.add(p.id);
+    }
+    for (final d in dungeons.where((d) => d.land == 0)) {
+      s.dungeonsDone.add(d.id);
+    }
+    for (final (r, _) in relicPartsOn(0)) {
+      s.forged.add(r);
+    }
+    expect(e.landCleared(0), isTrue);
+    expect(e.taskDone(taskById('clear:0')!), isTrue);
+    final keys = s.keys;
+    expect(e.claimTask('clear:0'), isNotNull);
+    expect(s.keys, keys + 1);
+    expect(e.claimTask('clear:0'), isNull);
+    expect(e.claimTask('clear:1'), isNull, reason: 'not cleared');
+    expect(suitTasks.length, suitArts.length);
+    expect(taskById('suit:ashen')!.done(s), isFalse);
+    e.mark('suit:ashen');
+    expect(taskById('suit:ashen')!.done(s), isTrue, reason: 'worn once is enough');
+    final gold = regionTasks.fold<int>(0, (n, t) => n + t.reward.gold);
+    expect(gold, lessThan(6000));
   });
 
   test('bolts can be swapped any time, plain ones in between', () {

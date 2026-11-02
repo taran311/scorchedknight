@@ -455,7 +455,11 @@ class GameState {
     this.knockouts = 0,
     this.flees = 0,
     this.ng = 0,
-  }) : settings = settings ?? Settings(),
+    Set<String>? did,
+    Set<String>? tasksClaimed,
+  }) : did = did ?? {},
+       tasksClaimed = tasksClaimed ?? {},
+       settings = settings ?? Settings(),
        gearSets = gearSets ?? [],
        explored = explored ?? {},
        risenDown = risenDown ?? {},
@@ -688,6 +692,10 @@ class GameState {
   /// through). Each one makes the foes tougher and legendaries likelier.
   int ng;
 
+  /// Firsts you've done that the game can't otherwise tell from your save ('brew', 'deal',
+  /// 'temper'…), for the tasks; and the tasks whose rewards you've claimed.
+  final Set<String> did, tasksClaimed;
+
   /// Whether Vharrax has fallen (the story is done; the world keeps going).
   bool get won => bossesDown.contains(mainLands - 1);
 
@@ -809,6 +817,8 @@ class GameState {
     'kos': knockouts,
     'flees': flees,
     if (ng > 0) 'ng': ng,
+    if (did.isNotEmpty) 'did': did.toList(),
+    if (tasksClaimed.isNotEmpty) 'tasks': tasksClaimed.toList(),
   };
 
   factory GameState.fromJson(Map<String, dynamic> raw) {
@@ -940,6 +950,8 @@ class GameState {
       knockouts: n('kos'),
       flees: n('flees'),
       ng: n('ng'),
+      did: {...((j['did'] as List?) ?? const []).whereType<String>()},
+      tasksClaimed: {...((j['tasks'] as List?) ?? const []).whereType<String>()},
     );
   }
 }

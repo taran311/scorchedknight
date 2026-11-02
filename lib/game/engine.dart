@@ -17,6 +17,7 @@ import 'mounts.dart';
 import 'spells.dart';
 import 'tarot.dart';
 import 'vault.dart';
+import 'tasks.dart';
 import 'events.dart';
 import 'encounters.dart';
 import 'rules.dart';
@@ -3636,6 +3637,55 @@ class GameEngine {
   }
 
   /// Dunstan reworks [g] (something you wear) up to your level.
+  // ---------------- tasks ----------------
+
+  /// Notes a first that the tasks look for (see GameState.did).
+  void mark(String what) => state.did.add(what);
+
+  /// Whether task [t] is done (a region task: whether its region is cleared).
+  bool taskDone(GameTask t) => t.land != null ? landCleared(t.land!) : t.done(state);
+
+  /// The task to show next: the first one done and waiting to be claimed (region tasks too), else
+  /// the first of the main ones not done yet.
+  GameTask? get nextTask {
+    bool open(GameTask t) => !state.tasksClaimed.contains(t.id);
+    return allTasks.where((t) => open(t) && taskDone(t)).firstOrNull ?? gameTasks.where(open).firstOrNull;
+  }
+
+  /// Tasks done but not yet claimed.
+  int get tasksReady => allTasks.where((t) => !state.tasksClaimed.contains(t.id) && taskDone(t)).length;
+
+  /// Claims task [id]'s reward, if it's done and not claimed yet. Returns what it gave, in words.
+  List<String>? claimTask(String id) {
+    final t = taskById(id);
+    if (t == null || state.tasksClaimed.contains(id) || !taskDone(t)) return null;
+    state.tasksClaimed.add(id);
+    final k = state.knight, r = t.reward, got = <String>[];
+    if (r.gold > 0) {
+      k.coins += r.gold;
+      got.add('+${r.gold} gold');
+    }
+    if (r.xp > 0) {
+      final xp = (xpToNext(k) * r.xp).round();
+      _grantXp(xp);
+      got.add('+$xp XP');
+    }
+    if (r.potions > 0) {
+      _givePotions(r.potions);
+      got.add('+${r.potions} potion${r.potions == 1 ? '' : 's'}');
+    }
+    if (r.scrolls > 0) {
+      k.scrolls += r.scrolls;
+      got.add('+${r.scrolls} scroll${r.scrolls == 1 ? '' : 's'} of enchanting');
+    }
+    if (r.keys > 0) {
+      state.keys += r.keys;
+      got.add('+${r.keys} Cinder key${r.keys == 1 ? '' : 's'}');
+    }
+    _note('Task done: ${t.title}. ${got.join(', ')}.', EntryKind.gold);
+    return got;
+  }
+
   // ---------------- New Game+ ----------------
 
   /// Why you can't start the road again yet (null: you can).

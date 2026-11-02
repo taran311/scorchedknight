@@ -13,9 +13,10 @@ import 'classes.dart';
 import 'crafting.dart';
 import 'engine.dart';
 import 'loot.dart';
+import 'tasks.dart';
 import 'models.dart';
 import 'events.dart';
-import 'rules.dart' show Trait;
+import 'rules.dart' show Trait, suitWorn;
 import 'tarot.dart';
 import 'vault.dart';
 import 'wilds.dart';
@@ -234,6 +235,9 @@ class GameController extends ChangeNotifier {
   }
 
   void _changed() {
+    // A whole faction suit worn once counts for its task, even after you take a piece off.
+    final suit = suitWorn(state.knight);
+    if (suit != null) engine.mark('suit:$suit');
     _save();
     notifyListeners();
   }
@@ -287,6 +291,7 @@ class GameController extends ChangeNotifier {
 
   GearItem? temper(GearItem g) {
     final item = engine.temper(g);
+    if (item != null) engine.mark('temper');
     if (item != null) _changed();
     return item;
   }
@@ -301,6 +306,7 @@ class GameController extends ChangeNotifier {
 
   bool enterWild(int a) {
     final ok = engine.enterWild(a);
+    if (ok) engine.mark('wilds');
     if (ok) _changed();
     return ok;
   }
@@ -336,6 +342,7 @@ class GameController extends ChangeNotifier {
 
   bool enterDungeon(String id) {
     final ok = engine.enterDungeon(id);
+    if (ok) engine.mark('delve');
     if (ok) _changed();
     return ok;
   }
@@ -663,6 +670,7 @@ class GameController extends ChangeNotifier {
 
   bool purchase(String id) {
     final ok = engine.purchase(id);
+    if (ok && id == 'potion') engine.mark('potion');
     if (ok) _changed();
     return ok;
   }
@@ -672,6 +680,7 @@ class GameController extends ChangeNotifier {
 
   bool brew(Brew b) {
     final ok = engine.brew(b);
+    if (ok) engine.mark('brew');
     if (ok) _changed();
     return ok;
   }
@@ -689,6 +698,7 @@ class GameController extends ChangeNotifier {
 
   bool craftArmour(String id) {
     final ok = engine.craftArmour(id);
+    if (ok) engine.mark('craft');
     if (ok) _changed();
     return ok;
   }
@@ -714,12 +724,14 @@ class GameController extends ChangeNotifier {
 
   GearItem? forgePiece(String setId, GearSlot slot) {
     final item = engine.forgePiece(setId, slot);
+    if (item != null) engine.mark('piece');
     if (item != null) _changed();
     return item;
   }
 
   bool fletch(Gem g) {
     final ok = engine.fletch(g);
+    if (ok) engine.mark('fletch');
     if (ok) _changed();
     return ok;
   }
@@ -747,6 +759,7 @@ class GameController extends ChangeNotifier {
   String? get whyNotVault => engine.whyNotVault;
   VaultFind? openVault() {
     final out = engine.openVault();
+    if (out != null) engine.mark('vault');
     _changed();
     return out;
   }
@@ -757,6 +770,7 @@ class GameController extends ChangeNotifier {
   String? get whyNotDeal => engine.whyNotDeal;
   bool buyDeal() {
     final ok = engine.buyDeal();
+    if (ok) engine.mark('deal');
     _changed();
     return ok;
   }
@@ -788,6 +802,7 @@ class GameController extends ChangeNotifier {
   /// Puts a rite on the hotbar or takes it off.
   void prepareSpell(String id) {
     engine.toggleRite(id);
+    if (state.knight.rites.contains(id)) engine.mark('rite');
     _changed();
   }
 
@@ -865,6 +880,18 @@ class GameController extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ---- tasks ----
+
+  GameTask? get nextTask => engine.nextTask;
+  bool taskDone(GameTask t) => engine.taskDone(t);
+  int get tasksReady => engine.tasksReady;
+
+  List<String>? claimTask(String id) {
+    final got = engine.claimTask(id);
+    if (got != null) _changed();
+    return got;
+  }
+
   // ---- loot and classes ----
 
   /// The next drop waiting for "equip or sell", if any.
@@ -872,6 +899,7 @@ class GameController extends ChangeNotifier {
 
   int equipLoot(String id) {
     final sold = engine.equipLoot(id);
+    engine.mark('equip');
     _changed();
     return sold;
   }

@@ -33,6 +33,7 @@ import 'hero_page.dart';
 import 'class_picker.dart' show HeroOrHeroine;
 import 'frames.dart';
 import 'hud.dart';
+import 'tasks_view.dart';
 import 'item_icons.dart';
 import 'journal_panel.dart';
 import 'loot_window.dart';
@@ -264,6 +265,11 @@ class _InnPageState extends State<InnPage> with RouteAware {
                         // The Ember King is down: go round again, harder.
                         if (s.won) ...[
                           _NewGamePlusCard(controller: c),
+                          const SizedBox(height: 10),
+                        ],
+                        // The next task: something to try, and a little for trying it.
+                        if (c.nextTask != null) ...[
+                          TaskCard(controller: c),
                           const SizedBox(height: 10),
                         ],
                         // Hob's cellar: once you've a Cinder key (or have ever opened it).
