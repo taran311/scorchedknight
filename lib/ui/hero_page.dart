@@ -14,6 +14,7 @@ import '../game/crafting.dart';
 import '../game/classes.dart';
 import '../game/controller.dart';
 import '../game/loot.dart';
+import '../game/vault.dart' show isKeepsake;
 import '../game/models.dart' show Knight;
 import '../game/mounts.dart';
 import '../game/rules.dart';
@@ -523,7 +524,7 @@ class _SlotSheetState extends State<_SlotSheet> {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          Expanded(child: StoneButton(title: 'Sell', caption: '+${picked.value} gold', onPressed: () {
+                          Expanded(child: StoneButton(title: 'Sell', caption: isKeepsake(picked) ? 'One of a kind' : '+${picked.value} gold', onPressed: isKeepsake(picked) ? null : () {
                             c.sellFromStash(picked.id);
                             Audio.play(Sfx.coins);
                           })),

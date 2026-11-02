@@ -9,6 +9,7 @@ import '../audio/audio.dart';
 import '../game/controller.dart';
 import '../game/classes.dart';
 import '../game/loot.dart';
+import '../game/vault.dart' show isKeepsake;
 import 'hero_view.dart';
 import 'item_icons.dart';
 import 'stat_icons.dart';
@@ -263,8 +264,8 @@ class _LootWindowState extends State<_LootWindow> {
                           child: StoneButton(
                             title: 'Keep',
                             icon: const ChestIcon(size: 24),
-                            caption: controller.stashFull ? 'Chest full' : '${controller.state.knight.stash.length}/${controller.stashCap}',
-                            onPressed: controller.stashFull ? null : () => Navigator.of(context).pop('keep'),
+                            caption: controller.stashFull && !isKeepsake(item) ? 'Chest full' : '${controller.state.knight.stash.length}/${controller.stashCap}',
+                            onPressed: controller.stashFull && !isKeepsake(item) ? null : () => Navigator.of(context).pop('keep'),
                           ),
                         ),
                       ],
@@ -273,9 +274,9 @@ class _LootWindowState extends State<_LootWindow> {
                         child: StoneButton(
                           title: 'Sell',
                           icon: const ItemIcon(Item.coins, size: 24),
-                          caption: '+${item.value} gold',
+                          caption: isKeepsake(item) ? 'One of a kind' : '+${item.value} gold',
                           tone: better ? ButtonTone.stone : ButtonTone.amber,
-                          onPressed: () => Navigator.of(context).pop('sell'),
+                          onPressed: isKeepsake(item) ? null : () => Navigator.of(context).pop('sell'),
                         ),
                       ),
                     ],

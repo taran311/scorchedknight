@@ -3266,7 +3266,7 @@ class GameEngine {
   /// Puts spoils straight into your gear chest without wearing them. False if the chest is full.
   bool keepLoot(String itemId) {
     final i = state.pendingLoot.indexWhere((g) => g.id == itemId);
-    if (i < 0 || stashFull) return false;
+    if (i < 0 || (stashFull && !isKeepsake(state.pendingLoot[i]))) return false;
     final item = state.pendingLoot.removeAt(i);
     state.knight.stash.add(item);
     _note('You put ${item.name} in your gear chest.', EntryKind.gold);
@@ -3294,7 +3294,7 @@ class GameEngine {
   /// Sells a piece from your gear chest.
   int sellFromStash(String itemId) {
     final k = state.knight, i = k.stash.indexWhere((g) => g.id == itemId);
-    if (i < 0) return 0;
+    if (i < 0 || isKeepsake(k.stash[i])) return 0;
     final item = k.stash.removeAt(i);
     k.coins += item.value;
     _note('You sell ${item.name} for ${item.value} gold.', EntryKind.gold);
@@ -3364,7 +3364,7 @@ class GameEngine {
 
   int sellLoot(String itemId) {
     final i = state.pendingLoot.indexWhere((g) => g.id == itemId);
-    if (i < 0) return 0;
+    if (i < 0 || isKeepsake(state.pendingLoot[i])) return 0;
     final item = state.pendingLoot.removeAt(i);
     state.knight.coins += item.value;
     _note('You sell ${item.name} for ${item.value} gold.', EntryKind.gold);
@@ -3628,9 +3628,10 @@ class GameEngine {
     final open = s.vaultFound.length < vaultPiecesOpen(k.level);
     final unfound = [for (final p in vaultPieces) if (!s.vaultFound.contains(p.name)) p];
     final sure = open && unfound.isNotEmpty && s.vaultDry >= vaultSure;
-    if (sure || (roll < vaultPieceChance && (open || unfound.isEmpty))) {
+    // (All six found: the vault gives gear and gold from then on, never a second of a piece.)
+    if (sure || (roll < vaultPieceChance && open && unfound.isNotEmpty)) {
       s.vaultDry = 0;
-      final pool = unfound.isEmpty ? vaultPieces : unfound;
+      final pool = unfound;
       final piece = pool[_rng.nextInt(pool.length)];
       final g = loot.vaultPiece(piece, k.level);
       if (!s.vaultFound.contains(piece.name)) {
