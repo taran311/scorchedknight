@@ -15,6 +15,7 @@ import '../game/models.dart' show Knight;
 import '../game/mounts.dart';
 import '../game/rules.dart';
 import '../game/spells.dart';
+import '../game/tasks.dart' show GameTask;
 import 'fill_column.dart';
 import 'hero_view.dart';
 import 'item_icons.dart';
@@ -22,6 +23,7 @@ import 'journal_panel.dart' show fmt;
 import 'loot_window.dart';
 import 'material_icons.dart';
 import 'merchant.dart';
+import 'task_routes.dart';
 import 'tasks_view.dart';
 import 'theme.dart';
 
@@ -29,15 +31,18 @@ import 'theme.dart';
 enum _Tab { gear, rites, companions, satchel, home, journey }
 
 class HeroPage extends StatefulWidget {
-  const HeroPage({super.key, required this.controller});
+  const HeroPage({super.key, required this.controller, this.tab});
   final GameController controller;
+
+  /// The tab to open on (gear, rites, satchel, home, journey…), when a task sent you here.
+  final String? tab;
 
   @override
   State<HeroPage> createState() => _HeroPageState();
 }
 
 class _HeroPageState extends State<HeroPage> {
-  _Tab _tab = _Tab.gear;
+  late _Tab _tab = _Tab.values.where((t) => t.name == widget.tab).firstOrNull ?? _Tab.gear;
 
   @override
   Widget build(BuildContext context) {
@@ -90,7 +95,7 @@ class _HeroPageState extends State<HeroPage> {
                 ),
                 _Tab.satchel => _Satchel(controller: c),
                 _Tab.home => _Home(controller: c),
-                _Tab.journey => _Journey(controller: c),
+                _Tab.journey => _Journey(controller: c, onGo: (t) => goToTask(context, c, t, tent: (tab) => setState(() => _tab = _Tab.values.byName(tab)))),
               }),
             ]),
         ),
@@ -843,8 +848,9 @@ class _Spellbook extends StatelessWidget {
 
 /// The journey so far: continents crossed, bosses felled and a few tallies.
 class _Journey extends StatelessWidget {
-  const _Journey({required this.controller});
+  const _Journey({required this.controller, this.onGo});
   final GameController controller;
+  final ValueChanged<GameTask>? onGo;
 
   @override
   Widget build(BuildContext context) {
@@ -862,7 +868,7 @@ class _Journey extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        TaskList(controller: controller),
+        TaskList(controller: controller, onGo: onGo),
         const SizedBox(height: 10),
         Stone(
       child: Column(

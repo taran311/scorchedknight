@@ -7,6 +7,7 @@ import '../audio/audio.dart';
 import '../game/controller.dart';
 import '../game/rules.dart' show xpToNext;
 import '../game/tasks.dart';
+import 'task_routes.dart' show taskGoes;
 import 'item_icons.dart';
 import 'theme.dart';
 
@@ -69,15 +70,18 @@ Future<void> _claim(BuildContext context, GameController c, GameTask t) async {
 /// The next task, as one row in the square: what to do and what it pays, and a Claim button
 /// (glowing) once it's done.
 class TaskCard extends StatelessWidget {
-  const TaskCard({super.key, required this.controller});
+  const TaskCard({super.key, required this.controller, this.onGo});
   final GameController controller;
+
+  /// Tapped while it's still to do: off to wherever it's done (a shop, the map, your tent).
+  final ValueChanged<GameTask>? onGo;
 
   @override
   Widget build(BuildContext context) {
     final c = controller, t = c.nextTask;
     if (t == null) return const SizedBox.shrink();
-    final done = c.taskDone(t), more = c.tasksReady - (done ? 1 : 0);
-    return Container(
+    final done = c.taskDone(t), more = c.tasksReady - (done ? 1 : 0), go = !done && onGo != null && taskGoes(t);
+    final card = Container(
       padding: const EdgeInsets.fromLTRB(10, 6, 8, 6),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(4),
@@ -110,17 +114,22 @@ class TaskCard extends StatelessWidget {
               width: 88,
               child: StoneButton(title: 'Claim', compact: true, tone: ButtonTone.amber, onPressed: () => _claim(context, c, t)),
             ),
+          if (go) const Icon(Icons.chevron_right, color: Palette.parch2, size: 26),
         ],
       ),
     );
+    return go ? GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => onGo!(t), child: card) : card;
   }
 }
 
 /// Every task, in order: claimed ones ticked and dimmed, done ones with a Claim button, the rest
 /// with their reward.
 class TaskList extends StatelessWidget {
-  const TaskList({super.key, required this.controller});
+  const TaskList({super.key, required this.controller, this.onGo});
   final GameController controller;
+
+  /// A row still to do, tapped: off to wherever it's done.
+  final ValueChanged<GameTask>? onGo;
 
   @override
   Widget build(BuildContext context) {
@@ -160,7 +169,7 @@ class TaskList extends StatelessWidget {
     return Builder(
       builder: (context) {
         final got = s.tasksClaimed.contains(t.id), done = c.taskDone(t);
-        return Opacity(
+        final row = Opacity(
           opacity: got ? .45 : 1,
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 4),
@@ -181,10 +190,12 @@ class TaskList extends StatelessWidget {
                   )
                 else
                   TaskRewardChips(controller: c, reward: t.reward, size: 12),
+                if (!done && !got && onGo != null && taskGoes(t)) const Icon(Icons.chevron_right, color: Palette.parch2, size: 20),
               ],
             ),
           ),
         );
+        return !done && !got && onGo != null && taskGoes(t) ? GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => onGo!(t), child: row) : row;
       },
     );
   }

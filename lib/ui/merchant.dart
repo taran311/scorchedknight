@@ -810,9 +810,10 @@ class CostButton extends StatelessWidget {
 
 /// A shop window: whoever keeps it (their face, name and one line in a speech bubble), your gold,
 /// and their wares.
-Future<void> _showShop(BuildContext context, GameController c, {required String name, required String role, required String line, required Look look, required List<Color> glow, required Color colour, required Widget Function(String tab) wares, required List<(String, String, IconData)> tabs, double zoom = 2.8}) {
-  // Each shop in a few short sections, one at a time, so a section fits a phone screen whole.
-  var tab = tabs.first.$1;
+Future<void> _showShop(BuildContext context, GameController c, {required String name, required String role, required String line, required Look look, required List<Color> glow, required Color colour, required Widget Function(String tab) wares, required List<(String, String, IconData)> tabs, double zoom = 2.8, String? open}) {
+  // Each shop in a few short sections, one at a time, so a section fits a phone screen whole
+  // (opened at [open], when a task sent you here for something in it).
+  var tab = tabs.any((t) => t.$1 == open) ? open! : tabs.first.$1;
   return showDialog<void>(
   context: context,
   builder: (context) => StatefulBuilder(builder: (context, setTab) => Dialog(
@@ -942,7 +943,8 @@ class _ShopTab extends StatelessWidget {
 }
 
 /// Mags' stall, from the square.
-Future<void> showMerchantWindow(BuildContext context, GameController c) => _showShop(
+Future<void> showMerchantWindow(BuildContext context, GameController c, {String? tab}) => _showShop(
+  open: tab,
   context,
   c,
   name: 'Mags',
@@ -956,7 +958,8 @@ Future<void> showMerchantWindow(BuildContext context, GameController c) => _show
 );
 
 /// The forge, from the square.
-Future<void> showForgeWindow(BuildContext context, GameController c) => _showShop(
+Future<void> showForgeWindow(BuildContext context, GameController c, {String? tab}) => _showShop(
+  open: tab,
   context,
   c,
   name: smithName,
@@ -970,7 +973,8 @@ Future<void> showForgeWindow(BuildContext context, GameController c) => _showSho
 );
 
 /// The hedge-mage's tower, from the square.
-Future<void> showEnchanterWindow(BuildContext context, GameController c) => _showShop(
+Future<void> showEnchanterWindow(BuildContext context, GameController c, {String? tab}) => _showShop(
+  open: tab,
   context,
   c,
   name: mageName,

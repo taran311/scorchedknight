@@ -30,10 +30,10 @@ import 'account_panel.dart';
 import 'cadence.dart';
 import 'fill_column.dart';
 import 'battle_screen.dart';
-import 'hero_page.dart';
 import 'class_picker.dart' show HeroOrHeroine;
 import 'frames.dart';
 import 'hud.dart';
+import 'task_routes.dart';
 import 'tasks_view.dart';
 import 'item_icons.dart';
 import 'journal_panel.dart';
@@ -161,35 +161,7 @@ class _InnPageState extends State<InnPage> with RouteAware {
     await openBattle(context, c, BattleStart.resume);
   }
 
-  void _openKit() => Navigator.of(context).push(
-    MaterialPageRoute<void>(
-      builder: (_) => Scaffold(
-        body: Column(
-          children: [
-            SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 820),
-                    child: Row(
-                      children: [
-                        InnBackButton(label: 'Town', onPressed: () => Navigator.of(context).pop()),
-                        const SizedBox(width: 14),
-                        Flexible(child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text('Your ${homes[c.state.home].name}', style: Txt.logo().copyWith(fontSize: 24)))),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Expanded(child: ListenableBuilder(listenable: c, builder: (context, _) => HeroPage(controller: c))),
-          ],
-        ),
-      ),
-    ),
-  );
+  void _openKit() => openTent(context, c);
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
@@ -318,7 +290,7 @@ class _InnPageState extends State<InnPage> with RouteAware {
                         ],
                         // The next task: something to try, and a little for trying it.
                         if (c.nextTask != null) ...[
-                          TaskCard(controller: c),
+                          TaskCard(controller: c, onGo: (t) => goToTask(context, c, t)),
                           const SizedBox(height: 10),
                         ],
                         // Hob's cellar: once you've a Cinder key (or have ever opened it).
