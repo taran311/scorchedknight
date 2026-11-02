@@ -56,7 +56,8 @@ final gameTasks = <GameTask>[
   GameTask('bolts', 'Have Old Wick make bolts from a gem', (s) => s.did.contains('fletch'), const TaskReward(gold: 100)),
   GameTask('runeWeapon', 'Enchant your weapon at Old Wick\'s', (s) => s.did.contains('runeWeapon'), const TaskReward(scrolls: 1)),
   GameTask('runeArmour', 'Enchant your armour at Old Wick\'s', (s) => s.did.contains('runeArmour'), const TaskReward(gold: 150)),
-  GameTask('steed', 'Buy a steed from Mags', (s) => s.did.contains('steed'), const TaskReward(gold: 150)),
+  // (Any steed counts: once a boss has given you one, Mags only has better, later ones to sell.)
+  GameTask('steed', 'Get a steed: buy one from Mags, or win one', (s) => s.did.contains('steed') || s.knight.mounts.isNotEmpty, const TaskReward(gold: 150)),
   GameTask('cottage', 'Build the cottage', (s) => s.home >= 1, const TaskReward(xp: .4)),
   GameTask('errand', 'Send Wren on an errand', (s) => s.did.contains('errand'), const TaskReward(gold: 100)),
   GameTask('forge', 'Forge armour at Dunstan\'s', (s) => s.did.contains('craft'), const TaskReward(gold: 200)),
