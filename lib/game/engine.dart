@@ -3871,8 +3871,8 @@ class GameEngine {
     k.classWins[cls.id] = (k.classWins[cls.id] ?? 0) + renownFor(continents[state.continent].minLevel);
     final now = classRank(k, cls.id);
     if (now == before) return;
-    rankUp = '${cls.name} rank $now';
     final rite = cls.rites.where((sp) => sp.rank == now).firstOrNull;
+    rankUp = '${cls.name} rank $now${rite != null ? ' · ${rite.name}' : ''}';
     if (rite != null) {
       final active = k.rites.where((r) => spellById(r) != null && riteKnown(k, spellById(r)!)).length;
       if (!k.rites.contains(rite.id) && active < riteSlots) k.rites.add(rite.id);

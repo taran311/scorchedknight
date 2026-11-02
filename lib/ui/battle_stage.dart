@@ -1500,16 +1500,23 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   void _playLingering(SwingResult r, double at) {
     final total = r.burned + r.venomed + r.bled;
     if (total <= 0) return;
-    _at(at, () {
-      // One number for all of it, in the colour of whatever's doing the most; each still shows
-      // itself in its sparks (flames, a green cloud, blood).
-      final top = [(r.burned, _orange), (r.venomed, _green), (r.bled, _red)].reduce((a, b) => b.$1 > a.$1 ? b : a).$2;
-      _mark('$total', top, _foeChest + const Offset(-20, -60));
-      if (r.burned > 0) _spark('fire', _foeChest + const Offset(0, -20), 6, dir: -math.pi / 2, spread: 1, speed: 2, life: 500, radius: 6, gravity: -.02);
-      if (r.venomed > 0) _spark('venom', _foeChest, 8, speed: 1.6, life: 600, radius: 3, gravity: -.01);
-      if (r.bled > 0) _spill(_foeChest + const Offset(-10, 0), .6);
-      c.revealDamage(total);
-    });
+    // Each its own number in its own colour (venom green, fire orange, wounds red), a beat apart
+    // and stacked, so you can see what your poison is doing even with a fire burning too.
+    final ticks = [if (r.burned > 0) (r.burned, _orange, 'fire'), if (r.venomed > 0) (r.venomed, _green, 'venom'), if (r.bled > 0) (r.bled, _red, 'bleed')];
+    for (final (i, (n, col, kind)) in ticks.indexed) {
+      _at(at + i * 180, () {
+        _mark('$n', col, _foeChest + Offset(-20 + i * 26, -60 - i * 34));
+        switch (kind) {
+          case 'fire':
+            _spark('fire', _foeChest + const Offset(0, -20), 6, dir: -math.pi / 2, spread: 1, speed: 2, life: 500, radius: 6, gravity: -.02);
+          case 'venom':
+            _spark('venom', _foeChest, 8, speed: 1.6, life: 600, radius: 3, gravity: -.01);
+          default:
+            _spill(_foeChest + const Offset(-10, 0), .6);
+        }
+        c.revealDamage(n);
+      });
+    }
   }
 
   void _playOther(SwingResult r) {
@@ -1718,7 +1725,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   }
 
   /// Where a companion stands (or hovers), for its arrival.
-  static Offset _companionAt(Knight k) => petStage(k)?.$1 == Pet.fairy ? const Offset(_knightX - 60, _groundY - 210) : const Offset(120, _groundY - 40);
+  static Offset _companionAt(Knight k) => petStage(k)?.$1 == Pet.fairy ? const Offset(_knightX - 60, _groundY - 210) : const Offset(195, _groundY - 40);
 
   // ---------- ticker ----------
 
@@ -1989,7 +1996,9 @@ class _ScenePainter extends CustomPainter {
     final tall = size.height > size.width * .8;
     // (When you fall, the camera eases back out so the Reaper behind you fits in.)
     final pullBack = tall ? s.fx['gloom']!.clamp(0.0, 1.0) : 0.0;
-    final visibleW = math.min(sceneSize.width, math.max(tall ? 620.0 + 160 * pullBack : 700.0, sceneSize.height * size.width / size.height));
+    // (A dragon flying with you widens it a little, so its wings fit as well.)
+    final dragon = dragonStage(k), flier = dragon != null && dragon.name != 'Egg' && dragon.name != 'Hatchling';
+    final visibleW = math.min(sceneSize.width, math.max(tall ? 620.0 + (flier ? 80 : 0) + 160 * pullBack : 700.0, sceneSize.height * size.width / size.height));
     // (Centred a touch toward the foe: the big ones are wider than you, and mustn't lose a shoulder.)
     final left = ((tall ? 470 - 40 * pullBack : 482) - visibleW / 2).clamp(0.0, sceneSize.width - visibleW);
     canvas.scale(size.width / visibleW);
@@ -2097,7 +2106,7 @@ class _ScenePainter extends CustomPainter {
         canvas.scale(-1, 1);
       }
       if (ds.name == 'Egg') {
-        drawEgg(canvas, const Offset(128, _groundY - 2));
+        drawEgg(canvas, const Offset(172, _groundY - 2));
       } else {
         drawDragon(canvas, ds.name, t, breathing: fx['fire']! > 0, still: still);
       }
@@ -2811,8 +2820,12 @@ class _ScenePainter extends CustomPainter {
         s._arrival = null;
       } else if (age >= 0) {
         final a = (age < .1 ? age / .1 : 1 - math.max(0.0, (age - .75) / .25)).clamp(0.0, 1.0).toDouble();
-        final spot = _BattleStageState._companionAt(k) + Offset(0, (petStage(k)?.$1 == Pet.fairy ? -50 : -90) - 12 * age);
         final tp = TextPainter(text: TextSpan(text: 'New companion!', style: Txt.label(size: 22, color: const Color(0xFF9BE27A).withValues(alpha: a), weight: FontWeight.w900)), textDirection: TextDirection.ltr)..layout();
+        // Over the companion, but kept inside what this screen shows (a phone's view starts well
+        // right of the scene's edge, and the label's wider than the hound).
+        final raw = _BattleStageState._companionAt(k) + Offset(0, (petStage(k)?.$1 == Pet.fairy ? -50 : -90) - 12 * age);
+        final half = tp.width / 2 + 11;
+        final spot = Offset(raw.dx.clamp(left + 10 + half, math.max(left + 10 + half, left + visibleW - 10 - half)), raw.dy);
         final box = Rect.fromCenter(center: spot, width: tp.width + 22, height: tp.height + 8);
         canvas.drawRRect(RRect.fromRectAndRadius(box, const Radius.circular(14)), Paint()..color = Colors.black.withValues(alpha: .55 * a));
         canvas.drawRRect(RRect.fromRectAndRadius(box, const Radius.circular(14)), strokePaint(const Color(0xFF9BE27A).withValues(alpha: .7 * a), 1.5));

@@ -1330,6 +1330,10 @@ class _Result extends StatelessWidget {
           final chest = k.chest;
           spoils.addAll([
             if (k.levelUps > 0) _Spoil(const Icon(Icons.arrow_upward, size: 18, color: _green), 'Level ${s.knight.level}!', _green, big: true),
+            // Any rite the new level brings, by name, in its own colour.
+            if (k.levelUps > 0)
+              for (final sp in spells.where((sp) => sp.order == null && sp.level > s.knight.level - k.levelUps && sp.level <= s.knight.level))
+                _Spoil(Icon(riteIcon(sp), size: 18, color: Color(sp.argb)), 'New rite: ${sp.name}', Color(sp.argb), big: true, tip: s.knight.rites.contains(sp.id) ? 'On your hotbar' : 'Swap it onto your hotbar in your tent'),
             if (c.engine.rankUp case final up?) _Spoil(const Icon(Icons.military_tech, size: 18, color: Color(0xFFFFB04A)), up, const Color(0xFFFFB04A), big: true),
             _Spoil(const Icon(Icons.auto_awesome, size: 17, color: Color(0xFFB8D8FF)), '+${fmt(k.xp)} XP', const Color(0xFFB8D8FF)),
             if (k.wild)

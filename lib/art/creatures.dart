@@ -10,7 +10,8 @@ import 'sprites.dart';
 
 
 /// Where each stage sits in the 960 x 540 battle scene: (x, y, scale).
-const dragonPlacement = <String, (double, double, double)>{'Hatchling': (112, 452, .36), 'Drake': (110, 250, .62), 'Elder dragon': (118, 205, .86)};
+// (Close behind you, so a phone's narrower view still holds it: further left, it was off the edge.)
+const dragonPlacement = <String, (double, double, double)>{'Hatchling': (165, 452, .36), 'Drake': (170, 240, .62), 'Elder dragon': (180, 195, .86)};
 
 /// Mouth position in scene coordinates, for aiming fire.
 Offset dragonMouth(String stage, double t, {bool still = false}) {
