@@ -44,12 +44,12 @@ class VaultPiece {
 }
 
 const vaultPieces = <VaultPiece>[
-  VaultPiece('Emberwake Pendant', GearSlot.trinket, 'amulet', {Stat.crit: 1.2, Stat.vigour: 1.0, Stat.dodge: 1.1, Stat.damage: .45}, 'Warm as a hearthstone that never quite cooled.'),
-  VaultPiece('Ashwalker Boots', GearSlot.boots, 'boots', {Stat.dodge: 1.7, Stat.crit: 1.2, Stat.vigour: 1.0, Stat.guard: .9}, 'Salamander-hide soles. They leave no footprints, only scorch marks.'),
+  VaultPiece('Emberwake Pendant', GearSlot.trinket, 'amulet', {Stat.crit: .85, Stat.vigour: .7, Stat.dodge: .75, Stat.damage: .3}, 'Warm as a hearthstone that never quite cooled.'),
+  VaultPiece('Ashwalker Boots', GearSlot.boots, 'boots', {Stat.dodge: 1.45, Stat.crit: 1.05, Stat.vigour: .9, Stat.guard: .8}, 'Salamander-hide soles. They leave no footprints, only scorch marks.'),
   VaultPiece('Keeper\'s Gauntlets', GearSlot.gloves, 'gauntlets', {Stat.damage: 1.4, Stat.crit: 1.6, Stat.block: 1.4}, 'Whoever kept the vault kept these on. Mostly.'),
   VaultPiece('Ring of the Ember Vault', GearSlot.ring, 'ring', {Stat.lifesteal: 1.5, Stat.guard: 1.1, Stat.damage: .8, Stat.fortune: .8}, 'A key-ring once. The keys are long gone, the habit isn\'t.'),
   VaultPiece('Cinder Crown', GearSlot.helm, 'greathelm', {Stat.guard: 1.5, Stat.vigour: 1.5, Stat.lifesteal: 1.5}, 'Forged for a king who never came back for it.'),
-  VaultPiece('Brimstone Charm', GearSlot.trinket, 'charm', {Stat.block: 1.4, Stat.thorns: 1.4, Stat.regen: .8, Stat.damage: .35}, 'Smells of struck matches. Ill-wishers keep their distance.'),
+  VaultPiece('Brimstone Charm', GearSlot.trinket, 'charm', {Stat.block: 1.25, Stat.thorns: 1.25, Stat.regen: .8, Stat.damage: .3}, 'Smells of struck matches. Ill-wishers keep their distance.'),
 ];
 
 VaultPiece? vaultPieceNamed(String name) => vaultPieces.where((p) => p.name == name).firstOrNull;
@@ -74,10 +74,13 @@ bool guardianSworn(List<String> found) => vaultPieces.every((p) => found.contain
 /// can't be sold (and always fits in your chest), so a slip of the thumb never loses it for good.
 bool isKeepsake(GearItem g) =>
     g.gearSet == 'vault' ||
+    g.gearSet == 'arena' ||
     _onceOnly.contains(g.name) ||
     (g.slot == GearSlot.trinket && (g.art == 'ashenseal' || continents.any((l) => l.prize == g.art)));
 
 const _onceOnly = {
+  // The Allfather's spear, from the Hall of the Slain.
+  'Gungnir',
   // Relics, forged once.
   'Kingsfall', 'Bramblelash', 'Briarsong',
   // Elemental arms, one of each kind per hero.

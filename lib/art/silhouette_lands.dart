@@ -21,7 +21,7 @@ void paintSilhouetteLand(Canvas c, Setting s, BattlegroundSpec sp) {
   final horizon = sp.sky.last;
   // Each layer from far to near: closer to the sky's colour far off, near-black up close.
   Color layer(double k) => Color.lerp(horizon, _night, k)!;
-  final indoor = s == Setting.crypt || s == Setting.lair || s == Setting.tomb || s == Setting.deepforge || s == Setting.roost || s == Setting.icecave;
+  final indoor = s == Setting.hall || s == Setting.crypt || s == Setting.lair || s == Setting.tomb || s == Setting.deepforge || s == Setting.roost || s == Setting.icecave;
 
   // ---- Sky ----
   c.drawRect(Offset.zero & sceneSize, _vertical(sp.sky, 0, _ground));
@@ -322,6 +322,26 @@ void _features(Canvas c, Setting s, BattlegroundSpec sp, SeededRandom r, double 
         for (final x in [880.0, 935.0]) {
           _column(c, x, base + 8, 90 + r.next() * 60, fill, r);
         }
+      }
+    case Setting.hall:
+      // The Hall of the Slain. Far: the high gable end, its roof beams and a row of shields along
+      // the wall, the long hearth glowing under them. Near: carved roof-posts, with more shields
+      // and hanging horns.
+      if (!near) {
+        _hallBack(c, base + 4, fill, lit);
+      } else {
+        for (final x in [40.0, 470.0, 920.0]) {
+          _hallPost(c, x, base + 8, 330, fill);
+        }
+      }
+    case Setting.arena:
+      // The Ash Colosseum. Far: its curved wall, three tiers of arches with the dusk showing
+      // through them. Near: the low wall round the sand, crimson banners, braziers, and the
+      // gladiators' gate.
+      if (!near) {
+        _colosseum(c, base + 4, fill);
+      } else {
+        _podium(c, base + 6, fill, lit);
       }
     case Setting.tomb:
       // A tomb hall: square pillars carved with figures, braziers between, a sealed door far back.
@@ -952,4 +972,123 @@ void _anvil(Canvas c, double x, double base, double k, Paint p) {
   c.drawRect(Rect.fromLTWH(x - 16 * k, base - 26 * k, 32 * k, 26 * k), p);
   c.drawPath(poly([Offset(x - 30 * k, base - 40 * k), Offset(x + 22 * k, base - 40 * k), Offset(x + 48 * k, base - 46 * k), Offset(x + 24 * k, base - 52 * k), Offset(x - 34 * k, base - 52 * k), Offset(x - 40 * k, base - 46 * k)]), p);
   c.drawRect(Rect.fromLTWH(x - 10 * k, base - 41 * k, 20 * k, 15 * k), p);
+}
+
+
+/// The Colosseum's outer wall, curving away at the ends, three tiers of arches cut through it.
+void _colosseum(Canvas c, double base, Paint p) {
+  final wall = Path()..fillType = PathFillType.evenOdd;
+  // The wall's top bows down towards the middle, as a ring seen from inside.
+  double top(double x) => base - 250 + 50 * math.cos((x - 480) / 480 * math.pi / 2);
+  wall.moveTo(-20, base);
+  for (var x = -20.0; x <= 980; x += 20) {
+    wall.lineTo(x, top(x));
+  }
+  wall
+    ..lineTo(980, base)
+    ..close();
+  // The arches: three rows, narrower towards the edges where the ring turns away.
+  for (var row = 0; row < 3; row++) {
+    for (var x = 10.0; x < 960; x += 56) {
+      final squeeze = 1 - ((x - 480).abs() / 480) * .45;
+      final w = 30 * squeeze, h = 44.0;
+      final rowTop = top(x) + 18 + row * 66;
+      if (rowTop + h > base - 8) continue;
+      wall.addPath(
+        Path()
+          ..moveTo(x - w / 2, rowTop + h)
+          ..lineTo(x - w / 2, rowTop + w / 2)
+          ..arcToPoint(Offset(x + w / 2, rowTop + w / 2), radius: Radius.circular(w / 2))
+          ..lineTo(x + w / 2, rowTop + h)
+          ..close(),
+        Offset.zero,
+      );
+    }
+  }
+  c.drawPath(wall, p);
+  // The cornices between tiers.
+  for (var row = 0; row < 3; row++) {
+    final band = Path()..moveTo(-20, top(-20) + 12 + row * 66);
+    for (var x = -20.0; x <= 980; x += 20) {
+      band.lineTo(x, top(x) + 12 + row * 66);
+    }
+    c.drawPath(band, strokePaint(p.color, 5));
+  }
+  // Masts for the awning that once shaded the crowd, along the top.
+  for (var x = 30.0; x < 960; x += 70) {
+    c.drawRect(Rect.fromLTWH(x - 2, top(x) - 26, 4, 28), p);
+  }
+}
+
+/// The wall round the arena floor: a low podium with banners hung from it, braziers at each end and
+/// the gladiators' gate, its portcullis raised, in the middle.
+void _podium(Canvas c, double base, Paint p, double lit) {
+  c.drawRect(Rect.fromLTWH(-20, base - 62, 1000, 62), p);
+  c.drawRect(Rect.fromLTWH(-20, base - 70, 1000, 8), p);
+  // The gate: an arch into the dark under the stands, the portcullis's teeth showing at the top.
+  final gate = Path()
+    ..moveTo(440, base)
+    ..lineTo(440, base - 44)
+    ..arcToPoint(Offset(520, base - 44), radius: const Radius.circular(40))
+    ..lineTo(520, base)
+    ..close();
+  c.drawPath(gate, Paint()..color = const Color(0xFF060403));
+  for (var x = 446.0; x < 518; x += 10) {
+    c.drawRect(Rect.fromLTWH(x, base - 80, 3, 22), p);
+  }
+  // Crimson banners with a gold edge, hanging over the wall.
+  for (final x in [370.0, 590.0, 60.0, 900.0]) {
+    final banner = poly([Offset(x - 16, base - 70), Offset(x + 16, base - 70), Offset(x + 16, base - 18), Offset(x, base - 28), Offset(x - 16, base - 18)]);
+    c.drawPath(banner, Paint()..color = Color.lerp(p.color, const Color(0xFF8A1E1A), .7 * lit)!);
+    c.drawPath(banner, strokePaint(Color.lerp(p.color, const Color(0xFFE8C060), .5 * lit)!, 1.4));
+  }
+  for (final x in [140.0, 820.0]) {
+    _brazier(c, x, base - 62, .8, p, lit, wall: true);
+  }
+}
+
+
+/// The far end of the longhall: the roof's pitch and its beams, a row of round shields along the
+/// wall, and the glow of the long hearth below them.
+void _hallBack(Canvas c, double base, Paint p, double lit) {
+  // The gable: a steep roof-line over the end wall.
+  c.drawPath(poly([Offset(-20, base), Offset(-20, base - 230), Offset(480, base - 380), Offset(980, base - 230), Offset(980, base)]), p);
+  final beam = strokePaint(Color.lerp(p.color, const Color(0xFF000000), .35)!, 9);
+  for (var i = 1; i < 6; i++) {
+    final y = base - 230 - i * 22.0, half = 500 - i * 92.0;
+    c.drawLine(Offset(480 - half, y + 30), Offset(480 + half, y + 30), beam);
+  }
+  // The shields: painted, rimmed, a boss in the middle, lit by the fire below.
+  final colours = [const Color(0xFF6A1E1A), const Color(0xFF2E4A7A), const Color(0xFFB08A3A), const Color(0xFF3A5A3A)];
+  for (var i = 0; i < 11; i++) {
+    final x = 40 + i * 88.0, y = base - 150;
+    final face = Color.lerp(p.color, colours[i % 4], .55 * lit)!;
+    c.drawCircle(Offset(x, y), 26, Paint()..color = face);
+    c.drawCircle(Offset(x, y), 26, strokePaint(Color.lerp(p.color, const Color(0xFFC8A860), .45 * lit)!, 3));
+    c.drawCircle(Offset(x, y), 6, Paint()..color = Color.lerp(p.color, const Color(0xFFE8C060), .5 * lit)!);
+  }
+  // The long hearth's glow along the floor.
+  c.drawRect(
+    Rect.fromLTWH(0, base - 60, 960, 60),
+    Paint()..shader = ui.Gradient.linear(Offset(0, base), Offset(0, base - 60), [_lamp.withValues(alpha: .35 * lit), _lamp.withValues(alpha: 0)]),
+  );
+}
+
+/// A carved roof-post: a thick timber with a dragon's head at the top and a horn hanging from it.
+void _hallPost(Canvas c, double x, double base, double h, Paint p) {
+  c.drawRect(Rect.fromLTWH(x - 14, base - h, 28, h), p);
+  // The dragon-head bracket.
+  c.drawPath(poly([Offset(x - 14, base - h + 30), Offset(x - 50, base - h + 10), Offset(x - 62, base - h + 22), Offset(x - 40, base - h + 34), Offset(x - 14, base - h + 52)]), p);
+  c.drawPath(poly([Offset(x + 14, base - h + 30), Offset(x + 50, base - h + 10), Offset(x + 62, base - h + 22), Offset(x + 40, base - h + 34), Offset(x + 14, base - h + 52)]), p);
+  // A drinking horn on a strap.
+  c.drawLine(Offset(x + 14, base - h * .55), Offset(x + 30, base - h * .45), strokePaint(p.color, 2));
+  c.drawPath(
+    Path()
+      ..moveTo(x + 22, base - h * .45)
+      ..quadraticBezierTo(x + 40, base - h * .42, x + 44, base - h * .3)
+      ..lineTo(x + 36, base - h * .31)
+      ..quadraticBezierTo(x + 33, base - h * .4, x + 22, base - h * .41)
+      ..close(),
+    p,
+  );
 }

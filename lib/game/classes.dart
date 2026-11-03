@@ -219,6 +219,8 @@ const forgedArmour = <String, (String, int)>{
   'skyborn': ('Skyborn plate', 0xFF9AC8E8),
   'bushido': ('Bushido o-yoroi', 0xFFB8322A),
   'drakesworn': ('Drakesworn plate', 0xFF3E3442),
+  // The Ash Colosseum's prize: the Champion's bronze lorica.
+  'arena': ('Champion\'s lorica', 0xFFB0763A),
 };
 
 String setArmourId(String set) => 'set-$set';

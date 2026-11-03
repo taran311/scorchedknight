@@ -47,7 +47,7 @@ extension AmmoInfo on AmmoType {
   String get desc => switch (this) {
     AmmoType.fire => 'Sets the foe ablaze: fire every turn for $burnTurns turns',
     AmmoType.blessed => 'Holy fire: a little against anything, a lot against the undead',
-    AmmoType.leech => 'Each shot heals you 15% of its damage',
+    AmmoType.leech => 'Each shot heals you 6% of its damage',
     AmmoType.frost => 'A chill on each shot, and a chance to freeze the foe out of its next blow',
     AmmoType.venom => 'Each shot adds venom that eats at the foe every turn, building up',
   };
@@ -56,7 +56,7 @@ extension AmmoInfo on AmmoType {
   String describe(int level) => switch (this) {
     AmmoType.fire => 'Sets the foe ablaze: ${burnTick(level)} fire a turn for $burnTurns turns (ents burn twice as hard)',
     AmmoType.blessed => '+${holyShot(level, false)} holy fire, +${holyShot(level, true)} against the undead and demons',
-    AmmoType.leech => 'Each shot heals you 15% of its damage',
+    AmmoType.leech => 'Each shot heals you 6% of its damage',
     AmmoType.frost => '+${(ammoBonus(level) * frostShare).round()} frost, and a ${(freezeChance * 100).round()}% chance to freeze the foe out of its next blow',
     AmmoType.venom => 'Each shot adds ${venomTick(level)} venom a turn, for the rest of the fight (it stacks)',
   };
@@ -65,7 +65,7 @@ extension AmmoInfo on AmmoType {
   String short(int level) => switch (this) {
     AmmoType.fire => '${burnTick(level)} burn ×$burnTurns turns',
     AmmoType.blessed => '+${holyShot(level, false)} holy · +${holyShot(level, true)} vs undead',
-    AmmoType.leech => 'Heals 15% of the hit',
+    AmmoType.leech => 'Heals 6% of the hit',
     AmmoType.frost => '+${(ammoBonus(level) * frostShare).round()} frost · ${(freezeChance * 100).round()}% freeze',
     AmmoType.venom => '+${venomTick(level)} venom a turn, stacks',
   };

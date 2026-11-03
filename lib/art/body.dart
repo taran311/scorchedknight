@@ -1397,15 +1397,17 @@ void drawShield(Canvas c, Offset at, double tiltDeg, ShieldLook s) {
 /// A robe skirt from the waist to mid-shin that follows the legs.
 void _skirt(Canvas c, Skeleton sk, Look look) {
   final b = sk.build, col = look.skirt!;
-  Offset hem(Leg l, double off) => Offset.lerp(l.knee, l.ankle, .62)! + Offset(off, 0);
+  Offset hem(Leg l, double off) => look.kilt ? Offset.lerp(l.hip, l.knee, .62)! + Offset(off * .5, 0) : Offset.lerp(l.knee, l.ankle, .62)! + Offset(off, 0);
   final wb = sk.at(sk.pelvis, -b.hip * .75, b.spine * .22), wf = sk.at(sk.pelvis, b.hip * .75, b.spine * .22);
   final front = sk.legNear.knee.dx > sk.legFar.knee.dx ? sk.legNear : sk.legFar;
   final back = identical(front, sk.legNear) ? sk.legFar : sk.legNear;
   // The hem reaches past both knees, so a striding leg never pokes out of the robe's side.
   var hf = hem(front, 13), hb = hem(back, -13);
-  hf = Offset(math.max(hf.dx, front.knee.dx + 13), hf.dy);
-  hb = Offset(math.min(hb.dx, back.knee.dx - 13), hb.dy);
-  final fx = math.max(hf.dx, front.knee.dx + 14) + 2, bx = math.min(hb.dx, back.knee.dx - 14) - 4;
+  if (!look.kilt) {
+    hf = Offset(math.max(hf.dx, front.knee.dx + 13), hf.dy);
+    hb = Offset(math.min(hb.dx, back.knee.dx - 13), hb.dy);
+  }
+  final fx = look.kilt ? hf.dx + 3 : math.max(hf.dx, front.knee.dx + 14) + 2, bx = look.kilt ? hb.dx - 3 : math.min(hb.dx, back.knee.dx - 14) - 4;
   final mid = Offset((hf.dx + hb.dx) / 2, math.max(hf.dy, hb.dy) + 6);
   final path = Path()
     ..moveTo(wb.dx, wb.dy)
@@ -1426,6 +1428,15 @@ void _skirt(Canvas c, Skeleton sk, Look look) {
     ..quadraticBezierTo(bx, (wb.dy + hb.dy) / 2, wb.dx, wb.dy)
     ..close();
   fillPath(c, path, col, Offset(hb.dx, 0), Offset(hf.dx, 0));
+  if (look.kilt && look.torsoKind != TorsoKind.plain) {
+    // Pteruges: strips of leather hanging from an armoured kilt, each tipped with a stud.
+    final strap = strokePaint(const Color(0x66000000), 1.6), stud = Paint()..color = look.trim ?? const Color(0xFFC9A24E);
+    for (var i = 1; i < 6; i++) {
+      final top = Offset.lerp(wb, wf, i / 6)!, bottom = Offset.lerp(hb, hf, i / 6)!;
+      c.drawLine(top + const Offset(0, 4), bottom, strap);
+      c.drawCircle(bottom - const Offset(0, 3), 1.6, stud);
+    }
+  }
   final fold = strokePaint(const Color(0x40000000), 1.4);
   for (final k in const [.35, .65]) {
     final top = Offset.lerp(wb, wf, k)!, bottom = Offset.lerp(hb, hf, k)!;

@@ -276,4 +276,5 @@ IconData riteIcon(Spell sp) => switch (sp.kind) {
   SpellKind.charge => Icons.keyboard_double_arrow_right,
   SpellKind.reflect => Icons.flip,
   SpellKind.sleep => Icons.bedtime,
+  SpellKind.warcry => Icons.campaign,
 };

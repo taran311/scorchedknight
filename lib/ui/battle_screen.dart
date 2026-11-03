@@ -15,6 +15,7 @@ import '../game/crafting.dart' show smithName, coresPerRune, Gem, GemInfo, Eleme
 import '../game/engine.dart';
 import '../game/loot.dart' show specialChanceAt, Stat, RarityInfo, GearSlotLabel;
 import '../game/models.dart';
+import '../game/nemesis.dart' show nemesisTitle;
 import '../game/rules.dart';
 import '../game/knight_classes.dart' show riteKnown;
 import '../game/spells.dart';
@@ -30,6 +31,7 @@ import 'encounter_window.dart';
 import 'gear_glance.dart';
 import 'item_icons.dart';
 import 'stat_icons.dart';
+import 'merchant.dart' show promptRelicForge;
 import 'theme.dart';
 import 'trail_data.dart';
 
@@ -69,6 +71,25 @@ class _BattleScreenState extends State<BattleScreen> {
 
   /// The crossbow's timing bar is up, waiting for you to loose the bolt.
   bool _aiming = false;
+
+  /// A heavy blow coming: the move you picked waits while you brace (the ring closing on your
+  /// shield), then goes.
+  VoidCallback? _bracing;
+
+  /// Runs [go], after a brace if the foe has a heavy blow wound up. (Running away needs no brace.)
+  void _withBrace(VoidCallback go) {
+    if (_bracing != null) return;
+    if (!c.state.foeWindup || c.busy || c.outcome != null || !c.state.inBattle) return go();
+    setState(() => _bracing = go);
+  }
+
+  void _braced(double quality) {
+    final go = _bracing;
+    if (go == null) return;
+    setState(() => _bracing = null);
+    c.brace(quality);
+    go();
+  }
 
   /// On a phone (no hover): a tap uses a move straight away; holding one (or tapping one you can't
   /// use yet) shows its card above the moves until your next move. [_picked] is that move.
@@ -153,7 +174,8 @@ class _BattleScreenState extends State<BattleScreen> {
         ..showSnackBar(SnackBar(content: Text(why), duration: const Duration(milliseconds: 1400)));
       return;
     }
-    c.act(a);
+    if (a == BattleAction.flee) return c.act(a);
+    _withBrace(() => c.act(a));
   }
 
   /// A number key pressed while the last blow is still playing out: it fires as soon as it can, so
@@ -214,7 +236,8 @@ class _BattleScreenState extends State<BattleScreen> {
     if (!_aiming) return;
     setState(() => _aiming = false);
     if (c.busy || c.outcome != null || !c.state.inBattle) return;
-    c.act(BattleAction.shoot, aim: aimAt(pos, bullseyeFor(c.state.knight)));
+    final aim = aimAt(pos, bullseyeFor(c.state.knight));
+    _withBrace(() => c.act(BattleAction.shoot, aim: aim));
   }
 
   void _castRite(String id) {
@@ -226,7 +249,7 @@ class _BattleScreenState extends State<BattleScreen> {
         ..showSnackBar(SnackBar(content: Text(why), duration: const Duration(milliseconds: 1400)));
       return;
     }
-    c.castRite(id);
+    _withBrace(() => c.castRite(id));
   }
 
   /// On to the next stop on the trail (or into the lair, once it's open).
@@ -368,6 +391,8 @@ class _BattleScreenState extends State<BattleScreen> {
                                     lines: lines,
                                     moves: over
                                         ? null
+                                        : _bracing != null
+                                        ? [Expanded(child: _BraceRing(speed: c.state.settings.fastFights ? 1.4 : 1, onBrace: _braced))]
                                         : _aiming
                                         ? [Expanded(child: _AimBar(speed: c.state.settings.fastFights ? 1.6 : 1, zone: bullseyeFor(c.state.knight), onLoose: _loose, onCancel: () => setState(() => _aiming = false)))]
                                         : _actionRows().first,
@@ -800,8 +825,10 @@ class _FoeCard extends StatelessWidget {
       tags: [
         // Winding up a heavy blow: first, where you can't miss it.
         if (c.state.inBattle && c.state.foeWindup && !c.busy)
-          const FoeBadge(label: 'HEAVY ×$heavyBlow', colour: Color(0xFFFF5A4A), solid: true, tip: 'Winding up a heavy blow. Bash, freeze or hex it to stop it.'),
-        if (aura != null) FoeBadge(label: foe.pack ? 'PACK' : (foe.named ? 'RARE BOSS' : 'RARE'), colour: colour, solid: true, tip: aura.label),
+          const FoeBadge(label: 'HEAVY ×$heavyBlow', colour: Color(0xFFFF5A4A), solid: true, tip: 'Winding up a heavy blow. Bash, freeze or hex it to stop it, or brace when it comes: tap as the ring meets your shield.'),
+        if (c.engine.nemesisFight)
+          FoeBadge(label: 'NEMESIS', colour: const Color(0xFFE0405A), solid: true, tip: '${nemesisTitle(c.state.nemesis!.rank)} · has beaten you ${c.state.nemesis!.wins}× · beat it for its hoard')
+        else if (aura != null) FoeBadge(label: foe.pack ? 'PACK' : (foe.named ? 'RARE BOSS' : 'RARE'), colour: colour, solid: true, tip: aura.label),
         if (foe.boss && aura == null) const FoeBadge(label: 'BOSS', colour: Palette.amber, solid: true),
         // A foe well above you: say so (the stage shows it too, bigger and darker).
         if (foeMenace(c.state) case final m when m > 0)
@@ -830,6 +857,9 @@ class _FoeCard extends StatelessWidget {
         if (c.state.inBattle && c.state.foeSlowed > 0) FoeBadge(label: 'Slowed ${c.state.foeSlowed}', colour: const Color(0xFF6ABF9A), tip: 'Half its blows miss · ${c.state.foeSlowed} turns left'),
         if (c.state.inBattle && c.state.foeWeakened > 0) FoeBadge(label: 'Weakened ${c.state.foeWeakened}', colour: const Color(0xFFB8A0D8), tip: 'Its blows land 40% softer · ${c.state.foeWeakened} turns left'),
         if (c.state.inBattle && c.state.foeExposed > 0) FoeBadge(label: 'Exposed ${c.state.foeExposed}', colour: const Color(0xFFE0A050), tip: 'Your hits deal 25% more · ${c.state.foeExposed} turns left'),
+        // War cries: its, lifting its blows and cowing yours; and yours.
+        if (c.state.inBattle && c.state.foeRoar > 0) FoeBadge(label: 'War cry ${c.state.foeRoar}', colour: const Color(0xFFFF8A5A), tip: 'Its blows land 30% harder, and yours 20% softer · ${c.state.foeRoar} turns left'),
+        if (c.state.inBattle && c.state.heroRoar > 0) FoeBadge(label: 'Your War Cry ${c.state.heroRoar}', colour: const Color(0xFFCFE0F0), tip: 'Your blows land 25% harder · ${c.state.heroRoar} turns left'),
         if (c.state.inBattle && c.state.foeAsleep > 0) const FoeBadge(label: 'Asleep', colour: Color(0xFFB8A0E8), tip: 'It sleeps through its next blow'),
         if (c.state.inBattle && c.state.foeFrozen) const FoeBadge(label: 'Frozen', colour: Color(0xFF9ADFFF), tip: 'Frozen solid: it misses its next blow'),
         if (c.state.inBattle && c.state.foeBurnTurns > 0) FoeBadge(label: 'Burning ${c.state.foeBurnTurns}', colour: const Color(0xFFFF8A3A), tip: '${c.state.foeBurn} fire a turn · ${c.state.foeBurnTurns} turns left'),
@@ -1166,6 +1196,35 @@ class _ManaCost extends StatelessWidget {
 /// The bottom of the battle window: a dark strip of earth under the fight, an iron rail along its
 /// top, the latest thing that happened, and your moves (or, once it's over, how it went and what
 /// next). It dims while blows are trading, and lights up when it's your move.
+/// Its child fades in and only takes taps after a short beat, so a hurried tap (or several) meant
+/// for the fight's last move doesn't carry on to whatever button has just appeared under it.
+class _Armed extends StatefulWidget {
+  const _Armed({required this.child});
+  final Widget child;
+
+  @override
+  State<_Armed> createState() => _ArmedState();
+}
+
+class _ArmedState extends State<_Armed> {
+  static const _beat = Duration(milliseconds: 700);
+  var _armed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Future<void>.delayed(_beat, () {
+      if (mounted) setState(() => _armed = true);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => IgnorePointer(
+    ignoring: !_armed,
+    child: AnimatedOpacity(opacity: _armed ? 1 : .35, duration: const Duration(milliseconds: 220), child: widget.child),
+  );
+}
+
 class _CommandDeck extends StatelessWidget {
   const _CommandDeck({required this.controller, required this.lines, this.moves, this.result, this.detail, this.fill = false});
 
@@ -1219,7 +1278,8 @@ class _CommandDeck extends StatelessWidget {
             else
               _Result(controller: c, onDark: true),
             const SizedBox(height: 8),
-            Row(children: result!),
+            // A beat before the way on can be pressed: a tap meant for the last blow mustn't land on it.
+            _Armed(child: Row(children: result!)),
           ] else ...[
             // What just happened, two lines at most, beside a little banner (on a phone, under it, so
             // the lines get the whole width and aren't cut short).
@@ -1367,7 +1427,7 @@ class _Result extends StatelessWidget {
             if (k.levelUps > 0) _Spoil(const Icon(Icons.arrow_upward, size: 18, color: _green), 'Level ${s.knight.level}!', _green, big: true),
             // Any rite the new level brings, by name, in its own colour.
             if (k.levelUps > 0)
-              for (final sp in spells.where((sp) => sp.order == null && sp.level > s.knight.level - k.levelUps && sp.level <= s.knight.level))
+              for (final sp in spells.where((sp) => sp.order == null && sp.earned == null && sp.level > s.knight.level - k.levelUps && sp.level <= s.knight.level))
                 _Spoil(Icon(riteIcon(sp), size: 18, color: Color(sp.argb)), 'New rite: ${sp.name}', Color(sp.argb), big: true, tip: s.knight.rites.contains(sp.id) ? 'On your hotbar' : 'Swap it onto your hotbar in your tent'),
             if (c.engine.rankUp case final up?) _Spoil(const Icon(Icons.military_tech, size: 18, color: Color(0xFFFFB04A)), up, const Color(0xFFFFB04A), big: true),
             _Spoil(const Icon(Icons.auto_awesome, size: 17, color: Color(0xFFB8D8FF)), '+${fmt(k.xp)} XP', const Color(0xFFB8D8FF)),
@@ -1469,8 +1529,13 @@ class _Spoil extends StatelessWidget {
 }
 
 /// Opens a fight and returns how it ended.
-Future<BattleExit?> openBattle(BuildContext context, GameController c, BattleStart start) =>
-    Navigator.of(context).push<BattleExit>(MaterialPageRoute(builder: (_) => BattleScreen(controller: c, start: start)));
+/// (A relic's last part won in it: the way to the forge is offered as you come out, and taking it
+/// counts as heading back to town.)
+Future<BattleExit?> openBattle(BuildContext context, GameController c, BattleStart start) async {
+  final exit = await Navigator.of(context).push<BattleExit>(MaterialPageRoute(builder: (_) => BattleScreen(controller: c, start: start)));
+  if (context.mounted && await promptRelicForge(context, c)) return BattleExit.inn;
+  return exit;
+}
 
 /// The crossbow's timing bar: a dial sweeps back and forth; loose the bolt (tap, Space or Enter)
 /// with it in the gold centre for a bullseye, anywhere in the amber for a true shot, out at the
@@ -1664,4 +1729,122 @@ class _PickedCard extends StatelessWidget {
       ],
     ),
   );
+}
+
+/// Bracing for a heavy blow: a ring closes on your shield; tap as it meets it. Right on the beat is
+/// a perfect brace (a sure block), close is in time (no heavier than an ordinary blow), and a miss
+/// (or no tap at all) takes the heavy blow full on.
+class _BraceRing extends StatefulWidget {
+  const _BraceRing({required this.onBrace, this.speed = 1});
+  final ValueChanged<double> onBrace;
+  final double speed;
+
+  @override
+  State<_BraceRing> createState() => _BraceRingState();
+}
+
+class _BraceRingState extends State<_BraceRing> with SingleTickerProviderStateMixin {
+  // The ring meets the shield at [_beat] of the way through; a little after, it's too late.
+  static const _beat = .8;
+  late final _t = AnimationController(vsync: this, duration: Duration(milliseconds: (1100 / widget.speed).round()));
+  final _focus = FocusNode();
+  var _done = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _t.addStatusListener((s) {
+      if (s == AnimationStatus.completed) _tap(late: true);
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _focus.requestFocus();
+      _t.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _t.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  void _tap({bool late = false}) {
+    if (_done) return;
+    _done = true;
+    _t.stop();
+    final off = (_t.value - _beat).abs() * (1100 / widget.speed);
+    // (Windows in real time, whatever the speed: about a tenth of a second for perfect.)
+    final q = late ? 0.0 : (off <= 110 ? bracePerfect : (off <= 240 ? braceGood : 0.0));
+    Audio.play(q >= bracePerfect ? Sfx.block : (q > 0 ? Sfx.clang : Sfx.miss));
+    widget.onBrace(q);
+  }
+
+  @override
+  Widget build(BuildContext context) => CallbackShortcuts(
+    bindings: {
+      const SingleActivator(LogicalKeyboardKey.space): _tap,
+      const SingleActivator(LogicalKeyboardKey.enter): _tap,
+    },
+    child: Focus(
+      focusNode: _focus,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => _tap(),
+        child: SizedBox(
+          height: 66,
+          child: Row(
+            children: [
+              SizedBox(
+                width: 66,
+                height: 66,
+                // Only the ring repaints, on its own layer.
+                child: RepaintBoundary(child: AnimatedBuilder(animation: _t, builder: (context, _) => CustomPaint(painter: _BracePainter(_t.value / _beat)))),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('BRACE!', style: Txt.label(size: 18, color: const Color(0xFFFF8A6A), weight: FontWeight.w900)),
+                    Text('Tap as the ring meets your shield', style: Txt.onStone(size: 13.5)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _BracePainter extends CustomPainter {
+  _BracePainter(this.t);
+
+  /// 0 as the ring starts, 1 as it meets the shield (a little past, as it closes in too far).
+  final double t;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = size.center(Offset.zero), shield = size.width * .22;
+    // The shield: a gold disc that brightens as the moment comes.
+    canvas.drawCircle(c, shield, Paint()..color = Color.lerp(const Color(0xFF6A4A1A), const Color(0xFFFFD98A), t.clamp(0.0, 1.0))!);
+    canvas.drawCircle(c, shield, Paint()..color = const Color(0xFF2A1A10)..style = PaintingStyle.stroke..strokeWidth = 2);
+    // The ring closing in.
+    final r = shield + (size.width / 2 - shield) * (1 - t).clamp(-.3, 1.0);
+    canvas.drawCircle(
+      c,
+      math.max(2, r),
+      Paint()
+        ..color = (t > 1.05 ? const Color(0xFF8A3A2A) : const Color(0xFFFF8A6A)).withValues(alpha: .95)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_BracePainter o) => o.t != t;
 }

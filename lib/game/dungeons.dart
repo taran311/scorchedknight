@@ -184,10 +184,11 @@ const doorWeights = <DoorClue, double>{DoorClue.growl: 45, DoorClue.glitter: 25,
 /// The chance a room has a locked door among its others.
 const lockedChance = .3;
 
-/// Levels foes gain over a hero of [level] in room [room]: a third of your level more by the
-/// last room, an elite one more, and the boss more again.
+/// Levels foes gain over a hero of [level] in room [room]: a few more by the last room (more for a
+/// higher hero, but not so many that the late dungeons turn into walls), an elite one more, and
+/// the boss a couple more again.
 int dungeonLevels(int room, RoomKind kind, int level) =>
-    (level * .3 * room / dungeonRooms).round() + (kind == RoomKind.elite ? 1 : 0) + (kind == RoomKind.boss ? 1 + level ~/ 10 : 0);
+    ((2 + level * .1) * room / dungeonRooms).round() + (kind == RoomKind.elite ? 1 : 0) + (kind == RoomKind.boss ? 1 + level ~/ 15 : 0);
 
 /// The chance you spot a trap in time, and the share of your health one takes if you don't.
 const trapSpot = .35, trapHurtMin = .12, trapHurtMax = .22;

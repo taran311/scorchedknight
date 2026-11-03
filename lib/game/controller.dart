@@ -290,6 +290,21 @@ class GameController extends ChangeNotifier {
     return item;
   }
 
+  List<GearItem> get honeables => engine.honeables;
+  String? whyNotHone(GearItem g) => engine.whyNotHone(g);
+  bool hone(GearItem g) {
+    final ok = engine.hone(g);
+    if (ok) _changed();
+    return ok;
+  }
+
+  String? get whyNotCrate => engine.whyNotCrate();
+  GearItem? buyCrate(GearSlot slot) {
+    final g = engine.buyCrate(slot);
+    if (g != null) _changed();
+    return g;
+  }
+
   List<GearItem> get temperables => engine.temperables;
   int temperCost(GearItem g) => engine.temperCost(g);
   String? whyNotTemper(GearItem g) => engine.whyNotTemper(g);
@@ -728,6 +743,35 @@ class GameController extends ChangeNotifier {
 
   /// Explores a place on the map: a guarded one starts its fight (null comes back); anything else
   /// comes back as what happened.
+  /// The next warrior of the Hall of the Slain's wave (a fresh fight the battle screen walks on).
+  FoeType? startHallFight() {
+    final f = engine.startHallFight();
+    if (f != null) {
+      outcome = null;
+      lastKill = null;
+      lastSwing = null;
+    }
+    _changed();
+    return f;
+  }
+
+  void abandonHallWave() {
+    engine.abandonHallWave();
+    _changed();
+  }
+
+  /// Out onto the Colosseum's sand for the next bout (a fresh fight the battle screen walks on).
+  FoeType? startArenaBout() {
+    final f = engine.startArenaBout();
+    if (f != null) {
+      outcome = null;
+      lastKill = null;
+      lastSwing = null;
+    }
+    _changed();
+    return f;
+  }
+
   String? explorePlace(String id) {
     final out = engine.explorePlace(id);
     if (state.inBattle) {
@@ -846,6 +890,9 @@ class GameController extends ChangeNotifier {
   }
 
   /// Casts the rite [id] from the hotbar.
+  /// How well you braced for the heavy blow coming this turn (see GameEngine.braceNext).
+  void brace(double quality) => engine.braceNext = quality;
+
   void castRite(String id) {
     if (busy || !state.inBattle || engine.whyNotRite(id) != null) return;
     state.knight.preparedSpell = id;

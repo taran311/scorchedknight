@@ -7,12 +7,16 @@
 import 'dart:math' as math;
 
 import 'ammo.dart';
+import 'arena.dart';
+import 'hall.dart';
 import 'brews.dart';
 import 'catalog.dart';
 import 'crafting.dart';
 import 'classes.dart';
 import 'loot.dart';
 import 'models.dart';
+import 'nemesis.dart';
+import 'contracts.dart';
 import 'mounts.dart';
 import 'errands.dart';
 import 'knight_classes.dart';
@@ -229,12 +233,18 @@ class SwingResult {
   /// The knight's Shield Bash left the foe dazed (it skips its blow).
   bool stunned = false;
 
+  /// The foe roared a war cry instead of striking.
+  bool roared = false;
+
   /// A whole suit's signature on the bash (its word: IGNITE, DRINK…), and what it dealt and healed.
   String? art;
   int artHit = 0, artHeal = 0;
 
   /// The foe's blow this turn was a heavy one it wound up; and it's winding up another.
   bool heavy = false, windup = false;
+
+  /// You braced for its heavy blow: 1 in time, 2 perfectly (see [GameEngine.braceNext]).
+  int braced = 0;
 
   /// The Guardian's Oath caught the heavy blow.
   bool oath = false;
@@ -272,6 +282,9 @@ class GameEngine {
   /// This fight so far, for the combat feats: hits taken, potions drunk, rites cast and bolts
   /// shot. A fight picked up again after the game was closed counts as already hurt (unknown).
   int _fightHits = 1, _fightPotions = 0, _fightRites = 0, _fightBolts = 0, _fightSlumbers = 0;
+
+  /// A dodge, parry or block just now: the Champion's set's next blow lands harder.
+  bool _primed = false;
 
   /// The Blood Knight's Undying, spent this fight.
   bool _undyingUsed = false;
@@ -492,6 +505,7 @@ class GameEngine {
     final roll = _rng.nextDouble();
     Rare? rare;
     var at = idx[_rng.nextInt(idx.length)];
+    state.nemesis?.since++;
     if (!state.innRepaired && c == 0) {
       // Hob's job: only goblins for now. Soot Goblins carry off the timber; once that's back,
       // their Warbosses (and the iron) turn up too.
@@ -501,6 +515,18 @@ class GameEngine {
       final bases = idx.where(_canWearJack).toList();
       at = bases[_rng.nextInt(bases.length)];
       rare = Rare(at, Aura.blazing, name: 'Jack o\' Cinders', look: 'pumpkinhead');
+    } else if (_nemesisDue(c) case final n?) {
+      // Your nemesis has found you again.
+      rare = Rare(n.base, n.aura, name: n.name, look: n.look);
+      n.since = 0;
+      _begin(n.base, rare, above: n.rank ~/ 2 + math.max(0, landTier(c) - landTier(realmAt(n.base))));
+      _note(
+        n.rank >= 3
+            ? '${n.name} steps into the road ahead of you, and grins. "There you are." (Your nemesis: ${nemesisTitle(n.rank).toLowerCase()} now, and stronger every time it beats you.)'
+            : '${n.name} has found you. "Remember me?" (Your nemesis: beat it and it\'s gone for good, with everything it\'s taken.)',
+        EntryKind.gold,
+      );
+      return encounterType(n.base, rare);
     } else if (_golemFor(c) case final metal?) {
       // A golem pulls itself out of the rock, ore glinting in its back.
       rare = Rare(at, metal.aura, look: metal.golemLook);
@@ -549,6 +575,15 @@ class GameEngine {
         EntryKind.gold,
       );
       return f;
+    } else if (c == mainLands - 1 && !state.bossesDown.contains(c) && _rng.nextDouble() < generalChance && named.any((n) => !state.generalsDown.contains(n.name))) {
+      // One of the Ember King's generals, come down from the Throne to stop you.
+      final left = [for (final n in named) if (!state.generalsDown.contains(n.name)) n];
+      final n = left[_rng.nextInt(left.length)];
+      at = lookIndex(n.base, c);
+      rare = Rare(at, n.aura, name: n.name, look: n.look);
+      _begin(at, rare);
+      _note('${n.name}, one of the Ember King\'s generals, bars the road. Fell it, and Vharrax will be the weaker for it.', EntryKind.gold);
+      return encounterType(at, rare);
     } else if (roll < packChance(c) && packs.isNotEmpty) {
       final (look, name) = packs[_rng.nextInt(packs.length)];
       at = lookIndex(look, c);
@@ -580,6 +615,63 @@ class GameEngine {
     return f;
   }
 
+  /// Your nemesis, if it's due to find you in land [c]: never on Hob's job or the road's very first
+  /// fights after it last met you.
+  Nemesis? _nemesisDue(int c) {
+    final n = state.nemesis;
+    if (n == null || !state.innRepaired || n.since < nemesisWait) return null;
+    return _rng.nextDouble() < nemesisChance ? n : null;
+  }
+
+  /// A land's boss you keep falling to (see [GameState.bossLosses]):
+  /// you've learned its ways, and each time it stands a little less tall, down to [doggedMax] off.
+  /// (So a wall can always be climbed; the first try is the full fight.)
+  double doggedFor(int foe) {
+    final c = realmAt(foe);
+    if (foe != bossIndex(c) || state.bossesDown.contains(c)) return 1;
+    return 1 - math.min(doggedMax, doggedStep * (state.bossLosses[c] ?? 0));
+  }
+
+  /// The Ember King's HP, against what it would be: less for every general you've felled.
+  double get kingStrength => 1 - generalCut * state.generalsDown.where(emberGenerals.contains).length;
+
+  /// Whether the fight under way is with your nemesis.
+  bool get nemesisFight => state.rare != null && state.nemesis != null && state.rare!.name == state.nemesis!.name && state.rare!.look == state.nemesis!.look;
+
+  /// A foe that beat you (or, [fled], saw you run) becomes your nemesis, or your nemesis grows.
+  /// Only on the road: not bosses, named foes, packs or the like, which have stories of their own.
+  void _grudge({required bool fled}) {
+    final rare = state.rare;
+    if (state.wildFight || state.dungeonFight || state.raidFight || state.heroicFight || state.arenaFight || state.hallFight || state.place != null) return;
+    final n = state.nemesis;
+    if (n != null && nemesisFight) {
+      n.since = 0;
+      if (fled) {
+        _note('${n.name} doesn\'t chase you. It doesn\'t need to. It knows where you\'ll be.', EntryKind.damage);
+        return;
+      }
+      n.wins++;
+      if (n.rank < nemesisMaxRank) {
+        n.rank++;
+        _note('${n.name} stands over you and roars. It grows stronger on its win: ${nemesisTitle(n.rank)} now.', EntryKind.damage);
+      }
+      return;
+    }
+    if (n != null) return;
+    final f = foeIn(state);
+    if (f.boss || f.pack || f.named || (rare != null && (rare.look != null || rare.name != null))) return;
+    // Fleeing a common foe isn't a grudge; fleeing a rare one is.
+    if (fled && rare == null) return;
+    final name = nemesisName(_rng, fled: fled);
+    state.nemesis = Nemesis(base: state.foe, look: f.look, name: name, aura: rare?.aura ?? Aura.values[_rng.nextInt(Aura.values.length)]);
+    _note(
+      fled
+          ? 'Behind you, the ${f.name} watches you run, and laughs. By nightfall the whole road knows it as $name. It\'ll come looking for you. (A nemesis! Beat it for a fine reward.)'
+          : 'The ${foeAt(state.foe).name} that beat you is telling everyone about it. It has a name now: $name. It\'ll come looking for you. (A nemesis! Beat it for a fine reward.)',
+      EntryKind.damage,
+    );
+  }
+
   /// Whether Sir Malric is waiting on the road into land [c]: only on the road, only once Hob's job
   /// is done, and each meeting no sooner than its land.
   bool _malricDue(int c) {
@@ -604,6 +696,16 @@ class GameEngine {
     // A relic guardian only shows while you hold the blueprint and still need what it guards.
     if (p.relic case (final r, final i) when !relicPartWanted(r, i) && !state.explored.contains(p.id)) return false;
     return open && (!p.hidden || places.every((o) => o.hidden || o.relic != null || state.explored.contains(o.id)));
+  }
+
+  /// The notice board at the Soot & Kettle: the open contracts you can take now, the nearest to
+  /// your level first (at most [boardSize]).
+  List<Contract> get board {
+    final open = [
+      for (final c in contracts)
+        if (placeById(c.place) case final p? when !state.explored.contains(p.id) && placeShown(p) && whyNotTravel(p.land) == null) (c, p),
+    ]..sort((a, b) => continents[a.$2.land].minLevel.compareTo(continents[b.$2.land].minLevel));
+    return [for (final (c, _) in open.take(boardSize)) c];
   }
 
   /// Why you can't explore place [id] now (null: you can).
@@ -739,6 +841,111 @@ class GameEngine {
     _note('You let the bandits go. Somebody else\'s problem.');
   }
 
+  // ---------------- the Ash Colosseum ----------------
+
+  /// The bout you'd fight next in the Colosseum (once the Champion is down, he takes you on again,
+  /// for the crowd).
+  int get arenaBout => math.min(state.arenaWins, arenaBouts.length - 1);
+
+  /// Whether the Champion has fallen (the whole set won).
+  bool get arenaDone => state.arenaWins >= arenaBouts.length;
+
+  /// Why you can't fight in the Colosseum now (null: you can).
+  String? whyNotArena() {
+    if (state.inBattle) return 'Not mid-fight';
+    return whyNotTravel(arenaLand);
+  }
+
+  /// Out onto the sand: the next bout's gladiator steps up.
+  FoeType? startArenaBout() {
+    if (whyNotArena() != null) return null;
+    final i = arenaBout, b = arenaBouts[i], at = arenaBase();
+    state.continent = arenaLand;
+    final rare = Rare(at, arenaAura(i), name: b.name, look: b.look);
+    _begin(at, rare, above: b.above);
+    state.arenaFight = true;
+    _note(arenaDone ? 'The Champion of the Ash steps out again. The crowd that isn\'t there roars.' : 'Bout ${i + 1} of ${arenaBouts.length}: ${b.name}, ${b.school.toLowerCase()}, steps out onto the sand.', EntryKind.gold);
+    return encounterType(at, rare);
+  }
+
+  /// A bout won: the next one opens, and some bouts carry a piece of the Champion's set (the
+  /// Champion himself his helm and his lorica).
+  void _arenaWin() {
+    if (arenaDone) return;
+    final i = state.arenaWins, b = arenaBouts[i], k = state.knight;
+    state.arenaWins++;
+    final won = <GearItem>[];
+    if (b.prize case final slot?) won.add(loot.setPiece(arenaSet, slot, k.heroClass, k.level));
+    if (arenaDone) won.add(loot.setPiece(arenaSet, GearSlot.armour, k.heroClass, k.level));
+    state.pendingLoot.addAll(won);
+    if (arenaDone) {
+      _note('${b.name} goes down on one knee in the ash and pulls off his helm. "Yours," he says. "You\'ve earned it." The games-master stands in his box. You are the Champion of the Ash.', EntryKind.gold);
+    } else {
+      _note('${b.name} yields. ${won.isEmpty ? '' : 'The games-master throws down your prize: ${won.map((g) => g.name).join(' and ')}. '}Next: ${arenaBouts[state.arenaWins].name}.', EntryKind.gold);
+    }
+  }
+
+  // ---------------- the Hall of the Slain ----------------
+
+  /// Every wave won (the Thane down, the spear yours).
+  bool get hallDone => state.hallWaves >= hallWaves.length;
+
+  /// The wave under way (the last one again once it's all won, for the glory), and who's next in it.
+  int get hallWave => math.min(state.hallWaves, hallWaves.length - 1);
+  Einherjar get hallNext => hallWaves[hallWave].warriors[state.hallStep];
+
+  String? whyNotHall() {
+    if (state.inBattle) return 'Not mid-fight';
+    return whyNotTravel(hallLand);
+  }
+
+  /// The next warrior of the wave steps up (your HP as the last fight left it: no rest between).
+  FoeType? startHallFight() {
+    if (whyNotHall() != null) return null;
+    final e = hallNext, at = hallBase(), i = state.hallStep;
+    state.continent = hallLand;
+    final rare = Rare(at, e.look == 'einherjarThane' ? Aura.ancient : (i.isEven ? Aura.frost : Aura.ancient), name: e.name, look: e.look);
+    _begin(at, rare, above: e.above);
+    state.hallFight = true;
+    _note('${hallWaves[hallWave].name}, ${i + 1} of ${hallWaves[hallWave].warriors.length}: ${e.name} rises from the benches and takes up arms.', EntryKind.gold);
+    return encounterType(at, rare);
+  }
+
+  /// Walks out of a wave half-fought: it starts over next time.
+  void abandonHallWave() {
+    if (state.hallStep == 0) return;
+    state.hallStep = 0;
+    _note('You walk out of the hall mid-wave. The warriors you beat get back up, laughing. The wave starts over.');
+  }
+
+  /// A warrior of the hall beaten: on to the next, or the wave won (its reward with it).
+  void _hallWin() {
+    final w = hallWaves[hallWave];
+    state.hallStep++;
+    if (state.hallStep < w.warriors.length) {
+      _note('${w.warriors[state.hallStep - 1].name} falls, and the hall bangs its cups. Next: ${w.warriors[state.hallStep].name}. No rest.', EntryKind.gold);
+      return;
+    }
+    state.hallStep = 0;
+    if (hallDone) {
+      _note('${w.warriors.last.name} falls again, laughing. The hall roars for you.', EntryKind.gold);
+      return;
+    }
+    state.hallWaves++;
+    final k = state.knight;
+    switch (state.hallWaves) {
+      case 2:
+        if (!k.earnedRites.contains('warcry')) k.earnedRites.add('warcry');
+        if (k.rites.length < riteSlots && !k.rites.contains('warcry')) k.rites.add('warcry');
+        _note('${w.name} is beaten. The berserkers pound the tables and teach you their War Cry: a roar that lifts your blows and drowns out theirs. (A new rite: War Cry.)', EntryKind.gold);
+      case 3:
+        state.pendingLoot.add(loot.gungnir(k.level, k.heroClass));
+        _note('Ragnvald, Thane of the Slain, goes down on one knee and lays his spear across your hands. "The Allfather lent it to me," he says. "I think he\'d want it back in a fight. Take it." Gungnir is yours.', EntryKind.gold);
+      default:
+        _note('${w.name} is beaten. The hall raises its cups to you. Next: ${hallWaves[state.hallWaves].name}.', EntryKind.gold);
+    }
+  }
+
   // ---------------- heroic trails and relics ----------------
 
   /// A land's Heroic trail opens once its boss is down.
@@ -787,9 +994,16 @@ class GameEngine {
     state.relicParts[r] = (state.relicParts[r] ?? 0) | (1 << i);
     final found = relicPartsFound(state.relicParts, r);
     _note('You have the ${part.name}! ($found of ${relic.parts.length} parts of ${relic.name})', EntryKind.gold);
-    if (found == relic.parts.length) _note('That\'s every part of ${relic.name}. Take them to Dunstan\'s forge.', EntryKind.gold);
+    if (found == relic.parts.length) {
+      _note('That\'s every part of ${relic.name}. Take them to Dunstan\'s forge.', EntryKind.gold);
+      relicReady = r;
+    }
     return true;
   }
+
+  /// A relic whose last part just turned up (its land), for the screen to offer the way to the
+  /// forge; cleared once offered.
+  int? relicReady;
 
   /// Why Dunstan can't forge land [c]'s relic yet (null if she can).
   String? whyNotForge(int c) {
@@ -1466,7 +1680,10 @@ class GameEngine {
     if (state.inBattle || !bossReady) return false;
     final c = state.continent;
     _begin(bossIndex(c), null);
-    _note('${foeAt(bossIndex(c)).name} rises to meet you!', EntryKind.gold);
+    final dogged = doggedFor(bossIndex(c));
+    final weak = (c == mainLands - 1 && kingStrength < 1 ? ' His generals are dead, and it shows: he is ${((1 - kingStrength) * 100).round()}% weaker.' : '') +
+        (dogged < 1 ? ' You know its ways by now (${((1 - dogged) * 100).round()}% weaker).' : '');
+    _note('${foeAt(bossIndex(c)).name} rises to meet you!$weak', EntryKind.gold);
     return true;
   }
 
@@ -1479,12 +1696,13 @@ class GameEngine {
     _fightRites = 0;
     _fightSlumbers = 0;
     _fightBolts = 0;
+    _primed = false;
     state
       ..inBattle = true
       ..foe = foe
       ..rare = rare
       ..foeLevel = level
-      ..foeMax = (spawnHp(foe, level, rare) * ngFoeHp(state.ng)).round()
+      ..foeMax = (spawnHp(foe, level, rare) * ngFoeHp(state.ng) * (rare == null && foe == bossIndex(mainLands - 1) ? kingStrength : 1) * (rare == null ? doggedFor(foe) : 1)).round()
       ..turn = 0
       ..fleeTries = 0
       ..skillWait = 0
@@ -1525,6 +1743,11 @@ class GameEngine {
   void _endBattle() {
     state
       ..heroicFight = false
+      ..arenaFight = false
+      ..hallFight = false
+      ..foeRoar = 0
+      ..heroCowed = 0
+      ..heroRoar = 0
       ..wildFight = false
       ..dungeonFight = false
       ..foeBurn = 0
@@ -1752,12 +1975,18 @@ class GameEngine {
     final wolf = state.wolfTurns > 0 ? wolfDamage : 1.0;
     final updraft = foe.aloft && activeSets(k.setGear).any((e) => e.$1.updraft && e.$2 >= e.$1.full) ? updraftBoost : 1.0;
     final bushido = activeSets(k.setGear).any((e) => e.$1.bushido && e.$2 >= e.$1.full) ? 1 + math.min(bushidoCap, (state.turn - 1) * bushidoStep) : 1.0;
+    // The Champion's set: the blow after a dodge, a parry or a block lands harder.
+    // War cries: yours lifts your blows; the foe's, while it lasts, cows them.
+    final roared = (state.heroRoar > 0 ? warcryBoost : 1.0) * (state.heroCowed > 0 ? cowedHit : 1.0);
+    final showman = _primed && striking && activeSets(k.setGear).any((e) => e.$1.showman && e.$2 >= e.$1.full) ? showmanBoost : 1.0;
+    if (striking) _primed = false;
+    if (showman > 1) _note('The crowd roars: you counter!', EntryKind.damage);
     // The Dragon Knight's Draconic Blood (rank 10): every third attack breathes fire. The Forge
     // Knight's iron bolts punch through.
     final draconic = action == BattleAction.attack && state.turn % 3 == 0 && classPassive(k, 'drakesworn');
     if (draconic) _note('Draconic blood: you breathe fire with the blow!', EntryKind.damage);
     final ironBolt = shooting && classOf(k)?.id == 'deepforge' ? 1.25 : 1.0;
-    final mult = (draconic ? 1.5 : 1.0) * ironBolt * reach * edge * train * song * wolf * updraft * bushido * (adapted ? adaptBoost : 1) * (bash ? bashMult : (shooting ? crossbowShare(k) * aim : (casting && cape == 'starweave' ? 1.3 : 1.0)));
+    final mult = (draconic ? 1.5 : 1.0) * ironBolt * reach * edge * train * song * wolf * updraft * bushido * showman * roared * (adapted ? adaptBoost : 1) * (bash ? bashMult : (shooting ? crossbowShare(k) * aim : (casting && cape == 'starweave' ? 1.3 : 1.0)));
     final d = striking
         ? swingDamage(state, _rng.nextDouble(), special: fire, ammo: shot, spell: cast, hitRoll: _rng.nextDouble(), mult: mult, sureCrit: (state.turn == 1 && activeSets(k.setGear).any((e) => e.$1.firstCrit && e.$2 >= e.$1.full)) || (bash && suitWorn(k) == 'bushido'))
         : const SwingDamage();
@@ -1788,6 +2017,8 @@ class GameEngine {
         if (_rng.nextDouble() < fleeChance(k, foe, state.fleeTries)) {
           r.fled = true;
           state.flees++;
+          _grudge(fled: true);
+          if (state.hallFight) state.hallStep = 0;
           if (state.wildFight) {
             // In the wilds you run from the fight, not from the wilds, and shed weight as you go.
             final lost = _dropFromPack(fightFleeLoss);
@@ -1923,6 +2154,9 @@ class GameEngine {
       ..foeSlowed = math.max(0, state.foeSlowed - 1)
       ..foeWeakened = math.max(0, state.foeWeakened - 1)
       ..foeExposed = math.max(0, state.foeExposed - 1)
+      ..foeRoar = math.max(0, state.foeRoar - 1)
+      ..heroCowed = math.max(0, state.heroCowed - 1)
+      ..heroRoar = math.max(0, state.heroRoar - 1)
       ..skillWait = math.max(0, state.skillWait - 1)
       ..petWait = math.max(0, state.petWait - 1);
     return r;
@@ -1950,7 +2184,7 @@ class GameEngine {
         }
       case 'nightblood':
         final before = k.hp;
-        k.hp = math.min(maxHp(k), k.hp + (r.dealt * .25).round());
+        k.hp = math.min(maxHp(k), k.hp + (r.dealt / 6).round());
         r.artHeal = k.hp - before;
         if (r.artHeal > 0) _note('You drink deep: +${r.artHeal} HP.', EntryKind.good);
       case 'moonfang':
@@ -2128,6 +2362,13 @@ class GameEngine {
           _fightSlumbers++;
           state.foeAsleep = light ? 1 : cast.hex;
           _note(big ? '$foeName nods off, but it won\'t sleep long.' : (light ? '$foeName nods off again, but lightly now.' : '$foeName falls into a deep sleep.'));
+        case SpellKind.warcry:
+          // Your own war cry: your blows land harder, and theirs is drowned out.
+          state
+            ..heroRoar = cast.hex + 1
+            ..foeRoar = 0
+            ..heroCowed = 0;
+          _note('You roar the hall\'s war cry. Whatever ${foeIn(state).name} was shouting, it can\'t hear itself now.', EntryKind.good);
         case SpellKind.reflect:
           state.mirror = cast.wards;
           _note('A shimmering mirror rises before you.');
@@ -2152,7 +2393,7 @@ class GameEngine {
           ..foeBurnTurns = burnTurns;
       } else if (cls == 'nightblood') {
         final before = k.hp;
-        k.hp = math.min(maxHp(k), k.hp + (hit / 5).round());
+        k.hp = math.min(maxHp(k), k.hp + (hit / 8).round());
         r.mended += k.hp - before;
         r.mendedFrom = 'Blood bolt';
       }
@@ -2202,9 +2443,9 @@ class GameEngine {
       state.foeSlowed = 2;
       _note('The undertow drags at $foeName: half its blows will miss for two turns.', EntryKind.good);
     }
-    // The wolf heals as it tears; Bloodthirst (the full Nightblood set) doubles it all when you're low.
+    // The wolf heals as it tears; Bloodthirst (the full Nightblood set) adds half again when you're low.
     var heal = d.heal + (state.wolfTurns > 0 ? (hit * wolfHeal).round() : 0);
-    if (heal > 0 && bloodthirsty(k)) heal *= 2;
+    if (heal > 0 && bloodthirsty(k)) heal = (heal * 1.5).round();
     if (heal > 0) {
       final before = k.hp;
       k.hp = math.min(maxHp(k), k.hp + heal);
@@ -2295,6 +2536,10 @@ class GameEngine {
     }
   }
 
+  /// How well you braced for a heavy blow this turn (the timing ring on the fight screen): 0 not
+  /// at all, [braceGood] in time, [bracePerfect] right on the beat. Spent on the foe's turn.
+  double braceNext = 0;
+
   /// The foe's turn: if it's still standing, it hits back.
   void _foeTurn(SwingResult r, bool bashed) {
     final k = state.knight, foe = foeIn(state), foeName = foe.name;
@@ -2302,6 +2547,8 @@ class GameEngine {
     // A heavy blow it wound up last turn: spent now, landed or not.
     final heavy = state.foeWindup;
     state.foeWindup = false;
+    final brace = heavy ? braceNext : 0.0;
+    braceNext = 0;
     void spared(Guard g, String text) {
       r
         ..counter = 0
@@ -2315,6 +2562,15 @@ class GameEngine {
       return;
     }
     if (bashed) _note('$foeName shakes off your ${skillName(k)}!');
+    // A warrior of the hall: now and then a war cry instead of a blow (not while asleep or frozen).
+    if (foe.warcry && roarsOn(state.turn) && state.foeAsleep == 0 && !state.foeFrozen) {
+      state
+        ..foeRoar = roarTurns + 1
+        ..heroCowed = roarTurns + 1;
+      r.roared = true;
+      spared(Guard.roared, '$foeName throws back its head and roars a war cry! Its blows will land harder, and yours softer, for $roarTurns turns.');
+      return;
+    }
     final roll = _rng.nextDouble(), dodge = dodgeChance(k, foe), parry = parryChance(k), block = blockChance(k);
     if (pet != null && pet.$2.guard && _rng.nextDouble() < .12) {
       spared(Guard.guarded, '$foeName swings, but your ${pet.$2.name.toLowerCase()} leaps in the way.');
@@ -2330,6 +2586,7 @@ class GameEngine {
       state.wards--;
       spared(Guard.warded, '$foeName strikes. Your arcane ward absorbs it.');
     } else if (roll < dodge) {
+      _primed = true;
       r
         ..counter = 0
         ..guard = Guard.dodge;
@@ -2356,6 +2613,7 @@ class GameEngine {
       _note('$foeName strikes, and finds only a drift of silver leaves where you were.');
     } else if (roll < dodge + (1 - dodge) * parry) {
       // Parry: deflect the blow and strike back.
+      _primed = true;
       final hit = riposte(k);
       state.foeHp -= hit;
       r
@@ -2365,7 +2623,9 @@ class GameEngine {
       _note('$foeName strikes. You parry and riposte for $hit!', EntryKind.damage);
       r.kill = _checkKill();
     } else {
-      final blocked = _rng.nextDouble() < block;
+      // Braced right on the beat: the heavy blow meets your shield.
+      final blocked = brace >= bracePerfect || _rng.nextDouble() < block;
+      if (blocked) _primed = true;
       // The Guardian's Oath: the first heavy blow each fight that gets through to you meets the
       // vault-keeper's shield, and lands no harder than an ordinary one.
       final oath = heavy && !state.oathUsed && guardianSworn(state.vaultFound);
@@ -2374,8 +2634,14 @@ class GameEngine {
         r.oath = true;
         _note('$foeName brings its heavy blow down. Your Guardian\'s Oath holds: the shield takes the worst of it.');
       }
-      final full = (counterDamage(state) * (heavy && !oath ? heavyBlow : 1)).round();
-      r.heavy = heavy && !oath;
+      // Braced in time: it lands no harder than an ordinary blow.
+      final braced = brace >= braceGood && !oath;
+      if (braced) {
+        r.braced = brace >= bracePerfect ? 2 : 1;
+        _note(brace >= bracePerfect ? 'Perfect brace! You catch $foeName\'s heavy blow square on your shield.' : 'You brace in time: $foeName\'s heavy blow lands no harder than any other.', EntryKind.good);
+      }
+      final full = (counterDamage(state) * (heavy && !oath && !braced ? heavyBlow : 1)).round();
+      r.heavy = heavy && !oath && !braced;
       var hurt = blocked ? (full * blockLeak(k)).round() : full;
       if (state.mirror > 0) {
         // Mirror Ward: you take half; the foe takes the whole blow back.
@@ -2403,7 +2669,7 @@ class GameEngine {
         // Rally: the Bannerlord's cloak won't let you fall back.
         state.rallied = true;
         final before = k.hp;
-        k.hp = math.min(maxHp(k), k.hp + (maxHp(k) * .25).round());
+        k.hp = math.min(maxHp(k), k.hp + (maxHp(k) * .15).round());
         r.mended += k.hp - before;
         r.mendedFrom = 'Rally';
         _note('You rally beneath your banner and recover ${k.hp - before} HP!', EntryKind.good);
@@ -2472,7 +2738,13 @@ class GameEngine {
     final wild = state.wildFight;
     // Struggling on a land's trail: the town starts suggesting the wilds for better gear.
     final dungeon = state.dungeonFight;
-    if (!wild && !dungeon && !state.raidFight && !state.heroicFight) {
+    if (state.hallFight) state.hallStep = 0;
+    _grudge(fled: false);
+    if (state.rare == null && foeIn(state).boss && !state.heroicFight && !state.wildFight && !state.dungeonFight) {
+      final c = realmAt(state.foe);
+      state.bossLosses[c] = (state.bossLosses[c] ?? 0) + 1;
+    }
+    if (!wild && !dungeon && !state.raidFight && !state.heroicFight && !state.arenaFight && !state.hallFight) {
       final c = realmAt(state.rare?.base ?? state.foe);
       state.struggle[c] = (state.struggle[c] ?? 0) + 1;
     }
@@ -2638,6 +2910,7 @@ class GameEngine {
     final land = continents[c];
     String? companion;
     final opened = <int>[];
+    var wasUnlocked = state.unlocked;
     final placeWon = placeById(state.place);
     var egg = false;
     if (f.boss && rare == null) {
@@ -2646,6 +2919,7 @@ class GameEngine {
         state.pendingLoot.add(prize);
       }
       state.struggle.remove(c);
+      state.bossLosses.remove(c);
       if (firstBoss) {
         state.bossesDown.add(c);
         if (c == 0) _note('Up the lane, Old Wick\'s tower door creaks open at last. "Is that one-eyed brute gone? Good. Come in, come in."', EntryKind.good);
@@ -2669,6 +2943,7 @@ class GameEngine {
             break;
         }
         // Every land this boss opens a road to (that no other beaten boss had opened already).
+        wasUnlocked = state.unlocked;
         for (var l = 0; l < continents.length; l++) {
           final from = openers(l);
           if (from.contains(c) && !from.any((f) => f != c && state.bossesDown.contains(f))) {
@@ -2678,6 +2953,12 @@ class GameEngine {
         }
       }
     } else if (wild) {
+      _passTime();
+    } else if (state.arenaFight) {
+      _arenaWin();
+      _passTime();
+    } else if (state.hallFight) {
+      _hallWin();
       _passTime();
     } else if (state.heroicFight) {
       relicPart = _heroicWin(c, f.boss);
@@ -2819,6 +3100,26 @@ class GameEngine {
       formTrophy = worn;
       state.addMat(trophyKey(worn), 1);
     }
+    // One of the Ember King's generals.
+    if (rare?.name != null && c == mainLands - 1 && emberGenerals.contains(rare!.name) && state.generalsDown.add(rare.name!)) {
+      final down = state.generalsDown.length, all = emberGenerals.length;
+      _note(
+        down >= all
+            ? 'The last of the Ember King\'s generals falls. Up on the Throne, something roars, and it sounds afraid. (Vharrax is ${(generalCut * all * 100).round()}% weaker.)'
+            : 'One of the Ember King\'s generals is down ($down of $all). Vharrax will be ${(generalCut * down * 100).round()}% weaker when you face him.',
+        EntryKind.gold,
+      );
+    }
+    // Your nemesis, put down for good: everything it took from fallen knights.
+    final nemesis = state.nemesis != null && rare != null && rare.name == state.nemesis!.name && rare.look == state.nemesis!.look ? state.nemesis : null;
+    if (nemesis != null) {
+      state.nemesis = null;
+      state.nemesesSlain++;
+      final bonus = (r.coins * nemesisGoldPerRank * nemesis.rank).round();
+      k.coins += bonus;
+      state.pendingLoot.add(loot.roll(k.heroClass, k.level, odds: nemesis.rank >= nemesisLegendFrom ? const [0, 0, 0, 0, 1] : const [0, 0, 0, 1, 0]));
+      _note('${nemesis.name} falls, and doesn\'t get up. It had been busy: $bonus gold, and gear off a knight who wasn\'t as lucky as you.', EntryKind.gold);
+    }
     // Sir Malric yields and rides off (until the last time).
     var malricGone = false;
     if (rare?.look == malricLook) {
@@ -2849,6 +3150,10 @@ class GameEngine {
     if (prize != null) _note('${f.name} leaves its treasure behind: ${prize.name}!', EntryKind.gold);
     for (final l in opened) {
       _note(isSideLand(l) ? 'Off the road, a new land: ${continents[l].name}. ${continents[l].blurb}' : 'The way to ${continents[l].name} is open.', EntryKind.gold);
+    }
+    if (state.unlocked > wasUnlocked) {
+      final news = newInTown(wasUnlocked, state.unlocked);
+      if (news != null) _note(news, EntryKind.gold);
     }
     if (rare?.look == malricLook) {
       _note(
@@ -2915,6 +3220,11 @@ class GameEngine {
     if (placeWon != null) {
       _note(placeWon.after, EntryKind.gold);
       _placeReward(placeWon);
+      if (contractFor(placeWon.id) case final job?) {
+        final bounty = contractBounty(k.level);
+        k.coins += bounty;
+        _note('Contract done. Back in Cindervale, ${job.client} pays the bounty: $bounty gold.', EntryKind.gold);
+      }
     }
     if (raidWon == 'stall') {
       _givePotions();
@@ -3162,6 +3472,8 @@ class GameEngine {
   /// A night at the inn: full health, and you wake to the morning.
   int rest() {
     if (!state.innRepaired) return 0;
+    // (A night's sleep ends any wave of the Hall of the Slain you walked out of.)
+    state.hallStep = 0;
     final k = state.knight, before = k.hp;
     k.hp = maxHp(k);
     final healed = k.hp - before;
@@ -3866,6 +4178,52 @@ class GameEngine {
     ];
   }
 
+  /// Worn pieces Dunstan can hone: rare or finer, not yet at [honeMax] (the vault's pieces are
+  /// beyond his hammer).
+  List<GearItem> get honeables {
+    final k = state.knight;
+    return [
+      for (final g in k.gear)
+        if (g.rarity.index >= Rarity.rare.index && g.gearSet != 'vault' && g.slot != GearSlot.armour && g.stats.isNotEmpty && g.hone < honeMax) g,
+    ];
+  }
+
+  String? whyNotHone(GearItem g) {
+    if (state.inBattle) return 'Not mid-fight';
+    if (g.hone >= honeMax) return 'Honed as far as it goes';
+    final cost = honeCost(g, state.knight.level);
+    if (state.knight.coins < cost) return 'Needs $cost gold';
+    return null;
+  }
+
+  /// Dunstan hones [g]: +5% to every stat, for gold (more each time).
+  bool hone(GearItem g) {
+    if (whyNotHone(g) != null) return false;
+    final cost = honeCost(g, state.knight.level);
+    state.knight.coins -= cost;
+    honeOnce(g);
+    _note('$smithName works ${g.name} on the whetstone and the anvil. Honed +${g.hone}: every stat a little keener. (−$cost gold)', EntryKind.gold);
+    return true;
+  }
+
+  String? whyNotCrate() {
+    if (state.inBattle) return 'Not mid-fight';
+    final cost = crateCost(state.knight.level);
+    if (state.knight.coins < cost) return 'Needs $cost gold';
+    return null;
+  }
+
+  /// One of Mags' sealed crates, for [slot]: gear unseen until it's paid for (into your spoils).
+  GearItem? buyCrate(GearSlot slot) {
+    if (whyNotCrate() != null) return null;
+    final k = state.knight, cost = crateCost(k.level);
+    k.coins -= cost;
+    final g = loot.roll(k.heroClass, k.level, odds: crateOdds, only: slot, wielding: k.loadout.weapon);
+    state.pendingLoot.add(g);
+    _note('Mags pries open a sealed crate: ${g.name} (${g.rarity.label}). (−$cost gold)', EntryKind.gold);
+    return g;
+  }
+
   /// What tempering [g] costs, in gold.
   int temperCost(GearItem g) => temperFee(state.knight.level, state.knight.level - g.level, legendary: g.rarity == Rarity.legendary);
 
@@ -4284,3 +4642,17 @@ class RoadStep {
 
   RoadStep blocked(String why) => RoadStep(kind, title, sub, land, id: id, why: why);
 }
+
+/// What a newly opened road puts on the town's shelves: Mags' brews from the new land's herbs and
+/// Old Wick's ward for the land past it. Null when nothing new.
+String? newInTown(int was, int now) {
+  final brews = [for (final b in Brew.values) if (b.land > was && b.land <= now) b.label];
+  final wards = [for (var i = was + 2; i <= now + 1 && i < continents.length; i++) if (continents[i].ward != null) continents[i].ward!];
+  final bits = [
+    if (brews.isNotEmpty) 'Mags can brew ${_andList(brews)}',
+    if (wards.isNotEmpty) '$mageName can craft the ${_andList(wards)}',
+  ];
+  return bits.isEmpty ? null : 'New in town: ${bits.join('; ')}. Bring them the reagents.';
+}
+
+String _andList(List<String> xs) => xs.length == 1 ? xs.first : '${xs.sublist(0, xs.length - 1).join(', ')} and ${xs.last}';

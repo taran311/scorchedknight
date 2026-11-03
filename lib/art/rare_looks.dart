@@ -37,6 +37,9 @@ final Map<String, Look> _lookCache = {};
 /// [base] dressed in [aura]'s colours (a bit bigger, glowing eyes and weapons).
 Look auraLook(Look base, Aura aura, {bool named = false}) => _lookCache.putIfAbsent('${base.hashCode}:${aura.name}:$named', () {
   final glow = auraColour(aura), metal = _metal(aura), wash = _wash(aura);
+  // A gladiator, a warrior of the hall: they keep their own kit, and the aura only lights their eyes
+  // and blade.
+  if (base.ownKit) return base.withGlow(glow, named ? 1.06 : 1.03);
   final armoured = base.helm != null || base.pauldron != null;
   final ent = base.torsoKind == TorsoKind.bark || base.build == 'giant' || base.scale > 1.5 || base.ghostly || base.head == HeadKind.bull; // ents, giants, spirits and beasts get no armour, capes or crowns
   return Look(

@@ -3,6 +3,8 @@
 // Open http://localhost:5070/?bestiary (&from=N to skip ahead, &cols=N for a denser grid, &foes to
 // skip the knights).
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../art/beast_foes.dart';
@@ -14,9 +16,12 @@ import '../art/looks.dart';
 import '../art/poses.dart';
 import '../art/rare_looks.dart';
 import '../art/rig.dart';
+import '../game/arena.dart';
 import '../game/catalog.dart';
 import '../game/classes.dart';
 import '../game/crafting.dart';
+import '../game/hall.dart';
+import '../game/loot.dart';
 import '../game/models.dart';
 import 'theme.dart';
 
@@ -100,6 +105,47 @@ class BestiaryPreview extends StatelessWidget {
     ];
     fresh.addAll([for (final look in const ['seaSerpent', 'leviathan', 'kraken', 'griffin', 'stormRoc', 'cavebat', 'roostMother', 'snowwolf']) (look, (Canvas c, Size s) => _foe(c, s, FoeType(look, look)))]);
     if (Uri.base.queryParameters.containsKey('new')) return _grid(fresh);
+    // ?bestiary&hall: the Hall of the Slain's warriors, as you meet them and plain.
+    if (Uri.base.queryParameters.containsKey('hall')) {
+      final seen = <String>{};
+      return _grid([
+        for (final w in hallWaves)
+          for (final e in w.warriors)
+            if (seen.add(e.look)) (e.name, (Canvas c, Size s) => _humanoid(c, s, auraLook(foeLooks[e.look]!, Aura.ancient, named: true))),
+        for (final look in seen) ('$look (plain)', (Canvas c, Size s) => _humanoid(c, s, foeLooks[look]!)),
+      ]);
+    }
+    // ?bestiary&arena: the Ash Colosseum's gladiators, and a knight in the Champion's set.
+    if (Uri.base.queryParameters.containsKey('arena')) {
+      final loot = LootTable(math.Random(1));
+      Loadout kit({bool full = true}) {
+        final l = Loadout.starter(HeroClass.knight)..armour = full ? setArmourId('arena') : 'plate';
+        l.helm = loot.setPiece('arena', GearSlot.helm, HeroClass.knight, 30);
+        if (full) {
+          l
+            ..gloves = loot.setPiece('arena', GearSlot.gloves, HeroClass.knight, 30)
+            ..boots = loot.setPiece('arena', GearSlot.boots, HeroClass.knight, 30);
+        }
+        return l;
+      }
+      final ring = loot.setPiece('arena', GearSlot.ring, HeroClass.knight, 30);
+      final arena = <(String, void Function(Canvas, Size))>[
+        for (final b in arenaBouts) (b.name, (Canvas c, Size s) => _humanoid(c, s, auraLook(foeLooks[b.look]!, arenaAura(arenaBouts.indexOf(b)), named: true))),
+        for (final b in arenaBouts) ('${b.school} (plain)', (Canvas c, Size s) => _humanoid(c, s, foeLooks[b.look]!)),
+        ('Hero: Champion\'s set', (Canvas c, Size s) => _humanoid(c, s, lookFor(HeroClass.knight, kit(), ring: ring), flip: false)),
+        ('Heroine: Champion\'s set', (Canvas c, Size s) => _humanoid(c, s, lookFor(HeroClass.knight, kit(), ring: ring, female: true), flip: false)),
+        ('Hero: just the galea', (Canvas c, Size s) => _humanoid(c, s, lookFor(HeroClass.knight, kit(full: false)), flip: false)),
+      ];
+      // (&pick=N: one of them, full screen.)
+      final one = int.tryParse(Uri.base.queryParameters['pick'] ?? '');
+      if (one != null && one >= 0 && one < arena.length) {
+        return Scaffold(
+          backgroundColor: const Color(0xFF6E737A),
+          body: Column(children: [Expanded(child: CustomPaint(painter: _Tile(arena[one].$2), size: Size.infinite)), Text(arena[one].$1, style: Txt.label(size: 16, color: Palette.cream))]),
+        );
+      }
+      return _grid(arena);
+    }
     entries.addAll(fresh.take(2));
     // Companions.
     entries.add(('Wolf companion', (c, s) => _hound(c, s, wolfLook, 1.2)));

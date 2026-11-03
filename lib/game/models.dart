@@ -5,6 +5,7 @@ import 'catalog.dart';
 import 'encounters.dart' show chestEvery;
 import 'classes.dart';
 import 'loot.dart';
+import 'nemesis.dart';
 
 class Settings {
   Settings({this.name = 'Sir Smudge', this.guest = false, this.tourSeen = false, this.fastFights = false, this.gore = true, this.music = .5, this.sound = .8, this.muted = false, this.autoSellJunk = true, this.vibrate = true});
@@ -163,6 +164,7 @@ class Knight {
     Map<String, int>? classWins,
     this.activePet,
     List<String>? mounts,
+    List<String>? earnedRites,
     this.mount,
     this.scrolls = 0,
     this.female = false,
@@ -175,6 +177,7 @@ class Knight {
        ammo = ammo ?? {},
        brews = brews ?? {},
        mounts = mounts ?? [],
+       earnedRites = earnedRites ?? [],
        pets = pets ?? {},
        loadouts = loadouts ?? {for (final c in HeroClass.values) c: Loadout.starter(c)},
        ownedDyes = ownedDyes ?? ['crimson'];
@@ -231,6 +234,9 @@ class Knight {
 
   /// Mounts owned (ids in mounts.dart) and the one you ride (null: on foot).
   final List<String> mounts;
+
+  /// Rites won rather than learned (the Hall of the Slain's War Cry), by id.
+  final List<String> earnedRites;
   String? mount;
 
   /// Scrolls of enchanting: each pays for one rune at the enchanter instead of gold.
@@ -288,6 +294,7 @@ class Knight {
     if (classWins.isNotEmpty) 'cw': classWins,
     'activePet': activePet,
     if (mounts.isNotEmpty) 'mounts': mounts,
+    if (earnedRites.isNotEmpty) 'earned': earnedRites,
     if (mount != null) 'mount': mount,
     if (scrolls > 0) 'scrolls': scrolls,
     if (female) 'female': true,
@@ -331,6 +338,7 @@ class Knight {
       classWins: {for (final e in ((j['cw'] as Map?) ?? {}).entries) e.key as String: (e.value as num).toInt()},
       activePet: j['activePet'] as String?,
       mounts: (j['mounts'] as List?)?.cast<String>().toList(),
+      earnedRites: (j['earned'] as List?)?.cast<String>().toList(),
       mount: j['mount'] as String?,
       scrolls: (j['scrolls'] as num?)?.toInt() ?? 0,
       female: j['female'] == true,
@@ -374,6 +382,15 @@ class GameState {
     Map<int, int>? relicParts,
     Set<int>? forged,
     this.heroicFight = false,
+    this.arenaWins = 0,
+    this.arenaFight = false,
+    this.hallWaves = 0,
+    this.hallStep = 0,
+    this.hallFight = false,
+    this.nemesis,
+    this.nemesesSlain = 0,
+    Set<String>? generalsDown,
+    Map<int, int>? bossLosses,
     this.seasonSeen = '',
     this.encounter,
     this.encounterCalm = 0,
@@ -436,6 +453,9 @@ class GameState {
     this.foeSlowed = 0,
     this.foeWeakened = 0,
     this.foeExposed = 0,
+    this.foeRoar = 0,
+    this.heroCowed = 0,
+    this.heroRoar = 0,
     this.foeBurn = 0,
     this.foeBurnTurns = 0,
     this.foeVenom = 0,
@@ -482,6 +502,8 @@ class GameState {
        heroicWins = heroicWins ?? {},
        relicParts = relicParts ?? {},
        forged = forged ?? {},
+       generalsDown = generalsDown ?? {},
+       bossLosses = bossLosses ?? {},
        knight = knight ?? Knight(),
        wins = wins ?? List.filled(continents.length, 0),
        bossesDown = bossesDown ?? {},
@@ -540,6 +562,28 @@ class GameState {
   Map<int, int> heroicWins, relicParts;
   Set<int> forged;
   bool heroicFight;
+
+  /// Bouts won in the Ash Colosseum (all of them once the Champion is down), and whether the fight
+  /// under way is one.
+  int arenaWins;
+  bool arenaFight;
+
+  /// The Hall of the Slain: waves won, warriors beaten in the wave under way (back to 0 if you
+  /// fall or walk out), and whether the fight under way is one of them.
+  int hallWaves, hallStep;
+  bool hallFight;
+
+  /// The foe that beat you and won't let you forget it (see nemesis.dart), and how many you've put
+  /// down for good.
+  Nemesis? nemesis;
+  int nemesesSlain;
+
+  /// The Ember King's generals you've felled (by name): each one leaves him weaker.
+  final Set<String> generalsDown;
+
+  /// Times each land's boss has knocked you out (until you beat it): it gets no easier to look at,
+  /// but you learn its ways.
+  final Map<int, int> bossLosses;
 
   /// The last seasonal event you were welcomed to ('hallowash-2026'), so it's announced once.
   String seasonSeen;
@@ -661,6 +705,10 @@ class GameState {
   /// miss), weakened (hits 40% softer) and exposed (your hits deal 25% more).
   int foeAsleep, foeSlowed, foeWeakened, foeExposed;
 
+  /// War cries: turns the foe's roar still lifts its blows, turns you're cowed by it, and turns
+  /// your own War Cry still lifts yours.
+  int foeRoar, heroCowed, heroRoar;
+
   /// Burning bolts: fire the foe takes each turn, and turns of it left. Venom bolts: stacks of
   /// venom in it (each does its share every turn, for the rest of the fight).
   int foeBurn, foeBurnTurns, foeVenom;
@@ -739,6 +787,15 @@ class GameState {
     'partMask': {for (final e in relicParts.entries) '${e.key}': e.value},
     'forged': forged.toList(),
     'heroicFight': heroicFight,
+    if (arenaWins > 0) 'arena': arenaWins,
+    if (arenaFight) 'arenaFight': true,
+    if (hallWaves > 0) 'hallWaves': hallWaves,
+    if (hallStep > 0) 'hallStep': hallStep,
+    if (hallFight) 'hallFight': true,
+    if (nemesis != null) 'nemesis': nemesis!.toJson(),
+    if (nemesesSlain > 0) 'nemesesSlain': nemesesSlain,
+    if (generalsDown.isNotEmpty) 'generals': generalsDown.toList(),
+    if (bossLosses.isNotEmpty) 'bossLosses': {for (final e in bossLosses.entries) '${e.key}': e.value},
     'seasonSeen': seasonSeen,
     if (encounter != null) 'encounter': encounter,
     'encounterCalm': encounterCalm,
@@ -804,6 +861,9 @@ class GameState {
       'asleep': foeAsleep,
       'slowed': foeSlowed,
       'weakened': foeWeakened,
+      if (foeRoar > 0) 'foeRoar': foeRoar,
+      if (heroCowed > 0) 'cowed': heroCowed,
+      if (heroRoar > 0) 'heroRoar': heroRoar,
       'exposed': foeExposed,
       if (foeBurnTurns > 0) 'burn': [foeBurn, foeBurnTurns],
       if (foeVenom > 0) 'venom': foeVenom,
@@ -872,6 +932,15 @@ class GameState {
           : {for (final e in ((j['parts'] as Map?) ?? const {}).entries) int.parse(e.key as String): (1 << (e.value as num).toInt()) - 1},
       forged: {for (final x in (j['forged'] as List? ?? const [])) (x as num).toInt()},
       heroicFight: j['heroicFight'] as bool? ?? false,
+      arenaWins: n('arena'),
+      arenaFight: j['arenaFight'] as bool? ?? false,
+      hallWaves: n('hallWaves'),
+      hallStep: n('hallStep'),
+      hallFight: j['hallFight'] as bool? ?? false,
+      nemesis: Nemesis.fromJson(j['nemesis']),
+      nemesesSlain: n('nemesesSlain'),
+      generalsDown: {...((j['generals'] as List?) ?? const []).whereType<String>()},
+      bossLosses: {for (final e in ((j['bossLosses'] as Map?) ?? const {}).entries) int.parse(e.key as String): (e.value as num).toInt()},
       seasonSeen: j['seasonSeen'] as String? ?? '',
       encounter: j['encounter'] as String?,
       encounterCalm: n('encounterCalm'),
@@ -938,6 +1007,9 @@ class GameState {
       foeAsleep: n('asleep'),
       foeSlowed: n('slowed'),
       foeWeakened: n('weakened'),
+      foeRoar: n('foeRoar'),
+      heroCowed: n('cowed'),
+      heroRoar: n('heroRoar'),
       foeExposed: n('exposed'),
       foeBurn: (j['burn'] is List && (j['burn'] as List).length == 2) ? ((j['burn'] as List)[0] as num).toInt() : 0,
       foeBurnTurns: (j['burn'] is List && (j['burn'] as List).length == 2) ? ((j['burn'] as List)[1] as num).toInt() : 0,

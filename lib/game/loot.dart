@@ -40,7 +40,7 @@ class Cape {
 }
 
 const capes = <Cape>[
-  Cape('rally', 'Bannerlord\'s cloak', HeroClass.knight, 0xFF8A1E22, Stat.vigour, 'Rally: once a fight, when a blow leaves you under 30% health, you rally and recover 25% of it', 'A torn banner, stitched into a cloak after the battle it won.'),
+  Cape('rally', 'Bannerlord\'s cloak', HeroClass.knight, 0xFF8A1E22, Stat.vigour, 'Rally: once a fight, when a blow leaves you under 30% health, you rally and recover 15% of your health', 'A torn banner, stitched into a cloak after the battle it won.'),
   Cape('vanguard', 'Crusader\'s mantle', HeroClass.knight, 0xFFE8E4DA, Stat.guard, 'Vanguard: the first blow struck at you each fight glances off completely', 'White as the first light. It has never been touched by a first strike.'),
   Cape('manawell', 'Cloak of the Wellspring', HeroClass.mage, 0xFF2F6AA8, Stat.wisdom, 'Wellspring: every fight starts with 1 extra mana', 'The hem is always damp, as if it has just come out of a holy pool.'),
   Cape('starweave', 'Starweave cloak', HeroClass.mage, 0xFF2A1A4A, Stat.crit, 'Starweave: every spell you cast hits 30% harder', 'Look closely and the stars on it move.'),
@@ -58,7 +58,7 @@ const capeChance = .06;
 /// A set of gloves, boots and a ring that steers a build. Wear two pieces for the first bonus,
 /// all three for the second as well (a forged suit's second bonus wants four of its five).
 class GearSet {
-  const GearSet(this.id, this.name, this.two, this.three, this.twoText, this.threeText, {this.heroClass, this.cheaperSpells = false, this.forged = false, this.bloodthirst = false, this.longWolf = false, this.firstMiss = false, this.forgeheart = false, this.firstCrit = false, this.regrowth = false, this.undertow = false, this.adapt = false, this.updraft = false, this.bushido = false, this.dragonhide = false, this.perk});
+  const GearSet(this.id, this.name, this.two, this.three, this.twoText, this.threeText, {this.heroClass, this.cheaperSpells = false, this.forged = false, this.bloodthirst = false, this.longWolf = false, this.firstMiss = false, this.forgeheart = false, this.firstCrit = false, this.regrowth = false, this.undertow = false, this.adapt = false, this.updraft = false, this.bushido = false, this.dragonhide = false, this.showman = false, this.perk});
   final String id, name, twoText, threeText;
 
   /// The full set's special power in a few words, for its chip (null: stats only).
@@ -72,7 +72,7 @@ class GearSet {
   /// Only forged at Dunstan's, from blueprints (never a random drop).
   final bool forged;
 
-  /// The full Nightblood set: under half health, every heal from your blows is doubled.
+  /// The full Nightblood set: under half health, every heal from your blows is half as much again.
   final bool bloodthirst;
 
   /// The full Moonfang set: the Bloodmoon Pelt's wolf stays [longWolfTurns] turns longer.
@@ -111,6 +111,10 @@ class GearSet {
   /// himself) hits you [dragonhideFire] as hard.
   final bool dragonhide;
 
+  /// The Champion's set (from the Ash Colosseum): after you dodge, parry or block a blow, your next
+  /// blow lands [showmanBoost] times as hard. The crowd loves a counter.
+  final bool showman;
+
   /// Pieces it takes to wear the whole bonus (and its perk), and pieces there are. A questline set
   /// is a full suit of five (helm, armour, gauntlets, sabatons, signet): four for the bonus, all
   /// five to wear its colours head to foot. The vault's six count from three, like the rest.
@@ -121,34 +125,38 @@ class GearSet {
 /// How hard each forged set's pieces roll, so every set's pieces come out about as strong as one
 /// another (and a little stronger than a random epic piece): their stats are worth different amounts.
 const _setPower = <String, double>{
-  'ashen': 1.26,
-  'nightblood': 1.4,
-  'moonfang': 1.16,
-  'silverleaf': 1.4,
-  'deepforge': 1.75,
-  'faceless': 1.32,
-  'sunscale': 1.2,
+  'ashen': 1.3,
+  'nightblood': 1.0,
+  'moonfang': 1.25,
+  'silverleaf': 1.6,
+  'deepforge': 1.0,
+  'faceless': 1.22,
+  'sunscale': 1.4,
   'tidecaller': 1.03,
-  'changeling': 1.1,
-  'skyborn': 1.6,
-  'bushido': 1.0,
-  'drakesworn': 1.045,
+  'changeling': 0.97,
+  'skyborn': 1.5,
+  'bushido': 0.9,
+  'drakesworn': 1.0,
+  'arena': 1.15,
 };
 
 /// Turns the full Moonfang set adds to the wolf; what the full Deepforge set mends on a block.
-const dragonhideFire = .7;
+const dragonhideFire = .8;
+
+/// The Champion's set: how much harder the blow after a dodge, parry or block lands.
+const showmanBoost = 1.3;
 
 const longWolfTurns = 2, forgeheartHeal = .06, regrowthHeal = .04, undertowChance = .25, adaptBoost = 1.2, updraftBoost = 1.25, bushidoStep = .05, bushidoCap = .25;
 
 const gearSets = <GearSet>[
   GearSet('embersworn', 'Embersworn', {Stat.burn: 6}, {Stat.burn: 10, Stat.crit: 5}, '+6 fire on every full swing', '+10 more fire and +5% crit: a fire build'),
-  GearSet('bloodbound', 'Bloodbound', {Stat.leech: 4}, {Stat.leech: 6, Stat.lifesteal: 6}, 'Heal 4% of your damage', 'Heal 6% more, plus 6 per swing: a lifesteal build'),
+  GearSet('bloodbound', 'Bloodbound', {Stat.leech: 1, Stat.lifesteal: 3}, {Stat.leech: 2, Stat.lifesteal: 5}, 'Heal 1% of your damage, plus 3 a swing', 'Heal 2% more, plus 5 more a swing: a lifesteal build'),
   GearSet('windrunner', 'Windrunner', {Stat.dodge: 5}, {Stat.dodge: 5, Stat.crit: 8}, '+5% dodge', '+5% more dodge and +8% crit: a quick, deadly build'),
   GearSet('bulwark', 'Bulwark', {Stat.block: 5}, {Stat.block: 5, Stat.thorns: 25, Stat.guard: 5}, '+5% block', '+5% more block, +5% guard and thorns: a wall'),
   GearSet('arcanist', 'Arcanist', {Stat.wisdom: 20, Stat.crit: 3}, {}, '+20% XP and +3% crit', 'Every spell costs 1 less mana', heroClass: HeroClass.mage, cheaperSpells: true, perk: 'Spells cost 1 less mana'),
   // Forged from blueprints: the Ashen Order's, Ravenmoor's vampires' and the Weald's werewolves'.
   GearSet('ashen', 'Ashen', {Stat.guard: 4, Stat.burn: 3}, {Stat.thorns: 20, Stat.burn: 4}, '+4% guard and +3 fire', '+20 thorns and +4 more fire: whoever strikes you burns', forged: true),
-  GearSet('nightblood', 'Nightblood', {Stat.leech: 4, Stat.lifesteal: 4}, {Stat.leech: 3}, 'Heal 4% of your damage, plus 4 a swing', 'Bloodthirst: under half health, everything your blows heal you is doubled', forged: true, bloodthirst: true, perk: 'Under half HP: heals doubled'),
+  GearSet('nightblood', 'Nightblood', {Stat.lifesteal: 2, Stat.crit: 3}, {Stat.leech: 1}, 'Heal 2 a swing, and +3% crit', 'Bloodthirst: under half health, everything your blows heal you is half as much again', forged: true, bloodthirst: true, perk: 'Under half HP: heals +50%'),
   GearSet('moonfang', 'Moonfang', {Stat.crit: 5, Stat.dodge: 3}, {Stat.crit: 4, Stat.dodge: 3, Stat.damage: 3}, '+5% crit and +3% dodge', '+4% crit, +3% dodge, +3 damage, and the Bloodmoon Pelt\'s wolf stays $longWolfTurns turns longer', forged: true, longWolf: true, perk: 'Wolf form lasts 2 turns longer'),
   GearSet('silverleaf', 'Silverleaf', {Stat.dodge: 4, Stat.crit: 4}, {Stat.dodge: 4, Stat.regen: 8}, '+4% dodge and +4% crit', '+4% more dodge, regeneration, and the first blow at you each fight always misses', forged: true, firstMiss: true, perk: 'First blow at you misses'),
   GearSet('deepforge', 'Deepforge', {Stat.guard: 5, Stat.block: 4}, {Stat.block: 5, Stat.vigour: 20}, '+5% guard and +4% block', '+5% more block, +20 vigour, and every blow you block mends you 6% of your HP', forged: true, forgeheart: true, perk: 'Blocks heal 6% HP'),
@@ -159,8 +167,9 @@ const gearSets = <GearSet>[
   // The Ember Vault's own six (vault.dart): found only behind Hob's cellar door, never forged or
   // dropped. Wear any three for the full bonus.
   GearSet('vault', 'Vaultkeeper', {Stat.burn: 4, Stat.fortune: 10}, {Stat.burn: 5, Stat.guard: 3}, '+4 fire on every full swing and +10% gold', '+5 more fire and +3% guard: the vault\'s embers burn for you', forged: true),
+  GearSet('arena', 'Champion\'s', {Stat.damage: 4, Stat.crit: 4}, {Stat.damage: 3, Stat.parry: 4}, '+4 damage and +4% crit', '+3 more damage, +4% parry, and after you dodge, parry or block a blow your next one lands 30% harder: the crowd loves a counter', forged: true, showman: true, perk: 'Counter after a dodge, parry or block: +30%'),
   GearSet('bushido', 'Bushido', {Stat.parry: 4, Stat.crit: 4}, {Stat.damage: 3, Stat.parry: 3}, '+4% parry and +4% crit', '+3 damage, +3% more parry, and every turn a fight goes on, your blows land 5% harder (up to 25%): the longer the duel, the surer the cut', forged: true, bushido: true, perk: '+5% a turn, up to 25%'),
-  GearSet('drakesworn', 'Drakesworn', {Stat.burn: 4, Stat.vigour: 10}, {Stat.burn: 3, Stat.guard: 3}, '+4 fire on every full swing and +10 vigour', '+3 more fire, +3% guard, and dragon scale over your steel: fire hits you 30% softer (dragons, demons, the Ember King)', forged: true, dragonhide: true, perk: 'Fire hits you 30% softer'),
+  GearSet('drakesworn', 'Drakesworn', {Stat.burn: 4, Stat.vigour: 10}, {Stat.burn: 3, Stat.guard: 3}, '+4 fire on every full swing and +10 vigour', '+3 more fire, +3% guard, and dragon scale over your steel: fire hits you 20% softer (dragons, demons, the Ember King)', forged: true, dragonhide: true, perk: 'Fire hits you 20% softer'),
   GearSet('skyborn', 'Skyborn', {Stat.dodge: 5, Stat.crit: 3}, {Stat.crit: 4, Stat.dodge: 3}, '+5% dodge and +3% crit', '+4% more crit, +3% dodge, and against anything in the air (fliers, ghosts, archers on the cliffs) all your blows land 25% harder', forged: true, updraft: true, perk: '+25% against fliers'),
 ];
 
@@ -332,7 +341,7 @@ const bloodleechChance = .12;
 
 /// The most of your damage you can heal from bloodleech, however it's stacked (ammunition can
 /// push it a little further for that one shot).
-const leechCap = 25;
+const leechCap = 6;
 
 /// Full swings it takes to charge a special attack; it fires on the last of them.
 const specialCharge = 4;
@@ -410,6 +419,7 @@ const specials = <String, Special>{
   'arcanestorm': Special('Arcane Storm', 'Bolts of raw magic rain down on the foe: 2.2x damage', 2.2, 0xFFB07AFF, rain: true, sure: true),
   'cleave': Special('Mighty Cleave', 'A great sweeping blow: 2.2x damage', 2.2, 0xFFE8E2D0, cleave: true, sure: true),
   'oath': Special('Unbroken Oath', 'Every promise you kept strikes at once: triple damage plus holy fire', 3, 0xFFF0E2B8, element: Stat.smite, sure: true),
+  'gungnir': Special('Allfather\'s Throw', 'The spear leaves your hand and comes back to it: it never misses, and lands as a critical 3x blow', 3, 0xFFCFE0F0, crit: true, sure: true),
   'kingsfall': Special('Fall of Kings', 'The crack in the blade splits open: a sweeping blow of crown-fire for 3.2x damage plus fire', 3.2, 0xFFFF8A3A, element: Stat.burn, cleave: true, sure: true),
   'bramblelash': Special('Bramblelash', 'The briar lashes out and roots the foe: 3x damage plus poison, and you recover 15 HP', 3, 0xFF6FBF4A, element: Stat.poison, heal: 15, sure: true),
   'briarvolley': Special('Briarsong', 'Arrows that burst into thorns where they land: 3x damage plus poison, and you recover 15 HP', 3, 0xFF6FBF4A, volley: 4, element: Stat.poison, heal: 15, sure: true),
@@ -495,13 +505,16 @@ class GearItem {
     this.special,
     this.enchant,
     this.gearSet,
-  }) : stats = tidyStats(slot, rarity, stats);
+  }) : stats = Map.of(tidyStats(slot, rarity, stats));
 
   /// The gear set this piece belongs to (an id in [gearSets]), if any.
   final String? gearSet;
 
   /// A rune from the enchanter (or found on the drop).
   EnchantRoll? enchant;
+
+  /// Times Dunstan has honed it (each one +[honeStep] to every stat, up to [honeMax]).
+  int hone = 0;
 
   /// A quest weapon's special attack (an id in [specials]).
   final String? special;
@@ -554,7 +567,9 @@ class GearItem {
     if (special != null) 'sp': special,
     if (gearSet != null) 'set': gearSet,
     if (enchant != null) 'en': enchant!.toJson(),
+    if (hone > 0) 'hn': hone,
     'stats': {for (final e in stats.entries) e.key.name: e.value},
+    'sv': gearStatsVersion,
   };
 
   factory GearItem.fromJson(Map<String, dynamic> j) => GearItem(
@@ -574,9 +589,27 @@ class GearItem {
     enchant: EnchantRoll.fromJson(j['en']),
     stats: _vaultStats(j) ?? {
       for (final e in ((j['stats'] as Map?) ?? {}).entries)
-        if (Stat.values.any((s) => s.name == e.key)) Stat.values.byName(e.key as String): (e.value as num).toInt(),
+        if (Stat.values.any((s) => s.name == e.key))
+          Stat.values.byName(e.key as String): _restat(Stat.values.byName(e.key as String), (e.value as num).toInt(), (j['level'] as num).toInt(), (j['sv'] as num?)?.toInt() ?? 0),
     },
-  );
+  )..hone = (j['hn'] as num?)?.toInt() ?? 0;
+}
+
+/// Which balance of stats a saved piece was rolled under. 1: regeneration, lifesteal and bloodleech
+/// were cut back (they healed more than foes could hurt you), so a piece from before is brought
+/// down to what it would roll today when it loads.
+const gearStatsVersion = 1;
+
+int _restat(Stat s, int v, int level, int version) {
+  if (version >= 1) return v;
+  final was = switch (s) {
+    Stat.regen => 6 + level * 2.0,
+    Stat.lifesteal => 1 + level * .25,
+    Stat.leech => 6 + level * .15,
+    _ => null,
+  };
+  if (was == null) return v;
+  return math.max(1, (v * _base(s, level) / was).round());
 }
 
 /// A vault piece saved with an older mix of stats (the pendant's XP, the ring before its fire),
@@ -745,7 +778,7 @@ const Map<HeroClass, Map<GearSlot, List<_Base>>> _bases = {
       _Base('Zweihänder', 'greatsword', Stat.damage, 1.35, _m),
       _Base('Great cleaver', 'cleaver', Stat.damage, 1.35, _m),
       // A duellist's blade: light, quick, and it finds the gaps.
-      _Base('Rapier', 'rapier', Stat.damage, .95, _m),
+      _Base('Rapier', 'rapier', Stat.damage, 1.05, _m),
       // Blunt
       _Base('Flanged mace', 'mace', Stat.damage, 1.1, _m),
       _Base('Morning star', 'morningstar', Stat.damage, 1.2, _m),
@@ -1030,7 +1063,32 @@ GearItem tempered(GearItem g, int level) => GearItem(
   gearSet: g.gearSet,
   value: (g.value * (3 + level * 1.2) / (3 + g.level * 1.2)).round(),
   stats: {for (final e in g.stats.entries) e.key: math.max(e.value, (e.value * _base(e.key, level) / _base(e.key, g.level)).round())},
-);
+)..hone = g.hone;
+
+/// Honing at the forge: each step adds this share of every stat, up to [honeMax] steps.
+const honeStep = .05, honeMax = 5;
+
+/// [g] honed once more: every stat up by [honeStep] of its unhoned worth (at least 1).
+void honeOnce(GearItem g) {
+  final base = 1 + honeStep * g.hone;
+  for (final e in g.stats.entries.toList()) {
+    g.stats[e.key] = e.value + math.max(1, (e.value / base * honeStep).round());
+  }
+  g.hone++;
+}
+
+/// Mags' sealed crates: gear for a slot you choose, never worse than rare (and now and then
+/// legendary), sold unseen.
+const crateOdds = [0, 0, 600, 350, 50];
+int crateCost(int level) => 150 + 40 * level;
+
+/// Dunstan's fee for honing [g] from +[GearItem.hone] to the next step: more for each step, and for
+/// finer pieces.
+int honeCost(GearItem g, int level) => ((60 + 12 * level) * (g.hone + 1) * switch (g.rarity) {
+  Rarity.legendary => 2.2,
+  Rarity.epic => 1.5,
+  _ => 1.0,
+}).round();
 
 /// How much of a stat an enchantment or base grants at a level.
 int _roll(Stat s, int level, double mult, math.Random r) {
@@ -1044,15 +1102,15 @@ double _base(Stat s, int level) {
     Stat.poison || Stat.burn || Stat.frost || Stat.bleed => 1.5 + level * .45,
     Stat.smite => 3 + level * .8,
     Stat.crit => 4 + level * .3,
-    Stat.lifesteal => 1 + level * .25,
+    Stat.lifesteal => 1 + level * .1,
     Stat.guard => 2.5 + level * .15,
     Stat.vigour => 6 + level * 2.0,
-    Stat.regen => 6 + level * 2.0,
+    Stat.regen => 3 + level * .7,
     Stat.thorns => 3 + level * 1.0,
     Stat.fortune || Stat.wisdom => 8 + level * 1.0,
     Stat.dragonkin => 1 + level * .15,
     Stat.dodge || Stat.parry || Stat.block => 4 + level * .2,
-    Stat.leech => 6 + level * .15,
+    Stat.leech => 1 + level * .04,
     Stat.wyrmbane => 5.0,
   };
   return v.toDouble();
@@ -1540,6 +1598,23 @@ class LootTable {
     );
   }
 
+  /// Gungnir, the Allfather's spear, from the Thane of the Hall of the Slain: a relic-grade spear
+  /// whose throw never misses.
+  GearItem gungnir(int level, HeroClass heroClass) => GearItem(
+    id: _id(),
+    name: 'Gungnir',
+    slot: GearSlot.weapon,
+    art: 'spear',
+    rarity: Rarity.legendary,
+    level: level,
+    heroClass: HeroClass.knight,
+    tint: 0xFFE8DCA8,
+    lore: 'The Allfather\'s spear, lent to the Thane of the Slain for a thousand years of feasting and fighting. Its runes are older than the Burning. It has never missed.',
+    special: 'gungnir',
+    value: _value(level, Rarity.legendary, GearSlot.weapon) * 3,
+    stats: _signature(const {Stat.damage: 1.85, Stat.crit: 1.2}, level, heroClass, edge: relicEdge),
+  );
+
   /// Elemental arms, one of each kind per hero: flame (from fire elementals), frost (from frost
   /// elementals), dawn (from the Skyreach Aeries) and shadow (from Ravenmoor's night). Knights get
   /// a blade of that element, rangers a bow, mages a staff or wand. Epic.
@@ -1715,7 +1790,7 @@ class LootTable {
     level: level,
     lore: 'A gilded mask with no mouth and one eye, and a red tear painted down through it. Wear it, and the Reaper looks right past you.',
     value: _value(level, Rarity.epic, GearSlot.trinket),
-    stats: {Stat.dodge: _roll(Stat.dodge, level, 1.4, _r), Stat.crit: _roll(Stat.crit, level, 1.2, _r), Stat.leech: _roll(Stat.leech, level, 1.0, _r)},
+    stats: {Stat.dodge: _roll(Stat.dodge, level, 1.5, _r), Stat.crit: _roll(Stat.crit, level, 1.5, _r), Stat.damage: _roll(Stat.damage, level, .9, _r), Stat.leech: _roll(Stat.leech, level, 1.0, _r)},
   );
 
   /// A special boss's legendary trinket, by art.
@@ -1729,22 +1804,22 @@ class LootTable {
     final early = earlyTrophies.contains(art);
     final (name, lore, stats) = switch (art) {
       'infernalsigil' => ('Infernal Sigil', 'Azgar\'s seal. It burns the hand of anyone unworthy. You seem fine.', {Stat.damage: 1.6, Stat.leech: 1.2, Stat.crit: 1.2}),
-      'emberheart' => ('Emberheart', 'The last coal of the Ember King. It keeps you warm, and it is very sorry.', {Stat.damage: 2.0, Stat.burn: 2.0, Stat.vigour: 1.8, Stat.crit: 1.4}),
-      'acorn' => ('Bramblecrown\'s Acorn', 'Grandmother Bramblecrown\'s last seed. Plant it somewhere that never burned.', {Stat.regen: 1.8, Stat.vigour: 1.6, Stat.thorns: 1.4}),
+      'emberheart' => ('Emberheart', 'The last coal of the Ember King. It keeps you warm, and it is very sorry.', {Stat.damage: 1.17, Stat.burn: 1.17, Stat.vigour: 1.05, Stat.crit: 0.82}),
+      'acorn' => ('Bramblecrown\'s Acorn', 'Grandmother Bramblecrown\'s last seed. Plant it somewhere that never burned.', {Stat.regen: 2.46, Stat.vigour: 2.19, Stat.thorns: 1.92}),
       'gargoyleheart' => ('Gargoyle Heart', 'A heart of carved stone. It beats once an hour, very hard.', {Stat.guard: 1.6, Stat.thorns: 1.6, Stat.block: 1.2}),
-      'ankh' => ('Ankh of Nephrakhet', 'The Ash Pharaoh\'s key of life. It is cold, and it ticks like a heart.', {Stat.vigour: 2.0, Stat.smite: 1.6, Stat.leech: 1.0}),
-      'phylactery' => ('Bone Phylactery', 'The Colossus kept its heart in here. It still beats, slowly.', {Stat.vigour: 2.2, Stat.regen: 1.8, Stat.block: 1.0}),
-      'ashenseal' => ('Malric\'s Ashen Seal', 'The seal of the Ashen Order, broken in two. He gave it to you himself, at the end. "Do better with it than I did."', {Stat.damage: 1.3, Stat.burn: 1.2, Stat.guard: 1.3}),
-      'heartsblood' => ('Heart\'s Blood', 'A drop of the Countess, set in a crystal vial. It is still warm, and it still wants.', {Stat.leech: 2.0, Stat.lifesteal: 2.0, Stat.crit: 1.5}),
-      'starleaf' => ('Starleaf Brooch', 'Queen Ithriel\'s own brooch: a silver leaf with a star caught in it. The elves say it never lets an arrow fly crooked.', {Stat.crit: 2.4, Stat.dodge: 2.2, Stat.regen: 1.8}),
+      'ankh' => ('Ankh of Nephrakhet', 'The Ash Pharaoh\'s key of life. It is cold, and it ticks like a heart.', {Stat.vigour: 2.38, Stat.smite: 1.91, Stat.leech: 1.19}),
+      'phylactery' => ('Bone Phylactery', 'The Colossus kept its heart in here. It still beats, slowly.', {Stat.vigour: 2.86, Stat.regen: 2.34, Stat.block: 1.3}),
+      'ashenseal' => ('Malric\'s Ashen Seal', 'The seal of the Ashen Order, broken in two. He gave it to you himself, at the end. "Do better with it than I did."', {Stat.damage: 1.17, Stat.burn: 1.08, Stat.guard: 1.17}),
+      'heartsblood' => ('Heart\'s Blood', 'A drop of the Countess, set in a crystal vial. It is still warm, and it still wants.', {Stat.leech: 1.4, Stat.lifesteal: 1.6, Stat.crit: 1.6, Stat.damage: 1.0}),
+      'starleaf' => ('Starleaf Brooch', 'Queen Ithriel\'s own brooch: a silver leaf with a star caught in it. The elves say it never lets an arrow fly crooked.', {Stat.crit: 3.18, Stat.dodge: 2.91, Stat.regen: 2.38}),
       'runependant' => ('Thane\'s Rune-Pendant', 'A runestone on a chain as thick as your thumb. Grimnar says it was his grandmother\'s. It hums when you\'re hit.', {Stat.guard: 2.9, Stat.block: 2.6, Stat.vigour: 2.5}),
-      'echostone' => ('The Echo Stone', 'A violet stone from the Roost Mother\'s nest, set in silver wings. Hold it to your ear and you hear the cave, and every blow coming before it lands.', {Stat.damage: .7, Stat.dodge: 1.5, Stat.leech: 1.4, Stat.crit: 1.1}),
+      'echostone' => ('The Echo Stone', 'A violet stone from the Roost Mother\'s nest, set in silver wings. Hold it to your ear and you hear the cave, and every blow coming before it lands.', {Stat.damage: 0.89, Stat.dodge: 1.91, Stat.leech: 1.78, Stat.crit: 1.4}),
       'rimeheart' => ('The Rimeheart', 'The Jarl\'s heart-stone: a lump of blue glacier ice in a cage of black iron. It never melts, and the cold in it keeps you standing.', {Stat.frost: 1.25, Stat.guard: 1.2, Stat.vigour: 1.05, Stat.damage: .55}),
       'blossomseal' => ('Shogun\'s Blossom Seal', 'The Iron Shogun\'s seal: a cherry blossom carved in red jade. Duels fought under it are always fair, and always short.', {Stat.crit: 1.6, Stat.parry: 1.5, Stat.damage: 1.3}),
       'stormfeather' => ('Thunderwing\'s Plume', 'One feather from the Storm Roc, as long as your arm. It hums before a storm, and your blows come down like lightning.', {Stat.crit: 1.7, Stat.dodge: 1.5, Stat.damage: 1.3}),
-      'mirrorheart' => ('Heart of the Thousandfold', 'A grey, slippery heart that changes shape in your hand: a bird, a fist, your own face. It wants to be useful.', {Stat.damage: 1.5, Stat.crit: 1.5, Stat.dodge: 1.5}),
+      'mirrorheart' => ('Heart of the Thousandfold', 'A grey, slippery heart that changes shape in your hand: a bird, a fist, your own face. It wants to be useful.', {Stat.damage: 1.36, Stat.crit: 1.36, Stat.dodge: 1.36}),
       'leviathaneye' => ('Leviathan\'s Eye', 'A pale, glowing eye the size of your fist, set in coral. It never closes, and the sea is calm wherever it looks.', {Stat.frost: 1.8, Stat.vigour: 1.6, Stat.dodge: 1.3}),
-      'sunfang' => ('Sun-Eater\'s Fang', 'King Ssarrak\'s tooth, set in sun-gold. It is always warm, and it makes your wounds itch as they close.', {Stat.damage: 1.1, Stat.regen: 1.5, Stat.thorns: 1.1}),
+      'sunfang' => ('Sun-Eater\'s Fang', 'King Ssarrak\'s tooth, set in sun-gold. It is always warm, and it makes your wounds itch as they close.', {Stat.damage: 1.25, Stat.regen: 1.71, Stat.thorns: 1.25}),
       'thousandmask' => ('Mask of a Thousand Faces', 'The Mother\'s own mask, with every face she ever took moving under the porcelain. Wear it, and foes can never quite tell where you\'ll strike.', {Stat.crit: 1.7, Stat.parry: 1.5, Stat.damage: 1.3}),
       'bloodmoonpelt' => ('Bloodmoon Pelt', 'The Alpha\'s hide, red under the moon. Wear it, and when you\'re hurt badly enough, the wolf comes out.', {Stat.damage: 1.1, Stat.crit: 1.2, Stat.vigour: 1.0}),
       _ => ('Krugg\'s War Horn', 'One blast and every ork in the valley picks up an axe.', {Stat.damage: 1.5, Stat.crit: 1.2, Stat.fortune: 1.2}),
@@ -1780,15 +1855,18 @@ class LootTable {
       ('ashen', GearSlot.gloves) => (Stat.damage, Stat.burn, Stat.guard),
       ('ashen', GearSlot.boots) => (Stat.guard, Stat.block, Stat.vigour),
       ('ashen', _) => (Stat.burn, Stat.thorns, Stat.guard),
-      ('nightblood', GearSlot.gloves) => (Stat.damage, Stat.lifesteal, Stat.crit),
-      ('nightblood', GearSlot.boots) => (Stat.dodge, Stat.vigour, Stat.lifesteal),
-      ('nightblood', _) => (Stat.leech, Stat.lifesteal, Stat.vigour),
+      // (Its healing comes from the set's own bonus and Bloodthirst; the pieces add only a little
+      // more, or the Blood Knight would never need to rest.)
+      ('nightblood', GearSlot.gloves) => (Stat.damage, Stat.crit, Stat.lifesteal),
+      ('nightblood', GearSlot.boots) => (Stat.dodge, Stat.vigour, Stat.crit),
+      ('nightblood', _) => (Stat.damage, Stat.vigour, Stat.crit),
       ('silverleaf', GearSlot.gloves) => (Stat.crit, Stat.damage, Stat.dodge),
       ('silverleaf', GearSlot.boots) => (Stat.dodge, Stat.regen, Stat.crit),
       ('silverleaf', _) => (Stat.crit, Stat.regen, Stat.dodge),
       ('deepforge', GearSlot.gloves) => (Stat.damage, Stat.guard, Stat.block),
-      ('deepforge', GearSlot.boots) => (Stat.guard, Stat.block, Stat.vigour),
-      ('deepforge', _) => (Stat.block, Stat.guard, Stat.thorns),
+      // (Guard and block both run into their caps in a full suit, so it carries some damage too.)
+      ('deepforge', GearSlot.boots) => (Stat.guard, Stat.vigour, Stat.damage),
+      ('deepforge', _) => (Stat.block, Stat.damage, Stat.thorns),
       // (The duellists' suits lean on damage and vigour: parry and crit both run into their caps
       // fast, so a suit made of them alone would waste half its worth.)
       ('faceless', GearSlot.gloves) => (Stat.damage, Stat.crit, Stat.vigour),
@@ -1809,6 +1887,9 @@ class LootTable {
       ('bushido', GearSlot.gloves) => (Stat.damage, Stat.crit, Stat.vigour),
       ('bushido', GearSlot.boots) => (Stat.parry, Stat.vigour, Stat.damage),
       ('bushido', _) => (Stat.damage, Stat.vigour, Stat.crit),
+      ('arena', GearSlot.gloves) => (Stat.damage, Stat.crit, Stat.vigour),
+      ('arena', GearSlot.boots) => (Stat.vigour, Stat.dodge, Stat.damage),
+      ('arena', _) => (Stat.damage, Stat.vigour, Stat.parry),
       ('drakesworn', GearSlot.gloves) => (Stat.damage, Stat.burn, Stat.crit),
       ('drakesworn', GearSlot.boots) => (Stat.vigour, Stat.guard, Stat.burn),
       ('drakesworn', _) => (Stat.burn, Stat.guard, Stat.vigour),
@@ -1839,10 +1920,15 @@ class LootTable {
         HeroClass.ranger => 'bracers',
       },
       GearSlot.boots => heroClass == HeroClass.knight ? 'sabatons' : 'boots',
-      GearSlot.helm => setId == 'bushido' ? 'kabuto' : (setId == 'drakesworn' ? 'wyrmhelm' : (setId == 'ashen' ? 'sallet' : 'greathelm')),
+      GearSlot.helm => setId == 'arena' ? 'galea' : setId == 'bushido' ? 'kabuto' : (setId == 'drakesworn' ? 'wyrmhelm' : (setId == 'ashen' ? 'sallet' : 'greathelm')),
       _ => 'ring',
     };
-    final noun = switch (slot) {
+    final noun = setId == 'arena' ? switch (slot) {
+      GearSlot.gloves => 'manica',
+      GearSlot.boots => 'greaves',
+      GearSlot.helm => 'galea',
+      _ => 'signet',
+    } : switch (slot) {
       GearSlot.gloves => heroClass == HeroClass.knight ? 'gauntlets' : (heroClass == HeroClass.mage ? 'gloves' : 'bracers'),
       GearSlot.boots => heroClass == HeroClass.knight ? 'sabatons' : 'boots',
       GearSlot.helm => 'helm',
@@ -1868,10 +1954,11 @@ class LootTable {
         'skyborn' => 0xFF9AC8E8,
         'bushido' => 0xFFB8322A,
         'drakesworn' => 0xFF8A2A1A,
+        'arena' => 0xFFB0763A,
         _ => 0xFF8A94A8,
       },
       heroClass: slot == GearSlot.ring ? null : heroClass,
-      lore: 'Forged by Dunstan from a blueprint. ${set.twoText} with two pieces; ${set.threeText[0].toLowerCase()}${set.threeText.substring(1)} with ${set.full == 4 ? 'four' : 'all three'}.',
+      lore: '${setId == 'arena' ? 'Won on the sand of the Ash Colosseum.' : 'Forged by Dunstan from a blueprint.'} ${set.twoText} with two pieces; ${set.threeText[0].toLowerCase()}${set.threeText.substring(1)} with ${set.full == 4 ? 'four' : 'all three'}.',
       value: _value(level, rarity, slot),
       stats: stats,
     );
@@ -1979,7 +2066,7 @@ class LootTable {
     var bloodleech = false;
     if (slot == _w && rarity.index >= Rarity.epic.index && _r.nextDouble() < bloodleechChance) {
       bloodleech = true;
-      stats[Stat.leech] = (rarity == Rarity.legendary ? 14 : 10) + _r.nextInt(4);
+      stats[Stat.leech] = (rarity == Rarity.legendary ? 4 : 3) + _r.nextInt(2);
     }
     // Now and then a rare-or-better weapon comes already enchanted.
     final enchant = slot == _w && rarity.index >= Rarity.rare.index && _r.nextDouble() < .15 ? rollEnchant(EnchantSlot.weapon, level, _r) : null;

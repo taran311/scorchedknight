@@ -15,6 +15,7 @@ import 'battle_screen.dart';
 import 'fill_column.dart';
 import 'hud.dart';
 import 'loot_window.dart';
+import 'merchant.dart' show promptRelicForge;
 import 'theme.dart';
 
 class DungeonPage extends StatefulWidget {
@@ -53,6 +54,7 @@ class _DungeonPageState extends State<DungeonPage> {
       _ => Sfx.quest,
     });
     if (mounted && c.nextLoot != null) await resolvePendingLoot(context, c, title: out.$1.title);
+    if (mounted) await promptRelicForge(context, c);
   }
 
   Future<void> _fight(BattleStart how) async {

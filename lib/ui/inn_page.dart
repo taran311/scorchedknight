@@ -50,6 +50,7 @@ import 'theme.dart';
 import 'wilds_page.dart';
 import 'trail_data.dart' show trailAt;
 import 'trail_page.dart';
+import '../game/contracts.dart';
 
 class InnPage extends StatefulWidget {
   const InnPage({super.key, required this.controller});
@@ -180,6 +181,8 @@ class _InnPageState extends State<InnPage> with RouteAware {
     if (exit == BattleExit.onward && mounted && nextLand != null) {
       final to = nextLand!;
       nextLand = null;
+      await showRoadOpens(context, c, from: c.state.continent, to: to);
+      if (!mounted) return;
       await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => TrailPage(controller: c, land: to)));
     }
   }
@@ -321,6 +324,11 @@ class _InnPageState extends State<InnPage> with RouteAware {
                         // The road: the next land's boss, so there's always a way on.
                         if (c.engine.roadStep() case final step? when !(job && step.land == 0)) ...[
                           _RoadCard(controller: c, step: step, onGo: () => _goRoad(step)),
+                          const SizedBox(height: 10),
+                        ],
+                        // The notice board: the village's troubles, a contract each.
+                        if (!job && c.engine.board.isNotEmpty) ...[
+                          _BoardCard(controller: c),
                           const SizedBox(height: 10),
                         ],
                         // The next task: something to try, and a little for trying it.
@@ -1945,3 +1953,121 @@ class _RoadCard extends StatelessWidget {
     );
   }
 }
+
+/// The notice board by the inn door: the top contract, and the rest a tap away.
+class _BoardCard extends StatelessWidget {
+  const _BoardCard({required this.controller});
+  final GameController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final board = controller.engine.board, top = board.first, p = placeById(top.place)!;
+    const pin = Color(0xFFE0B070);
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => showBoard(context, controller),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: Color.lerp(Palette.stone3, pin, .5)!, width: 1.4),
+            gradient: const LinearGradient(begin: Alignment.centerLeft, end: Alignment.centerRight, colors: [Color(0xFF33261A), Color(0xFF18120D)], stops: [0, .6]),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(color: const Color(0xFFCDB98C), border: Border.all(color: Colors.black), borderRadius: BorderRadius.circular(3)),
+                child: const Icon(Icons.push_pin, color: Color(0xFF8A2A1A), size: 28),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('NOTICE BOARD · ${board.length} ${board.length == 1 ? 'CONTRACT' : 'CONTRACTS'}', style: Txt.label(size: 11, color: Palette.parch2)),
+                    Text(p.foe!.$4, maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.label(size: 14.5, color: Palette.cream, weight: FontWeight.w800)),
+                    const SizedBox(height: 3),
+                    Text('${top.client} · ${continents[p.land].name}', maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.label(size: 12, color: pin)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(width: 76, child: StoneButton(title: 'Read', compact: true, onPressed: () => showBoard(context, controller))),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The notice board up close: each contract, who posted it and what they'll pay, and the way there.
+Future<void> showBoard(BuildContext context, GameController c) => showDialog<void>(
+  context: context,
+  builder: (ctx) {
+    final board = c.engine.board, bounty = contractBounty(c.state.knight.level);
+    return Dialog(
+      backgroundColor: Palette.stone1,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('The Notice Board', style: Txt.label(size: 20, color: Palette.cream)),
+              const SizedBox(height: 2),
+              Text('Pinned by the inn door. Put the trouble down, and whoever posted it pays a bounty on top of what you find.', style: Txt.onStone(size: 13.5)),
+              for (final job in board) ...[
+                const SizedBox(height: 12),
+                Builder(builder: (context) {
+                  final p = placeById(job.place)!, l = continents[p.land];
+                  return Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE6D8B4),
+                      border: Border.all(color: const Color(0xFF8A6A3A), width: 1.5),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('WANTED: ${p.foe!.$4.toUpperCase()}', style: Txt.inkLabel(size: 14, color: const Color(0xFF8A2A1A))),
+                        Text('${p.name} · ${l.name}', style: Txt.inkLabel(size: 12, color: const Color(0xFF5A4A32), weight: FontWeight.w700)),
+                        const SizedBox(height: 6),
+                        Text('"${job.ask}"', style: Txt.body(size: 14.5, italic: true)),
+                        Text('— ${job.client}', style: Txt.body(size: 13, color: const Color(0xFF5A4A32))),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(child: Text('Bounty: $bounty gold', style: Txt.inkLabel(size: 14))),
+                            StoneButton(
+                              title: 'Take it',
+                              compact: true,
+                              tone: ButtonTone.blood,
+                              onPressed: () {
+                                Navigator.of(ctx).pop();
+                                Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => MapPage(controller: c, place: job.place)));
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+              const SizedBox(height: 12),
+              Align(alignment: Alignment.centerRight, child: TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text('Close', style: Txt.label(size: 15, color: Palette.parch2)))),
+            ],
+          ),
+        ),
+      ),
+    );
+  },
+);

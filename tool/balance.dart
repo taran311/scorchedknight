@@ -31,6 +31,21 @@ class Stats {
   final actions = <BattleAction, int>{};
 }
 
+/// How the auto-players brace for heavy blows (the timing ring): 'off' never, 'avg' (30% perfect,
+/// 40% in time, 30% missed), 'good' (60% perfect, 30% in time). Set with brace=off|avg|good.
+String braceSkill = 'avg';
+final _braceRng = Random(77);
+void brace(GameEngine e) {
+  if (!e.state.foeWindup) return;
+  final r = _braceRng.nextDouble();
+  final (p, g) = switch (braceSkill) {
+    'good' => (.6, .3),
+    'avg' => (.3, .4),
+    _ => (0.0, 0.0),
+  };
+  e.braceNext = r < p ? bracePerfect : (r < p + g ? braceGood : 0);
+}
+
 /// The auto-player's choice for this turn.
 /// The hardest-hitting rite on the hotbar you can afford right now (made the one to cast).
 bool riteReady(GameEngine e) {
@@ -91,7 +106,7 @@ final legendsByLand = <int, int>{};
 final fineByArt = <String, int>{};
 final lootBySource = <String, int>{}, fightsBySource = <String, int>{}, legendBySource = <String, int>{};
 
-void run(String style, int seed, Stats st, {void Function(GameEngine e, int land)? onBoss}) {
+void run(String style, int seed, Stats st, {void Function(GameEngine e, int land)? onBoss, void Function(GameEngine e, int land)? onChallenge}) {
   const cls = HeroClass.knight;
   final e = GameEngine(GameEngine.newGame(heroClass: cls), random: Random(seed), clock: () => DateTime(2026, 6, 1));
   final rng = Random(seed + 7);
@@ -225,6 +240,7 @@ void run(String style, int seed, Stats st, {void Function(GameEngine e, int land
       e.startRaid();
       st.raids++;
     } else if (boss) {
+      if (tries == 0 && onChallenge != null) onChallenge(e, c);
       e.challengeBoss();
       tries++;
     } else {
@@ -243,6 +259,7 @@ void run(String style, int seed, Stats st, {void Function(GameEngine e, int land
       st.actions[a] = (st.actions[a] ?? 0) + 1;
       // A fair hand on the timing bar: a bullseye now and then, a graze now and then.
       final roll = rng.nextDouble();
+      brace(e);
       final r = e.takeTurn(a, aim: a == BattleAction.shoot ? (roll < .3 ? bullseye : (roll < .85 ? 1 : graze)) : 1);
       turns++;
       taken += r.counter ?? 0;
@@ -306,6 +323,7 @@ bool _fightOut(GameEngine e, Random rng) {
   while (e.state.inBattle) {
     final a = choose(e, 'all');
     final roll = rng.nextDouble();
+    brace(e);
     final r = e.takeTurn(a, aim: a == BattleAction.shoot ? (roll < .3 ? bullseye : (roll < .85 ? 1 : graze)) : 1);
     if (r.knockedOut) return false;
   }
@@ -497,6 +515,7 @@ String pct(List<double> xs) => xs.isEmpty ? '-' : '${(xs.reduce((a, b) => a + b)
 
 void main(List<String> args) {
   final runs = args.isEmpty ? 20 : int.parse(args.first);
+  braceSkill = args.firstWhere((a) => a.startsWith('brace='), orElse: () => 'brace=avg').substring(6);
   brews = !args.contains('nobrews');
   side = args.contains('side');
   ngTier = int.tryParse(args.firstWhere((a) => a.startsWith('ng'), orElse: () => 'ng0').substring(2)) ?? 0;

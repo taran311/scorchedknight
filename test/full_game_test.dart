@@ -24,7 +24,7 @@ import 'package:scorchedknight/game/spells.dart';
 /// What one playthrough saw and did.
 class Run {
   final seen = <String>{};
-  int fights = 0, knockouts = 0, saves = 0;
+  int fights = 0, knockouts = 0, bossKnockouts = 0, placeKnockouts = 0, saves = 0;
   bool won = false;
   final bossLevels = <int, int>{};
 }
@@ -98,8 +98,9 @@ void inTown(GameEngine e, Run run) {
   for (final t in tiersFor(k.heroClass).skip(1).where((t) => !t.dropOnly && !isCrafted(t.id))) {
     if (!e.owns(t.id) && k.coins >= e.priceOf(t.id) * 1.2) e.purchase(t.id);
   }
+  // (Stops when Mags won't sell: mid-fight, say, after a strongbox ambush.)
   while (k.potions < 4 && k.coins > e.priceOf('potion') * 3) {
-    e.purchase('potion');
+    if (!e.purchase('potion')) break;
   }
   if (k.coins > e.priceOf('crossbow') * 1.5) e.purchase('crossbow');
   // Old Wick: wards first (reagents are needed for them), then gems into bolts, then a rune.
@@ -183,7 +184,10 @@ Run playThrough(int seed, {int maxFights = 4000}) {
   var e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(seed), clock: () => DateTime(2026, 6, 1));
   final rng = Random(seed + 1);
   e.takeHobsJob();
-  var extra = 0;
+  // Levels to wait before trying each land's boss again, after losing to it.
+  final extra = <int, int>{};
+  String? place;
+  final beatenAt = <String, int>{};
   while (!e.state.won && run.fights < maxFights) {
     inTown(e, run);
     final s = e.state, k = s.knight;
@@ -197,14 +201,17 @@ Run playThrough(int seed, {int maxFights = 4000}) {
     if (side != null && run.fights % 2 == 0) c = side;
     e.travel(c);
     final raid = s.raid != null;
-    final boss = !raid && e.bossReady && !s.bossesDown.contains(c) && k.level >= bossLevel(c) - 1 + extra;
+    final boss = !raid && e.bossReady && !s.bossesDown.contains(c) && k.level >= bossLevel(c) - 1 + (extra[c] ?? 0) &&
+        // A side land's boss that keeps winning: leave it for later, like a player would.
+        (!isSideLand(c) || (extra[c] ?? 0) < 6);
     if (raid) {
       e.startRaid();
       run.seen.add('raid');
     } else if (boss) {
       e.challengeBoss();
-    } else if (places.where((p) => p.kind == PlaceKind.guarded && e.whyNotExplore(p.id) == null && k.level >= continents[p.land].minLevel + 3).firstOrNull case final p?) {
+    } else if (places.where((p) => p.kind == PlaceKind.guarded && e.whyNotExplore(p.id) == null && k.level >= continents[p.land].minLevel + 3 && k.level >= (beatenAt[p.id] ?? 0) + 3).firstOrNull case final p?) {
       e.explorePlace(p.id);
+      place = p.id;
       run.seen.add('guard ${p.id}');
     } else {
       e.explore();
@@ -218,14 +225,30 @@ Run playThrough(int seed, {int maxFights = 4000}) {
     if (elementalOf(s.rare?.look) case final el?) run.seen.add('elemental ${el.name}');
     if (foe.night) run.seen.add('night foe');
     var turns = 0;
+    final placeTry = place;
+    place = null;
+    // Your nemesis and the Ember King's generals are story foes, fought above a common foe's
+    // strength: counted with the guarded places, not the road.
+    final story = e.nemesisFight || emberGenerals.contains(s.rare?.name);
     while (s.inBattle) {
       final a = choose(e);
+      // An ordinary hand on the brace ring: perfect a third of the time, in time as often again.
+      if (s.foeWindup) {
+        final b = rng.nextDouble();
+        e.braceNext = b < .3 ? bracePerfect : (b < .7 ? braceGood : 0);
+      }
       final r = e.takeTurn(a, aim: a == BattleAction.shoot ? [bullseye, 1.0, graze][rng.nextInt(3)] : 1);
       turns++;
       checkSane(e, 'after turn $turns of fight ${run.fights} (${foe.name}, ${a.name})');
       if (r.knockedOut) {
         run.knockouts++;
-        if (boss) extra++;
+        // Like a player: beaten at a place, come back a few levels stronger.
+        if (placeTry != null) beatenAt[placeTry] = k.level;
+        if (placeTry != null || story) run.placeKnockouts++;
+        if (boss) {
+          extra[c] = (extra[c] ?? 0) + 1;
+          run.bossKnockouts++;
+        }
       }
       if (r.cheatedDeath) run.seen.add('cheated death');
       if (r.wolfed) run.seen.add('wolfform');
@@ -235,7 +258,7 @@ Run playThrough(int seed, {int maxFights = 4000}) {
     }
     if (boss && s.bossesDown.contains(c) && !run.bossLevels.containsKey(c)) {
       run.bossLevels[c] = k.level;
-      extra = 0;
+      extra.remove(c);
     }
     if (s.encounter != null) {
       e.resolveEncounter(rng.nextInt(2));
@@ -268,10 +291,15 @@ void main() {
       final main = run.bossLevels.keys.where((c) => c < mainLands).toSet();
       expect(main.containsAll({0, mainLands - 1}) && main.length >= mainLands - 2, isTrue, reason: 'skipped too many bosses: ${run.bossLevels}');
       expect(run.saves, greaterThan(5));
-      // A careful player should rarely be knocked out.
-      expect(run.knockouts, lessThan(run.fights ~/ 50 + 10), reason: '${run.knockouts} knockouts in ${run.fights} fights');
+      // A careful player should rarely be knocked out on the road; a boss may well take a few tries.
+      // Guarded places, your nemesis and the Ember King's generals are challenges (they fight above a
+      // common foe): counted apart from the road, like the bosses.
+      final road = run.knockouts - run.bossKnockouts - run.placeKnockouts;
+      expect(road, lessThan(run.fights ~/ 50 + 10), reason: '$road knockouts on the road in ${run.fights} fights');
+      expect(run.placeKnockouts, lessThan(25), reason: '${run.placeKnockouts} knockouts at guarded places and by story foes');
+      expect(run.bossKnockouts, lessThan(run.bossLevels.length * 3 + 6), reason: '${run.bossKnockouts} boss knockouts for ${run.bossLevels.length} bosses');
       // ignore: avoid_print
-      print('seed $seed: ${run.fights} fights, ${run.knockouts} knockouts, bosses at levels ${run.bossLevels.values.join(', ')}');
+      print('seed $seed: ${run.fights} fights, ${run.knockouts} knockouts (${run.bossKnockouts} by bosses, ${run.placeKnockouts} at places or by story foes), bosses at levels ${run.bossLevels.values.join(', ')}');
     });
   }
 

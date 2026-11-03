@@ -82,6 +82,8 @@ enum HeadKind {
   eboshi,
   topknot,
   oni,
+  // A gladiator's helm (the Ash Colosseum, and the Champion's set): [Look.order] says which school.
+  galea,
   // The batkin of the Hollowdeep: great splayed ears, a leaf nose, small fangs and glowing eyes.
   bat,
   // The yetis of the Frostmarch: a shaggy white mane, curled horns, a blue face and tusks.
@@ -272,11 +274,97 @@ class Look {
     this.usekh = false,
     this.feathered = false,
     this.order,
+    this.kilt = false,
+    this.ownKit = false,
   });
 
   /// The same foe as a veteran of many fights, for one well above you (tier 1 tough, 2 deadly):
   /// heavy shoulder plates, a battle-torn cape, worked armour and eyes that burn in the helm; a
   /// deadly one adds horn-spikes along its arms and legs and a smouldering red glow.
+  /// The same figure, a little bigger, its eyes and weapon lit in [glow]: how a rare in its own
+  /// clothes (a gladiator of the Colosseum) shows its aura without losing its kit.
+  Look withGlow(Color glow, double grow) => Look(
+    build: build,
+    stance: stance,
+    skin: skin,
+    torso: torso,
+    upper: upper,
+    fore: fore,
+    hand: hand,
+    thigh: thigh,
+    shin: shin,
+    boot: boot,
+    head: head,
+    scale: scale * grow,
+    torsoKind: torsoKind,
+    knee: knee,
+    elbow: elbow,
+    pauldron: pauldron,
+    ruff: ruff,
+    talons: talons,
+    fangCollar: fangCollar,
+    tabard: tabard,
+    trim: trim,
+    emblem: emblem,
+    belt: belt,
+    pouch: pouch,
+    cape: cape,
+    tattered: tattered,
+    capeFlow: capeFlow,
+    helm: helm,
+    plume: plume,
+    eyeGlow: glow,
+    crown: crown,
+    hair: hair,
+    beard: beard,
+    hood: hood,
+    mask: mask,
+    maskTrim: maskTrim,
+    weapon: weapon,
+    offhand: offhand,
+    poisoned: poisoned,
+    rusty: rusty,
+    shield: shield,
+    wraps: wraps,
+    gore: gore,
+    miasma: miasma,
+    skirt: skirt,
+    quiver: quiver,
+    weaponGlow: glow,
+    offhandGlow: offhandGlow,
+    legendary: legendary,
+    hatColour: hatColour,
+    weaponTint: weaponTint,
+    foliage: foliage,
+    canopy: canopy,
+    embers: embers,
+    bareBranches: bareBranches,
+    berries: berries,
+    thorns: thorns,
+    weaponRarity: weaponRarity,
+    wings: wings,
+    tail: tail,
+    ghostly: ghostly,
+    armourGlow: armourGlow,
+    wyrmHorns: wyrmHorns,
+    wyrmGloves: wyrmGloves,
+    wyrmBoots: wyrmBoots,
+    female: female,
+    soot: soot,
+    shine: shine,
+    engrave: engrave,
+    engraveCol: engraveCol,
+    blackIron: blackIron,
+    kitDetail: kitDetail,
+    sprite: sprite,
+    bandaged: bandaged,
+    usekh: usekh,
+    feathered: feathered,
+    order: order,
+    kilt: kilt,
+    ownKit: ownKit,
+  );
+
   Look veteran(int tier) => tier <= 0
       ? this
       : Look(
@@ -356,6 +444,9 @@ class Look {
     bandaged: bandaged,
     usekh: usekh,
     feathered: feathered,
+    order: order,
+    kilt: kilt,
+    ownKit: ownKit,
   );
 
   final String build;
@@ -384,6 +475,14 @@ class Look {
 
   /// Robe skirt for mages; drawn from the waist to the shins.
   final Ramp? skirt;
+
+  /// The skirt is a short kilt (a gladiator's loincloth, a legionary's tunic): it stops above the
+  /// knee.
+  final bool kilt;
+
+  /// A rare in its own clothes keeps them (a gladiator, a warrior of the Hall of the Slain): its aura
+  /// lights its eyes and weapon, and doesn't re-armour it or crown it.
+  final bool ownKit;
 
   /// Leather colour of a quiver worn on the back.
   final Color? quiver;
@@ -429,7 +528,8 @@ class Look {
   /// Enchanted or high-tier wyrmscale glows softly in its dragon's colour.
   final Color? armourGlow;
 
-  /// The order whose crest an [HeadKind.orderhelm] wears (a faction suit's id).
+  /// The order whose crest an [HeadKind.orderhelm] wears (a faction suit's id), or the gladiator
+  /// school whose helm a [HeadKind.galea] is ('murmillo', 'thraex', 'galea'...).
   final String? order;
 
   /// A heroine: longer hair (a braid under a helm), lashes and no beard.
@@ -513,6 +613,7 @@ HeadKind _headFor(HeroClass c, GearItem? helm) {
     'kabuto' => HeadKind.kabuto,
     'jingasa' => HeadKind.jingasa,
     'eboshi' => HeadKind.eboshi,
+    'galea' => HeadKind.galea,
     _ => c == HeroClass.knight ? HeadKind.greathelm : HeadKind.bare,
   };
 }
@@ -601,6 +702,8 @@ const setLiveries = <String, SetLivery>{
   'skyborn': SetLivery(0xFF5A88B0, 0xFF9AC8E8, 0xFFE8D8B0),
   'bushido': SetLivery(0xFF8A1E1A, 0xFFB8322A, 0xFFE8C060),
   'drakesworn': SetLivery(0xFF6A1A12, 0xFF3E3442, 0xFFE3A548, tattered: true, horns: true),
+  // The Champion's set: bronze, and the arena's red.
+  'arena': SetLivery(0xFF8A1E1A, 0xFFB0763A, 0xFFE8C060),
   'vault': SetLivery(0xFF5A2A10, 0xFF9A5A2A, 0xFFFF9A4A),
 };
 
@@ -672,22 +775,25 @@ Look lookFor(HeroClass c, Loadout l, {String dye = 'crimson', bool gloves = fals
         skin: skin,
         // Starting kit: a battered mail shirt over the gambeson.
         torso: m ?? (livery != null ? ramp(livery.metal, .3, .5) : ramp(0xFF6E7379, .3, .5)),
-        torsoKind: wyrmKit ? TorsoKind.dragonplate : (tier.look == ArmourLook.lamellar ? TorsoKind.lamellar : (tier.look == ArmourLook.scales ? TorsoKind.scales : (plate ? TorsoKind.plate : TorsoKind.mail))),
+        // The Champion's set, worn whole: a gladiator's banded bronze, bare arms and thighs, and a
+        // skirt of crimson leather strips.
+        torsoKind: setId == 'arena' ? TorsoKind.lamellar : wyrmKit ? TorsoKind.dragonplate : (tier.look == ArmourLook.lamellar ? TorsoKind.lamellar : (tier.look == ArmourLook.scales ? TorsoKind.scales : (plate ? TorsoKind.plate : TorsoKind.mail))),
         // A ragged dark tasset hangs from the belt, and the cape is torn to match.
-        skirt: wyrmKit ? ramp(0xFF2A2228, .2, .55) : null,
+        skirt: setId == 'arena' ? ramp(0xFF8A1E1A, .25, .5) : (wyrmKit ? ramp(0xFF2A2228, .2, .55) : null),
+        kilt: setId == 'arena',
         tattered: wyrmKit || (livery?.tattered ?? false),
         talons: wyrmKit,
         fangCollar: wyrmKit || (livery?.horns ?? false),
         ruff: l.armour == 'furmantle' ? const Color(0xFFB8AA96) : (livery?.ruff == null ? null : Color(livery!.ruff!)),
-        upper: m ?? cloth,
+        upper: setId == 'arena' ? skin : (m ?? cloth),
         fore: m ?? ramp(0xFF6E4A2E),
         hand: gl ?? (plate ? m! : (gloves ? helmSteel : ramp(0xFF5A3A22, .25, .5))),
-        thigh: m ?? cloth,
+        thigh: setId == 'arena' ? skin : (m ?? cloth),
         // Worn sabatons carry their own greaves; bare, plate legs match the suit.
         shin: plate ? (bt != null && l.boots!.tint != null ? bt : m!) : boot,
         boot: boot,
-        knee: plate ? m : null,
-        elbow: plate ? m : null,
+        knee: plate && setId != 'arena' ? m : null,
+        elbow: plate && setId != 'arena' ? m : null,
         pauldron: plate || blackIron || wyrmTierOfArmour(l.armour) != null ? m : ramp(0xFF6E4A2E),
         // Plate is worn bare so the breastplate shows; cloth and mail wear the surcoat.
         tabard: (plate && l.armour != 'surcoat') || tier.look == ArmourLook.lamellar ? null : dyeCol,
@@ -698,7 +804,7 @@ Look lookFor(HeroClass c, Loadout l, {String dye = 'crimson', bool gloves = fals
         // bare suit's matching helm takes the armour's metal.
         (l.helm != null ? (l.helm!.tint != null ? gearRamp(l.helm!) : helmSteel) : ((plate || blackIron) && head != HeadKind.nasal ? (blackIron ? _knightMetals['plate']! : m) : helmSteel)),
         plume: head == HeadKind.greathelm || head == HeadKind.sallet ? dyeCol : null,
-        order: head == HeadKind.orderhelm ? l.helm?.gearSet : null,
+        order: head == HeadKind.orderhelm ? l.helm?.gearSet : (head == HeadKind.galea ? 'galea' : null),
         armourGlow: _wyrmGlow(l),
         wyrmHorns: wyrmTierOfArmour(l.armour) != null || (livery?.horns ?? false),
         wyrmGloves: _wyrmOf(l.gloves) != null,
@@ -1674,6 +1780,84 @@ Look _blossom({String rank = 'ronin'}) {
   );
 }
 
+/// The gladiators of the Ash Colosseum: bare-chested, a broad bronze belt over a white loincloth,
+/// a padded manica on the sword arm and bronze greaves, each school with its own helm and kit. The
+/// Champion of the Ash wears a bronze muscle-cuirass and a crimson cloak, and his crest burns.
+Look _gladiator(String school) {
+  final champ = school == 'champion', net = school == 'retiarius', archer = school == 'sagittarius';
+  final skin = ramp(switch (school) {
+    'retiarius' => 0xFFB07A55,
+    'thraex' => 0xFFD8A27A,
+    'secutor' => 0xFF9A6A48,
+    'sagittarius' => 0xFFE0B08C,
+    _ => 0xFFC48E68,
+  }, .25, .45);
+  final bronze = ramp(0xFFB0763A, .35, .5), steel = ramp(0xFF9AA2AA, .3, .5);
+  final linen = ramp(0xFFE8DCC0, .2, .4), padding = ramp(0xFFD8CCA8, .2, .45);
+  final red = school == 'thraex' ? const Color(0xFF6A2A5A) : (school == 'hoplomachus' ? const Color(0xFF2A4A7A) : const Color(0xFF9A1E1A));
+  return Look(
+    build: champ ? 'brute' : (net || archer ? 'lean' : 'human'),
+    scale: champ ? 1.25 : 1,
+    stance: archer ? Stance.ranger : (net ? Stance.rogue : Stance.knight),
+    skin: skin,
+    // Bare to the waist, all but the Champion (bronze, muscled) and the archer (a linen tunic).
+    torso: champ ? bronze : (archer ? linen : skin),
+    torsoKind: champ ? TorsoKind.plate : (archer ? TorsoKind.leather : TorsoKind.plain),
+    upper: champ ? bronze : skin,
+    fore: net ? skin : padding,
+    hand: ramp(0xFF6A4A2E, .25, .5),
+    thigh: skin,
+    // A white loincloth, short, under the broad belt (the archer's tunic is longer cloth).
+    skirt: linen,
+    kilt: true,
+    ownKit: true,
+    shin: secutorOrHeavy(school) ? bronze : (net ? skin : steel),
+    boot: ramp(0xFF5A3A22, .2, .5),
+    knee: champ ? bronze : null,
+    // The net-man's galerus: a tall bronze guard on the shoulder.
+    pauldron: net || champ ? bronze : null,
+    belt: const Color(0xFFB0763A),
+    trim: const Color(0xFFE8C060),
+    cape: champ ? const Color(0xFF8A1E1A) : null,
+    capeFlow: champ ? .8 : 0,
+    head: net ? HeadKind.bare : HeadKind.galea,
+    order: switch (school) {
+      'champion' => 'champion',
+      _ => school,
+    },
+    helm: school == 'secutor' ? steel : (champ ? ramp(0xFFD8A040, .35, .5) : bronze),
+    plume: switch (school) {
+      'hoplomachus' => const Color(0xFFE8E4DA),
+      'thraex' => const Color(0xFFB8322A),
+      'champion' => const Color(0xFFFF7A2A),
+      _ => null,
+    },
+    hair: const Color(0xFF2A1A10),
+    beard: net ? const Color(0xFF2A1A10) : null,
+    female: archer || school == 'thraex',
+    eyeGlow: champ ? const Color(0xFFFFB04A) : null,
+    quiver: archer ? const Color(0xFF6E5030) : null,
+    weapon: switch (school) {
+      'retiarius' => Weapon.trident,
+      'thraex' => Weapon.scimitar,
+      'hoplomachus' => Weapon.spear,
+      'sagittarius' => Weapon.longbow,
+      'champion' => Weapon.longsword,
+      _ => Weapon.shortsword,
+    },
+    weaponGlow: champ ? const Color(0xFFFF7A2A) : null,
+    shield: switch (school) {
+      'murmillo' || 'secutor' => ShieldLook(field: red, kind: ShieldKind.tower),
+      'thraex' => ShieldLook(field: red, kind: ShieldKind.buckler),
+      'hoplomachus' || 'champion' => ShieldLook(field: champ ? const Color(0xFF8A1E1A) : red, kind: ShieldKind.round),
+      _ => null,
+    },
+  );
+}
+
+/// Heavy schools wear bronze greaves on both legs.
+bool secutorOrHeavy(String school) => school == 'secutor' || school == 'murmillo' || school == 'champion';
+
 /// The Hollowdeep's batkin: furred bat-folk with leathery wings folded at their backs. Skulkers
 /// are lean and carry hooked sickles; echo-callers wear a ragged robe and carry a staff that hums
 /// violet; roost-guards wear scale over their fur and carry a glaive.
@@ -1756,6 +1940,62 @@ Look _frost({String rank = 'reaver'}) {
   );
 }
 
+/// The warriors of the Hall of the Slain: the dead who died well, still feasting and fighting, a
+/// little paler than the living and lit gold from inside, as if the hall's fire never left them.
+/// Reavers in mail and a spectacled helm with round shield and axe; berserkers bare-chested under a
+/// bear's pelt, an axe in each hand; skalds in long blue wool with a staff of runes; the frost-giant
+/// the Thane wrestled to death; and the Thane himself, in gilt mail and a white fur mantle, with the
+/// Allfather's spear.
+Look _einherjar({String rank = 'reaver'}) {
+  final giant = rank == 'giant', thane = rank == 'thane', berserk = rank == 'berserker', skald = rank == 'skald';
+  final skin = giant ? ramp(0xFFA8C8DC, .25, .5) : ramp(0xFFE0C0A0, .22, .45);
+  final fur = ramp(berserk ? 0xFF5A4030 : 0xFF8A7A66, .25, .5);
+  final mail = ramp(thane ? 0xFFB09050 : 0xFF8A8E94, .3, .5);
+  final wool = ramp(skald ? 0xFF2E4A7A : (thane ? 0xFF6A1E1A : 0xFF6A2A20), .3, .5);
+  const gold = Color(0xFFFFD27A);
+  return Look(
+    build: giant || thane ? 'giant' : (berserk ? 'brute' : 'human'),
+    scale: thane ? 1.35 : (giant ? 1.45 : 1),
+    stance: skald ? Stance.mage : Stance.knight,
+    skin: skin,
+    torso: berserk ? skin : (giant ? fur : (skald ? wool : mail)),
+    torsoKind: berserk ? TorsoKind.plain : (giant ? TorsoKind.fur : (skald ? TorsoKind.robe : (thane ? TorsoKind.plate : TorsoKind.mail))),
+    upper: berserk || giant ? skin : mail,
+    fore: skin,
+    hand: giant || berserk ? skin : ramp(0xFF5A3E26, .25, .5),
+    thigh: wool,
+    shin: berserk || giant ? fur : ramp(0xFF8A7A66, .25, .5),
+    boot: ramp(0xFF3A2A1C, .2, .5),
+    skirt: skald ? wool : null,
+    ruff: berserk ? const Color(0xFF6A4A32) : (thane ? const Color(0xFFF2F4F8) : (giant ? null : const Color(0xFFB8A890))),
+    pauldron: thane ? mail : null,
+    tabard: thane ? const Color(0xFF6A1E1A) : (rank == 'reaver' ? const Color(0xFF6A2A20) : null),
+    cape: thane ? const Color(0xFF2A3A5A) : null,
+    capeFlow: thane ? .7 : 0,
+    belt: const Color(0xFF3A2416),
+    trim: gold,
+    head: berserk || skald || giant || thane ? HeadKind.bare : HeadKind.nasal,
+    helm: rank == 'reaver' ? ramp(0xFF9AA0A8, .3, .5) : null,
+    hair: giant || thane || skald ? const Color(0xFFE8F0F4) : (berserk ? const Color(0xFF8A3A1A) : const Color(0xFFC88A3A)),
+    beard: giant || thane || skald ? const Color(0xFFE8F0F4) : (berserk ? const Color(0xFF8A3A1A) : const Color(0xFFC88A3A)),
+    crown: thane,
+    female: rank == 'skald',
+    eyeGlow: gold,
+    gore: berserk,
+    weapon: switch (rank) {
+      'giant' => Weapon.club,
+      'thane' => Weapon.spear,
+      'skald' => Weapon.staff,
+      _ => Weapon.axe,
+    },
+    offhand: berserk ? Weapon.axe : Weapon.none,
+    ownKit: true,
+    weaponGlow: thane || skald ? const Color(0xFFE8F0FF) : null,
+    weaponTint: thane ? const Color(0xFFE8DCA8) : null,
+    shield: rank == 'reaver' || thane ? ShieldLook(field: thane ? const Color(0xFF6A1E1A) : const Color(0xFF2E4A7A), trim: gold, kind: ShieldKind.round) : null,
+  );
+}
+
 /// The Skyreach Aeries: harpies (wild-haired, feathered wings, talons) and the aeriekin, proud
 /// bird-folk with hawks' heads and great wings, in sky-blue and bronze. Wardens carry a spear and
 /// wear bronze; skyshots carry a longbow; stormcallers a staff that crackles.
@@ -1799,6 +2039,20 @@ Look _aerie({String rank = 'warden'}) {
 }
 
 final Map<String, Look> foeLooks = {
+  // The Hall of the Slain.
+  'einherjarReaver': _einherjar(),
+  'einherjarBerserker': _einherjar(rank: 'berserker'),
+  'einherjarSkald': _einherjar(rank: 'skald'),
+  'einherjarGiant': _einherjar(rank: 'giant'),
+  'einherjarThane': _einherjar(rank: 'thane'),
+  // The Ash Colosseum.
+  'murmillo': _gladiator('murmillo'),
+  'retiarius': _gladiator('retiarius'),
+  'thraex': _gladiator('thraex'),
+  'hoplomachus': _gladiator('hoplomachus'),
+  'sagittarius': _gladiator('sagittarius'),
+  'secutor': _gladiator('secutor'),
+  'arenaChampion': _gladiator('champion'),
   ...entLooks,
   'ghost': _spirit(robe: 0xFF9AB8C8),
   'banshee': _spirit(robe: 0xFFB8C8D8, head: HeadKind.banshee, eyes: const Color(0xFFCFF4FF)),

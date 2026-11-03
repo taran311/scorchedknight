@@ -21,6 +21,7 @@ import '../game/rules.dart';
 import '../game/knight_classes.dart';
 import '../game/spells.dart';
 import '../game/tasks.dart' show GameTask;
+import '../game/nemesis.dart' show nemesisTitle;
 import 'errands_view.dart';
 import 'fill_column.dart';
 import 'hero_view.dart';
@@ -713,7 +714,7 @@ class _Spellbook extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = controller, k = c.state.knight, cls = classOf(k);
     // The rites anyone learns by level; a class's own come below, while you wear its suit.
-    final list = [for (final sp in spells) if (sp.order == null) sp]..sort((a, b) => a.level.compareTo(b.level));
+    final list = [for (final sp in spells) if (sp.order == null) sp]..sort((a, b) => (a.earned == null ? a.level : 999).compareTo(b.earned == null ? b.level : 999));
     final active = [for (final id in k.rites) if (spellById(id) case final sp? when riteKnown(k, sp)) sp].take(riteSlots).toList();
     // A class rite: its tile, lit when it's yours (on the hotbar: its slot), locked till its rank.
     Widget classTile(Spell sp) {
@@ -865,7 +866,7 @@ class _Spellbook extends StatelessWidget {
                       builder: (context) {
                         final known = riteKnown(k, sp), slotAt = active.indexOf(sp), prepared = slotAt >= 0, col = Color(sp.argb);
                         return Tooltip(
-                          message: known ? '${sp.name}: ${sp.desc}${prepared ? ' (tap to take it off your hotbar)' : ' (tap to put it on your hotbar)'}' : '${sp.name}: learned at level ${sp.level}',
+                          message: known ? '${sp.name}: ${sp.desc}${prepared ? ' (tap to take it off your hotbar)' : ' (tap to put it on your hotbar)'}' : (sp.earned != null ? '${sp.name}: won in ${sp.earned}' : '${sp.name}: learned at level ${sp.level}'),
                           child: GestureDetector(
                             onTap: known ? () => c.prepareSpell(sp.id) : null,
                             child: MouseRegion(
@@ -910,7 +911,7 @@ class _Spellbook extends StatelessWidget {
                                         ),
                                       ),
                                     ),
-                                    if (!known) Positioned(right: 5, top: 4, child: Text('Lv ${sp.level}', style: Txt.label(size: 11, color: Palette.parch2))),
+                                    if (!known) Positioned(right: 5, top: 4, child: Text(sp.earned != null ? 'Won' : 'Lv ${sp.level}', style: Txt.label(size: 11, color: Palette.parch2))),
                                     // On the hotbar: its slot number in a small round badge in the corner.
                                     if (prepared)
                                       Positioned(
@@ -964,13 +965,15 @@ class _Journey extends StatelessWidget {
     final s = controller.state;
     final rows = <(String, String)>[
       ('Continents reached', '${[for (var i = 0; i < mainLands; i++) if (openers(i).isEmpty || openers(i).any(s.bossesDown.contains)) i].length} of $mainLands${[for (var i = mainLands; i < continents.length; i++) if (openers(i).any(s.bossesDown.contains)) i].isEmpty ? '' : ' (and off the road)'}'),
-      ('Places explored', '${s.explored.length} of ${places.length}'),
+      ('Places explored', '${s.explored.where((id) => placeById(id) != null).length} of ${places.length}'),
       ('Bosses felled', s.bossesDown.isEmpty ? 'none yet' : [for (final i in s.bossesDown.toList()..sort()) continents[i].boss.name].join(', ')),
       ('Foes felled', fmt(s.foesFelled)),
       ('Rare foes', fmt(s.raresFelled)),
       ('Chests opened', fmt(s.chestsOpened)),
       ('Knocked out', s.knockouts == 0 ? 'never' : '${s.knockouts} ${s.knockouts == 1 ? 'time' : 'times'}'),
       ('Ran away', s.flees == 0 ? 'never' : '${s.flees} ${s.flees == 1 ? 'time' : 'times'}'),
+      if (s.nemesis != null) ('Your nemesis', '${s.nemesis!.name} (${nemesisTitle(s.nemesis!.rank).toLowerCase()})'),
+      if (s.nemesesSlain > 0) ('Nemeses slain', '${s.nemesesSlain}'),
     ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

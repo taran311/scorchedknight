@@ -15,6 +15,7 @@ import '../art/silhouette.dart';
 import '../game/catalog.dart';
 import '../game/classes.dart' show HeroClass;
 import '../game/controller.dart';
+import '../game/dungeons.dart' show dungeonById;
 import '../game/models.dart' show GameState;
 import '../game/rules.dart';
 import '../audio/audio.dart';
@@ -23,6 +24,7 @@ import 'encounter_window.dart';
 import 'fill_column.dart';
 import 'gear_glance.dart';
 import 'hud.dart';
+import 'map_page.dart';
 import 'item_icons.dart';
 import 'stat_icons.dart' show InfoChip;
 import 'theme.dart';
@@ -97,10 +99,13 @@ class _TrailPageState extends State<TrailPage> {
     if (exit == BattleExit.onward) _onward();
   }
 
-  void _onward() {
+  Future<void> _onward() async {
     final to = nextLand;
     nextLand = null;
     if (to == null || c.whyNotTravel(to) != null) return;
+    // A moment on the map first: the road from here to there.
+    await showRoadOpens(context, c, from: land, to: to);
+    if (!mounted) return;
     Navigator.of(context).pushReplacement(MaterialPageRoute<void>(builder: (_) => TrailPage(controller: c, land: to)));
   }
 
@@ -269,6 +274,18 @@ class _TrailPageState extends State<TrailPage> {
                         ] else
                           _NextStop(controller: c, land: land, onGo: _go),
                         const SizedBox(height: 10),
+                        // A relic part kept somewhere in this land (a guardian's place or a dungeon's
+                        // hoard), once you have its blueprint: what it is, and the way there.
+                        for (final (r, i) in relicPartsOn(land))
+                          if (!relics[r]!.parts[i].risen && s.bossesDown.contains(r) && !s.forged.contains(r) && !hasRelicPart(s.relicParts, r, i)) ...[
+                            _RelicLead(controller: c, relic: r, part: i, land: land),
+                            const SizedBox(height: 10),
+                          ],
+                        // The Throne: the Ember King's generals, and how much weaker each one leaves him.
+                        if (land == mainLands - 1 && !s.bossesDown.contains(land)) ...[
+                          _Generals(state: s),
+                          const SizedBox(height: 10),
+                        ],
                         Grow(child: _Lurking(controller: c, land: land)),
                     ]),
                   ),
@@ -538,6 +555,55 @@ class _Heroic extends StatelessWidget {
                 height: 52,
                 decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0xFF7A2418), border: Border.all(color: gold, width: 2)),
                 child: Center(child: risen ? const Icon(Icons.workspace_premium, color: gold, size: 28) : const ItemIcon(Item.swords, size: 30)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A relic part waiting at a place or in a dungeon in this land: the relic and its parts (the one
+/// here glowing, as on a Heroic trail), and a tap to go straight there on the map.
+class _RelicLead extends StatelessWidget {
+  const _RelicLead({required this.controller, required this.relic, required this.part, required this.land});
+  final GameController controller;
+  final int relic, part, land;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = controller.state, r = relics[relic]!, p = r.parts[part];
+    final dungeon = p.source == PartSource.dungeon;
+    final spot = dungeon ? dungeonById(p.at)?.name : placeById(p.at)?.name;
+    const gold = Color(0xFFFFD98A);
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => MapPage(controller: controller, place: dungeon ? null : p.at, dungeon: dungeon ? p.at : null))),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF3A1A12), Color(0xFF1A0C08)]),
+            border: Border.all(color: gold, width: 1.5),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(child: Text('RELIC PART · ${(spot ?? 'somewhere here').toUpperCase()}', style: Txt.label(size: 12, color: gold))),
+                  Text(dungeon ? 'Delve ›' : 'Go there ›', style: Txt.label(size: 13, color: gold, weight: FontWeight.w800)),
+                ],
+              ),
+              const SizedBox(height: 6),
+              _RelicReward(
+                name: relic == 2 && s.knight.heroClass == HeroClass.ranger ? 'Briarsong' : r.name,
+                relic: r,
+                has: [for (var i = 0; i < r.parts.length; i++) hasRelicPart(s.relicParts, relic, i)],
+                here: land,
+                forged: false,
               ),
             ],
           ),
@@ -1053,3 +1119,45 @@ class _TrailPainter extends CustomPainter {
   bool shouldRepaint(_TrailPainter old) => old.land != land || old.at != at || old.step != step || old.hero != hero;
 }
 
+
+/// The Ember King's generals, on the Throne's trail: who's down, who still stands, and what it's
+/// worth against him.
+class _Generals extends StatelessWidget {
+  const _Generals({required this.state});
+  final GameState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final down = state.generalsDown.where(emberGenerals.contains).length;
+    const ember = Color(0xFFFF8A4A);
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF3A160C), Color(0xFF1A0A06)]),
+        border: Border.all(color: ember, width: 1.5),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(down == 0 ? 'THE EMBER KING\'S GENERALS' : 'GENERALS DOWN: $down OF ${emberGenerals.length} · VHARRAX ${(generalCut * down * 100).round()}% WEAKER', style: Txt.label(size: 12, color: ember)),
+          const SizedBox(height: 4),
+          Text('Each one you fell on the road before you face him leaves him weaker.', style: Txt.onStone(size: 13.5)),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            children: [
+              for (final g in emberGenerals)
+                InfoChip(
+                  icon: Icon(state.generalsDown.contains(g) ? Icons.check_circle : Icons.local_fire_department, size: 14, color: state.generalsDown.contains(g) ? const Color(0xFF9BE27A) : ember),
+                  text: g,
+                  colour: state.generalsDown.contains(g) ? const Color(0xFF9BE27A) : ember,
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}

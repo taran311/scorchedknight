@@ -139,7 +139,7 @@ void paintGearIcon(Canvas canvas, Size size, GearItem item, HeroClass heroClass,
       final sk = Skeleton.solve(b, Pose.of({}));
       final hasHat = item.art == 'wizardhat' || item.art == 'scoutcap';
       // An order's crest (wings, a fin, a wolf's head) stands well clear of the helm: step back.
-      final crest = look.head == HeadKind.orderhelm;
+      final crest = look.head == HeadKind.orderhelm || look.head == HeadKind.galea;
       canvas.translate(s * (crest ? .56 : .5), s * (hasHat ? .62 : (crest ? .6 : .55)));
       canvas.scale(s / (b.head * (hasHat ? 4.4 : (crest ? 4.6 : 3.2))));
       canvas.translate(-sk.head.dx, -sk.head.dy);

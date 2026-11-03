@@ -4,8 +4,11 @@ import 'dart:math' as math;
 
 import 'ammo.dart';
 import 'brews.dart';
+import 'arena.dart' show arenaBoutOf;
+import 'hall.dart' show roarHit, einherjarOf;
 import 'catalog.dart';
 import 'classes.dart';
+import 'knight_classes.dart' show classOf;
 import 'loot.dart';
 import 'models.dart';
 import 'spells.dart';
@@ -233,9 +236,9 @@ DragonStage? dragonStage(Knight k) {
 /// Damage of one plain attack before effects and crits.
 int fullSwing(Knight k) => 8 + 2 * k.level + heroStats(k).damage;
 
-/// A summoned skeleton's blow: half of one of yours (so the rites that raise them keep pace with
+/// A summoned skeleton's blow: seven tenths of one of yours (so the rites that raise them keep pace with
 /// your gear, not just your level).
-int summonHit(Knight k) => (fullSwing(k) * .5).round();
+int summonHit(Knight k) => (fullSwing(k) * .7).round();
 
 /// The level of the foes you meet in [continent]: never below the continent's own level, and they
 /// keep pace with you above it.
@@ -267,12 +270,16 @@ int spawnHp(int foeIndex, int level, [Rare? rare]) {
   // A rare in its own clothes (the Hidden Ones, golems) has its own HP; the base foe sets the land.
   final i = rare?.base ?? foeIndex, f = rare?.type ?? foeAt(i);
   final variant = rare == null ? 1.0 : (rare.name != null && !rare.pack ? namedRareHp : rareHp) * (f.boss ? .7 : 1);
-  return ((8 + 2 * level) * turnsPerFoe * (f.boss ? bossTurns : 1) * f.hp * variant * toughness(landTier(realmAt(i)), level)).round();
+  return ((8 + 2 * level) * turnsPerFoe * (f.boss ? bossTurns : 1) * f.hp * variant * toughness(landTier(realmAt(i)), level) * (f.boss || ownTuning(rare) ? 1 : continents[realmAt(i)].foeHp)).round();
 }
 
 /// Later continents are tougher, and foes keep pace with the gear a hero of [level] usually
 /// carries: weapons, crits, elements and companions take a hero from a little over a bare swing at
 /// level 1 to about four times it by level 30 (see tool/balance.dart).
+/// The Colosseum's gladiators and the Hall's warriors are tuned on their own (arena.dart, hall.dart),
+/// not by the land they fight in.
+bool ownTuning(Rare? rare) => rare != null && (arenaBoutOf(rare.look) != null || einherjarOf(rare.look, null) != null);
+
 double toughness(int realm, int level) => (1 + .06 * realm) * gearPower(level);
 
 /// How many bare swings a typically geared hero of [level] hits for.
@@ -401,7 +408,7 @@ SwingDamage swingDamage(GameState state, double roll, {Special? special, AmmoTyp
     smite: el(Stat.smite, ((foe.undead || foe.demon || foe.element == 'poison' ? s.smite : 0) + (sp?.element == Stat.smite ? extra : 0) + ammoAdds(Stat.smite)) * (foe.spirit ? 2 : 1)),
     chip: chip,
     // Bloodleech heals a share of the hit (capped), on top of flat lifesteal.
-    heal: s.lifesteal + (sp?.heal ?? 0) + (base * math.min(leechCap + (shot == AmmoType.leech ? 15 : 0), s.leech + (shot == AmmoType.leech ? 15 : 0)) / 100).round(),
+    heal: s.lifesteal + (sp?.heal ?? 0) + (base * math.min(leechCap + (shot == AmmoType.leech ? 6 : 0), s.leech + (shot == AmmoType.leech ? 6 : 0)) / 100).round(),
     leech: s.leech > 0 || shot == AmmoType.leech,
     devastating: devastating,
     glancing: glancing,
@@ -416,14 +423,20 @@ SwingDamage swingDamage(GameState state, double roll, {Special? special, AmmoTyp
 
 /// How hard the foe at [foeIndex] (or a rare variant) hits back each turn, before armour. Grows
 /// with its level and continent; bosses and rare foes hit harder.
+const foeHitGrowth = .45, bossHit = 1.6;
 int foeAttack(int foeIndex, Rare? rare, int level) {
   final f = encounterType(foeIndex, rare), realm = landTier(realmAt(rare?.base ?? foeIndex));
   var a = (13 + 5.6 * level + 1.4 * math.max(0, level - 8)) * (1 + .05 * realm);
   // The first few levels go easier on a new hero, while they learn the ropes (and the flat part of
   // the formula would otherwise make Cindervale the hardest land in the game, per foe).
   if (level < 5) a *= .7 + .075 * (level - 1);
+  // Foes keep pace with the armour, parries and blocks a hero gathers (as their HP keeps pace with
+  // the hero's weapons, in [toughness]), so a regular fight still costs a real share of your HP
+  // late on, not a scratch.
+  a *= 1 + foeHitGrowth * (1 - math.exp(-math.max(0, level - 5) / 8));
   // Bosses hit hard (Gorbo, the very first, a little less: he's where a new hero learns bosses).
-  if (f.boss) a *= realm == 0 ? 1.4 : 1.6;
+  if (f.boss) a *= (realm == 0 ? 1.2 : bossHit) * f.hit;
+  if (!f.boss && !ownTuning(rare)) a *= continents[realmAt(rare?.base ?? foeIndex)].foeHit;
   if (f.dragon) a += 1;
   if (f.rare) a *= f.named ? 1.35 : 1.2;
   if (f.pack) a *= 1.1;
@@ -431,11 +444,12 @@ int foeAttack(int foeIndex, Rare? rare, int level) {
   return a.round();
 }
 
-/// The chance the foe's blow misses you outright (more for nimble rangers).
-double dodgeChance(Knight k, [FoeType? foe]) => math.min(.6, (k.heroClass == HeroClass.ranger ? .25 : .15) + heroStats(k).dodge / 100 + (foe?.look == 'cyclops' ? cyclopsDodge : 0));
+/// The chance the foe's blow misses you outright (more for nimble rangers). Up to 40% (rangers 50%):
+/// it stacks with parrying, blocking and armour.
+double dodgeChance(Knight k, [FoeType? foe]) => math.min(k.heroClass == HeroClass.ranger ? .5 : .4, (k.heroClass == HeroClass.ranger ? .25 : .15) + heroStats(k).dodge / 100 + (foe?.look == 'cyclops' ? cyclopsDodge : 0));
 
 /// How the foe's blow went.
-enum Guard { dodge, parry, block, hit, frozen, warded, slowed, guarded, asleep, stunned }
+enum Guard { dodge, parry, block, hit, frozen, warded, slowed, guarded, asleep, stunned, roared }
 
 /// Share of an attack the off-hand weapon adds when dual wielding.
 const dualStrikeShare = .08;
@@ -474,7 +488,8 @@ double parryChance(Knight k) {
 }
 
 /// The chance to block (or, for mages, ward off) most of the blow, from class, shield and guard.
-/// Up to 50%.
+/// Up to 40% (50% for the Forge Knight, whose order is built on it): it stacks with dodging,
+/// parrying and armour, so it can't be the whole story.
 double blockChance(Knight k) {
   final base = switch (k.heroClass) {
     HeroClass.knight => 10,
@@ -483,7 +498,7 @@ double blockChance(Knight k) {
   };
   final shield = _hasShield(k) ? 8 : 0;
   final s = heroStats(k);
-  return ((base + shield + s.guard ~/ 2 + s.block) / 100).clamp(0.0, .5);
+  return ((base + shield + s.guard ~/ 2 + s.block) / 100).clamp(0.0, classOf(k)?.id == 'deepforge' ? .5 : .4);
 }
 
 /// A block lets this share of the blow through (a shield stops more of it).
@@ -498,7 +513,7 @@ int nextBlow(GameState s) => (counterDamage(s) * (s.foeWindup ? heavyBlow : 1)).
 /// The foe's blow after armour and guard (at least 1).
 int counterDamage(GameState s) {
   final k = s.knight;
-  final weakened = s.foeWeakened > 0 ? .6 : 1.0; // Enfeeble
+  final weakened = (s.foeWeakened > 0 ? .6 : 1.0) * (s.foeRoar > 0 ? roarHit : 1.0); // Enfeeble; a war cry
   // The dead hit softer against armour made of their own bones.
   final bones = foeIn(s).undead && boneArmour.contains(k.loadout.armour) ? boneWard : 1.0;
   final bark = brewOn(k, Brew.barkskin) ? barkskinBrew : 1.0;
@@ -582,7 +597,7 @@ class SuitArt {
 
 const suitArts = <String, SuitArt>{
   'ashen': SuitArt('Cinder Slam', 'Ashen Cut', 'IGNITE', 0xFFFF6A2A, 'Sets it ablaze'),
-  'nightblood': SuitArt('Blood Rend', 'Crimson Cut', 'DRINK', 0xFFE0405A, 'Heals you a quarter of the blow'),
+  'nightblood': SuitArt('Blood Rend', 'Crimson Cut', 'DRINK', 0xFFE0405A, 'Heals you a sixth of the blow'),
   'moonfang': SuitArt('Savage Maul', 'Moonfang Rake', 'BLEED', 0xFFC8C4BC, 'Opens a bleeding wound'),
   'silverleaf': SuitArt('Moonlit Feint', 'Silver Cut', 'WEAKEN', 0xFFE8E0B0, 'It hits softer for 2 turns'),
   'deepforge': SuitArt('Anvil Strike', 'Runed Cut', 'STUN', 0xFFE8C060, 'Always stuns, bosses too'),

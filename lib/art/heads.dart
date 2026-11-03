@@ -105,6 +105,8 @@ void drawHead(Canvas c, Skeleton sk, Look look, double t, {bool still = false}) 
       _batHead(c, r, look);
     case HeadKind.yeti:
       _yetiHead(c, r, look);
+    case HeadKind.galea:
+      _galea(c, r, look, t, still, look.order ?? 'murmillo');
   }
   if (look.crown && look.head == HeadKind.shifter) {
     // The Thousandfold: a ring of faces, like the Mother of Masks, but every one of them its own.
@@ -2754,5 +2756,213 @@ void _orderHelm(Canvas c, double r, Look look, double t, bool still, String orde
     case 'sunscale':
       // Slit-pupilled gold eyes behind the visor.
       c.drawLine(Offset(r * .55, -r * .335), Offset(r * 1.2, -r * .335), strokePaint(const Color(0xCCE8C040), 1.6));
+  }
+}
+
+
+/// A gladiator's helm, by school ([style]): the murmillo's fish-fin crest, the thraex's griffin,
+/// the hoplomachus's plume, the secutor's smooth egg with two small eyeholes, the sagittaria's open
+/// cone, and the champion's (and the Champion's set's) galea, a crest of spikes over a face-guard
+/// with two great eye-slots. Broad-brimmed bronze, grilled faces.
+void _galea(Canvas c, double r, Look look, double t, bool still, String style) {
+  final bronze = look.helm ?? const [Color(0xFFE8B878), Color(0xFFB0763A), Color(0xFF5A3418)];
+  final dark = shade(bronze[2], -.35), edge = shade(bronze[0], .2);
+  final sway = still ? 0.0 : math.sin(t / 620);
+  final secutor = style == 'secutor', archer = style == 'sagittarius';
+  final galea = style == 'galea' || style == 'champion';
+  // An open-faced helm shows the face under it.
+  if (archer) _humanHead(c, r, look);
+  // Behind the bowl: plumes and crests that sweep back.
+  final plume = look.plume;
+  if (style == 'hoplomachus' || style == 'thraex') {
+    // Feathers, a tall bunch on top (hoplomachus), or one at each side (thraex).
+    final col = plume ?? const Color(0xFFE8E4DA);
+    final spots = style == 'hoplomachus' ? [(-.1, -1.25, 2.1)] : [(-.6, -.95, 1.5), (.35, -1.05, 1.4)];
+    for (final (x, y, h) in spots) {
+      for (var i = 0; i < 5; i++) {
+        final a = -1.15 + i * .2 + sway * .04;
+        final base = Offset(r * x, r * y), tip = base + Offset(math.cos(a) * r * h * .55 - r * .25, -r * h * (.8 + i * .05));
+        final f = Path()
+          ..moveTo(base.dx - r * .1, base.dy)
+          ..quadraticBezierTo(base.dx - r * .35, (base.dy + tip.dy) / 2, tip.dx, tip.dy)
+          ..quadraticBezierTo(base.dx + r * .2, (base.dy + tip.dy) / 2, base.dx + r * .12, base.dy)
+          ..close();
+        fillPath(c, f, [shade(col, .25), col, shade(col, -.4)], tip, base, width: 1);
+      }
+    }
+  }
+  // The bowl.
+  final bowl = Path()
+    ..moveTo(-r * 1.08, r * .55)
+    ..cubicTo(-r * 1.22, -r * .7, -r * .55, -r * 1.42, r * .15, -r * 1.4)
+    ..cubicTo(r * .95, -r * 1.36, r * 1.22, -r * .7, r * 1.18, -r * .1)
+    ..lineTo(r * 1.1, r * .55)
+    ..close();
+  if (!archer) {
+    // The face-guard (or, on the secutor, the whole smooth shell) comes down to the chin.
+    final face = Path()
+      ..moveTo(r * .05, -r * .45)
+      ..lineTo(r * 1.2, -r * .4)
+      ..quadraticBezierTo(r * 1.32, r * .4, r * 1.08, r * 1.08)
+      ..quadraticBezierTo(r * .5, r * 1.3, -r * .2, r * 1.05)
+      ..lineTo(-r * .3, r * .2)
+      ..close();
+    fillPath(c, face, bronze, Offset(r * .2, -r * .4), Offset(r * 1.2, r * 1.1));
+    // The neck-guard flaring out behind.
+    final neck = Path()
+      ..moveTo(-r * .7, r * .3)
+      ..quadraticBezierTo(-r * 1.35, r * .55, -r * 1.55, r * 1.05)
+      ..lineTo(-r * .95, r * 1.05)
+      ..quadraticBezierTo(-r * .7, r * .8, -r * .35, r * .75)
+      ..close();
+    fillPath(c, neck, bronze, Offset(-r * 1.5, r * .3), Offset(-r * .4, r * 1.05));
+  }
+  fillPath(c, bowl, bronze, Offset(-r, -r * 1.4), Offset(r * 1.1, r * .4));
+  c.save();
+  c.clipPath(bowl);
+  _ellipse(c, Offset(-r * .1, -r * .95), r * .65, r * .2, Paint()..color = const Color(0x40FFFFFF), -.08);
+  c.drawRect(Rect.fromLTRB(-r * 1.3, -r * 1.5, -r * .55, r * .6), Paint()..shader = ui.Gradient.linear(Offset(-r * 1.25, 0), Offset(-r * .55, 0), [dark.withValues(alpha: .65), dark.withValues(alpha: 0)]));
+  c.restore();
+  // The brim, wide and flat, all the way round (not on the secutor's smooth egg, nor the archer's cone).
+  if (!secutor && !archer) {
+    // (Broad at the back, curling down over the brow at the front, like a fin of bronze.)
+    final brim = Path()
+      ..moveTo(-r * 1.5, r * .1)
+      ..quadraticBezierTo(-r * .2, -r * .38, r * 1.05, -r * .46)
+      ..quadraticBezierTo(r * 1.4, -r * .44, r * 1.42, -r * .22)
+      ..quadraticBezierTo(r * 1.2, -r * .3, r * 1.0, -r * .26)
+      ..quadraticBezierTo(-r * .2, -r * .16, -r * 1.42, r * .3)
+      ..close();
+    fillPath(c, brim, bronze, Offset(0, -r * .46), Offset(0, r * .2), width: 1.2);
+    c.drawPath(Path()..moveTo(-r * 1.45, r * .14)..quadraticBezierTo(-r * .2, -r * .32, r * 1.05, -r * .4), strokePaint(edge.withValues(alpha: .7), .9));
+  }
+  // The face: a grille of holes, the secutor's two little eyeholes, or the galea's great slots.
+  if (galea) {
+    for (final y in const [-.12]) {
+      final slot = Path()
+        ..moveTo(r * .45, r * y)
+        ..lineTo(r * 1.18, r * (y - .02))
+        ..lineTo(r * 1.16, r * (y + .2))
+        ..quadraticBezierTo(r * .8, r * (y + .3), r * .5, r * (y + .22))
+        ..close();
+      c.drawPath(slot, Paint()..color = const Color(0xFF120806));
+    }
+    // The nose-bar between the slots, and a row of breathing holes at the mouth.
+    c.drawLine(Offset(r * .86, -r * .14), Offset(r * .9, r * .35), strokePaint(bronze[1], r * .14));
+    for (var i = 0; i < 4; i++) {
+      c.drawCircle(Offset(r * (.62 + i * .14), r * .62), r * .045, Paint()..color = const Color(0xFF120806));
+    }
+  } else if (secutor) {
+    for (final x in const [.78, 1.02]) {
+      c.drawCircle(Offset(r * x, -r * .05), r * .07, Paint()..color = const Color(0xFF120806));
+    }
+  } else if (!archer) {
+    // The grille: a lattice of round holes over the eyes and nose.
+    final grille = Rect.fromLTRB(r * .42, -r * .28, r * 1.14, r * .62);
+    c.drawRRect(RRect.fromRectAndRadius(grille.inflate(r * .04), Radius.circular(r * .12)), strokePaint(dark, 1.4));
+    for (var row = 0; row < 4; row++) {
+      for (var col = 0; col < 4; col++) {
+        c.drawCircle(Offset(grille.left + (col + .5) * grille.width / 4, grille.top + (row + .5) * grille.height / 4), r * .06, Paint()..color = const Color(0xFF120806));
+      }
+    }
+  }
+  if (look.eyeGlow case final glow? when !archer) {
+    c.drawCircle(Offset(r * .95, -r * .02), r * .1, Paint()..color = glow);
+  }
+  // On top: the crest.
+  switch (style) {
+    case 'murmillo':
+      // A fish's fin: tall, arched, ribbed, running front to back.
+      // (Tall and swept back, like the dorsal fin of the fish the school is named for.)
+      final fin = Path()
+        ..moveTo(-r * 1.0, -r * 1.0)
+        ..cubicTo(-r * 1.5, -r * 2.2, -r * .2, -r * 2.85, r * .75, -r * 2.55)
+        ..quadraticBezierTo(r * .35, -r * 2.0, r * 1.0, -r * 1.15)
+        ..quadraticBezierTo(r * .1, -r * 1.42, -r * 1.0, -r * 1.0)
+        ..close();
+      fillPath(c, fin, bronze, Offset(0, -r * 2.7), Offset(0, -r * 1.1));
+      for (var i = 0; i < 7; i++) {
+        final u = i / 6;
+        final base = Offset(-r * .85 + u * r * 1.7, -r * (1.18 + math.sin(u * math.pi) * .1));
+        final tip = Offset(-r * .95 + u * r * 1.45, -r * (2.0 + math.sin(u * math.pi) * .5));
+        c.drawLine(base, tip, strokePaint(dark.withValues(alpha: .55), 1.1));
+      }
+    case 'thraex':
+      // A griffin's head rearing up off the crown, beak forward.
+      final g = Path()
+        ..moveTo(-r * .55, -r * 1.25)
+        ..quadraticBezierTo(-r * .4, -r * 2.0, r * .25, -r * 2.15)
+        ..quadraticBezierTo(r * .75, -r * 2.15, r * .95, -r * 1.85)
+        ..lineTo(r * .6, -r * 1.75)
+        ..quadraticBezierTo(r * .35, -r * 1.6, r * .4, -r * 1.3)
+        ..close();
+      fillPath(c, g, bronze, Offset(0, -r * 2.1), Offset(0, -r * 1.2));
+      c.drawCircle(Offset(r * .45, -r * 1.95), r * .06, Paint()..color = const Color(0xFF120806));
+    case 'hoplomachus':
+      // (The plume's already up: a short ridge to seat it.)
+      c.drawPath(Path()..moveTo(-r * .5, -r * 1.3)..quadraticBezierTo(r * .1, -r * 1.55, r * .55, -r * 1.3), strokePaint(dark, r * .22));
+    case 'secutor':
+      // Just a low fin, smooth as the rest: nothing for a net to catch.
+      final fin = Path()
+        ..moveTo(-r * .7, -r * 1.12)
+        ..quadraticBezierTo(r * .05, -r * 1.75, r * .85, -r * .95)
+        ..quadraticBezierTo(r * .1, -r * 1.42, -r * .7, -r * 1.12)
+        ..close();
+      fillPath(c, fin, bronze, Offset(0, -r * 1.7), Offset(0, -r * 1.0));
+    case 'sagittarius':
+      // A tall cone with a knob, and cheek-guards.
+      final cone = Path()
+        ..moveTo(-r * 1.0, -r * .55)
+        ..quadraticBezierTo(-r * .55, -r * 1.7, r * .05, -r * 2.0)
+        ..quadraticBezierTo(r * .55, -r * 1.7, r * 1.0, -r * .55)
+        ..close();
+      fillPath(c, cone, bronze, Offset(0, -r * 2), Offset(0, -r * .5));
+      c.drawCircle(Offset(r * .05, -r * 2.02), r * .13, Paint()..color = bronze[0]);
+      final cheek = Path()
+        ..moveTo(r * .35, -r * .55)
+        ..lineTo(r * .7, -r * .5)
+        ..quadraticBezierTo(r * .75, r * .3, r * .45, r * .55)
+        ..lineTo(r * .3, -r * .2)
+        ..close();
+      fillPath(c, cheek, bronze, Offset(r * .3, -r * .5), Offset(r * .7, r * .5), width: 1);
+    default:
+      // The galea: a fin crest with a row of spikes along its spine (the Champion's burns).
+      final champ = style == 'champion';
+      final fin = Path()
+        ..moveTo(-r * .95, -r * .95)
+        ..cubicTo(-r * .95, -r * 1.95, r * .55, -r * 2.05, r * 1.0, -r * 1.15)
+        ..quadraticBezierTo(r * .2, -r * 1.42, -r * .95, -r * .95)
+        ..close();
+      fillPath(c, fin, bronze, Offset(0, -r * 1.95), Offset(0, -r * 1.05));
+      for (var i = 0; i < 6; i++) {
+        final u = i / 5;
+        final at = Offset(-r * .85 + u * r * 1.75, -r * (1.35 + math.sin(u * math.pi) * .55));
+        final spike = Path()
+          ..moveTo(at.dx - r * .1, at.dy + r * .05)
+          ..lineTo(at.dx - r * .18 + r * .05, at.dy - r * .34)
+          ..lineTo(at.dx + r * .1, at.dy + r * .02)
+          ..close();
+        c.drawPath(spike, Paint()..color = edge);
+        c.drawPath(spike, strokePaint(outline, .8));
+      }
+      if (champ || plume != null) {
+        // Fire along the crest, flickering.
+        final fire = plume ?? const Color(0xFFFF7A2A);
+        for (var i = 0; i < 7; i++) {
+          final u = i / 6, f = still ? .5 : (math.sin(t / 110 + i * 1.7) + 1) / 2;
+          final at = Offset(-r * .8 + u * r * 1.6, -r * (1.55 + math.sin(u * math.pi) * .45));
+          final flame = Path()
+            ..moveTo(at.dx - r * .14, at.dy + r * .1)
+            ..quadraticBezierTo(at.dx - r * .2, at.dy - r * (.35 + f * .25), at.dx - r * .05, at.dy - r * (.55 + f * .35))
+            ..quadraticBezierTo(at.dx + r * .14, at.dy - r * .25, at.dx + r * .12, at.dy + r * .1)
+            ..close();
+          c.drawPath(flame, Paint()..color = fire.withValues(alpha: .85));
+          c.drawPath(flame.shift(Offset(0, r * .08)), Paint()..color = const Color(0xFFFFD84A).withValues(alpha: .7));
+        }
+      }
+  }
+  // A band of rivets round the base of the bowl.
+  for (var i = 0; i < 4; i++) {
+    c.drawCircle(Offset(-r * .8 + i * r * .45, -r * .55 + i * r * .02), r * .05, Paint()..color = edge);
   }
 }

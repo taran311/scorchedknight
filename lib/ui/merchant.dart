@@ -349,6 +349,27 @@ class MerchantWares extends StatelessWidget {
           if (bought.length < upgrades.length) Text('Better armour: forged at $smithName\'s', style: Txt.onStone(size: 12.5)),
         ],
         ],
+        // Sealed crates: gear for the slot you pick, rare or finer, sight unseen.
+        if (on('crates')) ...[
+          x.heading('Sealed crates · rare or finer, now and then legendary'),
+          for (final (slot, label) in const [(GearSlot.weapon, 'Weapon'), (GearSlot.offhand, 'Off-hand'), (GearSlot.helm, 'Helm'), (GearSlot.gloves, 'Gloves'), (GearSlot.boots, 'Boots'), (GearSlot.ring, 'Ring'), (GearSlot.trinket, 'Trinket')])
+            x.ware(
+              const Icon(Icons.inventory_2, color: Color(0xFFC89A5A), size: 26),
+              '$label crate',
+              'Level ${k.level} · opened when paid for',
+              CostButton(
+                label: '${crateCost(k.level)} gold',
+                onTap: c.whyNotCrate == null
+                    ? () {
+                        if (c.buyCrate(slot) != null) {
+                          Audio.play(Sfx.coins);
+                          resolvePendingLoot(context, c, title: 'From Mags\' sealed crate');
+                        }
+                      }
+                    : null,
+              ),
+            ),
+        ],
         if (on('dyes')) ...[
         x.heading('Dyes · ${switch (k.heroClass) {
           HeroClass.knight => 'cape, tabard, plume and shield',
@@ -489,6 +510,23 @@ class ForgeWares extends StatelessWidget {
             ),
           ),
         if (c.temperables.isEmpty) Text('Epic and legendary gear, back up to your level', style: Txt.onStone(size: 12.5)),
+        // Honing: a little more out of a piece you love, for more gold each time.
+        x.heading('Honing · each step +${(honeStep * 100).round()}% to every stat, up to +$honeMax'),
+        for (final g in c.honeables)
+          x.ware(
+            GearIcon(item: g, size: 30, heroClass: k.heroClass, dye: k.dye),
+            g.name,
+            g.hone == 0 ? 'Not yet honed' : 'Honed +${g.hone}',
+            CostButton(
+              label: '+${g.hone + 1} · ${honeCost(g, k.level)} gold',
+              onTap: c.whyNotHone(g) == null
+                  ? () {
+                      if (c.hone(g)) Audio.play(Sfx.clang);
+                    }
+                  : null,
+            ),
+          ),
+        if (c.honeables.isEmpty) Text('Rare or finer gear you wear (your vault pieces are beyond Dunstan\'s hammer)', style: Txt.onStone(size: 12.5)),
         ],
         if (on('suits')) ...[
         if (!forgedSets.any((f) => s.mat(trophyKey(f.trophy)) > 0 || setPieceSlots.any((slot) => s.mat(blueprintKey(f.id, slot)) > 0)))
@@ -1046,7 +1084,7 @@ Future<void> showMerchantWindow(BuildContext context, GameController c, {String?
   look: magsLook,
   glow: const [Color(0xFF3A6A3A), Color(0xFF12200F)],
   colour: const Color(0xFF8BD46A),
-  tabs: const [('supplies', 'Supplies', Icons.local_drink), ('brews', 'Brews', Icons.science), ('kit', 'Kit', Icons.gps_fixed), ('dyes', 'Dyes', Icons.palette)],
+  tabs: const [('supplies', 'Supplies', Icons.local_drink), ('brews', 'Brews', Icons.science), ('kit', 'Kit', Icons.gps_fixed), ('crates', 'Crates', Icons.inventory_2), ('dyes', 'Dyes', Icons.palette)],
   wares: (tab) => MerchantWares(controller: c, tab: tab),
 );
 
@@ -1127,4 +1165,45 @@ class _DyeSwatch extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// The last part of a relic has just turned up: say so, and offer the way to Dunstan's forge (back
+/// to town, the forge open). Returns whether you went.
+Future<bool> promptRelicForge(BuildContext context, GameController c) async {
+  final r = c.engine.relicReady;
+  if (r == null || !context.mounted) return false;
+  c.engine.relicReady = null;
+  final relic = relics[r]!, k = c.state.knight;
+  final name = r == 2 && k.heroClass == HeroClass.ranger ? 'Briarsong' : relic.name;
+  final low = k.level < relic.minLevel;
+  Audio.play(Sfx.levelUp);
+  final go = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: Palette.stone1,
+      title: Row(
+        children: [
+          const Icon(Icons.hardware, color: Color(0xFFFFB04A), size: 26),
+          const SizedBox(width: 8),
+          Expanded(child: Text('Every part of $name!', style: Txt.label(size: 20, color: Palette.cream, weight: FontWeight.w800))),
+        ],
+      ),
+      content: Text(
+        '${[for (final p in relic.parts) p.name].join(', ')}: all yours. $smithName can forge $name for ${relic.gold} gold'
+        '${low ? ', once you reach level ${relic.minLevel}' : ''}.',
+        style: Txt.onStone(size: 15),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text('Later', style: Txt.label(size: 15, color: Palette.parch2))),
+        StoneButton(title: 'To the forge', tone: ButtonTone.amber, compact: true, onPressed: () => Navigator.of(ctx).pop(true)),
+      ],
+    ),
+  );
+  if (go != true || !context.mounted) return false;
+  final nav = Navigator.of(context);
+  nav.popUntil((route) => route.isFirst);
+  // (The navigator outlives the page the prompt came from: the forge opens over the town.)
+  // ignore: use_build_context_synchronously
+  if (c.whyShut('forge') == null) await showForgeWindow(nav.context, c, tab: 'forge');
+  return true;
 }

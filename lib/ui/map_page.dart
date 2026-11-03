@@ -8,6 +8,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../art/paint_kit.dart';
+import '../game/arena.dart';
+import '../game/hall.dart';
 import '../game/catalog.dart';
 import '../game/controller.dart';
 import '../audio/audio.dart';
@@ -23,6 +25,10 @@ import 'trail_page.dart';
 import 'wilds_page.dart';
 import '../game/wilds.dart';
 import '../game/dungeons.dart';
+import '../game/contracts.dart';
+import '../game/models.dart' show GameState;
+import 'arena_page.dart';
+import 'hall_page.dart';
 import 'dungeon_page.dart';
 
 /// The map is 1000 wide and this tall: the lands, and the Shattered Sea along the bottom.
@@ -137,6 +143,25 @@ class _MapPageState extends State<MapPage> {
   /// A dungeon picked on the map (shown in the panel instead of a land).
   late String? _dungeonPick = widget.dungeon;
 
+  /// The Ash Colosseum or the Hall of the Slain picked on the map (shown in the panel instead of a land).
+  bool _arenaPick = false, _hallPick = false;
+
+  /// Into the Hall of the Slain: its waves, and the way onto its floor.
+  Future<void> _hall() async {
+    if (c.whyNotTravel(hallLand) != null) return;
+    if (!await headHomeFirst(context, c) || !mounted) return;
+    await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => HallPage(controller: c)));
+    if (mounted) setState(() {});
+  }
+
+  /// Into the Colosseum: its bouts, and the way out onto the sand.
+  Future<void> _arena() async {
+    if (c.whyNotTravel(arenaLand) != null) return;
+    if (!await headHomeFirst(context, c) || !mounted) return;
+    await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ArenaPage(controller: c)));
+    if (mounted) setState(() {});
+  }
+
   /// Down into a dungeon (or back to the run under way in it).
   Future<void> _delve(Dungeon d) async {
     if (c.whyNotDungeon(d.id) != null) return;
@@ -172,6 +197,8 @@ class _MapPageState extends State<MapPage> {
   Future<void> _enter(int land) async {
     setState(() {
       _pick = land;
+      _arenaPick = false;
+      _hallPick = false;
       _wildPick = null;
       _placePick = null;
       _dungeonPick = null;
@@ -256,6 +283,8 @@ class _MapPageState extends State<MapPage> {
   Future<void> _wilds(int a) async {
     setState(() {
       _wildPick = a;
+      _arenaPick = false;
+      _hallPick = false;
       _placePick = null;
       _dungeonPick = null;
     });
@@ -365,6 +394,10 @@ class _MapPageState extends State<MapPage> {
                                                   wildsOpen: [for (var a = 0; a < wildAreas.length; a++) c.wildOpen(a)],
                                                   wildPicked: _wildPick,
                                                   trip: s.wild,
+                                                  arena: (c.engine.whyNotArena() == null || s.inBattle && c.whyNotTravel(arenaLand) == null, s.arenaWins),
+                                                  arenaPicked: _arenaPick,
+                                                  hall: (c.whyNotTravel(hallLand) == null, s.hallWaves),
+                                                  hallPicked: _hallPick,
                                                 ),
                                               ),
                                             ),
@@ -381,15 +414,33 @@ class _MapPageState extends State<MapPage> {
                                             for (final p in places)
                                               if (c.placeShown(p) || (!p.hidden && p.relic == null)) _hotspot(Offset(p.x, p.y + 6), math.max(46, 40 / k), math.max(46, 40 / k), k, p.name, () => setState(() {
                                                 _placePick = p.id;
+                                                _arenaPick = false;
+                                                _hallPick = false;
                                                 _dungeonPick = null;
                                               })),
                                             for (final d in dungeons)
                                               _hotspot(Offset(d.x, d.y), math.max(46, 40 / k), math.max(46, 40 / k), k, d.name, () => setState(() {
                                                 _dungeonPick = d.id;
+                                                _arenaPick = false;
+                                                _hallPick = false;
                                                 _placePick = null;
                                                 _wildPick = null;
                                               })),
                                             for (var a = 0; a < wildAreas.length; a++) _hotspot(_wildSpots[a] + const Offset(0, 8), 150, 86, k, wildAreas[a].name, () => _wilds(a)),
+                                            _hotspot(const Offset(arenaX, arenaY), math.max(50, 44 / k), math.max(46, 40 / k), k, arenaName, () => setState(() {
+                                              _arenaPick = true;
+                                              _hallPick = false;
+                                              _placePick = null;
+                                              _dungeonPick = null;
+                                              _wildPick = null;
+                                            })),
+                                            _hotspot(const Offset(hallX, hallY), math.max(50, 44 / k), math.max(46, 40 / k), k, hallName, () => setState(() {
+                                              _hallPick = true;
+                                              _arenaPick = false;
+                                              _placePick = null;
+                                              _dungeonPick = null;
+                                              _wildPick = null;
+                                            })),
                                             _hotspot(_innSpot + const Offset(0, 2), 120, 70, k, 'Back to the Soot & Kettle', _home),
                                           ],
                                         );
@@ -406,7 +457,11 @@ class _MapPageState extends State<MapPage> {
                                     child: Text('Drag to look around · pinch in to see every name', textAlign: TextAlign.center, style: Txt.label(size: 12, color: Palette.parch2)),
                                   ),
                                 SizedBox(height: phone ? 6 : 10),
-                                if (dungeonById(_dungeonPick) case final d?)
+                                if (_arenaPick)
+                                  _ArenaPanel(controller: c, onGo: _arena)
+                                else if (_hallPick)
+                                  _HallPanel(controller: c, onGo: _hall)
+                                else if (dungeonById(_dungeonPick) case final d?)
                                   _DungeonPanel(controller: c, dungeon: d, onGo: () => _delve(d))
                                 else if (placeById(_placePick) case final p?)
                                   _PlacePanel(controller: c, place: p, onGo: () => _explore(p))
@@ -567,6 +622,9 @@ class _PlacePanel extends StatelessWidget {
               PlaceKind.cache => 'something hidden here',
               PlaceKind.shrine => 'a shrine',
             }}', style: Txt.label(size: 13, color: Palette.amber)),
+            ...?_relicNote(c.state, p.id),
+            if (contractFor(p.id) case final job? when !done)
+              Text('Contract: ${job.client} pays ${contractBounty(c.state.knight.level)} gold', style: Txt.label(size: 12.5, color: const Color(0xFFE0B070))),
             const SizedBox(height: 2),
             Text(done ? p.after : p.blurb, maxLines: 3, overflow: TextOverflow.ellipsis, style: Txt.onStone(size: 15)),
           ],
@@ -574,6 +632,112 @@ class _PlacePanel extends StatelessWidget {
         StoneButton(
           title: done ? 'Explored' : (why == null ? (p.kind == PlaceKind.guarded ? 'Fight' : 'Explore') : 'Not yet'),
           caption: done || why == null ? null : why,
+          tone: ButtonTone.blood,
+          onPressed: why == null ? onGo : null,
+        ),
+      ),
+    );
+  }
+}
+
+/// A relic part kept at the place or dungeon [id], once you have its blueprint: what it is and
+/// which relic it's for (gold while it's still there to take, green once it's yours).
+List<Widget>? _relicNote(GameState s, String id) {
+  final notes = [
+    for (final (r, i) in relicPartsAt(id))
+      if (s.bossesDown.contains(r) && !s.forged.contains(r)) (relics[r]!, i, hasRelicPart(s.relicParts, r, i)),
+  ];
+  if (notes.isEmpty) return null;
+  return [
+    for (final (relic, i, got) in notes)
+      Padding(
+        padding: const EdgeInsets.only(top: 3),
+        child: Row(
+          children: [
+            Icon(got ? Icons.check_circle : Icons.extension, size: 15, color: got ? const Color(0xFF9BE27A) : const Color(0xFFFFD98A)),
+            const SizedBox(width: 5),
+            Expanded(
+              child: Text(
+                got ? '${relic.parts[i].name} found (for ${relic.name})' : 'Relic part here: ${relic.parts[i].name}, for ${relic.name}',
+                style: Txt.label(size: 13, color: got ? const Color(0xFF9BE27A) : const Color(0xFFFFD98A), weight: FontWeight.w800),
+              ),
+            ),
+          ],
+        ),
+      ),
+  ];
+}
+
+/// The Hall of the Slain picked on the map: how far you've come, and the way in.
+class _HallPanel extends StatelessWidget {
+  const _HallPanel({required this.controller, required this.onGo});
+  final GameController controller;
+  final VoidCallback onGo;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = controller, s = c.state, why = c.whyNotTravel(hallLand), done = s.hallWaves >= hallWaves.length;
+    return Stone(
+      child: _panel(
+        context,
+        Container(
+          width: 70,
+          height: 70,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: const RadialGradient(colors: [Color(0xFFC8803A), Color(0xFF3A2414)]),
+            border: Border.all(color: Palette.amber, width: 2),
+          ),
+          child: Icon(done ? Icons.emoji_events : Icons.shield, color: const Color(0xFFFFE6A0), size: 34),
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(hallName, style: Txt.label(size: 22, color: Palette.cream, weight: FontWeight.w800)),
+            Text('${continents[hallLand].name} · ${done ? 'the hall has drunk to you' : 'wave ${s.hallWaves + 1} of ${hallWaves.length}'}', style: Txt.label(size: 13, color: Palette.amber)),
+            const SizedBox(height: 2),
+            Text(why ?? (done ? 'The Thane will fight you again, for the glory of it.' : 'Three waves of the honoured dead, no rest between. They teach a War Cry, and the Thane carries the Allfather\'s spear.'), maxLines: 3, overflow: TextOverflow.ellipsis, style: Txt.onStone(size: 15)),
+          ],
+        ),
+        StoneButton(title: why == null ? 'Enter' : 'Locked', tone: ButtonTone.blood, onPressed: why == null ? onGo : null),
+      ),
+    );
+  }
+}
+
+/// The Ash Colosseum picked on the map: how far you've come, and the way in.
+class _ArenaPanel extends StatelessWidget {
+  const _ArenaPanel({required this.controller, required this.onGo});
+  final GameController controller;
+  final VoidCallback onGo;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = controller, s = c.state, why = c.whyNotTravel(arenaLand), done = s.arenaWins >= arenaBouts.length;
+    return Stone(
+      child: _panel(
+        context,
+        Container(
+          width: 70,
+          height: 70,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: const RadialGradient(colors: [Color(0xFFE8C890), Color(0xFF8A5A2E)]),
+            border: Border.all(color: Palette.amber, width: 2),
+          ),
+          child: Icon(done ? Icons.emoji_events : Icons.stadium, color: const Color(0xFF3A1E0E), size: 34),
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(arenaName, style: Txt.label(size: 22, color: Palette.cream, weight: FontWeight.w800)),
+            Text('${continents[arenaLand].name} · ${done ? 'you are its Champion' : 'bout ${s.arenaWins + 1} of ${arenaBouts.length}'}', style: Txt.label(size: 13, color: Palette.amber)),
+            const SizedBox(height: 2),
+            Text(why ?? (done ? 'The Champion of the Ash will fight you again, for the crowd.' : 'Seven gladiators, one after another. Beat them all for the Champion\'s set.'), maxLines: 3, overflow: TextOverflow.ellipsis, style: Txt.onStone(size: 15)),
+          ],
+        ),
+        StoneButton(
+          title: why == null ? 'Enter' : 'Locked',
           tone: ButtonTone.blood,
           onPressed: why == null ? onGo : null,
         ),
@@ -614,6 +778,7 @@ class _DungeonPanel extends StatelessWidget {
               '${continents[d.land].name} · ${here ? 'room ${math.min(s.dungeonRoom + 1, dungeonRooms + 1)} of ${dungeonRooms + 1}' : (done ? '${d.boss.$1} beaten' : 'ruled by ${d.boss.$1}')}',
               style: Txt.label(size: 13, color: Palette.amber),
             ),
+            ...?_relicNote(s, d.id),
             const SizedBox(height: 2),
             Text(why ?? d.blurb, maxLines: 3, overflow: TextOverflow.ellipsis, style: Txt.onStone(size: 15, color: why == null ? Palette.parch2 : Palette.cream)),
           ],
@@ -711,7 +876,15 @@ class _WildPanel extends StatelessWidget {
 const _done = Color(0xFF9BE27A);
 
 class _MapPainter extends CustomPainter {
-  _MapPainter({required this.open, required this.selected, required this.beaten, this.cleared = const {}, required this.wildsOpen, this.wildPicked, this.trip, this.pins = const [], this.pinPicked, this.delves = const [], this.delvePicked, this.lockedLands = const {}, this.nameLand, this.allNames = true});
+  _MapPainter({required this.open, required this.selected, required this.beaten, this.cleared = const {}, required this.wildsOpen, this.wildPicked, this.trip, this.pins = const [], this.pinPicked, this.delves = const [], this.delvePicked, this.lockedLands = const {}, this.nameLand, this.allNames = true, this.arena = (false, 0), this.arenaPicked = false, this.hall = (false, 0), this.hallPicked = false});
+
+  /// The Hall of the Slain: whether it's open, and waves won.
+  final (bool, int) hall;
+  final bool hallPicked;
+
+  /// The Ash Colosseum: whether it's open, and bouts won.
+  final (bool, int) arena;
+  final bool arenaPicked;
 
   /// Lands you can't reach yet: their spots are small, dim and nameless (a hint of what's out there,
   /// not a wall of padlocks).
@@ -758,6 +931,8 @@ class _MapPainter extends CustomPainter {
     for (final (d, _, _, _) in delves) {
       _taken.add(Rect.fromCenter(center: Offset(d.x, d.y) + const Offset(4, -4), width: 40, height: 34));
     }
+    _taken.add(Rect.fromCenter(center: const Offset(arenaX, arenaY), width: 44, height: 34));
+    _taken.add(Rect.fromCenter(center: const Offset(hallX, hallY), width: 44, height: 34));
     canvas.save();
     canvas.scale(size.width / 1000);
     const rect = Rect.fromLTWH(0, 0, 1000, _mapH);
@@ -857,6 +1032,10 @@ class _MapPainter extends CustomPainter {
     for (final (d, open, done, here) in delves) {
       _delve(canvas, Offset(d.x, d.y), d.name, open, done, here, d.id == delvePicked, locked: lockedLands.contains(d.land), named: named(d.land, d.id == delvePicked));
     }
+    // The Ash Colosseum: a ring of arches.
+    _arenaMark(canvas, const Offset(arenaX, arenaY), arena.$1, arena.$2, arenaPicked, locked: lockedLands.contains(arenaLand), named: named(arenaLand, arenaPicked));
+    // The Hall of the Slain: a longhouse with a shield on its gable.
+    _hallMark(canvas, const Offset(hallX, hallY), hall.$1, hall.$2, hallPicked, locked: lockedLands.contains(hallLand), named: named(hallLand, hallPicked));
     // Their names last, each in the first free spot round its marker, so none lands on another.
     for (final (tp, at, gap) in _queued) {
       _float(canvas, tp, at, gap);
@@ -1157,6 +1336,75 @@ class _MapPainter extends CustomPainter {
     ));
   }
 
+  /// The Hall of the Slain on the map: a longhouse, steep-roofed, a shield on its gable, gold once
+  /// its Thane is down.
+  void _hallMark(Canvas c, Offset at, bool open, int won, bool picked, {bool locked = false, bool named = true}) {
+    final a = open ? 1.0 : (locked && !picked ? .3 : .45);
+    final done = won >= hallWaves.length;
+    if (picked) c.drawOval(Rect.fromCenter(center: at, width: 48, height: 36), strokePaint(const Color(0xFFFFE6A0), 3));
+    final roof = poly([at + const Offset(-20, -2), at + const Offset(0, -16), at + const Offset(20, -2)]);
+    final walls = Rect.fromLTRB(at.dx - 16, at.dy - 3, at.dx + 16, at.dy + 10);
+    c.drawRect(walls, Paint()..color = const Color(0xFF6A4A2E).withValues(alpha: a));
+    c.drawRect(walls, strokePaint(const Color(0xFF2A1A0E).withValues(alpha: a), 1.6));
+    c.drawPath(roof, Paint()..color = const Color(0xFF4A3420).withValues(alpha: a));
+    c.drawPath(roof, strokePaint(const Color(0xFF2A1A0E).withValues(alpha: a), 1.6));
+    // Crossed gable-ends, like horns, and the door.
+    c.drawLine(at + const Offset(-4, -20), at + const Offset(4, -12), strokePaint(const Color(0xFF2A1A0E).withValues(alpha: a), 1.6));
+    c.drawLine(at + const Offset(4, -20), at + const Offset(-4, -12), strokePaint(const Color(0xFF2A1A0E).withValues(alpha: a), 1.6));
+    c.drawRect(Rect.fromLTRB(at.dx - 3, at.dy + 2, at.dx + 3, at.dy + 10), Paint()..color = const Color(0xFF140E0A).withValues(alpha: a));
+    c.drawCircle(at + const Offset(0, -6), 3.2, Paint()..color = const Color(0xFFB0302A).withValues(alpha: a));
+    if (done) {
+      c.drawCircle(at + const Offset(20, -14), 6, Paint()..color = const Color(0xFFE3A548));
+      c.drawCircle(at + const Offset(20, -14), 6, strokePaint(const Color(0xFF3A2614), 1));
+    } else if (!open && !locked) {
+      _padlock(c, at + const Offset(20, 6), .45);
+    }
+    _taken.add(Rect.fromCenter(center: at, width: 44, height: 32));
+    if (!named) return;
+    _queued.add((
+      TextPainter(
+        text: TextSpan(text: hallName, style: Txt.inkLabel(size: 13, color: open ? const Color(0xFF2A1A0E) : const Color(0xFF6A5A44))),
+        textDirection: TextDirection.ltr,
+      )..layout(),
+      at,
+      16.0,
+    ));
+  }
+
+  /// The Ash Colosseum on the map: an oval of arches, gold once its Champion is down.
+  void _arenaMark(Canvas c, Offset at, bool open, int won, bool picked, {bool locked = false, bool named = true}) {
+    final a = open ? 1.0 : (locked && !picked ? .3 : .45);
+    final done = won >= arenaBouts.length;
+    if (picked) c.drawOval(Rect.fromCenter(center: at, width: 46, height: 34), strokePaint(const Color(0xFFFFE6A0), 3));
+    final outer = Rect.fromCenter(center: at, width: 38, height: 26), inner = Rect.fromCenter(center: at + const Offset(0, 2), width: 22, height: 12);
+    c.drawOval(outer, Paint()..color = const Color(0xFFB08A5A).withValues(alpha: a));
+    // The arches round the wall, and the sand floor inside.
+    for (var i = 0; i < 9; i++) {
+      final x = outer.left + 4 + i * 3.8;
+      c.drawLine(Offset(x, at.dy - 6), Offset(x, at.dy + 2), strokePaint(const Color(0xFF5A3E22).withValues(alpha: a), 1.6));
+    }
+    c.drawOval(inner, Paint()..color = const Color(0xFFE8C890).withValues(alpha: a));
+    c.drawOval(outer, strokePaint(const Color(0xFF2A1A0E).withValues(alpha: a), 1.8));
+    c.drawOval(inner, strokePaint(const Color(0xFF5A3E22).withValues(alpha: a), 1.2));
+    if (done) {
+      // A laurel's gold, for the Champion of the Ash.
+      c.drawCircle(at + const Offset(18, -14), 6, Paint()..color = const Color(0xFFE3A548));
+      c.drawCircle(at + const Offset(18, -14), 6, strokePaint(const Color(0xFF3A2614), 1));
+    } else if (!open && !locked) {
+      _padlock(c, at + const Offset(18, 6), .45);
+    }
+    _taken.add(Rect.fromCenter(center: at, width: 44, height: 32));
+    if (!named) return;
+    _queued.add((
+      TextPainter(
+        text: TextSpan(text: arenaName, style: Txt.inkLabel(size: 13, color: open ? const Color(0xFF2A1A0E) : const Color(0xFF6A5A44))),
+        textDirection: TextDirection.ltr,
+      )..layout(),
+      at,
+      16.0,
+    ));
+  }
+
   /// Rects already used on the map (names, padlocks, flags, markers), and the place and dungeon
   /// names still to put down: (text, marker, how far from it).
   final _taken = <Rect>[];
@@ -1344,6 +1592,10 @@ class _MapPainter extends CustomPainter {
       old.wildPicked != wildPicked ||
       old.pinPicked != pinPicked ||
       old.delvePicked != delvePicked ||
+      old.arena != arena ||
+      old.arenaPicked != arenaPicked ||
+      old.hall != hall ||
+      old.hallPicked != hallPicked ||
       old.delves.toString() != delves.toString() ||
       old.pins.length != pins.length ||
       old.pins.where((p) => p.$2).length != pins.where((p) => p.$2).length ||
@@ -1414,4 +1666,206 @@ class _PulsePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_PulsePainter old) => old.t != t;
+}
+
+/// A boss has fallen and the road runs on: a moment on the map, the way from the land behind you
+/// to the new one inked in and your marker walking it, before the new land's trail. A couple of
+/// seconds at most, and a tap skips it. (So the move to a new land is something you see happen,
+/// not a screen that changed under a hurried thumb.)
+Future<void> showRoadOpens(BuildContext context, GameController c, {required int from, required int to}) {
+  Audio.play(Sfx.quest);
+  return Navigator.of(context).push(
+    PageRouteBuilder<void>(
+      opaque: true,
+      transitionDuration: const Duration(milliseconds: 250),
+      reverseTransitionDuration: const Duration(milliseconds: 250),
+      pageBuilder: (context, a1, a2) => _RoadOpens(controller: c, from: from, to: to),
+      transitionsBuilder: (context, a, a2, child) => FadeTransition(opacity: a, child: child),
+    ),
+  );
+}
+
+class _RoadOpens extends StatefulWidget {
+  const _RoadOpens({required this.controller, required this.from, required this.to});
+  final GameController controller;
+  final int from, to;
+
+  @override
+  State<_RoadOpens> createState() => _RoadOpensState();
+}
+
+class _RoadOpensState extends State<_RoadOpens> with SingleTickerProviderStateMixin {
+  late final _t = AnimationController(vsync: this, duration: const Duration(milliseconds: 2600))..forward();
+  var _gone = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _t.addStatusListener((s) {
+      if (s == AnimationStatus.completed) Future<void>.delayed(const Duration(milliseconds: 500), _leave);
+    });
+  }
+
+  void _leave() {
+    if (_gone || !mounted) return;
+    _gone = true;
+    Navigator.of(context).pop();
+  }
+
+  @override
+  void dispose() {
+    _t.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.controller, s = c.state, l = continents[widget.to];
+    final a = _spots[widget.from], b = _spots[widget.to];
+    // The stretch of the map the road crosses, with room round it.
+    final view = Rect.fromPoints(a, b).inflate(170).intersect(const Rect.fromLTWH(0, 0, 1000, _mapH));
+    return Scaffold(
+      backgroundColor: const Color(0xFF0E0B08),
+      body: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _leave,
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              children: [
+                Expanded(
+                  child: Stone(
+                    padding: const EdgeInsets.all(3),
+                    child: LayoutBuilder(
+                      builder: (context, box) {
+                        // Zoom so the whole road fits, centred.
+                        final k = math.min(box.maxWidth / view.width, box.maxHeight / view.height);
+                        final dx = (box.maxWidth - view.width * k) / 2 - view.left * k, dy = (box.maxHeight - view.height * k) / 2 - view.top * k;
+                        return ClipRect(
+                          child: Stack(
+                            children: [
+                              Positioned(
+                                left: dx,
+                                top: dy,
+                                width: 1000 * k,
+                                height: _mapH * k,
+                                child: RepaintBoundary(
+                                  child: CustomPaint(
+                                    isComplex: true,
+                                    painter: _MapPainter(
+                                      open: [for (var i = 0; i < continents.length; i++) c.whyNotTravel(i) == null],
+                                      selected: -1,
+                                      beaten: s.bossesDown,
+                                      wildsOpen: [for (var w = 0; w < wildAreas.length; w++) c.wildOpen(w)],
+                                      lockedLands: {for (var i = 0; i < continents.length; i++) if (c.whyNotTravel(i) != null) i},
+                                      nameLand: widget.to,
+                                      allNames: false,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                left: dx,
+                                top: dy,
+                                width: 1000 * k,
+                                height: _mapH * k,
+                                child: AnimatedBuilder(animation: _t, builder: (context, _) => CustomPaint(painter: _RoadPainter(a, b, _t.value, Color(l.argb)))),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // The new land's name, once the road gets there.
+                AnimatedBuilder(
+                  animation: _t,
+                  builder: (context, _) {
+                    final v = Curves.easeOutBack.transform(((_t.value - .62) / .38).clamp(0.0, 1.0));
+                    return Opacity(
+                      opacity: v.clamp(0.0, 1.0),
+                      child: Transform.translate(
+                        offset: Offset(0, 14 * (1 - v)),
+                        child: Column(
+                          children: [
+                            Text('THE ROAD OPENS', style: Txt.label(size: 13, color: Palette.amber)),
+                            const SizedBox(height: 2),
+                            Text(l.name, textAlign: TextAlign.center, style: Txt.logo().copyWith(fontSize: 28, color: Color.lerp(Color(l.argb), Palette.cream, .35))),
+                            const SizedBox(height: 4),
+                            Text(l.blurb, textAlign: TextAlign.center, maxLines: 3, overflow: TextOverflow.ellipsis, style: Txt.onStone(size: 14.5)),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 8),
+                Text('Tap to go on', style: Txt.onStone(size: 12.5, color: Palette.parch2.withValues(alpha: .6))),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The road being inked from [a] to [b] ([t] 0 to 1), your marker walking it, and a ring round the
+/// new land as you arrive.
+class _RoadPainter extends CustomPainter {
+  _RoadPainter(this.a, this.b, this.t, this.colour);
+  final Offset a, b;
+  final double t;
+  final Color colour;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.scale(size.width / 1000);
+    // A gentle bend, not a ruler line.
+    final mid = (a + b) / 2, d = b - a;
+    final bend = mid + Offset(-d.dy, d.dx) * .18;
+    final path = Path()
+      ..moveTo(a.dx, a.dy)
+      ..quadraticBezierTo(bend.dx, bend.dy, b.dx, b.dy);
+    final walk = Curves.easeInOut.transform(((t - .1) / .55).clamp(0.0, 1.0));
+    final metric = path.computeMetrics().first;
+    final drawn = metric.length * walk;
+    // The road so far, in dashes of red ink.
+    final ink = Paint()
+      ..color = const Color(0xFF8A2A1A)
+      ..strokeWidth = 5
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    for (var x = 0.0; x < drawn; x += 22) {
+      canvas.drawPath(metric.extractPath(x, math.min(x + 12, drawn)), ink);
+    }
+    // Where you set out from.
+    canvas.drawCircle(a, 9, Paint()..color = const Color(0xFF3A2A1A));
+    canvas.drawCircle(a, 5, Paint()..color = Palette.amber);
+    // You, walking it.
+    final at = metric.getTangentForOffset(drawn)?.position ?? a;
+    canvas.drawCircle(at, 18, Paint()..color = Palette.amber.withValues(alpha: .25));
+    canvas.drawCircle(at, 11, Paint()..color = const Color(0xFF2A1A10));
+    canvas.drawCircle(at, 8, Paint()..color = const Color(0xFFFFD98A));
+    // Arrived: a ring opens round the new land.
+    final ring = ((t - .62) / .38).clamp(0.0, 1.0);
+    if (ring > 0) {
+      canvas.drawCircle(
+        b,
+        20 + 50 * ring,
+        Paint()
+          ..color = colour.withValues(alpha: (1 - ring) * .9)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 5,
+      );
+    }
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_RoadPainter o) => o.t != t;
 }

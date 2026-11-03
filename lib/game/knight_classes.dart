@@ -48,13 +48,13 @@ const knightClasses = <KnightClass>[
     passive: 'Undying',
     passiveText: 'Once a fight, a killing blow leaves you on 1 HP',
     bolts: 'Blood bolts',
-    boltsText: 'Your bolts heal you a fifth of what they deal',
+    boltsText: 'Your bolts heal you an eighth of what they deal',
   ),
   KnightClass(
     id: 'deepforge',
     name: 'Forge Knight',
     focus: 'Guard and stun',
-    blurb: 'The dwarves\' iron order. Blocks, wards and stops foes in their tracks.',
+    blurb: 'The dwarves\' iron order. Blocks more than any other knight (up to half of all blows), wards, and stops foes in their tracks.',
     argb: 0xFFE8C060,
     passive: 'Living Steel',
     passiveText: 'A fifth of every blow you block hits back',
@@ -92,6 +92,7 @@ int winsToNextRank(Knight k, String id) {
 /// Whether [k] can use rite [sp] now: a level rite once learned; a class rite while wearing that
 /// class's suit, at the rank it unlocks.
 bool riteKnown(Knight k, Spell sp) {
+  if (sp.earned != null) return k.earnedRites.contains(sp.id);
   if (sp.order == null) return sp.level <= k.level;
   return classOf(k)?.id == sp.order && classRank(k, sp.order!) >= sp.rank;
 }

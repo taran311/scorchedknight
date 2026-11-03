@@ -8,7 +8,10 @@
 
 import 'dart:math' as math;
 
+
+import 'arena.dart';
 import 'crafting.dart';
+import 'hall.dart';
 
 /// How a foe hits you: up close, with arrows, with magic, or with fire.
 enum Strike { melee, arrow, magic, fire }
@@ -56,7 +59,7 @@ extension FoeKindInfo on FoeKind {
 }
 
 class FoeType {
-  const FoeType(this.name, this.look, {this.boss = false, this.undead = false, this.dragon = false, this.ork = false, this.ent = false, this.hp = 1, this.aura, this.named = false, this.hound = false, this.stone = false, this.demon = false, this.spirit = false, this.venomous = false, this.beast = false, this.pack = false, this.aloft = false, this.strike = Strike.melee, this.armoured = false, this.night = false, this.element, this.mimic = false, this.regrows = false, this.shifts = false, this.evasive = false, this.ironhide = false});
+  const FoeType(this.name, this.look, {this.boss = false, this.undead = false, this.dragon = false, this.ork = false, this.ent = false, this.hp = 1, this.aura, this.named = false, this.hound = false, this.stone = false, this.demon = false, this.spirit = false, this.venomous = false, this.beast = false, this.pack = false, this.aloft = false, this.strike = Strike.melee, this.armoured = false, this.night = false, this.element, this.mimic = false, this.regrows = false, this.shifts = false, this.evasive = false, this.ironhide = false, this.warcry = false, this.hit = 1});
   final String name;
 
   /// Only out after dark (the vampires of Ravenmoor, the werewolves of the Howling Weald).
@@ -84,6 +87,13 @@ class FoeType {
 
   /// Dwarves: hides like old leather under forge-hardened mail. Critical hits land as ordinary ones.
   final bool ironhide;
+
+  /// The warriors of the Hall of the Slain: now and then, instead of a blow, a war cry that lifts
+  /// their own blows and cows yours for a few turns (see hall.dart).
+  final bool warcry;
+
+  /// How hard its blows land against the usual for its land and level (a boss's own tuning).
+  final double hit;
 
   /// Clad in heavy armour (plate, bone plate, scales, ironbark): your blade does less, rites cut
   /// straight through.
@@ -178,12 +188,19 @@ class Continent {
     required this.reagent,
     this.tier,
     this.opensAfter,
+    this.foeHit = 1,
+    this.foeHp = 1,
   });
   final String name, blurb;
 
   /// A side land, off the road to the Ember Throne: the land whose boss opens it (null for the
   /// lands along the road, each opened by the one before).
   final int? opensAfter;
+
+  /// How hard this land's own foes (not its boss) hit, and how much HP they have, against the
+  /// usual for its level: each land's own tuning, so a fight costs about the same share of your HP
+  /// wherever you are.
+  final double foeHit, foeHp;
 
   /// How tough its foes are, as a land along the road would be (null: its place on the road).
   final int? tier;
@@ -334,6 +351,12 @@ List<(int, int)> relicPartsOn(int land) => [
       if (e.value.parts[i].land == land) (e.key, i),
 ];
 
+/// The relic parts kept at the place or dungeon [id] (a guardian's or a hoard's): (relic, part index).
+List<(int, int)> relicPartsAt(String id) => [
+  for (final e in relics.entries)
+    for (var i = 0; i < e.value.parts.length; i++)
+      if (e.value.parts[i].at == id) (e.key, i),
+];
 
 /// The chance a foe carries timber or iron for your building, once Hob's job is done.
 const buildFindChance = .3;
@@ -352,7 +375,7 @@ const hobsJob = 'Hob the innkeeper looks at the smouldering roof, then at you. "
 const winsForBoss = 8;
 
 /// The share of your HP you get back catching your breath after every win (on top of regeneration).
-const breathShare = .06;
+const breathShare = .03;
 
 /// The lands along the road, Cindervale to the Ember Throne. The side lands come after them.
 const mainLands = 7;
@@ -428,6 +451,7 @@ const continents = <Continent>[
     name: 'The Gloomfen',
     blurb: 'A drowned marsh where the ash fell into the water and the dead got up to complain about it.',
     minLevel: 6,
+    foeHit: 1.1,
     argb: 0xFF7A9A8A,
     foes: [
       FoeType('Bog Shambler', 'zombie', undead: true),
@@ -439,7 +463,7 @@ const continents = <Continent>[
       FoeType('Plague Shambler', 'plague', undead: true, hp: 1.1, armoured: true),
       FoeType('Bog Witch', 'witch', hp: .9, strike: Strike.magic),
     ],
-    boss: FoeType('The Bone Colossus', 'bonecolossus', boss: true, undead: true),
+    boss: FoeType('The Bone Colossus', 'bonecolossus', boss: true, hp: 1.15, hit: 1.1, undead: true),
     companion: Companion.nightmare,
     companionText: 'From the Colossus\'s ribcage steps a ghostly black horse. It snorts embers and lets you climb on.',
     prize: 'phylactery',
@@ -458,6 +482,8 @@ const continents = <Continent>[
     name: 'The Thornwild',
     blurb: 'An old forest that grew back after the fire, very fast and very cross about it.',
     minLevel: 12,
+    foeHit: 1.25,
+    foeHp: 1.1,
     argb: 0xFF6E9A4A,
     foes: [
       FoeType('Twigling', 'twigling', ent: true, hp: .8),
@@ -469,7 +495,7 @@ const continents = <Continent>[
       FoeType('Centaur Outrider', 'centaur', beast: true, strike: Strike.arrow),
       FoeType('Ironbark Ent', 'ironEnt', ent: true, hp: 1.25, armoured: true),
     ],
-    boss: FoeType('Grandmother Bramblecrown', 'oakheart', boss: true, ent: true),
+    boss: FoeType('Grandmother Bramblecrown', 'oakheart', boss: true, hp: 1.15, hit: 1.1, ent: true),
     companion: Companion.fairy,
     companionText: 'A fairy was trapped in Bramblecrown\'s branches. Freed, she follows you, glowing smugly.',
     prize: 'acorn',
@@ -488,6 +514,7 @@ const continents = <Continent>[
     name: 'The Grimtusk Badlands',
     blurb: 'Red rock and war drums. The orks think the Great Burning was a party, and they want another.',
     minLevel: 18,
+    foeHit: .9,
     argb: 0xFFC0703E,
     foes: [
       FoeType('Ork Raider', 'ork', ork: true),
@@ -499,7 +526,7 @@ const continents = <Continent>[
       FoeType('Ash Warlock', 'warlock', strike: Strike.magic),
       FoeType('Ork Warlord', 'orkWarlord', ork: true, hp: 1.3, armoured: true),
     ],
-    boss: FoeType('Krugg the Mountain', 'orkbehemoth', boss: true, ork: true, hp: 1.1, armoured: true),
+    boss: FoeType('Krugg the Mountain', 'orkbehemoth', boss: true, hp: 1.15, hit: .95, ork: true, armoured: true),
     companion: Companion.hellhound,
     companionText: 'Krugg kept a hellhound pup in a cage. You open it. It sets your boots on fire, affectionately.',
     prize: 'warhorn',
@@ -518,6 +545,8 @@ const continents = <Continent>[
     name: 'The Sunken Sands',
     blurb: 'The Burning turned a sea of sand to glass and cracked open the old kings\' tombs. Now the dead walk out of them, still wound in their linen, and raiders pick over what they leave.',
     minLevel: 25,
+    foeHit: 1.15,
+    foeHp: 1.1,
     argb: 0xFFE0B060,
     foes: [
       FoeType('Dune Raider', 'duneRaider'),
@@ -527,7 +556,7 @@ const continents = <Continent>[
       FoeType('Tomb Priest', 'tombPriest', undead: true, hp: .9, strike: Strike.magic),
       FoeType('Tomb Guardian', 'mummyGuard', undead: true, hp: 1.2, armoured: true),
     ],
-    boss: FoeType('Nephrakhet, the Ash Pharaoh', 'pharaoh', boss: true, undead: true, hp: 1.15, strike: Strike.magic),
+    boss: FoeType('Nephrakhet, the Ash Pharaoh', 'pharaoh', boss: true, hp: 1.5, hit: 1.45, undead: true, strike: Strike.magic),
     companion: Companion.none,
     companionText: 'Nephrakhet crumbles to dust and linen. Behind his throne, the treasury of a dynasty glitters in the torchlight.',
     prize: 'ankh',
@@ -546,6 +575,7 @@ const continents = <Continent>[
     name: 'The Cinderreach',
     blurb: 'Black glass and smoking craters on the edge of Vharrax\'s realm. Dragons nest here, and not all of them chose his side.',
     minLevel: 31,
+    foeHit: 1.1,
     argb: 0xFF8A5A9A,
     foes: [
       FoeType('Ash Wyvern', 'wyvern', dragon: true, aloft: true, strike: Strike.fire),
@@ -555,7 +585,7 @@ const continents = <Continent>[
       FoeType('Ashen Knight', 'ashenKnight', armoured: true),
       FoeType('Gargoyle Sentinel', 'gargoylematriarch', stone: true, hp: 1.1, aloft: true),
     ],
-    boss: FoeType('Scorchmaw, Hound of Vharrax', 'demonhound', boss: true, hound: true, strike: Strike.fire),
+    boss: FoeType('Scorchmaw, Hound of Vharrax', 'demonhound', boss: true, hp: 1.4, hit: 1.3, hound: true, strike: Strike.fire),
     companion: Companion.dragon,
     companionText: 'Behind Scorchmaw\'s den, in a nest of cooled glass: a dragon egg, still warm. It isn\'t on his side either.',
     prize: 'collar',
@@ -575,6 +605,7 @@ const continents = <Continent>[
     name: 'The Ember Throne',
     blurb: 'Vharrax\'s mountain. Everything here is on fire, including the fire.',
     minLevel: 38,
+    foeHit: 1.05,
     argb: 0xFFE0502A,
     foes: [
       FoeType('Throne Pit Demon', 'pitdemon', demon: true, hp: 1.1, strike: Strike.fire),
@@ -583,7 +614,7 @@ const continents = <Continent>[
       FoeType('Elder Ember Wyrm', 'elderWyrm', dragon: true, hp: 1.15, aloft: true, strike: Strike.fire),
       FoeType('Azgar, Herald of Vharrax', 'demonlord', demon: true, hp: 1.3, armoured: true),
     ],
-    boss: FoeType('Vharrax the Ember King', 'emberKing', boss: true, dragon: true, hp: 1.35, aloft: true, strike: Strike.fire),
+    boss: FoeType('Vharrax the Ember King', 'emberKing', boss: true, hp: 1.5, hit: 1.25, dragon: true, aloft: true, strike: Strike.fire),
     companion: Companion.none,
     companionText: 'The Ember King falls, and for the first time since the Great Burning, it rains.',
     prize: 'emberheart',
@@ -602,6 +633,8 @@ const continents = <Continent>[
     name: 'Ravenmoor',
     blurb: 'A grey moor under a black castle. By day its thralls work the fields with their eyes down. By night the castle wakes, and it is hungry.',
     minLevel: 14,
+    foeHit: 1.25,
+    foeHp: 1.1,
     tier: 2,
     opensAfter: 1,
     argb: 0xFF9A3A4A,
@@ -613,7 +646,7 @@ const continents = <Continent>[
       FoeType('Blood Bride', 'bloodBride', undead: true, hp: .9, strike: Strike.magic, night: true),
       FoeType('Vampire Knight', 'vampireKnight', undead: true, hp: 1.15, armoured: true, night: true),
     ],
-    boss: FoeType('Countess Morwenna', 'countess', boss: true, undead: true, hp: 1.1, strike: Strike.magic, night: true),
+    boss: FoeType('Countess Morwenna', 'countess', boss: true, hp: 1.25, hit: 1.2, undead: true, strike: Strike.magic, night: true),
     companion: Companion.none,
     companionText: 'The Countess comes apart into a hundred bats, and they scatter over the moor. In the castle\'s cellar, the thralls\' chains hang open. They walk home in the dawn light.',
     prize: 'heartsblood',
@@ -628,6 +661,8 @@ const continents = <Continent>[
     name: 'The Howling Weald',
     blurb: 'Pinewood the fire never reached, and nobody goes into after dark. The woodsmen are friendly enough by day. They do not talk about the moon.',
     minLevel: 20,
+    foeHit: 1.35,
+    foeHp: 1.1,
     tier: 3,
     opensAfter: 2,
     argb: 0xFF6A7A9A,
@@ -639,7 +674,7 @@ const continents = <Continent>[
       FoeType('Moonstalker', 'werewolfStalker', hp: .95, night: true),
       FoeType('Silverback', 'werewolfBrute', hp: 1.25, night: true),
     ],
-    boss: FoeType('The Alpha of the Weald', 'werewolfAlpha', boss: true, hp: 1.15, night: true),
+    boss: FoeType('The Alpha of the Weald', 'werewolfAlpha', boss: true, hp: 1.45, hit: 1.45, night: true),
     companion: Companion.none,
     companionText: 'The Alpha falls, and the moon goes back behind the clouds. In the morning, the woodsmen are just woodsmen again, and very sorry about everything.',
     prize: 'bloodmoonpelt',
@@ -654,6 +689,8 @@ const continents = <Continent>[
     name: 'The Silverwood',
     blurb: 'The elves shut their forest when the world burned, and sang the fire back out of it. Every leaf is still silver. They do not want visitors, and they shoot first.',
     minLevel: 30,
+    foeHit: 1.25,
+    foeHp: 1.1,
     tier: 5,
     opensAfter: 2,
     argb: 0xFFA8C8B0,
@@ -665,7 +702,7 @@ const continents = <Continent>[
       FoeType('Silverbark Ent', 'mossEnt', ent: true, hp: 1.1),
       FoeType('Moonhorn Unicorn', 'unicorn', beast: true, strike: Strike.magic),
     ],
-    boss: FoeType('Queen Ithriel', 'elfQueen', boss: true, hp: 1.1, strike: Strike.magic, evasive: true),
+    boss: FoeType('Queen Ithriel', 'elfQueen', boss: true, hp: 1.3, hit: 1.25, strike: Strike.magic, evasive: true),
     companion: Companion.none,
     companionText: 'Queen Ithriel lowers her staff. "You fight like we used to, before we hid." The gates of the Silverwood open, a little, for you.',
     prize: 'starleaf',
@@ -680,6 +717,8 @@ const continents = <Continent>[
     name: 'Deepforge Hold',
     blurb: 'A dwarf-hold under the mountains, sealed since the Burning. Its forges never went out, and neither did its grudges. They mine, and smith, and fight anyone who knocks.',
     minLevel: 26,
+    foeHit: 1.15,
+    foeHp: 1.05,
     tier: 4,
     opensAfter: 3,
     argb: 0xFFB8865A,
@@ -690,7 +729,7 @@ const continents = <Continent>[
       FoeType('Rune-Priest', 'dwarfRune', hp: .9, strike: Strike.magic, ironhide: true),
       FoeType('Forge Golem', 'golemIron', hp: .75, stone: true),
     ],
-    boss: FoeType('Thane Grimnar Deepforge', 'dwarfThane', boss: true, hp: 1.15, armoured: true, ironhide: true),
+    boss: FoeType('Thane Grimnar Deepforge', 'dwarfThane', boss: true, hp: 1.25, hit: 1.15, armoured: true, ironhide: true),
     companion: Companion.none,
     companionText: 'Thane Grimnar throws down his hammer and laughs till his beard shakes. "Nobody\'s beaten me since the old king. Come and drink, sooty one!" The hold is open to you now.',
     prize: 'runependant',
@@ -705,6 +744,8 @@ const continents = <Continent>[
     name: 'The Isle of Mists',
     blurb: 'An island out past the Weald\'s coast, where the fog never lifts. The people there gave their faces to it after the Burning, so they would never have to see what was lost. They want yours.',
     minLevel: 33,
+    foeHit: 1.2,
+    foeHp: 1.1,
     tier: 5,
     opensAfter: 8,
     argb: 0xFFB8B4BC,
@@ -715,7 +756,7 @@ const continents = <Continent>[
       FoeType('Faceless Warden', 'facelessWarden', hp: 1.15, armoured: true, mimic: true),
       FoeType('Fog Wraith', 'ghost', hp: .85, spirit: true, aloft: true, strike: Strike.magic),
     ],
-    boss: FoeType('The Mother of Masks', 'facelessMother', boss: true, hp: 1.15, strike: Strike.magic, mimic: true),
+    boss: FoeType('The Mother of Masks', 'facelessMother', boss: true, hp: 1.35, hit: 1.2, strike: Strike.magic, mimic: true),
     companion: Companion.none,
     companionText: 'The Mother of Masks falls, and her ring of faces shatters. All over the island, the Faceless touch their cheeks, and find them there again. The fog begins, very slowly, to lift.',
     prize: 'thousandmask',
@@ -730,6 +771,8 @@ const continents = <Continent>[
     name: 'The Sunscale Jungle',
     blurb: 'South of the Sands, where the glass gives way to steaming jungle and stepped stone temples. The lizardfolk worship the sun, and they think the Great Burning was their god paying a visit.',
     minLevel: 28,
+    foeHit: 1.2,
+    foeHp: 1.1,
     tier: 4,
     opensAfter: 4,
     argb: 0xFF6AAA4A,
@@ -740,7 +783,7 @@ const continents = <Continent>[
       FoeType('Saurian Champion', 'lizardChampion', hp: 1.2, armoured: true, regrows: true),
       FoeType('Marsh Drake', 'mossDragon', dragon: true, aloft: true, strike: Strike.fire),
     ],
-    boss: FoeType('King Ssarrak the Sun-Eater', 'lizardKing', boss: true, hp: 1.15, armoured: true, regrows: true),
+    boss: FoeType('King Ssarrak the Sun-Eater', 'lizardKing', boss: true, hp: 1.3, hit: 1.15, armoured: true, regrows: true),
     companion: Companion.none,
     companionText: 'King Ssarrak sinks to his knees and hisses, almost laughing. "The sun has chosen a new champion. Very well." The temple drums go quiet.',
     prize: 'sunfang',
@@ -755,6 +798,8 @@ const continents = <Continent>[
     name: 'The Shattered Sea',
     blurb: 'South of the world, the Burning boiled the sea and broke the coast into a thousand reefs. The merrow fight over the wrecks, the serpents hunt the shallows, and something enormous sleeps in the deep.',
     minLevel: 22,
+    foeHit: 1.2,
+    foeHp: 1.1,
     tier: 3,
     opensAfter: 1,
     argb: 0xFF3A8AB8,
@@ -765,7 +810,7 @@ const continents = <Continent>[
       FoeType('Sea Serpent', 'seaSerpent', hp: 1.1, beast: true),
       FoeType('Drowned Sailor', 'drownedSailor', undead: true, hp: .9),
     ],
-    boss: FoeType('The Leviathan', 'leviathan', boss: true, hp: 1.2, beast: true, strike: Strike.magic),
+    boss: FoeType('The Leviathan', 'leviathan', boss: true, hp: 1.5, hit: 1.4, beast: true, strike: Strike.magic),
     companion: Companion.none,
     companionText: 'The Leviathan sinks into the deep, and the sea goes calm for the first time since the Burning. On the shore, the merrow watch you, and one by one they lower their tridents.',
     prize: 'leviathaneye',
@@ -780,6 +825,8 @@ const continents = <Continent>[
     name: 'The Changeling Isle',
     blurb: 'Out past the reefs, an island where nothing keeps its shape for long. The changelings who live there wear the faces of everything they\'ve ever met. Whatever steps out to meet you, it won\'t stay that way.',
     minLevel: 36,
+    foeHit: 1.2,
+    foeHp: 1.1,
     tier: 5,
     opensAfter: 13,
     argb: 0xFFA88AD0,
@@ -789,7 +836,7 @@ const continents = <Continent>[
       FoeType('Mimic Hulk', 'shifterHulk', hp: 1.2, shifts: true),
       FoeType('Echo', 'ghost', hp: .85, spirit: true, aloft: true, strike: Strike.magic),
     ],
-    boss: FoeType('The Thousandfold', 'thousandfold', boss: true, hp: 1.2, mimic: true, shifts: true),
+    boss: FoeType('The Thousandfold', 'thousandfold', boss: true, hp: 1.3, hit: 1.2, mimic: true, shifts: true),
     companion: Companion.none,
     companionText: 'The Thousandfold falls, wearing your face, and for a moment you\'re not sure which of you won. Then it melts into a puddle of grey, and the island\'s changelings settle, one by one, into shapes of their own.',
     prize: 'mirrorheart',
@@ -804,6 +851,8 @@ const continents = <Continent>[
     name: 'The Skyreach Aeries',
     blurb: 'Peaks above the clouds, where the ash never reached. The aeriekin nest here with their griffins, and they look down on the burned world in every sense. Harpies circle below, waiting for anyone who falls.',
     minLevel: 34,
+    foeHit: 1.2,
+    foeHp: 1.05,
     tier: 5,
     opensAfter: 10,
     argb: 0xFF9AC8E8,
@@ -814,7 +863,7 @@ const continents = <Continent>[
       FoeType('Aeriekin Stormcaller', 'aerieCaller', hp: .9, aloft: true, strike: Strike.magic),
       FoeType('Griffin', 'griffin', hp: 1.1, beast: true, aloft: true),
     ],
-    boss: FoeType('Old Thunderwing, the Storm Roc', 'stormRoc', boss: true, hp: 1.2, beast: true, aloft: true, strike: Strike.magic),
+    boss: FoeType('Old Thunderwing, the Storm Roc', 'stormRoc', boss: true, hp: 1.4, hit: 1.2, beast: true, aloft: true, strike: Strike.magic),
     companion: Companion.none,
     companionText: 'Old Thunderwing comes down on the peak like a falling cloud, and does not get up. The aeriekin bow their heads to you, one by one. Down in the valley, a griffin chick watches you with interest.',
     prize: 'stormfeather',
@@ -829,6 +878,8 @@ const continents = <Continent>[
     name: 'The Blossom Isles',
     blurb: 'Far out in the eastern sea, islands where the blossom never stopped falling, even when the sky burned. Masterless ronin walk the roads, shinobi watch from the rooftops, and oni come down from the mountains. The Shogun has closed the ports. He has not closed them to you; he simply expects you to die.',
     minLevel: 37,
+    foeHit: 1.3,
+    foeHp: 1.15,
     tier: 5,
     opensAfter: 14,
     argb: 0xFFF0A8C0,
@@ -839,7 +890,7 @@ const continents = <Continent>[
       FoeType('Onmyoji', 'onmyoji', hp: .9, strike: Strike.magic),
       FoeType('Mountain Oni', 'oni', hp: 1.2, beast: true),
     ],
-    boss: FoeType('The Iron Shogun', 'shogun', boss: true, hp: 1.25, armoured: true),
+    boss: FoeType('The Iron Shogun', 'shogun', boss: true, hp: 1.4, hit: 1.2, armoured: true),
     companion: Companion.none,
     companionText: 'The Iron Shogun kneels, sets down his sword, and bows to you. The ports open the next morning. The blossom keeps falling, and for the first time in a long while, people stop to watch it.',
     prize: 'blossomseal',
@@ -854,6 +905,8 @@ const continents = <Continent>[
     name: 'The Hollowdeep',
     blurb: 'Caves under the fen hills, where the bats fled when the sky burned. There are millions of them down there now, and they have grown large. The batkin who live among them hunt by ear, and they can hear you breathing.',
     minLevel: 19,
+    foeHit: 1.05,
+    foeHp: 1.05,
     tier: 3,
     opensAfter: 1,
     argb: 0xFF7A6A9A,
@@ -864,7 +917,7 @@ const continents = <Continent>[
       FoeType('Batkin Roost-Guard', 'batkinGuard', armoured: true),
       FoeType('Cave Bear', 'cavebear', hp: 1.05, beast: true),
     ],
-    boss: FoeType('The Roost Mother', 'roostMother', boss: true, hp: 1.2, beast: true, aloft: true),
+    boss: FoeType('The Roost Mother', 'roostMother', boss: true, hp: 1.3, hit: 1.1, beast: true, aloft: true),
     companion: Companion.none,
     companionText: 'The Roost Mother folds her wings and drops into the dark below. Ten thousand bats pour out of the caves at once, past you, up into a sky that isn\'t burning any more. The batkin watch them go, and then they watch you.',
     prize: 'echostone',
@@ -879,6 +932,8 @@ const continents = <Continent>[
     name: 'The Frostmarch',
     blurb: 'North of the orklands, the Burning went the other way: the sky froze, and so did everything under it. Glaciers have swallowed a whole city. The reavers who live in its ruins worship the frost giants, and the frost giants let them.',
     minLevel: 27,
+    foeHit: 1.35,
+    foeHp: 1.1,
     tier: 4,
     opensAfter: 3,
     argb: 0xFF9AC0DC,
@@ -890,7 +945,7 @@ const continents = <Continent>[
       FoeType('Frost Giant', 'frostGiant', hp: 1.2, armoured: true),
       FoeType('Ice Wraith', 'iceWraith', hp: .85, spirit: true, aloft: true, strike: Strike.magic, element: 'frost'),
     ],
-    boss: FoeType('Jarl Hrimgar the Ice-Crowned', 'frostJarl', boss: true, hp: 1.25, armoured: true),
+    boss: FoeType('Jarl Hrimgar the Ice-Crowned', 'frostJarl', boss: true, hp: 1.45, hit: 1.4, armoured: true),
     companion: Companion.none,
     companionText: 'Jarl Hrimgar falls to one knee, and the ice crown cracks clean in two. Somewhere under the glacier, the frozen city groans. By morning there is water running in its streets for the first time in a hundred years.',
     prize: 'rimeheart',
@@ -928,6 +983,7 @@ FoeType formed(FoeType me, int? form) {
     t.look,
     boss: me.boss,
     hp: me.hp,
+    hit: me.hit,
     aura: me.aura,
     named: me.named,
     pack: me.pack,
@@ -1120,13 +1176,17 @@ class Rare {
       // The Rime Wyrm: a frost dragon (fire melts it; frost does nothing), wherever it lairs.
       return FoeType(name ?? 'Rime Wyrm', look!, dragon: true, hp: 1.1, aura: aura, named: name != null, aloft: true, strike: Strike.magic, element: 'frost');
     }
+    // A warrior of the Hall of the Slain.
+    if (einherjarOf(look, name) case final e?) return hallFoeType(e, aura);
+    // A gladiator of the Ash Colosseum.
+    if (arenaBoutOf(look) case final bout?) return arenaFoeType(bout, aura);
     final golem = golemTypes[look];
     if (golem != null) {
       // A golem: living stone, wherever it walks.
       return FoeType(name ?? golem.$1, look!, hp: golem.$2, aura: aura, stone: true);
     }
     final b = foeAt(base);
-    return FoeType(name ?? '${aura.label} ${b.name}', look ?? b.look, boss: b.boss, undead: b.undead, dragon: b.dragon, ork: b.ork, ent: b.ent, hp: b.hp, aura: aura, named: name != null && !pack, hound: b.hound, stone: b.stone, demon: b.demon, spirit: b.spirit, venomous: b.venomous, beast: b.beast, pack: pack, aloft: b.aloft, strike: b.strike, armoured: b.armoured, night: b.night, element: b.element, mimic: b.mimic, regrows: b.regrows, shifts: b.shifts, evasive: b.evasive, ironhide: b.ironhide);
+    return FoeType(name ?? '${aura.label} ${b.name}', look ?? b.look, boss: b.boss, undead: b.undead, dragon: b.dragon, ork: b.ork, ent: b.ent, hp: b.hp, aura: aura, named: name != null && !pack, hound: b.hound, stone: b.stone, demon: b.demon, spirit: b.spirit, venomous: b.venomous, beast: b.beast, pack: pack, aloft: b.aloft, strike: b.strike, armoured: b.armoured, night: b.night, element: b.element, mimic: b.mimic, regrows: b.regrows, shifts: b.shifts, evasive: b.evasive, ironhide: b.ironhide, hit: b.hit);
   }
 
   Map<String, dynamic> toJson() => {'b': base, 'a': aura.name, if (name != null) 'n': name, if (pack) 'p': true, if (look != null) 'l': look};
@@ -1204,6 +1264,15 @@ FoeType encounterType(int foe, Rare? rare) => rare?.type ?? foeAt(foe);
 /// When you set out, the chance a rare foe turns up instead (and the share of those that are
 /// named bosses), and the chance a pack ambushes you.
 const rareChance = .08, namedRareShare = .35;
+
+/// The Ember King's generals: the Ember Throne's named foes. Each one felled before you face him
+/// takes [generalCut] off his strength (his HP); while any still stand, one comes for you on
+/// [generalChance] of the Throne's fights.
+List<String> get emberGenerals => [for (final n in continents[mainLands - 1].named) n.name];
+const generalCut = .08, generalChance = .12;
+
+/// A boss you keep falling to: what each knockout it deals you takes off it, and the most.
+const doggedStep = .05, doggedMax = .2;
 
 /// Packs turn up more often the further you go.
 double packChance(int continent) => .05 + .025 * continent;
@@ -1301,7 +1370,11 @@ const bloodDrink = .5;
 const toxinGrowth = .35, bleedTurns = 2, frostFreeze = .08;
 
 /// The chance a foe (a boss) winds up a heavy blow for its next turn, and how hard it lands.
-const windupChance = .15, windupBoss = .15, heavyBlow = 1.5;
+const windupChance = .18, windupBoss = .18, heavyBlow = 1.8;
+
+/// Bracing for a heavy blow (the timing ring): how good a brace counts as in time, and as
+/// perfect (a sure block on top).
+const braceGood = .5, bracePerfect = 1.0;
 const jackpotChance = .04;
 
 /// A clean kill (a crossbow bolt lands the finishing blow): this much more gold from the foe, and
@@ -1501,23 +1574,16 @@ const places = <Place>[
   Place('lanternchapel', 'Lantern Chapel', 1, 300, 395, PlaceKind.shrine, 'A drowned chapel with one candle still burning on the altar. Nobody has lit it in years.', 'You kneel. The candle flares pale and cold, and for a moment you see the Reaper\'s shadow turn away. (Reaper\'s Bane is in you.)', brew: 'reaperbane'),
   Place('drownedbell', 'The Drowned Bell', 1, 510, 410, PlaceKind.guarded, 'Out in the fen, a bell rings under the water. Something is ringing it.', 'The Bellringer wails, and sinks for good. In the silt where she stood: a sack of old offerings and a gem.', foe: ('banshee', null, Aura.frost, 'The Bellringer'), purses: 2, gems: 1),
   Place('fairyring', 'The Fairy Ring', 2, 175, 175, PlaceKind.shrine, 'A perfect ring of white mushrooms, humming faintly. Stepping inside seems rude. You do it anyway.', 'Tiny lights spin round you, giggling. You come out of the ring a day later, feeling marvellous, mana tingling in your fingers. (Wisp brew for three fights.)', brew: 'wisp', potions: 1),
-  Place('hollowstump', 'The Hollow Stump', 2, 360, 205, PlaceKind.cache, 'A great stump, hollow inside, with a squirrel-sized door. Somebody lives here. Somebody rich.', 'A squirrel\'s hoard: nuts, mostly, and a surprising number of gems.', gems: 2, purses: 1),
   Place('skulltotem', 'The Skull Totem', 3, 455, 225, PlaceKind.guarded, 'A pile of skulls taller than a house, and an ork shaman asleep at the top of it.', 'Gutrot the Unburied tumbles down his own totem. His hut is full of loot from a dozen raids.', foe: ('orkShaman', null, Aura.venom, 'Gutrot the Unburied'), purses: 3),
-  Place('ironseam', 'The Iron Seam', 3, 640, 200, PlaceKind.cache, 'A crack in the red rock, and in it, a gleam. The orks never noticed: they were busy shouting.', 'You prise out lumps of good ore. Dunstan will be pleased.', ore: {'iron': 6, 'gold': 3}),
-  Place('sphinx', 'The Riddling Sphinx', 4, 905, 245, PlaceKind.shrine, 'A stone sphinx half-buried in the sand. "What walks on four legs, then two, then fights a dragon?" You say "me". It seems to accept that.', 'The sphinx\'s eyes glow, and you feel wiser, and sturdier. (Barkskin for three fights, and a purse it was sitting on.)', brew: 'barkskin', purses: 2),
-  Place('treasury', 'The Sunken Treasury', 4, 928, 360, PlaceKind.cache, 'Steps going down into the glass sand, and at the bottom, a door with a pharaoh\'s seal. It\'s been opened before. Not all the way.', 'Gold, dusty and heavy, and a jewel the tomb-robbers missed.', purses: 4, gems: 1),
   Place('malriccamp', 'An Abandoned Camp', 5, 610, 430, PlaceKind.cache, 'A cold campfire on the black glass, a bedroll, and a knight\'s things left neatly folded. Someone left in a hurry, or doesn\'t mean to come back.', 'Under the bedroll: Ashen steel, and a letter in a careful hand. "If I don\'t come back, I was wrong about all of it. — M."', trophies: 3, purses: 2),
   Place('glasswyrm', 'Glassjaw\'s Roost', 5, 790, 560, PlaceKind.guarded, 'A wyvern\'s nest of melted glass and stolen silver, and the wyvern, wide awake.', 'Glassjaw crashes down into her own hoard. You fill your pockets.', foe: ('wyvern', null, Aura.gilded, 'Glassjaw'), purses: 4, ore: {'obsidian': 4}, wyrm: 1),
   Place('battower', 'The Bat Tower', 7, 318, 350, PlaceKind.guarded, 'A ruined tower on the moor, black with roosting bats. They all wake at dusk, and so does their master.', 'The Bat King bursts into a cloud of shrieking wings. In his roost: fangs, and the Countess\'s tithe.', foe: ('vampireSpawn', null, Aura.cursed, 'The Bat King'), purses: 2, trophies: 3),
   Place('moonpool', 'The Moon Pool', 8, 48, 255, PlaceKind.shrine, 'A still pool in the pines that holds the moon even by day. The werewolves drink here. So, carefully, do you.', 'The water is ice-cold and tastes of silver. You feel wolfish. At the edge, shed pelts, silver in the moonlight.', trophies: 3, potions: 1),
   Place('starlitglade', 'The Starlit Glade', 9, 440, 38, PlaceKind.shrine, 'A glade where the elves leave offerings to the stars: bowls of water, and folded silk. Taking some seems rude. Kneeling seems right.', 'Starlight pools in your hands and runs up your arms. (Arcane brew for three fights.) Somebody left elven silk on the stone; you take it, gratefully.', brew: 'arcane', trophies: 3),
   Place('lostmine', 'The Lost Mine', 10, 700, 32, PlaceKind.guarded, 'A mine the dwarves sealed and forgot. Somebody unsealed it, and is down there with a pick, laughing.', 'Rustbeard the Mad goes down at last. His cart is full: ore, and ingots of runesteel.', foe: ('dwarfAxe', null, Aura.blazing, 'Rustbeard the Mad'), ore: {'gold': 4, 'obsidian': 3}, trophies: 3),
-  Place('maskmaker', 'The Mask-Maker\'s Hut', 11, 190, 106, PlaceKind.cache, 'A hut on the shore, walls hung with porcelain faces, every one of them smiling. The mask-maker is gone. The faces are watching the door.', 'Behind the workbench: her savings, and a basket of faces she never got to give back.', purses: 3, trophies: 4),
   Place('ziggurat', 'The Sunken Ziggurat', 12, 962, 418, PlaceKind.guarded, 'A stepped temple half-swallowed by the jungle, with something old sleeping on the altar at the top. It is very warm, and very big, and it is waking up.', 'The Egg-Keeper slumps across her altar. Around it: offerings of gold, gems, and her own shed scales.', foe: ('lizardShaman', 'lizardChampion', Aura.gilded, 'Sss\'thyx the Egg-Keeper'), purses: 3, gems: 1, trophies: 4),
   Place('krakenreef', 'The Kraken\'s Reef', 13, 715, 652, PlaceKind.guarded, 'A ring of black rock where the water boils, and wrecks piled on wrecks. Every sailor knows not to sail here. Every sailor knows why.', 'The Kraken sinks back into the deep with a sound like a ship breaking. Among the wrecks, where it slept: a weapon that belonged to a sea-god.', foe: ('seaSerpent', 'kraken', Aura.ancient, 'The Kraken'), purses: 4),
-  Place('wreck', 'The Sunken Galleon', 13, 330, 640, PlaceKind.cache, 'A treasure galleon, broken on the reef at low tide. The merrow have been at it, but not all of it.', 'In the captain\'s cabin, under a foot of water: his strongbox, and a handful of pearls.', purses: 4, gems: 2, trophies: 2),
   Place('mirrorhall', 'The Hall of Mirrors', 14, 868, 600, PlaceKind.shrine, 'A ruined hall full of mirrors, and in every one, a different you: older, younger, a goblin, a dragon. One of them winks.', 'You stare until your reflection settles back into your own shape, and feel stronger for it. (Might for three fights.) The mirrors shed their silver skins at your feet.', brew: 'might', trophies: 3),
-  Place('castleoflanterns', 'The Lantern Shrine', 16, 700, 640, PlaceKind.shrine, 'A shrine on a rock in the sea, hung with a thousand paper lanterns. An old priest sweeps the steps and doesn\'t look up.', 'You ring the bell and bow. The priest nods, once, and hands you a cup of tea and a folded scrap of lacquer. (Might for three fights.)', brew: 'might', trophies: 3),
   Place('rocnest', 'The Great Nest', 15, 798, 26, PlaceKind.guarded, 'A nest the size of a cottage on the highest peak, woven from whole trees, and something huge and feathered sitting on it.', 'The mother griffin takes wing and is gone. In the nest: feathers by the armful, gold the aeriekin left as offerings, and eggshell like porcelain.', foe: ('griffin', null, Aura.ancient, 'The Mother Griffin'), purses: 3, trophies: 4, gems: 1),
   // The second wave: something to go and look at in every corner of the map.
   Place('orkscouts', 'The Ork Scout Camp', 0, 205, 590, PlaceKind.guarded, 'A ring of spears by the shore and a cooking fire nobody bothered to hide. Orks, this far from the Badlands, scouting.', 'Snagga the Scout won\'t be reporting back. His camp is full of things the orks stole on the way here.', foe: ('pillager', 'ork', Aura.blazing, 'Snagga the Scout'), purses: 2, potions: 1),
@@ -1526,7 +1592,6 @@ const places = <Place>[
   Place('queensleep', 'The Queen\'s Sarcophagus', 4, 705, 300, PlaceKind.guarded, 'A painted coffin standing upright in the sand, lid ajar. The paint shows a queen asleep. The coffin is empty.', 'Merit-Ash crumbles back to dust, still wearing her jewels. You take them. She won\'t mind now.', foe: ('mummyGuard', null, Aura.cursed, 'Merit-Ash, the Sleepless Queen'), purses: 3, gems: 1),
   Place('glassfurnace', 'The Glass Furnace', 5, 655, 575, PlaceKind.guarded, 'A crater of molten glass that never cools, and in the middle of it, the fire has stood up. It has noticed you.', 'The Furnace Heart gutters out into a lump of black glass. Around the crater: obsidian, cooled and glittering.', foe: ('pitdemon', 'elementalEmber', Aura.blazing, 'The Furnace Heart'), purses: 3, ore: {'obsidian': 4}),
   Place('ashengate', 'The Ashen Gate', 6, 945, 185, PlaceKind.guarded, 'A gate of black iron in the middle of nowhere, with no wall either side. Its keeper stands in front of it anyway. He has stood there since the Burning.', 'Lord Cindermane kneels and lets his sword fall. "Go on, then," he says. Behind the gate: everything he was set to guard.', foe: ('ashenChampion', null, Aura.blazing, 'Lord Cindermane, the Last Gatekeeper'), purses: 4, gems: 2),
-  Place('reliquary', 'The Burnt Reliquary', 6, 775, 95, PlaceKind.cache, 'A chapel the Ember King\'s fire went straight through. The roof is gone, the pews are ash, and the reliquary under the altar is still locked.', 'The lock gives. Inside: the chapel\'s gold, a jewel, and two flasks of holy water that kept the fire out.', purses: 3, gems: 1, potions: 2),
   Place('gallows', 'The Gallows Crossroads', 7, 405, 282, PlaceKind.guarded, 'Four roads, one gibbet, and a crowd of ghouls round it, waiting on their king. Something with a crown is sitting on the crossbeam.', 'The Gallows King drops off his beam for the last time. In the gibbet cage: the Countess\'s tithe, and what the hanged left behind.', foe: ('ghoul', 'ghoulking', Aura.cursed, 'The Gallows King'), purses: 2, trophies: 3),
   Place('woodcutter', 'The Woodcutter\'s Hut', 8, 150, 385, PlaceKind.guarded, 'A hut in a clearing, an axe in the block, and the woodcutter at the door, smiling too wide. The moon is up. His shadow isn\'t a man\'s.', 'Old Hatchet goes down, and stays a man as he does. Under the hut: his savings, and the pelts of everything he hunted.', foe: ('woodsman', null, Aura.cursed, 'Old Hatchet, the Woodcutter'), purses: 2, trophies: 3),
   Place('unicornspring', 'The Unicorn Spring', 9, 408, 98, PlaceKind.shrine, 'A spring in the silver birches where the unicorns drink. One is drinking now. It looks at you, and decides you can stay.', 'You drink after it. The water is sweet and cold and mends you all the way through. (Mending draught for three fights.)', brew: 'healing', potions: 2),
@@ -1541,13 +1606,10 @@ const places = <Place>[
   Place('rimehollow', 'The Rime Wyrm\'s Hollow', 18, 650, 300, PlaceKind.guarded, 'A hole in the glacier, blue all the way down, and breath coming up out of it that freezes on the air. The reavers won\'t go near it. They call what\'s in there the Grandfather.', 'The Rime Wyrm shatters like a frozen lake in spring. Among the ice: scales as clear as glass, and everything that ever fell down its hole.', foe: ('yeti', 'frostWyrm', Aura.frost, 'Grandfather Rime'), purses: 3, gems: 1, wyrm: 3),
   Place('caldera', 'The Obsidian Caldera', 5, 815, 500, PlaceKind.guarded, 'A crater of black glass, still smoking, and a drake asleep in the bottom of it, curled round a clutch of eggs gone cold. She is not asleep.', 'Cinderjaw falls across her nest. Her scales come away black and hot, and her hoard is in the glass beneath her.', foe: ('obsidian', null, Aura.blazing, 'Cinderjaw'), purses: 4, ore: {'obsidian': 3}, wyrm: 4),
   Place('eyrie', 'The Elder\'s Eyrie', 6, 755, 175, PlaceKind.guarded, 'A spire of red rock above the Throne, and on top of it, an old gold wyrm, older than the Ember King, watching him burn the world and doing nothing about it.', 'The Elder Wyrm sighs, a long, hot, tired sigh, and lies down for the last time. Her gold is your gold now. So are her scales.', foe: ('elderWyrm', null, Aura.ancient, 'Aurumvex the Elder'), purses: 5, gems: 2, wyrm: 5),
-  Place('seacave', 'The Sea Cave', 17, 405, 655, PlaceKind.cache, 'The Hollowdeep runs all the way to the sea, and the tide fills its last cave twice a day. Smugglers used it. Then the bats came.', 'Behind a rock the bats never moved: the smugglers\' last load, still dry in oilcloth.', purses: 3, gems: 2),
   // Relic guardians: they show once you hold the blueprint that needs what they guard.
   Place('emberpit', 'The Ember Pit', 3, 600, 140, PlaceKind.guarded, 'A pit in the red rock, glowing from the bottom. An ork fire-priest sits in it, cross-legged, a coal the size of your head cupped in his hands. It is the old king\'s ember core, and he has been praying to it.', 'Skarr the Ember-Keeper falls into his own fire and doesn\'t come out. The ember core is still warm. It will be warm for a thousand years.', foe: ('orkShaman', null, Aura.blazing, 'Skarr the Ember-Keeper'), purses: 3, relic: (0, 1), above: 3),
   Place('briarheart', 'The Briar Heart', 2, 140, 215, PlaceKind.guarded, 'Deep in the Thornwild, the brambles twist into a knot the size of a house, and the knot is breathing. Something at its heart keeps the whole wood growing.', 'The Briar Heart shudders, and lets go of the one living strand it was holding. It coils round your wrist, gently, like it\'s decided you\'ll do.', foe: ('thornEnt', null, Aura.venom, 'The Briar Heart'), purses: 2, relic: (2, 0), above: 3),
   Place('elderheart', 'The Elder Heartwood', 9, 285, 160, PlaceKind.guarded, 'The oldest tree in the Silverwood, hollowed out by the elves into a hall. An elf in silver-leaf armour stands at its door, and has done for three hundred years.', 'Warden Aelindor kneels, and offers you a grip of heartwood with both hands. "The Grandmother asked for it back, once. I told her no. I find I can\'t tell you no."', foe: ('elfWarden', null, Aura.ancient, 'Warden Aelindor'), purses: 3, relic: (2, 1), above: 3),
-  Place('frozencaravan', 'The Frozen Caravan', 18, 785, 238, PlaceKind.cache, 'A merchant caravan, frozen solid in the middle of the pass: wagons, oxen, drivers, all of it, still mid-stride under the ice. The strongbox is on the last wagon.', 'You chip it free. Inside: a hundred-year-old fortune, a bottle of something warming, and furs the reavers never found.', purses: 4, potions: 1, trophies: 3),
-  Place('yeticave', 'The Yeti\'s Larder', 18, 612, 180, PlaceKind.guarded, 'A cave full of bones, and a yeti the size of a cottage asleep across the mouth of it. Something in there glitters.', 'Old Avalanche goes down like his name. Past the bones: everything he ever took off a traveller.', foe: ('yeti', null, Aura.ancient, 'Old Avalanche'), purses: 3, gems: 2, trophies: 2),
   Place('orchardroost', 'The Orchard Roost', 17, 300, 612, PlaceKind.guarded, 'An old orchard sank into the caves when the hill fell in. The fruit bats found it. Their king has eaten every fig in it, and is still hungry.', 'The Fig King flaps off into the dark, much too full to fight. Under the trees: a pile of seeds, a pile of coins, and fangs he lost in the figs.', foe: ('cavebat', null, Aura.gilded, 'The Fig King'), purses: 2, trophies: 3),
   Place('lostisle', 'The Lost Isle', 0, 228, 20, PlaceKind.cache, 'Out past the coast, an island that isn\'t on any map but yours, now you\'ve been everywhere else. A rowing boat waits on the shore.', 'On the island, under a crooked tree: the old king\'s last treasure, buried before the Burning.', purses: 6, legendary: true, hidden: true),
 ];

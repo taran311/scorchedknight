@@ -769,6 +769,12 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         if (r.drained > 0) _at(d0 + hit + 500, () => _heart(r.drained, const Offset(_knightX + 10, _groundY - 270)));
       case SpellKind.blast:
         _at(d0 + hit, () => _spark(spell.element == Stat.burn ? 'fire' : 'bolt', _foeChest, 18, speed: 5.5, life: 500, radius: 4));
+      case SpellKind.warcry:
+        // A roar: a ring of breath and grit bursting out from you, and the words over your head.
+        _at(d0 + castReleaseMs, () {
+          _spark('grit', const Offset(_knightX + 20, _groundY - 150), 26, speed: 5, life: 700, radius: 3.5, gravity: 0);
+          _mark('War Cry!', [colour, shade(colour, -.5)], const Offset(_knightX - 20, _groundY - 250));
+        });
       case SpellKind.sleep:
         // Drifting motes of sleep settle on the foe.
         _at(d0 + hit, () {
@@ -1342,6 +1348,13 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
             }
           case Guard.guarded:
             _mark('Guarded!', _orange, at);
+            c.revealCounter();
+            return;
+          case Guard.roared:
+            // A warrior of the hall roars its war cry: breath and grit off it, the words over its head.
+            _spark('grit', _foeChest + const Offset(0, -40), 24, dir: math.pi, spread: 2.4, speed: 5, life: 700, radius: 3.5, gravity: 0);
+            _mark('War cry!', const [Color(0xFFFF8A5A), Color(0xFF8A1E1A)], _foeChest + const Offset(-30, -110));
+            _punch(.4);
             c.revealCounter();
             return;
           case Guard.slowed:

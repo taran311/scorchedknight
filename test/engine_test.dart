@@ -2,8 +2,10 @@
 
 import 'dart:convert';
 import 'dart:math';
+import 'dart:math' as math;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:scorchedknight/game/arena.dart';
 import 'package:scorchedknight/game/catalog.dart';
 import 'package:scorchedknight/game/ammo.dart';
 import 'package:scorchedknight/game/brews.dart';
@@ -21,6 +23,9 @@ import 'package:scorchedknight/game/tarot.dart';
 import 'package:scorchedknight/game/vault.dart';
 import 'package:scorchedknight/game/wilds.dart';
 import 'package:scorchedknight/game/dungeons.dart';
+import 'package:scorchedknight/game/hall.dart';
+import 'package:scorchedknight/game/nemesis.dart';
+import 'package:scorchedknight/game/contracts.dart';
 import 'package:scorchedknight/game/errands.dart';
 import 'package:scorchedknight/game/knight_classes.dart';
 import 'package:scorchedknight/game/spells.dart';
@@ -168,9 +173,12 @@ void main() {
     for (var i = 0; i < 300 && s.keys == 0; i++) {
       k.hp = maxHp(k);
       e.explore();
+      // (Won fights: a starting knight in starting kit soon stops winning them.)
+      s.foeHp = math.min(s.foeHp, 1);
       fightOut(e);
       s.encounter = null;
       s.pendingLoot.clear();
+      s.nemesis = null;
     }
     expect(s.keys, greaterThan(0));
     expect(GameState.fromJson(jsonDecode(jsonEncode(s.toJson())) as Map<String, dynamic>).keys, s.keys);
@@ -208,6 +216,315 @@ void main() {
     expect(kinds, {'piece', 'gear', 'gold'});
     final back = GameState.fromJson(jsonDecode(jsonEncode(s.toJson())) as Map<String, dynamic>);
     expect(back.vaultFound.length, vaultPieces.length);
+  });
+
+  test('contracts: every guarded place is someone\'s trouble, on the board, and pays a bounty', () {
+    for (final p in places.where((p) => p.foe != null && p.relic == null)) {
+      expect(contractFor(p.id), isNotNull, reason: p.id);
+    }
+    for (final c in contracts) {
+      expect(placeById(c.place)?.foe, isNotNull, reason: c.place);
+    }
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(2));
+    final s = e.state, k = s.knight..level = 8;
+    s.innRepaired = true;
+    final board = e.board;
+    expect(board, isNotEmpty);
+    expect(board.length, lessThanOrEqualTo(boardSize));
+    final job = board.first;
+    expect(e.explorePlace(job.place), isNull);
+    final gold = k.coins;
+    k.hp = maxHp(k);
+    s.foeHp = 1;
+    while (s.inBattle) {
+      e.takeTurn(BattleAction.attack);
+      s.foeHp = math.min(s.foeHp, 1);
+    }
+    expect(s.explored, contains(job.place));
+    expect(k.coins - gold, greaterThanOrEqualTo(contractBounty(k.level)));
+    expect(e.board.map((c) => c.place), isNot(contains(job.place)));
+  });
+
+  test('bracing for a heavy blow: in time it lands as an ordinary one, perfectly it\'s blocked', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(3));
+    final s = e.state, k = s.knight..level = 20;
+    s.innRepaired = true;
+    s.unlocked = 2;
+    s.bossesDown.addAll([0, 1]);
+    e.travel(2);
+    int blow(double brace) {
+      var hurt = 0, n = 0;
+      for (var i = 0; i < 300; i++) {
+        if (!s.inBattle) e.explore();
+        s
+          ..foeHp = s.foeMax = 999999
+          ..foeWindup = true
+          ..foeAsleep = 0
+          ..foeFrozen = false;
+        k.hp = maxHp(k);
+        e.braceNext = brace;
+        final r = e.takeTurn(BattleAction.attack);
+        if (r.counter != null && r.counter! > 0) {
+          hurt += r.counter!;
+          n++;
+        }
+        expect(e.braceNext, 0);
+      }
+      return n == 0 ? 0 : hurt ~/ n;
+    }
+    final none = blow(0), good = blow(braceGood), perfect = blow(bracePerfect);
+    expect(good, lessThan(none));
+    expect(perfect, lessThan(good));
+  });
+
+  test('the Ember King\'s generals: each one felled leaves him weaker', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(5));
+    final s = e.state, k = s.knight..level = 40;
+    s.innRepaired = true;
+    s.unlocked = mainLands - 1;
+    for (var c = 0; c < mainLands - 1; c++) {
+      s.bossesDown.add(c);
+    }
+    e.travel(mainLands - 1);
+    s.wins[mainLands - 1] = winsForBoss;
+    expect(e.challengeBoss(), isTrue);
+    final full = s.foeMax;
+    e.takeTurn(BattleAction.flee);
+    while (s.inBattle) {
+      e.takeTurn(BattleAction.flee);
+    }
+    // Generals come for you on the Throne's road; fell them all.
+    for (var i = 0; i < 400 && s.generalsDown.length < emberGenerals.length; i++) {
+      e.explore();
+      if (emberGenerals.contains(s.rare?.name)) {
+        k.hp = maxHp(k);
+        s.foeHp = 1;
+        while (s.inBattle) {
+          e.takeTurn(BattleAction.attack);
+          s.foeHp = math.min(s.foeHp, 1);
+        }
+      } else {
+        while (s.inBattle) {
+          e.takeTurn(BattleAction.flee);
+        }
+      }
+      if (s.encounter != null) e.resolveEncounter(0);
+      s.pendingLoot.clear();
+      s.nemesis = null;
+    }
+    expect(s.generalsDown, emberGenerals.toSet());
+    expect(GameState.fromJson(jsonDecode(jsonEncode(s.toJson())) as Map<String, dynamic>).generalsDown, s.generalsDown);
+    k.level = 40;
+    expect(e.challengeBoss(), isTrue);
+    expect(s.foeMax, lessThan(full * (1 - generalCut * 3) + 2));
+  });
+
+  test('a nemesis: the foe that beat you takes a name, grows, hunts you, and pays when it falls', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(11));
+    final s = e.state, k = s.knight..level = 12;
+    s.innRepaired = true;
+    s.unlocked = 2;
+    s.bossesDown.addAll([0, 1]);
+    e.travel(1);
+    void lose() {
+      while (s.inBattle) {
+        k.hp = 1;
+        k.potions = 0;
+        s.foeAsleep = 0;
+        s.foeFrozen = false;
+        s.foeHp = s.foeMax;
+        e.takeTurn(BattleAction.attack);
+      }
+    }
+    // Beaten by a common foe: it becomes your nemesis.
+    while (s.rare != null || !s.inBattle) {
+      if (s.inBattle) e.takeTurn(BattleAction.flee);
+      if (!s.inBattle) e.explore();
+    }
+    final look = foeIn(s).look;
+    lose();
+    final n = s.nemesis!;
+    expect(n.look, look);
+    expect(n.rank, 1);
+    expect(s.toJson()['nemesis'], isNotNull);
+    expect(GameState.fromJson(jsonDecode(jsonEncode(s.toJson())) as Map<String, dynamic>).nemesis!.name, n.name);
+    // It waits a few fights, then finds you.
+    var met = 0;
+    for (var i = 0; i < 200 && !e.nemesisFight; i++) {
+      e.explore();
+      if (!e.nemesisFight) e.takeTurn(BattleAction.flee);
+      met = i;
+    }
+    expect(e.nemesisFight, isTrue);
+    expect(met, greaterThanOrEqualTo(nemesisWait - 1));
+    expect(foeIn(s).name, n.name);
+    // It wins again: stronger.
+    lose();
+    expect(s.nemesis!.rank, 2);
+    // Beaten at last: gone, with its hoard.
+    s.nemesis!.since = nemesisWait;
+    while (!e.nemesisFight) {
+      if (!s.inBattle) e.explore();
+      if (!e.nemesisFight) e.takeTurn(BattleAction.flee);
+    }
+    final loot = s.pendingLoot.length, gold = k.coins;
+    k.hp = maxHp(k);
+    s.foeHp = 1;
+    while (s.inBattle) {
+      e.takeTurn(BattleAction.attack);
+      s.foeHp = math.min(s.foeHp, 1);
+    }
+    expect(s.nemesis, isNull);
+    expect(s.nemesesSlain, 1);
+    expect(s.pendingLoot.length, greaterThan(loot));
+    expect(s.pendingLoot.last.rarity, Rarity.epic);
+    expect(k.coins, greaterThan(gold));
+  });
+
+  test('the Hall of the Slain: waves in a row, war cries, the War Cry rite and Gungnir', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(6));
+    final s = e.state, k = s.knight..level = 34;
+    expect(e.whyNotHall(), isNotNull);
+    s.unlocked = 5;
+    for (var c = 0; c < 4; c++) {
+      s.bossesDown.add(c);
+    }
+    expect(e.whyNotHall(), isNull);
+    void win() {
+      s.foeHp = 1;
+      k.hp = maxHp(k);
+      while (s.inBattle) {
+        e.takeTurn(BattleAction.attack);
+        s.foeHp = math.min(s.foeHp, 1);
+      }
+    }
+    // A wave half-won, then walked out of: it starts over.
+    expect(e.startHallFight()!.warcry, isTrue);
+    win();
+    expect(s.hallStep, 1);
+    e.abandonHallWave();
+    expect(s.hallStep, 0);
+    // A warrior roars on its second turn: its blows harder, yours softer.
+    e.startHallFight();
+    s.foeHp = s.foeMax = 999999;
+    k.hp = maxHp(k);
+    var roared = false;
+    for (var t = 0; t < 3 && !roared; t++) {
+      roared = e.takeTurn(BattleAction.attack).roared;
+    }
+    expect(roared, isTrue);
+    expect(s.foeRoar, greaterThan(0));
+    expect(s.heroCowed, greaterThan(0));
+    final cowed = nextBlow(s);
+    s.foeRoar = 0;
+    expect(nextBlow(s), lessThan(cowed));
+    // Knocked out mid-wave: back to the start of it.
+    k.hp = 1;
+    s.foeWindup = false;
+    while (s.inBattle) {
+      k.hp = 1;
+      e.takeTurn(BattleAction.attack);
+    }
+    expect(s.hallStep, 0);
+    // All three waves: the War Cry after the second, Gungnir from the Thane.
+    for (var w = 0; w < hallWaves.length; w++) {
+      for (var i = 0; i < hallWaves[w].warriors.length; i++) {
+        expect(e.startHallFight()!.name, hallWaves[w].warriors[i].name);
+        win();
+      }
+      expect(s.hallWaves, w + 1);
+      if (w == 1) expect(k.earnedRites, contains('warcry'));
+    }
+    expect(e.hallDone, isTrue);
+    expect(riteKnown(k, spellById('warcry')!), isTrue);
+    expect(s.pendingLoot.where((g) => g.name == 'Gungnir'), hasLength(1));
+    expect(isKeepsake(s.pendingLoot.firstWhere((g) => g.name == 'Gungnir')), isTrue);
+    // The War Cry drowns out the foe's.
+    s.pendingLoot.clear();
+    e.startHallFight();
+    s.foeHp = s.foeMax = 999999;
+    s.foeRoar = 3;
+    s.heroCowed = 3;
+    s.mana = 9;
+    k.preparedSpell = 'warcry';
+    k.hp = maxHp(k);
+    s.foeAsleep = 2; // (so its blow can't end the fight first)
+    e.takeTurn(BattleAction.cast);
+    expect(s.heroRoar, greaterThan(0));
+    expect(s.heroCowed, 0);
+    final back = GameState.fromJson((jsonDecode(jsonEncode(s.toJson())) as Map).cast<String, dynamic>());
+    expect(back.hallWaves, hallWaves.length);
+    expect(back.knight.earnedRites, contains('warcry'));
+  });
+
+  test('the Ash Colosseum: seven bouts in order, the Champion\'s set along the way', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(4));
+    final s = e.state, k = s.knight..level = 30;
+    // Shut until the Sunken Sands are open.
+    expect(e.whyNotArena(), isNotNull);
+    s.unlocked = arenaLand;
+    for (var c = 0; c < arenaLand; c++) {
+      s.bossesDown.add(c);
+    }
+    expect(e.whyNotArena(), isNull);
+    final won = <GearItem>[];
+    for (var i = 0; i < arenaBouts.length; i++) {
+      final f = e.startArenaBout()!;
+      expect(f.name, arenaBouts[i].name);
+      expect(s.arenaFight, isTrue);
+      s.foeHp = 1;
+      k.hp = maxHp(k);
+      while (s.inBattle) {
+        e.takeTurn(BattleAction.attack);
+        s.foeHp = math.min(s.foeHp, 1);
+      }
+      expect(s.arenaFight, isFalse);
+      expect(s.arenaWins, i + 1);
+      won.addAll(s.pendingLoot.where((g) => g.gearSet == arenaSet));
+      s.pendingLoot.clear();
+    }
+    expect(e.arenaDone, isTrue);
+    // The whole suit: manica, greaves, signet, galea and lorica, none of them sellable.
+    expect({for (final g in won) g.slot}, {GearSlot.gloves, GearSlot.boots, GearSlot.ring, GearSlot.helm, GearSlot.armour});
+    expect(won.every(isKeepsake), isTrue);
+    // Afterwards the Champion takes you on again, with no second suit.
+    expect(e.startArenaBout()!.name, arenaBouts.last.name);
+    expect(s.arenaWins, arenaBouts.length);
+    // It survives saving.
+    final back = GameState.fromJson((jsonDecode(jsonEncode(s.toJson())) as Map).cast<String, dynamic>());
+    expect(back.arenaWins, arenaBouts.length);
+    expect(back.arenaFight, isTrue);
+  });
+
+  test('gold sinks: Mags\' sealed crates and Dunstan\'s honing', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(9));
+    final k = e.state.knight
+      ..level = 30
+      ..coins = 100000;
+    // A crate: paid for, rare or finer, the slot you asked for, into your spoils.
+    for (var i = 0; i < 20; i++) {
+      final g = e.buyCrate(GearSlot.helm)!;
+      expect(g.slot, GearSlot.helm);
+      expect(g.rarity.index, greaterThanOrEqualTo(Rarity.rare.index));
+    }
+    expect(k.coins, 100000 - 20 * crateCost(30));
+    expect(e.state.pendingLoot.length, 20);
+    // Honing: every stat up, dearer each step, five steps at most, and it survives a save.
+    final g = e.loot.roll(HeroClass.knight, 30, odds: const [0, 0, 0, 1, 0], only: GearSlot.weapon);
+    k.loadout.weapon = g;
+    final before = Map.of(g.stats), first = honeCost(g, 30);
+    expect(e.hone(g), isTrue);
+    for (final s in before.keys) {
+      expect(g.stats[s]!, greaterThan(before[s]!));
+    }
+    expect(honeCost(g, 30), greaterThan(first));
+    while (e.hone(g)) {}
+    expect(g.hone, honeMax);
+    expect(e.whyNotHone(g), isNotNull);
+    final back = GearItem.fromJson((jsonDecode(jsonEncode(g.toJson())) as Map).cast<String, dynamic>());
+    expect(back.hone, honeMax);
+    expect(back.stats, g.stats);
+    expect(tempered(g, 35).hone, honeMax);
   });
 
   test('a vault piece is strong, but never stronger than a legendary of its level', () {

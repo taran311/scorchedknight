@@ -11,7 +11,7 @@ import 'paint_kit.dart';
 import 'silhouette_lands.dart';
 import 'scenery.dart' show sceneSize;
 
-enum Setting { forest, road, graveyard, plague, village, castle, warcamp, ruins, crypt, elderwood, blightwood, heartgrove, orkcamp, totems, lair, swamp, ice, volcano, boneyard, summit, coast, desert, tomb, moor, moonwood, deepforge, fogshore, jungle, shiftisle, aerie, blossom, roost, frostruin, icecave }
+enum Setting { forest, road, graveyard, plague, village, castle, warcamp, ruins, crypt, elderwood, blightwood, heartgrove, orkcamp, totems, lair, swamp, ice, volcano, boneyard, summit, coast, desert, tomb, moor, moonwood, deepforge, fogshore, jungle, shiftisle, aerie, blossom, roost, frostruin, icecave, arena, hall }
 
 /// How the floating particles behave: drifting dust, rising embers or ash, or falling snow.
 enum MoteStyle { drift, embers, snow, spores, leaves }
@@ -117,6 +117,20 @@ const foeSettings = <String, Setting>{
   'tombPriest': Setting.tomb,
   'pharaoh': Setting.tomb,
   'duneRaider': Setting.desert,
+  // The Hall of the Slain's warriors fight on its floor, by its long fire.
+  'einherjarReaver': Setting.hall,
+  'einherjarBerserker': Setting.hall,
+  'einherjarSkald': Setting.hall,
+  'einherjarGiant': Setting.hall,
+  'einherjarThane': Setting.hall,
+  // The Ash Colosseum's gladiators fight on its sand.
+  'murmillo': Setting.arena,
+  'retiarius': Setting.arena,
+  'thraex': Setting.arena,
+  'hoplomachus': Setting.arena,
+  'sagittarius': Setting.arena,
+  'secutor': Setting.arena,
+  'arenaChampion': Setting.arena,
   'sandArcher': Setting.desert,
   'jackal': Setting.desert,
   // The Ashen Order.
@@ -366,6 +380,35 @@ const _specs = <Setting, BattlegroundSpec>{
     mote: Color(0x99F2D8A8),
     mist: Color(0x40F2D0A0),
     sun: Offset(640, 230),
+  ),
+  // The Hall of the Slain: firelight on black timber, the long hearth burning down the middle.
+  Setting.hall: BattlegroundSpec(
+    sky: [Color(0xFF120A06), Color(0xFF2E1A0E), Color(0xFF6A3A18), Color(0xFFC8803A)],
+    glow: Color(0xFFFFC870),
+    far: Color(0xFF2A1A0E),
+    ridge: Color(0xFF20140A),
+    hill: Color(0xFF1A1008),
+    ground: [Color(0xFF6A4A2E), Color(0xFF2A1C10)],
+    path: [Color(0xFF8A6A44), Color(0xFF4A3420)],
+    grass: Color(0xFF1A1008),
+    mote: Color(0x99FFD08A),
+    moteStyle: MoteStyle.embers,
+    sun: Offset(480, 240),
+  ),
+  // The Ash Colosseum: an ember-red dusk over the old arena's tiers, ash drifting down onto the sand.
+  Setting.arena: BattlegroundSpec(
+    sky: [Color(0xFF241210), Color(0xFF6E2E18), Color(0xFFC0602A), Color(0xFFF0B270)],
+    glow: Color(0xFFFFD08A),
+    far: Color(0xFF7A4A2E),
+    ridge: Color(0xFF5E3820),
+    hill: Color(0xFF4A2C18),
+    ground: [Color(0xFFC8A272), Color(0xFF6A4A2C)],
+    path: [Color(0xFFD8B484), Color(0xFF9A7A50)],
+    grass: Color(0xFF3A2414),
+    mote: Color(0x99FFC890),
+    moteStyle: MoteStyle.embers,
+    mist: Color(0x40F2C8A0),
+    sun: Offset(480, 250),
   ),
   // Inside the tombs: dusk-gold torchlight on sandstone.
   Setting.tomb: BattlegroundSpec(
@@ -1290,7 +1333,7 @@ void _props(Canvas c, Setting s, BattlegroundSpec sp, SeededRandom r) {
         c.drawLine(Offset(930, 354.0 + k * 9), Offset(960, 360.0 + k * 9), net);
         c.drawLine(Offset(932.0 + k * 5, 352), Offset(936.0 + k * 5, 408), net);
       }
-    case Setting.crypt || Setting.desert || Setting.tomb:
+    case Setting.crypt || Setting.desert || Setting.tomb || Setting.arena || Setting.hall:
       break;
   }
 }
