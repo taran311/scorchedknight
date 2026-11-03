@@ -327,8 +327,9 @@ class _InnPageState extends State<InnPage> with RouteAware {
                           _RoadCard(controller: c, step: step, onGo: () => _goRoad(step)),
                           const SizedBox(height: 10),
                         ],
-                        // The notice board: the village's troubles, a contract each.
-                        if (!job && c.engine.board.isNotEmpty) ...[
+                        // The notice board: the village's troubles, a contract each. (Like the road, not
+                        // until Hob's job is done: a new knight has one thing to do first.)
+                        if (s.innRepaired && c.engine.board.isNotEmpty) ...[
                           _BoardCard(controller: c),
                           const SizedBox(height: 10),
                         ],
