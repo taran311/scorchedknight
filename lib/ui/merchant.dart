@@ -85,6 +85,19 @@ class _Shop {
     ],
   );
 
+  /// A recipe's costs as have/need chips and, under them, where to get whatever you're short of
+  /// (one line each, only while short), so a greyed-out button always says where to go next.
+  Widget costs(List<(Widget, int, int, String?)> items) {
+    final short = <String>{for (final (_, n, need, where) in items) if (where != null && n < need) where};
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(spacing: 10, runSpacing: 2, children: [for (final (icon, n, need, _) in items) have(icon, n, need)]),
+        for (final w in short) Padding(padding: const EdgeInsets.only(top: 2), child: Text(w, style: Txt.onStone(size: 11.5, color: Palette.parch))),
+      ],
+    );
+  }
+
   Widget buy(String id) {
     final e = c.engine, k = c.state.knight;
     if (e.owns(id) && !id.startsWith('dye:')) return Text(id == 'potion' ? 'Belt full' : 'Owned', style: Txt.label(size: 13, color: ok));
@@ -383,7 +396,13 @@ class MerchantWares extends StatelessWidget {
               'Opening charge: ${(next.charge * 100).round()}% of a blow${next.burn ? ', and the foe burns' : ''} · now ${(best * 100).round()}%',
               why == null ? x.buy('mount:${next.id}') : Text(why, textAlign: TextAlign.right, style: Txt.label(size: 12, color: Palette.parch2)),
               extra: next.cores > 0
-                  ? Wrap(spacing: 10, children: [x.have(MatIcon.core(const Color(0xFFFF7A2A), size: 16), cores, next.cores), Text('Level ${next.level}+', style: Txt.label(size: 12, color: k.level >= next.level ? Palette.cream : Palette.parch2))])
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Wrap(spacing: 10, children: [x.have(MatIcon.core(const Color(0xFFFF7A2A), size: 16), cores, next.cores), Text('Level ${next.level}+', style: Txt.label(size: 12, color: k.level >= next.level ? Palette.cream : Palette.parch2))]),
+                        if (cores < next.cores) Padding(padding: const EdgeInsets.only(top: 2), child: Text(coreWhere(Elemental.ember), style: Txt.onStone(size: 11.5, color: Palette.parch))),
+                      ],
+                    )
                   : null,
             ),
           ];
@@ -446,13 +465,10 @@ class ForgeWares extends StatelessWidget {
                     }
                   : null,
             ),
-            extra: Wrap(
-              spacing: 10,
-              children: [
-                for (final e in armourRecipes[t.id]!.bars.entries) x.have(MatIcon.bar(e.key, size: 16), s.mat(barKey(e.key)), e.value),
-                x.have(const ItemIcon(Item.coins, size: 14), k.coins, armourRecipes[t.id]!.gold),
-              ],
-            ),
+            extra: x.costs([
+              for (final e in armourRecipes[t.id]!.bars.entries) (MatIcon.bar(e.key, size: 16), s.mat(barKey(e.key)), e.value, barWhere(e.key)),
+              (const ItemIcon(Item.coins, size: 14), k.coins, armourRecipes[t.id]!.gold, null),
+            ]),
           ),
         ],
         if (on('temper')) ...[
@@ -485,6 +501,14 @@ class ForgeWares extends StatelessWidget {
             // Where its trophies come from, so a shortfall says where to go.
             if (trophyLands(f.trophy).isNotEmpty)
               Padding(padding: const EdgeInsets.only(top: 4), child: Text('${f.trophy.label}: from foes in ${trophyLands(f.trophy).join(', ')}', style: Txt.onStone(size: 12.5, color: Palette.parch))),
+            // And its metal: bars are smelted here from golem ore, so say where those golems walk.
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                '${f.metal.bar}: smelt ${f.metal.ore.toLowerCase()} on the Forge tab; ${f.metal.golemName}s roam ${metalLands(f.metal).join(', ')}',
+                style: Txt.onStone(size: 12.5, color: Palette.parch),
+              ),
+            ),
             // An order's suit is a class: say so, and what kind of knight it makes you.
             if (knightClassById(f.id) case final cls?)
               Padding(
@@ -647,7 +671,7 @@ class EnchanterWares extends StatelessWidget {
                   label: 'Bind',
                   onTap: c.whyNotBind(el) == null ? () => enchantFlow(context, c, EnchantSlot.weapon, core: el) : null,
                 ),
-                extra: x.have(MatIcon.core(Color(el.argb), size: 16), s.mat(coreKey(el)), coresPerRune),
+                extra: x.costs([(MatIcon.core(Color(el.argb), size: 16), s.mat(coreKey(el)), coresPerRune, coreWhere(el))]),
               ),
         ],
         ],
@@ -663,7 +687,7 @@ class EnchanterWares extends StatelessWidget {
             ),
             a.label(Missile.bolt),
             '${a.short(k.level)}${(k.ammo[a.name] ?? 0) > 0 ? ' · ×${k.ammo[a.name]}' : ''}',
-            extra: x.have(MatIcon.gem(gemFor(a), size: 16), s.mat(gemKey(gemFor(a))), 1),
+            extra: x.costs([(MatIcon.gem(gemFor(a), size: 16), s.mat(gemKey(gemFor(a))), 1, gemWhere(gemFor(a)))]),
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -696,13 +720,10 @@ class EnchanterWares extends StatelessWidget {
                 s.warded.contains(i) ? Text('Warded', style: Txt.label(size: 13, color: _Shop.ok)) : CostButton(label: 'Craft', onTap: c.whyNotWard(i) == null ? () => c.craftWard(i) : null),
                 extra: s.warded.contains(i)
                     ? null
-                    : Wrap(
-                        spacing: 10,
-                        children: [
-                          Tooltip(message: '${continents[i - 1].reagent}, from ${continents[i - 1].name}', child: x.have(MatIcon.herb(i - 1, size: 15), s.reagents[i - 1], reagentsForWard)),
-                          x.have(const ItemIcon(Item.coins, size: 14), k.coins, wardPrice(i)),
-                        ],
-                      ),
+                    : x.costs([
+                        (MatIcon.herb(i - 1, size: 15), s.reagents[i - 1], reagentsForWard, '${continents[i - 1].reagent}: gathered in ${continents[i - 1].name}'),
+                        (const ItemIcon(Item.coins, size: 14), k.coins, wardPrice(i), null),
+                      ]),
               ),
         ],
       ],

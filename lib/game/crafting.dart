@@ -66,6 +66,12 @@ const golemLands = <int, List<(Metal, double)>>{
   6: [(Metal.obsidian, .06)],
 };
 
+/// The lands whose golems are made of [m], for the forge's "where do I get it" lines.
+List<String> metalLands(Metal m) => [
+  for (final e in golemLands.entries)
+    if (e.key < continents.length && e.value.any((g) => g.$1 == m)) continents[e.key].name,
+];
+
 /// Golems by look: (name, HP compared with a regular foe). Living stone: blades and arrows glance
 /// off and blunt weapons crush them, so they have a little less HP than they look.
 final golemTypes = <String, (String, double)>{for (final m in Metal.values) m.golemLook: (m.golemName, .75)};
@@ -393,3 +399,12 @@ const elementalLands = <int, List<(Elemental, double)>>{
 
 /// Cores an elemental leaves (one or two), and how many Old Wick binds into a rune.
 const coresMin = 1, coresMax = 2, coresPerRune = 3;
+
+// ------------------------------------------------------------------ where materials come from
+
+/// One short line per material saying where to get it, shown at the forge when you're short.
+String barWhere(Metal m) => 'Smelt ${m.ore.toLowerCase()} on the Forge tab · ${m.golemName}s roam ${metalLands(m).join(', ')}';
+String gemWhere(Gem g) => g == Gem.pearl
+    ? 'Pearls: the Shattered Sea\'s folk carry them, and any boss may leave one'
+    : '${g.label}s: every boss leaves a gem, rare foes often, others now and then';
+String coreWhere(Elemental e) => '${e.core}s: ${e.label}s rise in ${[for (final x in elementalLands.entries) if (x.key < continents.length && x.value.any((v) => v.$1 == e)) continents[x.key].name].join(', ')}';
