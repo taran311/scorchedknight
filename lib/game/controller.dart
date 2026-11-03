@@ -865,16 +865,17 @@ class GameController extends ChangeNotifier {
     _changed();
   }
 
-  /// Puts a rite on the hotbar or takes it off.
-  void prepareSpell(String id) {
+  /// Puts a rite on the hotbar or takes it off. False: the hotbar's full (take one off first).
+  bool prepareSpell(String id) {
     final had = state.knight.rites.contains(id), fresh = !had && !state.did.contains('hotbar:$id') && (spellById(id)?.level ?? 0) > 3;
-    engine.toggleRite(id);
+    if (!engine.toggleRite(id)) return false;
     final on = state.knight.rites.contains(id);
     if (on) engine.mark('hotbar:$id');
     // The task: a rite you've learned but never had on the hotbar, swapped on by hand. (The first
     // three, levels 1 to 3, go on by themselves; taking one off and putting it back isn't new.)
     if (fresh && on) engine.mark('rite');
     _changed();
+    return true;
   }
 
   String? whyNotRite(String id) => engine.whyNotRite(id);

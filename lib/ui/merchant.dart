@@ -33,6 +33,7 @@ import 'hud.dart' show brewIcon;
 import 'stat_icons.dart' show InfoChip, StatChip;
 import 'quest_dialog.dart' show NpcPortrait, magsLook;
 import 'theme.dart';
+import 'map_page.dart' show WhereLine;
 
 const _tierTint = <String, int>{
   'dragonhide': 0xFF2F6A46,
@@ -93,7 +94,7 @@ class _Shop {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Wrap(spacing: 10, runSpacing: 2, children: [for (final (icon, n, need, _) in items) have(icon, n, need)]),
-        for (final w in short) Padding(padding: const EdgeInsets.only(top: 2), child: Text(w, style: Txt.onStone(size: 11.5, color: Palette.parch))),
+        for (final w in short) Padding(padding: const EdgeInsets.only(top: 2), child: WhereLine(controller: c, text: w)),
       ],
     );
   }
@@ -345,20 +346,21 @@ class MerchantWares extends StatelessWidget {
         ),
         if (upgrades.isNotEmpty) ...[
           x.heading('${k.heroClass.label} armour'),
-          for (final t in bought.take(1)) x.ware(armourIcon(t), t.name, '−${(t.reduction * 100).round()}% damage taken · now −${(armourTierById(k.armour).reduction * 100).round()}%', x.buy(t.id)),
+          for (final t in bought.take(1)) x.ware(armourIcon(t), t.name, '${(t.reduction * 100).round()}% less damage (yours: ${(armourTierById(k.armour).reduction * 100).round()}%)', x.buy(t.id)),
           if (bought.length < upgrades.length) Text('Better armour: forged at $smithName\'s', style: Txt.onStone(size: 12.5)),
         ],
         ],
         // Sealed crates: gear for the slot you pick, rare or finer, sight unseen.
         if (on('crates')) ...[
           x.heading('Sealed crates · rare or finer, now and then legendary'),
+          Text(c.state.cratesToday >= cratesPerDay ? 'Sold out. Mags restocks overnight: sleep at the inn after dark.' : '${cratesPerDay - c.state.cratesToday} left today · Mags restocks overnight (and gets one back from every raid you chase down)', style: Txt.onStone(size: 12.5, color: Palette.parch)),
           for (final (slot, label) in const [(GearSlot.weapon, 'Weapon'), (GearSlot.offhand, 'Off-hand'), (GearSlot.helm, 'Helm'), (GearSlot.gloves, 'Gloves'), (GearSlot.boots, 'Boots'), (GearSlot.ring, 'Ring'), (GearSlot.trinket, 'Trinket')])
             x.ware(
               const Icon(Icons.inventory_2, color: Color(0xFFC89A5A), size: 26),
               '$label crate',
               'Level ${k.level} · opened when paid for',
               CostButton(
-                label: '${crateCost(k.level)} gold',
+                label: c.state.cratesToday >= cratesPerDay ? 'Sold out' : '${crateCost(k.level)} gold',
                 onTap: c.whyNotCrate == null
                     ? () {
                         if (c.buyCrate(slot) != null) {
@@ -459,7 +461,7 @@ class ForgeWares extends StatelessWidget {
             x.ware(
               MatIcon.ore(m, size: 28),
               'Smelt ${m.ore.toLowerCase()}',
-              '$orePerBar lumps make ${withArticle(m.bar.toLowerCase())} · ${smeltFee(k.level)} gold a bar',
+              '$orePerBar ore make 1 bar',
               CostButton(
                 label: c.engine.barsFrom(m) > 0 ? 'Smelt ${c.engine.barsFrom(m)} · ${c.engine.smeltCost(m)} gold' : 'Need $orePerBar',
                 onTap: c.whyNotSmelt(m) == null
@@ -476,7 +478,7 @@ class ForgeWares extends StatelessWidget {
           x.ware(
             armourIcon(t),
             t.name,
-            '−${(t.reduction * 100).round()}% damage taken · now −${(armourTierById(k.armour).reduction * 100).round()}%',
+            '${(t.reduction * 100).round()}% less damage (yours: ${(armourTierById(k.armour).reduction * 100).round()}%)',
             CostButton(
               label: 'Forge',
               onTap: c.whyNotCraft(t.id) == null
@@ -494,7 +496,7 @@ class ForgeWares extends StatelessWidget {
         ],
         if (on('temper')) ...[
         // Tempering: a favourite weapon reworked up to your level, so a farmed prize stays useful.
-        x.heading('Tempering'),
+        x.heading('Bring up to your level'),
         for (final w in c.temperables)
           x.ware(
             GearIcon(item: w, size: 30, heroClass: k.heroClass, dye: k.dye),
@@ -511,12 +513,12 @@ class ForgeWares extends StatelessWidget {
           ),
         if (c.temperables.isEmpty) Text('Epic and legendary gear, back up to your level', style: Txt.onStone(size: 12.5)),
         // Honing: a little more out of a piece you love, for more gold each time.
-        x.heading('Honing · each step +${(honeStep * 100).round()}% to every stat, up to +$honeMax'),
+        x.heading('Strengthen · +${(honeStep * 100).round()}% to every stat a step, up to +$honeMax'),
         for (final g in c.honeables)
           x.ware(
             GearIcon(item: g, size: 30, heroClass: k.heroClass, dye: k.dye),
             g.name,
-            g.hone == 0 ? 'Not yet honed' : 'Honed +${g.hone}',
+            g.hone == 0 ? 'Not strengthened yet' : 'Strengthened +${g.hone}',
             CostButton(
               label: '+${g.hone + 1} · ${honeCost(g, k.level)} gold',
               onTap: c.whyNotHone(g) == null
@@ -534,25 +536,23 @@ class ForgeWares extends StatelessWidget {
         // Set pieces, from the blueprints the Ashen Order, the vampires and the werewolves carry.
         for (final f in forgedSets)
           if (s.mat(trophyKey(f.trophy)) > 0 || setPieceSlots.any((slot) => s.mat(blueprintKey(f.id, slot)) > 0)) ...[
-            x.heading('${gearSetById(f.id)!.name} set · blueprints from ${f.from}'),
+            x.heading('${gearSetById(f.id)!.name} set'),
             SetChips(set: gearSetById(f.id)!, dense: true, named: false),
-            // Where its trophies come from, so a shortfall says where to go.
-            if (trophyLands(f.trophy).isNotEmpty)
-              Padding(padding: const EdgeInsets.only(top: 4), child: Text('${f.trophy.label}: from foes in ${trophyLands(f.trophy).join(', ')}', style: Txt.onStone(size: 12.5, color: Palette.parch))),
-            // And its metal: bars are smelted here from golem ore, so say where those golems walk.
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Text(
-                '${f.metal.bar}: smelt ${f.metal.ore.toLowerCase()} on the Forge tab; ${f.metal.golemName}s roam ${metalLands(f.metal).join(', ')}',
-                style: Txt.onStone(size: 12.5, color: Palette.parch),
-              ),
-            ),
             // An order's suit is a class: say so, and what kind of knight it makes you.
             if (knightClassById(f.id) case final cls?)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
-                child: Text('All five pieces: you become the ${cls.name} (${cls.focus.toLowerCase()}), with rites of its own', style: Txt.label(size: 12.5, color: Color(cls.argb))),
+                child: Text('All five: you become the ${cls.name} · ${cls.focus.toLowerCase()}', style: Txt.label(size: 12.5, color: Color(cls.argb))),
               ),
+            // Where its blueprints and trophies come from, and its metal: one line each.
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: WhereLine(controller: c, size: 12.5, text: '${f.trophy.label} and blueprints: ${f.from}${trophyLands(f.trophy).isEmpty ? '' : ' (${trophyLands(f.trophy).join(', ')})'}'),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: WhereLine(controller: c, size: 12.5, text: '${f.metal.bar}s: smelt ${f.metal.golemName.toLowerCase()} ore (${metalLands(f.metal).join(', ')})'),
+            ),
             const SizedBox(height: 4),
             for (final slot in setPieceSlots)
               if (s.mat(blueprintKey(f.id, slot)) > 0)
@@ -605,8 +605,7 @@ class ForgeWares extends StatelessWidget {
                         TextSpan(children: [
                           TextSpan(text: gearSetById(f.id)!.name, style: Txt.label(size: 13.5, color: Palette.cream)),
                           if (knightClassById(f.id) case final cls?) TextSpan(text: '  ${cls.name}', style: Txt.label(size: 12, color: Color(cls.argb))),
-                          TextSpan(text: '\nfrom ${f.from}', style: Txt.onStone(size: 12)),
-                          if (trophyLands(f.trophy).isNotEmpty) TextSpan(text: '\n${f.trophy.label} in ${trophyLands(f.trophy).join(', ')}', style: Txt.onStone(size: 12, color: Palette.parch)),
+                          TextSpan(text: '\n${f.from}${trophyLands(f.trophy).isEmpty ? '' : ' · ${trophyLands(f.trophy).join(', ')}'}', style: Txt.onStone(size: 12)),
                         ]),
                       ),
                     ),
@@ -714,7 +713,8 @@ class EnchanterWares extends StatelessWidget {
         ],
         ],
         if (on('bolts')) ...[
-        x.heading('Special bolts · 1 gem = $ammoBundle'),
+        x.heading('Special bolts · 1 gem makes $ammoBundle'),
+        Text('Gems: every boss leaves one, rare foes often, others now and then.', style: Txt.onStone(size: 12.5, color: Palette.parch)),
         for (final a in AmmoType.values)
           x.ware(
             Container(
@@ -725,7 +725,7 @@ class EnchanterWares extends StatelessWidget {
             ),
             a.label(Missile.bolt),
             '${a.short(k.level)}${(k.ammo[a.name] ?? 0) > 0 ? ' · ×${k.ammo[a.name]}' : ''}',
-            extra: x.costs([(MatIcon.gem(gemFor(a), size: 16), s.mat(gemKey(gemFor(a))), 1, gemWhere(gemFor(a)))]),
+            extra: x.costs([(MatIcon.gem(gemFor(a), size: 16), s.mat(gemKey(gemFor(a))), 1, gemFor(a) == Gem.pearl ? gemWhere(Gem.pearl) : null)]),
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -734,7 +734,7 @@ class EnchanterWares extends StatelessWidget {
                   const SizedBox(width: 6),
                 ],
                 CostButton(
-                  label: 'Fit ${gemFor(a).label.toLowerCase()} · ${fletchFee(k.level)} gold',
+                  label: 'Make · ${fletchFee(k.level)} gold',
                   onTap: c.whyNotFletch(gemFor(a)) == null
                       ? () {
                           c.fletch(gemFor(a));
@@ -1099,7 +1099,7 @@ Future<void> showForgeWindow(BuildContext context, GameController c, {String? ta
   look: questGiverLooks['smith']!,
   glow: const [Color(0xFFB0501E), Color(0xFF2A0E06)],
   colour: const Color(0xFFFFB04A),
-  tabs: const [('forge', 'Forge', Icons.hardware), ('temper', 'Temper', Icons.trending_up), ('suits', 'Suits', Icons.shield)],
+  tabs: const [('forge', 'Forge', Icons.hardware), ('temper', 'Upgrade', Icons.trending_up), ('suits', 'Suits', Icons.shield)],
   wares: (tab) => ForgeWares(controller: c, tab: tab),
 );
 

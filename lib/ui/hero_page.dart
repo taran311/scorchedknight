@@ -34,6 +34,7 @@ import 'task_routes.dart';
 import 'tasks_view.dart';
 import 'stat_icons.dart';
 import 'theme.dart';
+import 'map_page.dart' show WhereLine;
 
 /// The tabs inside your tent.
 enum _Tab { gear, rites, companions, satchel, home, journey }
@@ -723,7 +724,7 @@ class _Spellbook extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 3),
           child: GestureDetector(
-            onTap: known ? () => c.prepareSpell(sp.id) : null,
+            onTap: known ? () => _pickRite(context, c, sp.id) : null,
             child: Container(
               height: 86,
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
@@ -868,7 +869,7 @@ class _Spellbook extends StatelessWidget {
                         return Tooltip(
                           message: known ? '${sp.name}: ${sp.desc}${prepared ? ' (tap to take it off your hotbar)' : ' (tap to put it on your hotbar)'}' : (sp.earned != null ? '${sp.name}: won in ${sp.earned}' : '${sp.name}: learned at level ${sp.level}'),
                           child: GestureDetector(
-                            onTap: known ? () => c.prepareSpell(sp.id) : null,
+                            onTap: known ? () => _pickRite(context, c, sp.id) : null,
                             child: MouseRegion(
                               cursor: known ? SystemMouseCursors.click : MouseCursor.defer,
                               child: Container(
@@ -1245,9 +1246,10 @@ class _Home extends StatelessWidget {
                 ),
                 // Where the building stock comes from, so a shortfall says what to do about it.
                 if (s.timber < next.timber || s.ironScrap < next.iron)
-                  Text(
-                    'Foes drop it now and then: timber in ${[for (final l in timberLands) continents[l].name].join(' and ')}, iron in ${[for (final l in ironLands) continents[l].name].join(' and ')}${s.home >= 1 ? '. $retainerName brings some back from the fields' : ''}.',
-                    style: Txt.onStone(size: 12.5),
+                  WhereLine(
+                    controller: c,
+                    size: 12.5,
+                    text: 'Timber from foes in ${[for (final l in timberLands) continents[l].name].join(' and ')} · iron in ${[for (final l in ironLands) continents[l].name].join(' and ')}${s.home >= 1 ? ' · $retainerName finds some too' : ''}',
                   ),
                 if (next.after >= 0) ...[
                   const SizedBox(height: 4),
@@ -1455,4 +1457,12 @@ class _Training extends StatelessWidget {
       Trait.vigour => 'Ironhide',
     };
   }
+}
+
+/// A rite tapped in the spellbook: on or off the hotbar, or (full) a word on how to make room.
+void _pickRite(BuildContext context, GameController c, String id) {
+  if (c.prepareSpell(id)) return;
+  ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(const SnackBar(content: Text('Your hotbar is full. Tap a rite on it to take it off first.'), duration: Duration(milliseconds: 1800)));
 }

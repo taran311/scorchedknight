@@ -470,7 +470,14 @@ void main() {
       ..level = 30
       ..coins = 100000;
     // A crate: paid for, rare or finer, the slot you asked for, into your spoils.
+    e.state.innRepaired = true;
     for (var i = 0; i < 20; i++) {
+      // (Mags has a few a day: sleep through the night for more.)
+      if (e.state.cratesToday >= cratesPerDay) {
+        expect(e.whyNotCrate(), isNotNull);
+        e.state.day = false;
+        e.rest();
+      }
       final g = e.buyCrate(GearSlot.helm)!;
       expect(g.slot, GearSlot.helm);
       expect(g.rarity.index, greaterThanOrEqualTo(Rarity.rare.index));

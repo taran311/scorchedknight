@@ -1082,6 +1082,10 @@ void honeOnce(GearItem g) {
 const crateOdds = [0, 0, 600, 350, 50];
 int crateCost(int level) => 150 + 40 * level;
 
+/// Crates Mags has each day: she restocks overnight (sleep at the Soot & Kettle after dark). So a
+/// crate is a treat now and then, not a way to roll for the best gear all afternoon.
+const cratesPerDay = 3;
+
 /// Dunstan's fee for honing [g] from +[GearItem.hone] to the next step: more for each step, and for
 /// finer pieces.
 int honeCost(GearItem g, int level) => ((60 + 12 * level) * (g.hone + 1) * switch (g.rarity) {

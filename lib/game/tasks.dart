@@ -63,7 +63,7 @@ final gameTasks = <GameTask>[
   GameTask('forge', 'Forge armour at Dunstan\'s', (s) => s.did.contains('craft'), const TaskReward(gold: 200)),
   GameTask('vault', 'Open the Ember Vault', (s) => s.did.contains('vault') || s.vaultFound.isNotEmpty, const TaskReward(keys: 1)),
   GameTask('piece', 'Forge a faction suit piece', (s) => s.did.contains('piece'), const TaskReward(gold: 250)),
-  GameTask('temper', 'Temper a piece of gear', (s) => s.did.contains('temper'), const TaskReward(gold: 300)),
+  GameTask('temper', 'Bring a piece of gear up to your level at Dunstan\'s', (s) => s.did.contains('temper'), const TaskReward(gold: 300)),
   GameTask('heroic', 'Beat a risen boss on a Heroic trail', (s) => s.risenDown.isNotEmpty, const TaskReward(xp: .5, keys: 1)),
   GameTask('keep', 'Build the keep', (s) => s.home >= 2, const TaskReward(gold: 500)),
   GameTask('relic', 'Forge a relic', (s) => s.forged.isNotEmpty, const TaskReward(xp: .5, scrolls: 2)),

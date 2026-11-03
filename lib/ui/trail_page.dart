@@ -150,7 +150,7 @@ class _TrailPageState extends State<TrailPage> {
                         if (phone) ...[
                           Row(
                             children: [
-                              Expanded(child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: GestureDetector(onTap: () => showGearGlance(context, c), child: Tooltip(message: 'Your gear', child: HeroCard(controller: c, compact: true))))),
+                              Expanded(child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Tooltip(message: 'Your gear', child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => showGearGlance(context, c), child: AbsorbPointer(child: HeroCard(controller: c, compact: true)))))),
                               const SizedBox(width: 8),
                               InnBackButton(label: 'World', icon: Icons.public, onPressed: () => Navigator.of(context).pop()),
                             ],

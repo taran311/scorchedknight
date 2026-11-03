@@ -328,7 +328,7 @@ class _BattleScreenState extends State<BattleScreen> {
                                         crossAxisAlignment: CrossAxisAlignment.stretch,
                                         children: [
                                           // Tap your card: everything you're wearing, and what it adds up to.
-                                          Expanded(flex: 5, child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => showGearGlance(context, c), child: HeroStrip(controller: c))),
+                                          Expanded(flex: 5, child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => showGearGlance(context, c), child: AbsorbPointer(child: HeroStrip(controller: c)))),
                                           const SizedBox(width: 5),
                                           // Tap theirs: everything about it, in full.
                                           Expanded(flex: 6, child: _FoeCard(controller: c, foe: foe, fill: true)),
@@ -350,7 +350,7 @@ class _BattleScreenState extends State<BattleScreen> {
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(onTap: () => showGearGlance(context, c), child: Tooltip(message: 'Your gear', child: HeroCard(controller: c, mana: true)))),
+                                            MouseRegion(cursor: SystemMouseCursors.click, child: Tooltip(message: 'Your gear', child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => showGearGlance(context, c), child: AbsorbPointer(child: HeroCard(controller: c, mana: true))))),
                                             const SizedBox(height: 6),
                                             ConstrainedBox(constraints: const BoxConstraints(maxWidth: 300), child: StatusBadges(state: s, onBolts: _swapBolts)),
                                           ],
@@ -670,7 +670,7 @@ class _BattleScreenState extends State<BattleScreen> {
         else
           Expanded(
             child: o == Outcome.knockedOut
-                ? StoneButton(title: 'Wake up at the Soot & Kettle', tone: ButtonTone.blood, onPressed: () => _close(BattleExit.inn))
+                ? StoneButton(title: 'Wake up in town', tone: ButtonTone.blood, onPressed: () => _close(BattleExit.inn))
                 : StoneButton(title: c.dungeonCleared ? 'Claim the hoard' : 'Back to the doors', tone: ButtonTone.blood, onPressed: () => _close(BattleExit.map)),
           ),
       ];
@@ -680,7 +680,7 @@ class _BattleScreenState extends State<BattleScreen> {
       return [
         Expanded(
           child: o == Outcome.knockedOut
-              ? StoneButton(title: 'Wake up at the Soot & Kettle', tone: ButtonTone.blood, onPressed: () => _close(BattleExit.inn))
+              ? StoneButton(title: 'Wake up in town', tone: ButtonTone.blood, onPressed: () => _close(BattleExit.inn))
               : StoneButton(title: 'Back to the path', caption: 'Step ${c.state.wildDepth} of ${wildAreas[c.state.wild ?? 0].name}', tone: ButtonTone.blood, onPressed: () => _close(BattleExit.map)),
         ),
       ];
@@ -704,7 +704,7 @@ class _BattleScreenState extends State<BattleScreen> {
             child: StoneButton(title: 'Choose your spoils', tone: ButtonTone.blood, onPressed: () => resolvePendingLoot(context, c).then((_) => mounted ? setState(() {}) : null)),
           )
         else
-          Expanded(child: StoneButton(title: o == Outcome.knockedOut ? 'Wake up at the Soot & Kettle' : 'Back to town', tone: ButtonTone.blood, onPressed: () => _close(o == Outcome.knockedOut ? BattleExit.inn : BattleExit.map))),
+          Expanded(child: StoneButton(title: o == Outcome.knockedOut ? 'Wake up in town' : 'Back to town', tone: ButtonTone.blood, onPressed: () => _close(o == Outcome.knockedOut ? BattleExit.inn : BattleExit.map))),
       ];
     }
     // On a Heroic trail, onward means the next elite (or the risen boss).
@@ -732,7 +732,7 @@ class _BattleScreenState extends State<BattleScreen> {
         Expanded(
           flex: 2,
           child: c.heroicOpen(land)
-              ? StoneButton(title: 'Heroic trail', caption: 'Elites, back here', onPressed: () {
+              ? StoneButton(title: 'Heroic trail', caption: 'Tougher foes, more loot', onPressed: () {
                   _heroic = true;
                   _fightOn();
                 })
@@ -778,15 +778,15 @@ class _BattleScreenState extends State<BattleScreen> {
           Expanded(
             flex: 2,
             child: low
-                ? StoneButton(title: 'To town', caption: 'Low on health', tone: ButtonTone.blood, onPressed: () => _close(BattleExit.inn))
+                ? StoneButton(title: 'Rest in town', caption: 'Low on health', tone: ButtonTone.blood, onPressed: () => _close(BattleExit.inn))
                 : StoneButton(title: isPhone(context) ? 'Back' : 'Back to the trail', caption: isPhone(context) ? 'to the trail' : null, onPressed: waiting ? null : () => _close(BattleExit.map)),
           ),
         ];
       case Outcome.fled:
         // You ran: all the way home to the village.
-        return [Expanded(child: StoneButton(title: 'Back to the Soot & Kettle', caption: 'You ran all the way home', tone: ButtonTone.blood, onPressed: () => _close(BattleExit.inn)))];
+        return [Expanded(child: StoneButton(title: 'Back to town', caption: 'You got away', tone: ButtonTone.blood, onPressed: () => _close(BattleExit.inn)))];
       case Outcome.knockedOut:
-        return [Expanded(child: StoneButton(title: 'Wake up at the Soot & Kettle', tone: ButtonTone.blood, onPressed: () => _close(BattleExit.inn)))];
+        return [Expanded(child: StoneButton(title: 'Wake up in town', tone: ButtonTone.blood, onPressed: () => _close(BattleExit.inn)))];
     }
   }
 }

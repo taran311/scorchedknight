@@ -136,11 +136,14 @@ class _PhoneMapState extends State<_PhoneMap> {
 }
 
 class MapPage extends StatefulWidget {
-  const MapPage({super.key, required this.controller, this.place, this.dungeon});
+  const MapPage({super.key, required this.controller, this.place, this.dungeon, this.land});
   final GameController controller;
 
   /// A place or dungeon to open on, picked (the Road card's "explore this" or "delve into that").
   final String? place, dungeon;
+
+  /// Or a land to open on, picked (a recipe's "find on map": where its materials come from).
+  final int? land;
 
   @override
   State<MapPage> createState() => _MapPageState();
@@ -148,7 +151,7 @@ class MapPage extends StatefulWidget {
 
 class _MapPageState extends State<MapPage> {
   GameController get c => widget.controller;
-  late int _pick = placeById(widget.place)?.land ?? dungeonById(widget.dungeon)?.land ?? c.state.continent;
+  late int _pick = placeById(widget.place)?.land ?? dungeonById(widget.dungeon)?.land ?? widget.land ?? c.state.continent;
 
   /// A wild area picked on the map (shown in the panel instead of a land).
   int? _wildPick;
@@ -372,7 +375,7 @@ class _MapPageState extends State<MapPage> {
                                 ...[
                                   Row(
                                     children: [
-                                      Expanded(child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: GestureDetector(onTap: () => showGearGlance(context, c), child: Tooltip(message: 'Your gear', child: HeroCard(controller: c))))),
+                                      Expanded(child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Tooltip(message: 'Your gear', child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => showGearGlance(context, c), child: AbsorbPointer(child: HeroCard(controller: c)))))),
                                       const SizedBox(width: 8),
                                       InnBackButton(label: 'Town', onPressed: _home),
                                     ],
@@ -1900,4 +1903,53 @@ class _RoadPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_RoadPainter o) => o.t != t;
+}
+
+/// Where a material comes from, as a line you can tap: the map opens on the first land (or map
+/// spot) the line names. A shortfall says where to go and takes you there.
+class WhereLine extends StatelessWidget {
+  const WhereLine({super.key, required this.controller, required this.text, this.size = 11.5});
+  final GameController controller;
+  final String text;
+  final double size;
+
+  /// The first land (or, failing that, map spot) named in [text], with where in the text it comes.
+  (int?, String?) _target() {
+    int? land;
+    var at = text.length;
+    for (var i = 0; i < continents.length; i++) {
+      final n = text.indexOf(continents[i].name.replaceFirst('The ', ''));
+      if (n >= 0 && n < at) {
+        at = n;
+        land = i;
+      }
+    }
+    if (land != null) return (land, null);
+    for (final p in places) {
+      if (text.contains(p.name.replaceFirst('The ', ''))) return (null, p.id);
+    }
+    return (null, null);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final (land, place) = _target();
+    final line = Text(text, style: Txt.onStone(size: size, color: Palette.parch));
+    if (land == null && place == null) return line;
+    // (Only somewhere you can actually go: a land still shut just names it.)
+    if (land != null && controller.whyNotTravel(land) != null) return line;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => MapPage(controller: controller, land: land, place: place))),
+        child: Text.rich(
+          TextSpan(children: [
+            TextSpan(text: text, style: Txt.onStone(size: size, color: Palette.parch)),
+            TextSpan(text: '  Find on map ›', style: Txt.label(size: size, color: Palette.amber)),
+          ]),
+        ),
+      ),
+    );
+  }
 }

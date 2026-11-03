@@ -213,7 +213,7 @@ class GearDetails extends StatelessWidget {
             ),
             const SizedBox(width: 6),
             Flexible(
-              child: Text('${g.slot.label}${g.heroClass == null ? '' : ' · ${g.heroClass!.label}'} · Lv ${g.level}${g.hone > 0 ? ' · honed +${g.hone}' : ''}', style: Txt.onStone(size: 12.5)),
+              child: Text('${g.slot.label}${g.heroClass == null ? '' : ' · ${g.heroClass!.label}'} · Lv ${g.level}${g.hone > 0 ? ' · +${g.hone}' : ''}', style: Txt.onStone(size: 12.5)),
             ),
           ],
         ),

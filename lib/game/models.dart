@@ -389,6 +389,7 @@ class GameState {
     this.hallFight = false,
     this.nemesis,
     this.nemesesSlain = 0,
+    this.cratesToday = 0,
     Set<String>? generalsDown,
     Map<int, int>? bossLosses,
     this.seasonSeen = '',
@@ -577,6 +578,10 @@ class GameState {
   /// down for good.
   Nemesis? nemesis;
   int nemesesSlain;
+
+  /// Mags' sealed crates bought since the last morning (she has [cratesPerDay], and one more for
+  /// every raid on her stall you chase down that day: below zero, she has extra).
+  int cratesToday;
 
   /// The Ember King's generals you've felled (by name): each one leaves him weaker.
   final Set<String> generalsDown;
@@ -794,6 +799,7 @@ class GameState {
     if (hallFight) 'hallFight': true,
     if (nemesis != null) 'nemesis': nemesis!.toJson(),
     if (nemesesSlain > 0) 'nemesesSlain': nemesesSlain,
+    if (cratesToday != 0) 'cratesToday': cratesToday,
     if (generalsDown.isNotEmpty) 'generals': generalsDown.toList(),
     if (bossLosses.isNotEmpty) 'bossLosses': {for (final e in bossLosses.entries) '${e.key}': e.value},
     'seasonSeen': seasonSeen,
@@ -939,6 +945,7 @@ class GameState {
       hallFight: j['hallFight'] as bool? ?? false,
       nemesis: Nemesis.fromJson(j['nemesis']),
       nemesesSlain: n('nemesesSlain'),
+      cratesToday: n('cratesToday'),
       generalsDown: {...((j['generals'] as List?) ?? const []).whereType<String>()},
       bossLosses: {for (final e in ((j['bossLosses'] as Map?) ?? const {}).entries) int.parse(e.key as String): (e.value as num).toInt()},
       seasonSeen: j['seasonSeen'] as String? ?? '',

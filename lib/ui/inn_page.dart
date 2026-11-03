@@ -241,7 +241,7 @@ class _InnPageState extends State<InnPage> with RouteAware {
                         if (phone) ...[
                           Row(
                             children: [
-                              Expanded(child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: GestureDetector(onTap: () => showGearGlance(context, c), child: Tooltip(message: 'Your gear', child: HeroCard(controller: c))))),
+                              Expanded(child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Tooltip(message: 'Your gear', child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => showGearGlance(context, c), child: AbsorbPointer(child: HeroCard(controller: c)))))),
                               IconButton(
                                 tooltip: 'Settings',
                                 onPressed: () => showDialog<void>(context: context, builder: (_) => _SettingsWindow(controller: c)),
@@ -253,7 +253,7 @@ class _InnPageState extends State<InnPage> with RouteAware {
                         ],
                         _TownSquare(
                           compact: phone,
-                          hud: GestureDetector(onTap: () => showGearGlance(context, c), child: Tooltip(message: 'Your gear', child: HeroCard(controller: c))),
+                          hud: Tooltip(message: 'Your gear', child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => showGearGlance(context, c), child: AbsorbPointer(child: HeroCard(controller: c)))),
                           onSettings: () => showDialog<void>(context: context, builder: (_) => _SettingsWindow(controller: c)),
                           look: heroLook(k),
                           repaired: s.innRepaired,

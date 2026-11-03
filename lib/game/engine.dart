@@ -1855,24 +1855,25 @@ class GameEngine {
     return state.mana >= cost ? null : 'Needs $cost mana';
   }
 
-  /// Puts a rite on the hotbar, or takes it off (the hotbar always keeps at least one). With the
-  /// hotbar full, the newest rite takes the last slot.
-  void toggleRite(String id) {
+  /// Puts a rite on the hotbar, or takes it off (any of them, down to none). With the hotbar full,
+  /// a rite that isn't on it stays off (false comes back): take one off first.
+  bool toggleRite(String id) {
     final k = state.knight, sp = spellById(id);
-    if (sp == null || !riteKnown(k, sp)) return;
+    if (sp == null || !riteKnown(k, sp)) return false;
     // (Rites you can't use right now, a class's out of its suit, are kept but take no slot: put
     // the suit back on and they're on the hotbar again.)
     bool usable(String r) => spellById(r) != null && riteKnown(k, spellById(r)!);
     k.rites.removeWhere((r) => spellById(r) == null);
     final active = k.rites.where(usable).toList();
     if (k.rites.contains(id)) {
-      if (active.length > 1) k.rites.remove(id);
+      k.rites.remove(id);
     } else if (active.length < riteSlots) {
       k.rites.add(id);
     } else {
-      k.rites[k.rites.indexOf(active.last)] = id;
+      return false;
     }
     if (!k.rites.contains(k.preparedSpell) || !usable(k.preparedSpell)) k.preparedSpell = k.rites.where(usable).firstOrNull ?? k.preparedSpell;
+    return true;
   }
 
   /// Takes your turn, then (if it's still standing and you're still here) the foe's.
@@ -3212,7 +3213,9 @@ class GameEngine {
     }
     if (raidWon == 'stall') {
       _givePotions();
-      _note('You haul Mags\' stock back to her stall. She presses a health potion into your hand: "On the house. Don\'t tell anyone."', EntryKind.gold);
+      // Among what you brought back: a sealed crate she'd given up for lost (one more today).
+      state.cratesToday--;
+      _note('You haul Mags\' stock back to her stall. She presses a health potion into your hand: "On the house. Don\'t tell anyone." And there\'s a sealed crate in the haul she\'d given up for lost: one more for sale today.', EntryKind.gold);
     } else if (raidWon == 'inn') {
       k.coins += r.coins;
       _note('You bring Hob back his silver. He counts it twice and slides you ${r.coins} gold for your trouble.', EntryKind.gold);
@@ -3473,6 +3476,8 @@ class GameEngine {
             : 'Morning, such as it is. Since the Burning, Vharrax\'s ash hangs over everything; the sun is a dull coin behind it, and noon is a brown dusk.',
       );
     }
+    // A new morning: Mags has fresh crates in.
+    if (!state.day) state.cratesToday = 0;
     state
       ..day = true
       ..dayWins = 0;
@@ -4174,7 +4179,7 @@ class GameEngine {
 
   String? whyNotHone(GearItem g) {
     if (state.inBattle) return 'Not mid-fight';
-    if (g.hone >= honeMax) return 'Honed as far as it goes';
+    if (g.hone >= honeMax) return 'As strong as it gets';
     final cost = honeCost(g, state.knight.level);
     if (state.knight.coins < cost) return 'Needs $cost gold';
     return null;
@@ -4186,13 +4191,14 @@ class GameEngine {
     final cost = honeCost(g, state.knight.level);
     state.knight.coins -= cost;
     honeOnce(g);
-    _note('$smithName works ${g.name} on the whetstone and the anvil. Honed +${g.hone}: every stat a little keener. (−$cost gold)', EntryKind.gold);
+    _note('$smithName works ${g.name} on the whetstone and the anvil. It\'s +${g.hone} now: every stat a little stronger. (−$cost gold)', EntryKind.gold);
     return true;
   }
 
   String? whyNotCrate() {
     if (state.inBattle) return 'Not mid-fight';
     final cost = crateCost(state.knight.level);
+    if (state.cratesToday >= cratesPerDay) return 'Sold out till morning';
     if (state.knight.coins < cost) return 'Needs $cost gold';
     return null;
   }
@@ -4202,6 +4208,7 @@ class GameEngine {
     if (whyNotCrate() != null) return null;
     final k = state.knight, cost = crateCost(k.level);
     k.coins -= cost;
+    state.cratesToday++;
     final g = loot.roll(k.heroClass, k.level, odds: crateOdds, only: slot, wielding: k.loadout.weapon);
     state.pendingLoot.add(g);
     _note('Mags pries open a sealed crate: ${g.name} (${g.rarity.label}). (−$cost gold)', EntryKind.gold);
