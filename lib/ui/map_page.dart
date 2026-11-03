@@ -1741,7 +1741,11 @@ class _RoadOpensState extends State<_RoadOpens> with SingleTickerProviderStateMi
                       builder: (context, box) {
                         // Zoom so the whole road fits, centred.
                         final k = math.min(box.maxWidth / view.width, box.maxHeight / view.height);
-                        final dx = (box.maxWidth - view.width * k) / 2 - view.left * k, dy = (box.maxHeight - view.height * k) / 2 - view.top * k;
+                        // The box shows more than the road's stretch on one side: fill it with the map
+                        // round the road (centred on it, but never past the map's edge).
+                        final vw = box.maxWidth / k, vh = box.maxHeight / k, mid = view.center;
+                        double edge(double centre, double span, double size) => span >= size ? (size - span) / 2 : (centre - span / 2).clamp(0.0, size - span);
+                        final dx = -edge(mid.dx, vw, 1000) * k, dy = -edge(mid.dy, vh, _mapH) * k;
                         return ClipRect(
                           child: Stack(
                             children: [

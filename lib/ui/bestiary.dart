@@ -3,6 +3,7 @@
 // Open http://localhost:5070/?bestiary (&from=N to skip ahead, &cols=N for a denser grid, &foes to
 // skip the knights).
 
+import 'battle_screen.dart' show BraceRing;
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -61,6 +62,8 @@ class BestiaryPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (Uri.base.queryParameters.containsKey('check')) return _check();
+    // ?bestiary&brace: the brace ring on its own, over and over, with how each tap counted.
+    if (Uri.base.queryParameters.containsKey('brace')) return const _BraceDemo();
     final entries = <(String, void Function(Canvas, Size))>[];
     // The knight in every armour, hero and heroine.
     for (final female in Uri.base.queryParameters.containsKey('foes') ? const <bool>[] : [false, true]) {
@@ -248,4 +251,39 @@ void _foe(Canvas c, Size s, FoeType f) {
   } else {
     _humanoid(c, s, foeLookOf(f));
   }
+}
+
+class _BraceDemo extends StatefulWidget {
+  const _BraceDemo();
+  @override
+  State<_BraceDemo> createState() => _BraceDemoState();
+}
+
+class _BraceDemoState extends State<_BraceDemo> {
+  var _round = 0;
+  final _said = <String>[];
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: const Color(0xFF0E0B08),
+    body: Center(
+      child: SizedBox(
+        width: 380,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            BraceRing(
+              key: ValueKey(_round),
+              onBrace: (q) => setState(() {
+                _said.insert(0, q >= 1 ? 'perfect' : (q > 0 ? 'in time' : 'missed'));
+                _round++;
+              }),
+            ),
+            const SizedBox(height: 12),
+            Text(_said.take(8).join(' · '), style: const TextStyle(color: Colors.white70)),
+          ],
+        ),
+      ),
+    ),
+  );
 }

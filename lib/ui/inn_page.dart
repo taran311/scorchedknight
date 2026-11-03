@@ -182,7 +182,7 @@ class _InnPageState extends State<InnPage> with RouteAware {
       final to = nextLand!;
       nextLand = null;
       await showRoadOpens(context, c, from: c.state.continent, to: to);
-      if (!mounted) return;
+      if (!mounted || c.whyNotTravel(to) != null) return;
       await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => TrailPage(controller: c, land: to)));
     }
   }
@@ -321,8 +321,9 @@ class _InnPageState extends State<InnPage> with RouteAware {
                           ),
                           const SizedBox(height: 10),
                         ],
-                        // The road: the next land's boss, so there's always a way on.
-                        if (c.engine.roadStep() case final step? when !(job && step.land == 0)) ...[
+                        // The road: the next land's boss, so there's always a way on. (Not until Hob's
+                        // job is done: on a new game, the job is the way on, offered or taken.)
+                        if (c.engine.roadStep() case final step? when s.innRepaired || step.land != 0) ...[
                           _RoadCard(controller: c, step: step, onGo: () => _goRoad(step)),
                           const SizedBox(height: 10),
                         ],

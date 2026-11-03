@@ -392,7 +392,7 @@ class _BattleScreenState extends State<BattleScreen> {
                                     moves: over
                                         ? null
                                         : _bracing != null
-                                        ? [Expanded(child: _BraceRing(speed: c.state.settings.fastFights ? 1.4 : 1, onBrace: _braced))]
+                                        ? [Expanded(child: BraceRing(speed: c.state.settings.fastFights ? 1.4 : 1, onBrace: _braced))]
                                         : _aiming
                                         ? [Expanded(child: _AimBar(speed: c.state.settings.fastFights ? 1.6 : 1, zone: bullseyeFor(c.state.knight), onLoose: _loose, onCancel: () => setState(() => _aiming = false)))]
                                         : _actionRows().first,
@@ -725,7 +725,7 @@ class _BattleScreenState extends State<BattleScreen> {
           flex: 3,
           child: StoneButton(
             title: isPhone(context) ? 'Onward' : 'Onward to ${continents[to].name}',
-            caption: isPhone(context) ? continents[to].name : 'A new land',
+            caption: c.whyNotTravel(to) != null ? 'Opens at level ${continents[to].minLevel}' : (isPhone(context) ? continents[to].name : 'A new land'),
             tone: ButtonTone.blood,
             onPressed: () {
               nextLand = to;
@@ -1734,16 +1734,16 @@ class _PickedCard extends StatelessWidget {
 /// Bracing for a heavy blow: a ring closes on your shield; tap as it meets it. Right on the beat is
 /// a perfect brace (a sure block), close is in time (no heavier than an ordinary blow), and a miss
 /// (or no tap at all) takes the heavy blow full on.
-class _BraceRing extends StatefulWidget {
-  const _BraceRing({required this.onBrace, this.speed = 1});
+class BraceRing extends StatefulWidget {
+  const BraceRing({super.key, required this.onBrace, this.speed = 1});
   final ValueChanged<double> onBrace;
   final double speed;
 
   @override
-  State<_BraceRing> createState() => _BraceRingState();
+  State<BraceRing> createState() => BraceRingState();
 }
 
-class _BraceRingState extends State<_BraceRing> with SingleTickerProviderStateMixin {
+class BraceRingState extends State<BraceRing> with SingleTickerProviderStateMixin {
   // The ring meets the shield at [_beat] of the way through; a little after, it's too late.
   static const _beat = .8;
   late final _t = AnimationController(vsync: this, duration: Duration(milliseconds: (1100 / widget.speed).round()));
