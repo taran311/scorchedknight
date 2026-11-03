@@ -1709,16 +1709,20 @@ Future<void> showRoadOpens(BuildContext context, GameController c, {required int
       opaque: true,
       transitionDuration: const Duration(milliseconds: 250),
       reverseTransitionDuration: const Duration(milliseconds: 250),
-      pageBuilder: (context, a1, a2) => _RoadOpens(controller: c, from: from, to: to),
+      // (Still out of reach by level: the road is shown, but it stops short at a gate.)
+      pageBuilder: (context, a1, a2) => _RoadOpens(controller: c, from: from, to: to, gate: (c.whyNotTravel(to)?.startsWith('Reach level') ?? false) ? continents[to].minLevel : null),
       transitionsBuilder: (context, a, a2, child) => FadeTransition(opacity: a, child: child),
     ),
   );
 }
 
 class _RoadOpens extends StatefulWidget {
-  const _RoadOpens({required this.controller, required this.from, required this.to});
+  const _RoadOpens({required this.controller, required this.from, required this.to, this.gate});
   final GameController controller;
   final int from, to;
+
+  /// The level the new land opens at, while you're short of it.
+  final int? gate;
 
   @override
   State<_RoadOpens> createState() => _RoadOpensState();
@@ -1805,7 +1809,7 @@ class _RoadOpensState extends State<_RoadOpens> with SingleTickerProviderStateMi
                                 top: dy,
                                 width: 1000 * k,
                                 height: _mapH * k,
-                                child: AnimatedBuilder(animation: _t, builder: (context, _) => CustomPaint(painter: _RoadPainter(a, b, _t.value, Color(l.argb)))),
+                                child: AnimatedBuilder(animation: _t, builder: (context, _) => CustomPaint(painter: _RoadPainter(a, b, _t.value, Color(l.argb), gated: widget.gate != null))),
                               ),
                             ],
                           ),
@@ -1826,11 +1830,14 @@ class _RoadOpensState extends State<_RoadOpens> with SingleTickerProviderStateMi
                         offset: Offset(0, 14 * (1 - v)),
                         child: Column(
                           children: [
-                            Text('THE ROAD OPENS', style: Txt.label(size: 13, color: Palette.amber)),
+                            Text(widget.gate == null ? 'THE ROAD OPENS' : 'THE ROAD AHEAD', style: Txt.label(size: 13, color: Palette.amber)),
                             const SizedBox(height: 2),
                             Text(l.name, textAlign: TextAlign.center, style: Txt.logo().copyWith(fontSize: 28, color: Color.lerp(Color(l.argb), Palette.cream, .35))),
                             const SizedBox(height: 4),
-                            Text(l.blurb, textAlign: TextAlign.center, maxLines: 3, overflow: TextOverflow.ellipsis, style: Txt.onStone(size: 14.5)),
+                            if (widget.gate case final lv?)
+                              Text('Opens at level $lv. Grow stronger here first.', textAlign: TextAlign.center, style: Txt.onStone(size: 14.5, color: Palette.amber))
+                            else
+                              Text(l.blurb, textAlign: TextAlign.center, maxLines: 3, overflow: TextOverflow.ellipsis, style: Txt.onStone(size: 14.5)),
                           ],
                         ),
                       ),
@@ -1851,10 +1858,13 @@ class _RoadOpensState extends State<_RoadOpens> with SingleTickerProviderStateMi
 /// The road being inked from [a] to [b] ([t] 0 to 1), your marker walking it, and a ring round the
 /// new land as you arrive.
 class _RoadPainter extends CustomPainter {
-  _RoadPainter(this.a, this.b, this.t, this.colour);
+  _RoadPainter(this.a, this.b, this.t, this.colour, {this.gated = false});
   final Offset a, b;
   final double t;
   final Color colour;
+
+  /// Not open to you yet: the road stops at a gate short of the land.
+  final bool gated;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1868,7 +1878,9 @@ class _RoadPainter extends CustomPainter {
       ..quadraticBezierTo(bend.dx, bend.dy, b.dx, b.dy);
     final walk = Curves.easeInOut.transform(((t - .1) / .55).clamp(0.0, 1.0));
     final metric = path.computeMetrics().first;
-    final drawn = metric.length * walk;
+    // (Gated: only as far as the gate, a little short of the land.)
+    final reach = gated ? math.max(0.0, metric.length - 70) : metric.length;
+    final drawn = reach * walk;
     // The road so far, in dashes of red ink.
     final ink = Paint()
       ..color = const Color(0xFF8A2A1A)
@@ -1886,9 +1898,24 @@ class _RoadPainter extends CustomPainter {
     canvas.drawCircle(at, 18, Paint()..color = Palette.amber.withValues(alpha: .25));
     canvas.drawCircle(at, 11, Paint()..color = const Color(0xFF2A1A10));
     canvas.drawCircle(at, 8, Paint()..color = const Color(0xFFFFD98A));
-    // Arrived: a ring opens round the new land.
+    // Arrived: a ring opens round the new land. (Gated: a bar across the road instead.)
     final ring = ((t - .62) / .38).clamp(0.0, 1.0);
-    if (ring > 0) {
+    if (gated) {
+      if (ring > 0) {
+        final g = metric.getTangentForOffset(math.min(metric.length, reach + 26));
+        if (g != null) {
+          final across = Offset(-g.vector.dy, g.vector.dx) * 22 * Curves.easeOutBack.transform(ring);
+          canvas.drawLine(g.position - across, g.position + across, Paint()
+            ..color = const Color(0xFF2A1A10)
+            ..strokeWidth = 11
+            ..strokeCap = StrokeCap.round);
+          canvas.drawLine(g.position - across, g.position + across, Paint()
+            ..color = Palette.amber
+            ..strokeWidth = 5
+            ..strokeCap = StrokeCap.round);
+        }
+      }
+    } else if (ring > 0) {
       canvas.drawCircle(
         b,
         20 + 50 * ring,
@@ -1902,7 +1929,7 @@ class _RoadPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_RoadPainter o) => o.t != t;
+  bool shouldRepaint(_RoadPainter o) => o.t != t || o.gated != gated;
 }
 
 /// Where a material comes from, as a line you can tap: the map opens on the first land (or map

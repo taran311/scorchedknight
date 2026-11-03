@@ -48,6 +48,44 @@ import 'trace.dart';
 /// (Kept to the stage plus a margin: every backlight layer is this big, every frame.)
 const _figureBounds = Rect.fromLTWH(-40, -80, 1040, 660);
 const _knightX = 230.0, _groundY = 470.0, _foeX = 725.0, _knightScale = 1.12;
+
+/// Records the figures in runs (see [FigureRun]): each [next] closes the run so far and opens
+/// another with its own tint and fade. Only called with nothing saved on the canvas, so no
+/// transform is lost between runs.
+class _Runs {
+  final runs = <FigureRun>[];
+  ui.PictureRecorder? _rec;
+  ColorFilter? _tint;
+  double _alpha = 1;
+  bool _rim = true;
+
+  Canvas begin() => _open(null, 1, true);
+
+  Canvas _open(ColorFilter? tint, double alpha, bool rim) {
+    _tint = tint;
+    _alpha = alpha;
+    _rim = rim;
+    return Canvas(_rec = ui.PictureRecorder(), _figureBounds);
+  }
+
+  void _close() {
+    final rec = _rec;
+    if (rec == null) return;
+    runs.add(FigureRun(rec.endRecording(), tint: _tint, alpha: _alpha, rim: _rim));
+    _rec = null;
+  }
+
+  Canvas next(Canvas current, {ColorFilter? tint, double alpha = 1, bool rim = true}) {
+    if (identical(tint, _tint) && alpha == _alpha && rim == _rim) return current;
+    _close();
+    return _open(tint, alpha, rim);
+  }
+
+  List<FigureRun> finish() {
+    _close();
+    return runs;
+  }
+}
 // How far the knight charges in to strike: from their mark to blade's reach of the foe.
 const _dashReach = 255.0;
 
@@ -2106,8 +2144,15 @@ class _ScenePainter extends CustomPainter {
 
     // Every figure is drawn into a picture first, then laid down as a backlit silhouette.
     lightGlows = s._lite;
-    final outer = canvas, figures = dying ? null : ui.PictureRecorder();
-    if (figures != null) canvas = Canvas(figures, _figureBounds);
+    final outer = canvas, runs = dying ? null : _Runs();
+    if (runs != null) canvas = runs.begin();
+    // A tint or fade on one figure goes on its run, laid once in the body's pass (see FigureRun),
+    // not inside the picture; drawn straight to the screen (the Reaper's visit), it stays inline.
+    ColorFilter? inline(ColorFilter? f) => runs == null ? f : null;
+    double inlineAlpha(double a) => runs == null ? a : 1;
+    void runAs({ColorFilter? tint, double alpha = 1, bool rim = true}) {
+      if (runs != null) canvas = runs.next(canvas, tint: tint, alpha: alpha, rim: rim);
+    }
 
     final arriving = s._arrival != null && t < s._arrival!;
     final ds = dragonStage(k), pet = arriving ? null : petStage(k);
@@ -2182,10 +2227,21 @@ class _ScenePainter extends CustomPainter {
       if (dash > .08 && !still) {
         // Afterimages streaming behind the charge (just one on a phone: each is a whole extra knight
         // to draw, and three of them dropped frames mid-swing).
-        for (var i = 1; i <= (s._lite ? 1 : 3); i++) {
-          drawHumanoid(canvas, hero, kPose, t, DrawOptions(at: Offset(kx - i * 48 * math.min(dash, 1), _groundY), scale: _knightScale, alpha: .32 / i * math.min(dash, 1), shadow: false), still: true);
+        // (All of them in one faint run, unlit: each used to be a layer of its own in every pass.)
+        runAs(alpha: .24 * math.min(dash, 1), rim: false);
+        for (var i = s._lite ? 1 : 3; i >= 1; i--) {
+          drawHumanoid(canvas, hero, kPose, t, DrawOptions(at: Offset(kx - i * 48 * math.min(dash, 1), _groundY), scale: _knightScale, alpha: runs == null ? .32 / i * math.min(dash, 1) : 1, shadow: false), still: true);
         }
       }
+      final hurt = () {
+        // Low on health, the knight himself throbs red too (steady, not throbbing, with reduced
+        // motion), as well as the edges of the scene.
+        final frac = c.shownHeroHp / math.max(1, maxHp(c.state.knight));
+        final low = c.state.inBattle && frac < .3 && ko < .05 ? (.3 - frac) / .3 * (still ? .35 : .2 + .25 * (.5 + .5 * math.sin(t / 260))) : 0.0;
+        final red = math.max(fx['kflash']!, low);
+        return red > .02 ? hurtFilter(red) : null;
+      }();
+      runAs(tint: hurt);
       drawHumanoid(
         canvas,
         hero,
@@ -2197,17 +2253,11 @@ class _ScenePainter extends CustomPainter {
           flip: flee > .15,
           // Reaped from behind, you pitch forward onto your face.
           rotation: fx['gloom']! > 0 ? ko * 80 : -ko * 82,
-          tint: () {
-            // Low on health, the knight himself throbs red too (steady, not throbbing, with reduced
-            // motion), as well as the edges of the scene.
-            final frac = c.shownHeroHp / math.max(1, maxHp(c.state.knight));
-            final low = c.state.inBattle && frac < .3 && ko < .05 ? (.3 - frac) / .3 * (still ? .35 : .2 + .25 * (.5 + .5 * math.sin(t / 260))) : 0.0;
-            final red = math.max(fx['kflash']!, low);
-            return red > .02 ? hurtFilter(red) : null;
-          }(),
+          tint: inline(hurt),
         ),
         still: still,
       );
+      runAs();
       if (ko > .6 && !still && fx['gloom']! < .05) {
         // Little stars circling a dazed head.
         final head = Offset(_knightX - 150 * ko, _groundY - 40);
@@ -2288,14 +2338,16 @@ class _ScenePainter extends CustomPainter {
     if (s._foe.pack && (s._isBeast || (!s._isKraken && !s._isHound && !s._isDragon))) {
       // The rest of the pack stands behind the leader, a little smaller and in shade.
       const shade = ColorFilter.matrix([.74, 0, 0, 0, 0, 0, .74, 0, 0, 0, 0, 0, .8, 0, 0, 0, 0, 0, 1, 0]);
-      final tint = fx['flash']! > .02 ? flashFilter(fx['flash']! * .6) : shade;
+      final packTint = fx['flash']! > .02 ? flashFilter(fx['flash']! * .6) : shade;
+      final packAlpha = fx['alpha']! * (1 - fx['dying']! * .3);
+      runAs(tint: packTint, alpha: packAlpha);
+      final tint = inline(packTint), a = inlineAlpha(packAlpha);
       for (final (dx, dy, sc, ph) in const [(74.0, -12.0, .84, 2.9), (-38.0, -20.0, .78, .6)]) {
         final at = Offset(fx0 + dx, fy + dy);
         canvas.save();
         canvas.translate(at.dx, at.dy);
         canvas.scale(sc);
         canvas.translate(-at.dx, -at.dy);
-        final a = fx['alpha']! * (1 - fx['dying']! * .3);
         if (s._isBeast) {
           drawBeastFoe(canvas, s._foe.look, Offset(at.dx + 10, at.dy), t + ph * 900, dying: fx['dying']!, alpha: a, tint: tint, still: still, rider: s._foe.look.startsWith('centaur') ? s._foeLook : null);
         } else {
@@ -2305,6 +2357,7 @@ class _ScenePainter extends CustomPainter {
         }
         canvas.restore();
       }
+      runAs();
     }
     final menace = s._menaceNow;
     if (menace > 0 && fx['alpha']! > 0) {
@@ -2329,15 +2382,20 @@ class _ScenePainter extends CustomPainter {
       }
     }
     // (Tougher foes are drawn bigger, about their feet, and in a darker, bloodier hue.)
-    canvas.save();
-    canvas.translate(fx0, fy);
-    canvas.scale(s._menaceScale);
-    canvas.translate(-fx0, -fy);
     final dread = menace == 0
         ? null
         : ColorFilter.matrix(menace > 1
               ? const [.86, 0, 0, 0, 20, 0, .6, 0, 0, 0, 0, 0, .62, 0, 0, 0, 0, 0, 1, 0]
               : const [.94, 0, 0, 0, 10, 0, .78, 0, 0, 0, 0, 0, .78, 0, 0, 0, 0, 0, 1, 0]);
+    // Its flash when struck (or its darker hue, or your own shadow's), and its fade: on its run.
+    final humanoidFoe = !(s._isBeast || s._isKraken || s._isHound || s._isDragon);
+    final foeTint = fx['flash']! > .02 ? flashFilter(fx['flash']!) : (humanoidFoe && s._isYou ? _BattleStageState._shadowYou : dread);
+    runAs(tint: foeTint, alpha: fx['alpha']!);
+    final ownTint = inline(foeTint), ownAlpha = inlineAlpha(fx['alpha']!);
+    canvas.save();
+    canvas.translate(fx0, fy);
+    canvas.scale(s._menaceScale);
+    canvas.translate(-fx0, -fy);
     if (s._isBeast) {
       var hit = 0.0;
       if (s._foeClip != null) {
@@ -2348,7 +2406,7 @@ class _ScenePainter extends CustomPainter {
           hit = math.sin(math.min(1, p * 4) * math.pi / 2) * (1 - p);
         }
       }
-      drawBeastFoe(canvas, s._foe.look, Offset(fx0 + 10, fy), t, hit: hit, dying: fx['dying']!, alpha: fx['alpha']!, tint: fx['flash']! > .02 ? flashFilter(fx['flash']!) : dread, still: still, rider: s._foe.look.startsWith('centaur') ? s._foeLook : null);
+      drawBeastFoe(canvas, s._foe.look, Offset(fx0 + 10, fy), t, hit: hit, dying: fx['dying']!, alpha: ownAlpha, tint: ownTint, still: still, rider: s._foe.look.startsWith('centaur') ? s._foeLook : null);
     } else if (s._isKraken) {
       var hit = 0.0;
       if (s._foeClip != null) {
@@ -2359,7 +2417,7 @@ class _ScenePainter extends CustomPainter {
           hit = math.sin(math.min(1, p * 4) * math.pi / 2) * (1 - p);
         }
       }
-      drawSeaBeast(canvas, s._foe.look, Offset(fx0 + 20, fy), _BattleStageState._krakenScale, t, hit: hit, dying: fx['dying']!, alpha: fx['alpha']!, tint: fx['flash']! > .02 ? flashFilter(fx['flash']!) : dread, still: still);
+      drawSeaBeast(canvas, s._foe.look, Offset(fx0 + 20, fy), _BattleStageState._krakenScale, t, hit: hit, dying: fx['dying']!, alpha: ownAlpha, tint: ownTint, still: still);
     } else if (s._isHound) {
       // A great hound, facing the hero; it rears back when struck and topples when it falls.
       var hit = 0.0;
@@ -2376,9 +2434,8 @@ class _ScenePainter extends CustomPainter {
       canvas.translate(at.dx, at.dy);
       canvas.scale(-1, 1);
       canvas.rotate(-fx['dying']! * .9);
-      final flash = fx['flash']! > .02 ? flashFilter(fx['flash']!) : dread;
-      final layered = fx['alpha']! < 1 || flash != null;
-      if (layered) canvas.saveLayer(const Rect.fromLTRB(-700, -900, 700, 300), Paint()..color = Color.fromRGBO(0, 0, 0, fx['alpha']!)..colorFilter = flash);
+      final layered = ownAlpha < 1 || ownTint != null;
+      if (layered) canvas.saveLayer(const Rect.fromLTRB(-700, -900, 700, 300), Paint()..color = Color.fromRGBO(0, 0, 0, ownAlpha)..colorFilter = ownTint);
       drawHound(canvas, demonHoundLook, Offset.zero, _BattleStageState._houndScale, t, still: still);
       if (layered) canvas.restore();
       canvas.restore();
@@ -2399,10 +2456,10 @@ class _ScenePainter extends CustomPainter {
         Offset(fx0 + 30, fy),
         _BattleStageState._dragonScale,
         t,
-        alpha: fx['alpha']!,
+        alpha: ownAlpha,
         hit: hit,
         dying: fx['dying']!,
-        tint: fx['flash']! > .02 ? flashFilter(fx['flash']!) : dread,
+        tint: ownTint,
         still: still,
       );
     } else {
@@ -2420,14 +2477,15 @@ class _ScenePainter extends CustomPainter {
         at: Offset(fx0, fy),
         scale: s._foeScale,
         flip: true,
-        alpha: fx['alpha']!,
+        alpha: ownAlpha,
         rotation: -fx['dying']! * 78,
-        tint: fx['flash']! > .02 ? flashFilter(fx['flash']!) : (s._isYou ? _BattleStageState._shadowYou : dread),
+        tint: ownTint,
       ),
       still: still,
     );
     }
     canvas.restore();
+    runAs();
 
     // ---- The legendary specials that come for the foe in person ----
     final deadrun = fx['deadrun']!;
@@ -2479,13 +2537,15 @@ class _ScenePainter extends CustomPainter {
 
     canvas = outer;
     lightGlows = false;
-    if (figures != null) {
-      final figurePic = figures.endRecording();
-      // (Not disposed: on the web the frame is drawn later, and still needs it.)
+    if (runs != null) {
+      final figures = runs.finish();
+      // (Not disposed: on the web the frame is drawn later, and still needs them.)
       if (_perf.contains('r')) {
-        canvas.drawPicture(figurePic);
+        for (final r in figures) {
+          canvas.drawPicture(r.pic);
+        }
       } else if (!_perf.contains('f')) {
-        silhouettePicture(canvas, figurePic, _figureBounds, rim: rimFor(ground), lite: s._lite || _perf.contains('h'));
+        silhouetteRuns(canvas, figures, _figureBounds, rim: rimFor(ground), lite: s._lite || _perf.contains('h'));
       }
     }
 
@@ -2635,7 +2695,10 @@ class _ScenePainter extends CustomPainter {
         final centre = s._foeChest + const Offset(-110, 10);
         if (bash) {
           final r = 30 + 120 * Curves.easeOut.transform(age), a = (1 - age);
-          canvas.drawCircle(centre + const Offset(60, 0), r, strokePaint(col.withValues(alpha: .8 * a), 10 * a + 2)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3));
+          // (A soft wide ring under a firm one, rather than a blurred ring: a blur on a ring this big
+          // was a costly draw at the very moment of the blow.)
+          canvas.drawCircle(centre + const Offset(60, 0), r, strokePaint(col.withValues(alpha: .3 * a), 18 * a + 4));
+          canvas.drawCircle(centre + const Offset(60, 0), r, strokePaint(col.withValues(alpha: .8 * a), 10 * a + 2));
           canvas.drawCircle(centre + const Offset(60, 0), r * .7, strokePaint(const Color(0xFFFFFFFF).withValues(alpha: .6 * a), 3 * a + 1));
         } else {
           final sweep = 2.4 * Curves.easeOut.transform(math.min(1, age * 1.8)), from = -2.0;
@@ -2764,12 +2827,15 @@ class _ScenePainter extends CustomPainter {
         ..lineTo(tipX + 4, box.bottom + 14)
         ..lineTo(tipX + 9, box.bottom - 1)
         ..close();
-      canvas.saveLayer(Offset.zero & sceneSize, Paint()..color = Color.fromRGBO(0, 0, 0, a));
+      // (Faded through a layer only while it fades, and only as big as the bubble: a layer the
+      // size of the whole scene, every frame it showed, cost a phone dearly.)
+      final fading = a < 1;
+      if (fading) canvas.saveLayer(box.inflate(12).expandToInclude(Rect.fromLTWH(box.left, box.bottom, box.width, 20)), Paint()..color = Color.fromRGBO(0, 0, 0, a));
       canvas.drawPath(shape.shift(const Offset(0, 3)), Paint()..color = const Color(0x66000000)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4));
       canvas.drawPath(shape, Paint()..color = const Color(0xFFF4EAD0));
       canvas.drawPath(shape, strokePaint(const Color(0xFF3A2614), 2.2));
       tp.paint(canvas, box.topLeft + const Offset(13, 8));
-      canvas.restore();
+      if (fading) canvas.restore();
     } else {
       s._bubbleBox = null;
     }

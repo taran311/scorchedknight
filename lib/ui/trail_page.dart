@@ -106,13 +106,8 @@ class _TrailPageState extends State<TrailPage> {
     // A moment on the map first: the road from here to there.
     await showRoadOpens(context, c, from: land, to: to);
     if (!mounted) return;
-    // The road's open, but the land's foes are beyond you yet: say so, and stay on this trail.
-    if (c.whyNotTravel(to) case final why?) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text('${continents[to].name}: $why.'), duration: const Duration(seconds: 3)));
-      return;
-    }
+    // Beyond you yet (the road showed it stopping at a gate): stay on this trail.
+    if (c.whyNotTravel(to) != null) return;
     Navigator.of(context).pushReplacement(MaterialPageRoute<void>(builder: (_) => TrailPage(controller: c, land: to)));
   }
 
