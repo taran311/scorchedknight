@@ -72,23 +72,6 @@ class _BattleScreenState extends State<BattleScreen> {
   /// The crossbow's timing bar is up, waiting for you to loose the bolt.
   bool _aiming = false;
 
-  /// The turn you last braced on. The moment the foe rears back for a heavy blow, the brace ring
-  /// comes up in place of the moves (you set your guard as it winds up), and your move follows as
-  /// usual; the brace holds for the blow when it comes.
-  int? _bracedTurn;
-  bool get _braceDue => c.state.inBattle && c.state.foeWindup && !c.busy && c.outcome == null && _bracedTurn != c.state.turn;
-
-  /// Runs [go], unless the brace ring is up (a tap meant for it mustn't fire a move).
-  void _withBrace(VoidCallback go) {
-    if (_braceDue) return;
-    go();
-  }
-
-  void _braced(double quality) {
-    c.state.did.add('brace');
-    c.brace(quality);
-    setState(() => _bracedTurn = c.state.turn);
-  }
 
   /// On a phone (no hover): a tap uses a move straight away; holding one (or tapping one you can't
   /// use yet) shows its card above the moves until your next move. [_picked] is that move.
@@ -173,7 +156,7 @@ class _BattleScreenState extends State<BattleScreen> {
         ..showSnackBar(SnackBar(content: Text(why), duration: const Duration(milliseconds: 1400)));
       return;
     }
-    _withBrace(() => c.act(a));
+    c.act(a);
   }
 
   /// A number key pressed while the last blow is still playing out: it fires as soon as it can, so
@@ -224,7 +207,7 @@ class _BattleScreenState extends State<BattleScreen> {
   }
 
   void _shoot() {
-    if (_aiming || _braceDue) return;
+    if (_aiming) return;
     if (c.busy || c.outcome != null || !c.state.inBattle || c.whyNot(BattleAction.shoot) != null) return;
     setState(() => _aiming = true);
   }
@@ -235,7 +218,7 @@ class _BattleScreenState extends State<BattleScreen> {
     setState(() => _aiming = false);
     if (c.busy || c.outcome != null || !c.state.inBattle) return;
     final aim = aimAt(pos, bullseyeFor(c.state.knight));
-    _withBrace(() => c.act(BattleAction.shoot, aim: aim));
+    c.act(BattleAction.shoot, aim: aim);
   }
 
   void _castRite(String id) {
@@ -247,7 +230,7 @@ class _BattleScreenState extends State<BattleScreen> {
         ..showSnackBar(SnackBar(content: Text(why), duration: const Duration(milliseconds: 1400)));
       return;
     }
-    _withBrace(() => c.castRite(id));
+    c.castRite(id);
   }
 
   /// On to the next stop on the trail (or into the lair, once it's open).
@@ -389,8 +372,6 @@ class _BattleScreenState extends State<BattleScreen> {
                                     lines: lines,
                                     moves: over
                                         ? null
-                                        : _braceDue
-                                        ? [Expanded(child: BraceRing(key: ValueKey('brace${c.state.turn}'), first: !c.state.did.contains('brace'), speed: !c.state.did.contains('brace') ? .55 : (c.state.settings.fastFights ? 1.3 : 1), onBrace: _braced))]
                                         : _aiming
                                         ? [Expanded(child: _AimBar(speed: c.state.settings.fastFights ? 1.6 : 1, zone: bullseyeFor(c.state.knight), onLoose: _loose, onCancel: () => setState(() => _aiming = false)))]
                                         : _actionRows().first,
@@ -823,7 +804,7 @@ class _FoeCard extends StatelessWidget {
       tags: [
         // Winding up a heavy blow: first, where you can't miss it.
         if (c.state.inBattle && c.state.foeWindup && !c.busy)
-          const FoeBadge(label: 'HEAVY ×$heavyBlow', colour: Color(0xFFFF5A4A), solid: true, tip: 'Winding up a heavy blow. Bash, freeze or hex it to stop it, or brace when it comes: tap as the ring meets your shield.'),
+          const FoeBadge(label: 'HEAVY ×$heavyBlow', colour: Color(0xFFFF5A4A), solid: true, tip: 'Winding up a heavy blow. Bash, freeze or hex it to stop it.'),
         if (c.engine.nemesisFight)
           FoeBadge(label: 'NEMESIS', colour: const Color(0xFFE0405A), solid: true, tip: '${nemesisTitle(c.state.nemesis!.rank)} · has beaten you ${c.state.nemesis!.wins}× · beat it for its hoard')
         else if (aura != null) FoeBadge(label: foe.pack ? 'PACK' : (foe.named ? 'RARE BOSS' : 'RARE'), colour: colour, solid: true, tip: aura.label),
@@ -1727,125 +1708,4 @@ class _PickedCard extends StatelessWidget {
       ],
     ),
   );
-}
-
-/// Bracing for a heavy blow: a ring closes on your shield; tap as it meets it. Right on the beat is
-/// a perfect brace (a sure block), close is in time (no heavier than an ordinary blow), and a miss
-/// (or no tap at all) takes the heavy blow full on.
-class BraceRing extends StatefulWidget {
-  const BraceRing({super.key, required this.onBrace, this.speed = 1, this.first = false});
-  final ValueChanged<double> onBrace;
-  final double speed;
-
-  /// Your very first brace: slower, and it says what it's for.
-  final bool first;
-
-  @override
-  State<BraceRing> createState() => BraceRingState();
-}
-
-class BraceRingState extends State<BraceRing> with SingleTickerProviderStateMixin {
-  // The ring meets the shield at [_beat] of the way through; a little after, it's too late.
-  static const _beat = .8;
-  late final _t = AnimationController(vsync: this, duration: Duration(milliseconds: (850 / widget.speed).round()));
-  final _focus = FocusNode();
-  var _done = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _t.addStatusListener((s) {
-      if (s == AnimationStatus.completed) _tap(late: true);
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _focus.requestFocus();
-      _t.forward();
-    });
-  }
-
-  @override
-  void dispose() {
-    _t.dispose();
-    _focus.dispose();
-    super.dispose();
-  }
-
-  void _tap({bool late = false}) {
-    if (_done) return;
-    _done = true;
-    _t.stop();
-    final off = (_t.value - _beat).abs() * (850 / widget.speed);
-    // (Windows in real time, whatever the speed: about a tenth of a second for perfect.)
-    final q = late ? 0.0 : (off <= 110 ? bracePerfect : (off <= 240 ? braceGood : 0.0));
-    Audio.play(q >= bracePerfect ? Sfx.block : (q > 0 ? Sfx.clang : Sfx.miss));
-    widget.onBrace(q);
-  }
-
-  @override
-  Widget build(BuildContext context) => CallbackShortcuts(
-    bindings: {
-      const SingleActivator(LogicalKeyboardKey.space): _tap,
-      const SingleActivator(LogicalKeyboardKey.enter): _tap,
-    },
-    child: Focus(
-      focusNode: _focus,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTapDown: (_) => _tap(),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 66),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 66,
-                height: 66,
-                // Only the ring repaints, on its own layer.
-                child: RepaintBoundary(child: AnimatedBuilder(animation: _t, builder: (context, _) => CustomPaint(painter: _BracePainter(_t.value / _beat)))),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('BRACE!', style: Txt.label(size: 18, color: const Color(0xFFFF8A6A), weight: FontWeight.w900)),
-                    Text(widget.first ? 'A heavy blow is coming! Tap as the ring meets your shield to take it on the shield.' : 'Tap as the ring meets your shield', style: Txt.onStone(size: 13.5)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
-class _BracePainter extends CustomPainter {
-  _BracePainter(this.t);
-
-  /// 0 as the ring starts, 1 as it meets the shield (a little past, as it closes in too far).
-  final double t;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final c = size.center(Offset.zero), shield = size.width * .22;
-    // The shield: a gold disc that brightens as the moment comes.
-    canvas.drawCircle(c, shield, Paint()..color = Color.lerp(const Color(0xFF6A4A1A), const Color(0xFFFFD98A), t.clamp(0.0, 1.0))!);
-    canvas.drawCircle(c, shield, Paint()..color = const Color(0xFF2A1A10)..style = PaintingStyle.stroke..strokeWidth = 2);
-    // The ring closing in.
-    final r = shield + (size.width / 2 - shield) * (1 - t).clamp(-.3, 1.0);
-    canvas.drawCircle(
-      c,
-      math.max(2, r),
-      Paint()
-        ..color = (t > 1.05 ? const Color(0xFF8A3A2A) : const Color(0xFFFF8A6A)).withValues(alpha: .95)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 4,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_BracePainter o) => o.t != t;
 }

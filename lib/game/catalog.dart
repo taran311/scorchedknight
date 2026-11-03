@@ -614,7 +614,7 @@ const continents = <Continent>[
       FoeType('Elder Ember Wyrm', 'elderWyrm', dragon: true, hp: 1.15, aloft: true, strike: Strike.fire),
       FoeType('Azgar, Herald of Vharrax', 'demonlord', demon: true, hp: 1.3, armoured: true),
     ],
-    boss: FoeType('Vharrax the Ember King', 'emberKing', boss: true, hp: 1.5, hit: 1.25, dragon: true, aloft: true, strike: Strike.fire),
+    boss: FoeType('Vharrax the Ember King', 'emberKing', boss: true, hp: 1.5, hit: 1.2, dragon: true, aloft: true, strike: Strike.fire),
     companion: Companion.none,
     companionText: 'The Ember King falls, and for the first time since the Great Burning, it rains.',
     prize: 'emberheart',
@@ -1370,11 +1370,7 @@ const bloodDrink = .5;
 const toxinGrowth = .35, bleedTurns = 2, frostFreeze = .08;
 
 /// The chance a foe (a boss) winds up a heavy blow for its next turn, and how hard it lands.
-const windupChance = .18, windupBoss = .18, heavyBlow = 1.8;
-
-/// Bracing for a heavy blow (the timing ring): how good a brace counts as in time, and as
-/// perfect (a sure block on top).
-const braceGood = .5, bracePerfect = 1.0;
+const windupChance = .15, windupBoss = .15, heavyBlow = 1.5;
 const jackpotChance = .04;
 
 /// A clean kill (a crossbow bolt lands the finishing blow): this much more gold from the foe, and

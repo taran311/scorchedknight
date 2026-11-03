@@ -245,38 +245,6 @@ void main() {
     expect(e.board.map((c) => c.place), isNot(contains(job.place)));
   });
 
-  test('bracing for a heavy blow: in time it lands as an ordinary one, perfectly it\'s blocked', () {
-    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(3));
-    final s = e.state, k = s.knight..level = 20;
-    s.innRepaired = true;
-    s.unlocked = 2;
-    s.bossesDown.addAll([0, 1]);
-    e.travel(2);
-    int blow(double brace) {
-      var hurt = 0, n = 0;
-      for (var i = 0; i < 300; i++) {
-        if (!s.inBattle) e.explore();
-        s
-          ..foeHp = s.foeMax = 999999
-          ..foeWindup = true
-          ..foeAsleep = 0
-          ..foeFrozen = false;
-        k.hp = maxHp(k);
-        e.braceNext = brace;
-        final r = e.takeTurn(BattleAction.attack);
-        if (r.counter != null && r.counter! > 0) {
-          hurt += r.counter!;
-          n++;
-        }
-        expect(e.braceNext, 0);
-      }
-      return n == 0 ? 0 : hurt ~/ n;
-    }
-    final none = blow(0), good = blow(braceGood), perfect = blow(bracePerfect);
-    expect(good, lessThan(none));
-    expect(perfect, lessThan(good));
-  });
-
   test('the Ember King\'s generals: each one felled leaves him weaker', () {
     final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(5));
     final s = e.state, k = s.knight..level = 40;

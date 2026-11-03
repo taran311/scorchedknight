@@ -12,7 +12,6 @@ import 'trials.dart' show bossTrial, blade, trial;
 
 void main(List<String> args) {
   final runs = args.isEmpty ? 8 : int.parse(args.first);
-  braceSkill = args.firstWhere((a) => a.startsWith('brace='), orElse: () => 'brace=avg').substring(6);
   side = true;
   final at = List.generate(continents.length, (_) => <String>[]);
   for (var i = 0; i < runs; i++) {

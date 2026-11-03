@@ -40,7 +40,6 @@ List<String> snaps(int land, int n) {
       if (!s.inBattle) continue;
       var t = 0;
       while (s.inBattle && t < 200) {
-        brace(e);
         final r = e.takeTurn(pick(e));
         if (r.knockedOut) kos++;
         t++;
@@ -74,7 +73,6 @@ double gauntlet(List<String> ss, void Function(GameEngine e) setup, BattleAction
         if (!s.inBattle) continue;
         var ko = false, t = 0;
         while (s.inBattle && t < 200) {
-          brace(e);
           if (e.takeTurn(pick(e)).knockedOut) ko = true;
           t++;
         }
@@ -104,7 +102,6 @@ double gauntlet(List<String> ss, void Function(GameEngine e) setup, BattleAction
       var ko = false, t = 0;
       while (s.inBattle && t < 200) {
         final a = k.hp < maxHp(k) * .4 && e.whyNot(BattleAction.potion) == null ? BattleAction.potion : pick(e);
-        brace(e);
         if (e.takeTurn(a).knockedOut) ko = true;
         t++;
       }
@@ -153,7 +150,6 @@ void main(List<String> args) {
             var n = 0;
             while (s.inBattle && n < 200) {
               final a = k.hp < maxHp(k) * .4 && e.whyNot(BattleAction.potion) == null ? BattleAction.potion : withRites(e);
-              brace(e);
               e.takeTurn(a);
               n++;
             }
@@ -197,7 +193,6 @@ void main(List<String> args) {
               var n = 0;
               while (s.inBattle && n < 200) {
                 final a = k.hp < maxHp(k) * .4 && e.whyNot(BattleAction.potion) == null ? BattleAction.potion : withRites(e);
-                brace(e);
                 e.takeTurn(a);
                 n++;
               }
@@ -250,7 +245,6 @@ void main(List<String> args) {
           final hp0 = k.hp;
           var g = 0;
           while (s.inBattle) {
-            brace(e);
             final r = e.takeTurn(withRites(e));
             g += r.counter ?? 0;
             src['blows (lifesteal+leech)'] = (src['blows (lifesteal+leech)'] ?? 0) + r.damage.heal / maxHp(k);

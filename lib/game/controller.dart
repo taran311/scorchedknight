@@ -890,9 +890,6 @@ class GameController extends ChangeNotifier {
   }
 
   /// Casts the rite [id] from the hotbar.
-  /// How well you braced for the heavy blow coming this turn (see GameEngine.braceNext).
-  void brace(double quality) => engine.braceNext = quality;
-
   void castRite(String id) {
     if (busy || !state.inBattle || engine.whyNotRite(id) != null) return;
     state.knight.preparedSpell = id;

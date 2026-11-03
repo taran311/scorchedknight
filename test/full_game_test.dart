@@ -232,11 +232,6 @@ Run playThrough(int seed, {int maxFights = 4000}) {
     final story = e.nemesisFight || emberGenerals.contains(s.rare?.name);
     while (s.inBattle) {
       final a = choose(e);
-      // An ordinary hand on the brace ring: perfect a third of the time, in time as often again.
-      if (s.foeWindup) {
-        final b = rng.nextDouble();
-        e.braceNext = b < .3 ? bracePerfect : (b < .7 ? braceGood : 0);
-      }
       final r = e.takeTurn(a, aim: a == BattleAction.shoot ? [bullseye, 1.0, graze][rng.nextInt(3)] : 1);
       turns++;
       checkSane(e, 'after turn $turns of fight ${run.fights} (${foe.name}, ${a.name})');

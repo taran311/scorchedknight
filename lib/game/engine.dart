@@ -243,9 +243,6 @@ class SwingResult {
   /// The foe's blow this turn was a heavy one it wound up; and it's winding up another.
   bool heavy = false, windup = false;
 
-  /// You braced for its heavy blow: 1 in time, 2 perfectly (see [GameEngine.braceNext]).
-  int braced = 0;
-
   /// The Guardian's Oath caught the heavy blow.
   bool oath = false;
 
@@ -1690,7 +1687,6 @@ class GameEngine {
   void _begin(int foe, Rare? rare, {int above = 0}) {
     final k = state.knight, level = foeLevelFor(realmAt(rare?.base ?? foe), k.level) + above;
     _fightHits = 0;
-    braceNext = 0;
     _undyingUsed = false;
     rankUp = null;
     _fightPotions = 0;
@@ -2537,10 +2533,6 @@ class GameEngine {
     }
   }
 
-  /// How well you braced for a heavy blow this turn (the timing ring on the fight screen): 0 not
-  /// at all, [braceGood] in time, [bracePerfect] right on the beat. Spent on the foe's turn.
-  double braceNext = 0;
-
   /// The foe's turn: if it's still standing, it hits back.
   void _foeTurn(SwingResult r, bool bashed) {
     final k = state.knight, foe = foeIn(state), foeName = foe.name;
@@ -2548,8 +2540,6 @@ class GameEngine {
     // A heavy blow it wound up last turn: spent now, landed or not.
     final heavy = state.foeWindup;
     state.foeWindup = false;
-    final brace = heavy ? braceNext : 0.0;
-    braceNext = 0;
     void spared(Guard g, String text) {
       r
         ..counter = 0
@@ -2624,8 +2614,7 @@ class GameEngine {
       _note('$foeName strikes. You parry and riposte for $hit!', EntryKind.damage);
       r.kill = _checkKill();
     } else {
-      // Braced right on the beat: the heavy blow meets your shield.
-      final blocked = brace >= bracePerfect || _rng.nextDouble() < block;
+      final blocked = _rng.nextDouble() < block;
       if (blocked) _primed = true;
       // The Guardian's Oath: the first heavy blow each fight that gets through to you meets the
       // vault-keeper's shield, and lands no harder than an ordinary one.
@@ -2635,14 +2624,8 @@ class GameEngine {
         r.oath = true;
         _note('$foeName brings its heavy blow down. Your Guardian\'s Oath holds: the shield takes the worst of it.');
       }
-      // Braced in time: it lands no harder than an ordinary blow.
-      final braced = brace >= braceGood && !oath;
-      if (braced) {
-        r.braced = brace >= bracePerfect ? 2 : 1;
-        _note(brace >= bracePerfect ? 'Perfect brace! You catch $foeName\'s heavy blow square on your shield.' : 'You brace in time: $foeName\'s heavy blow lands no harder than any other.', EntryKind.good);
-      }
-      final full = (counterDamage(state) * (heavy && !oath && !braced ? heavyBlow : 1)).round();
-      r.heavy = heavy && !oath && !braced;
+      final full = (counterDamage(state) * (heavy && !oath ? heavyBlow : 1)).round();
+      r.heavy = heavy && !oath;
       var hurt = blocked ? (full * blockLeak(k)).round() : full;
       if (state.mirror > 0) {
         // Mirror Ward: you take half; the foe takes the whole blow back.
