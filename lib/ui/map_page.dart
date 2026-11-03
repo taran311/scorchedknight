@@ -91,12 +91,28 @@ class _PhoneMapState extends State<_PhoneMap> {
     builder: (context, box) {
       final h = box.maxHeight, w = h * 1000 / _mapH;
       if (_placed != box.biggest) {
-        // Centre the land you're in (as near as the edges allow).
-        final first = _placed == null;
+        // First time: centre the land you're in (as near as the edges allow). After that (the
+        // panel under the map grew or shrank as you picked something), keep looking at the same
+        // spot, at the same zoom: re-centring on the land made the map jump under your finger.
+        final first = _placed == null, old = _placed;
         _placed = box.biggest;
         final k = w / 1000;
-        final dx = (box.maxWidth / 2 - widget.focus.dx * k).clamp(box.maxWidth - w, 0.0);
-        final at = Matrix4.translationValues(dx, 0, 0);
+        Matrix4 at;
+        if (first || old == null) {
+          final dx = (box.maxWidth / 2 - widget.focus.dx * k).clamp(box.maxWidth - w, 0.0);
+          at = Matrix4.translationValues(dx, 0, 0);
+        } else {
+          final m = _view.value, zoom = m.getMaxScaleOnAxis(), t = m.getTranslation();
+          final oldK = old.height * 1000 / _mapH / 1000;
+          // The map point at the middle of the old view, in map units.
+          final mx = (old.width / 2 - t.x) / zoom / oldK, my = (old.height / 2 - t.y) / zoom / oldK;
+          final cw = w * zoom, ch = h * zoom;
+          final dx = (box.maxWidth / 2 - mx * k * zoom).clamp(math.min(0.0, box.maxWidth - cw), 0.0).toDouble();
+          final dy = (box.maxHeight / 2 - my * k * zoom).clamp(math.min(0.0, box.maxHeight - ch), 0.0).toDouble();
+          at = Matrix4.identity()
+            ..translateByDouble(dx, dy, 0, 1)
+            ..scaleByDouble(zoom, zoom, 1, 1);
+        }
         // (The viewer is listening after the first frame, so later moves wait for the frame to end.)
         if (first) {
           _view.value = at;

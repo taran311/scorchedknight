@@ -237,17 +237,37 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     // up again), never already standing there.
     fx['enter'] = 1;
     _sub = c.events.listen(_onEvent);
+    SchedulerBinding.instance.addTimingsCallback(_onTimings);
+  }
+
+  /// Frames that ran long lately, out of the last [_window]: once enough do, the stage drops to its
+  /// lighter look (no halo blur round the figures, one rim, 30 fps when nothing's moving) for the
+  /// rest of the session. A quick machine never notices; a struggling one stops stuttering.
+  static var _struggling = false;
+  static const _window = 90, _slowMs = 24, _slowShare = .2;
+  final _recent = <bool>[];
+  void _onTimings(List<ui.FrameTiming> timings) {
+    if (_struggling) return;
+    for (final f in timings) {
+      _recent.add(f.totalSpan.inMilliseconds > _slowMs);
+      if (_recent.length > _window) _recent.removeAt(0);
+    }
+    if (_recent.length >= _window && _recent.where((x) => x).length > _window * _slowShare) {
+      _struggling = true;
+      if (mounted) setState(() => _lite = true);
+    }
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    _lite = MediaQuery.sizeOf(context).width < 600;
+    _lite = _struggling || MediaQuery.sizeOf(context).width < 600;
   }
 
   @override
   void dispose() {
+    SchedulerBinding.instance.removeTimingsCallback(_onTimings);
     _sub.cancel();
     _ticker.dispose();
     _time.dispose();
@@ -286,6 +306,8 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     double gravity = .12,
     double lift = 1,
   }) {
+    // A flurry of blows piles bursts on bursts: past a few hundred motes, the oldest make way.
+    if (_particles.length + n > _maxParticles) _particles.removeRange(0, math.min(_particles.length, _particles.length + n - _maxParticles));
     for (var i = 0; i < n; i++) {
       final a = dir + (_rng.nextDouble() - .5) * spread, sp = speed * (.5 + _rng.nextDouble());
       _particles.add(
@@ -300,6 +322,8 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       );
     }
   }
+
+  static const _maxParticles = 220;
 
   void _mark(String text, List<Color> colours, Offset at, {IconData? icon}) => _marks.add(_Mark(text, colours, at, now, icon: icon));
 
@@ -2081,6 +2105,7 @@ class _ScenePainter extends CustomPainter {
     }
 
     // Every figure is drawn into a picture first, then laid down as a backlit silhouette.
+    lightGlows = s._lite;
     final outer = canvas, figures = dying ? null : ui.PictureRecorder();
     if (figures != null) canvas = Canvas(figures, _figureBounds);
 
@@ -2353,7 +2378,7 @@ class _ScenePainter extends CustomPainter {
       canvas.rotate(-fx['dying']! * .9);
       final flash = fx['flash']! > .02 ? flashFilter(fx['flash']!) : dread;
       final layered = fx['alpha']! < 1 || flash != null;
-      if (layered) canvas.saveLayer(null, Paint()..color = Color.fromRGBO(0, 0, 0, fx['alpha']!)..colorFilter = flash);
+      if (layered) canvas.saveLayer(const Rect.fromLTRB(-700, -900, 700, 300), Paint()..color = Color.fromRGBO(0, 0, 0, fx['alpha']!)..colorFilter = flash);
       drawHound(canvas, demonHoundLook, Offset.zero, _BattleStageState._houndScale, t, still: still);
       if (layered) canvas.restore();
       canvas.restore();
@@ -2453,6 +2478,7 @@ class _ScenePainter extends CustomPainter {
     }
 
     canvas = outer;
+    lightGlows = false;
     if (figures != null) {
       final figurePic = figures.endRecording();
       // (Not disposed: on the web the frame is drawn later, and still needs it.)
@@ -2640,18 +2666,12 @@ class _ScenePainter extends CustomPainter {
       final kk = 1 - p.age / p.life, alpha = math.min(1.0, kk * 1.4);
       switch (p.kind) {
         case 'fire':
+          // A flame mote: a soft orange rim, an amber body, a pale-hot core. (Plain circles: a
+          // gradient made afresh for every mote, every frame, was a good part of a fiery hit's cost.)
           final rr = p.radius * (1.4 - kk * .4);
-          canvas.drawCircle(
-            p.pos,
-            rr,
-            Paint()
-              ..shader = ui.Gradient.radial(
-                p.pos,
-                rr,
-                [Color.fromRGBO(255, 243, 196, alpha), Color.fromRGBO(255, 179, 71, alpha), const Color(0x00C83214)],
-                const [0, .35, 1],
-              ),
-          );
+          canvas.drawCircle(p.pos, rr, Paint()..color = Color.fromRGBO(200, 50, 20, alpha * .35));
+          canvas.drawCircle(p.pos, rr * .7, Paint()..color = Color.fromRGBO(255, 179, 71, alpha * .85));
+          canvas.drawCircle(p.pos, rr * .35, Paint()..color = Color.fromRGBO(255, 243, 196, alpha));
         case 'miasma':
           canvas.drawCircle(p.pos, p.radius * (1.6 - kk * .6), Paint()..color = Color.fromRGBO(182, 200, 106, kk * .25));
         default:
@@ -2724,7 +2744,7 @@ class _ScenePainter extends CustomPainter {
         textAlign: TextAlign.center,
       )..layout(maxWidth: 250));
       final w = tp.width + 26, h = tp.height + 16;
-      // Over its head, but inside what's on screen and clear of the banner and any number.
+      // Over its head, but inside what's on screen and clear of the banner.
       // (Placed again if a banner comes or goes, so it never sits under one.)
       if (s._bubbleByBanner != (s._banner != null)) s._bubbleBox = null;
       s._bubbleByBanner = s._banner != null;
@@ -2732,11 +2752,9 @@ class _ScenePainter extends CustomPainter {
         Size(w, h + 14),
         Offset(head.dx - w * .2, head.dy - h / 2 - 14),
         Rect.fromLTRB(left + 6, -above + 6, left + visibleW - 6, sceneSize.height + below - 6),
-        [
-          if (s._banner != null) Rect.fromLTWH(left, 96, visibleW, 76),
-          for (final m in s._marks)
-            if (m.box != null) m.box!,
-        ],
+        // Only the banner moves it: damage numbers make way for the bubble (see below), not the
+        // other way round, or a flurry of blows would chase it off the top of the screen.
+        [if (s._banner != null) Rect.fromLTWH(left, 96, visibleW, 76)],
       );
       final box = Rect.fromLTWH(spot.left, spot.top, w, h);
       final tipX = head.dx.clamp(box.left + 18, box.right - 18);

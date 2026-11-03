@@ -24,6 +24,11 @@ class DrawOptions {
 }
 
 /// Brightens toward white; used for hit flashes.
+/// Set by the fight screen while it's in its lighter look (a phone, or a screen that's been
+/// dropping frames): glows on weapons, gems and wyrmscale draw as plain soft shapes, or not at all,
+/// instead of blurs.
+bool lightGlows = false;
+
 ColorFilter flashFilter(double k) {
   final m = 1 + k * 1.4, add = k * 40;
   return ColorFilter.matrix([m, 0, 0, 0, add, 0, m, 0, 0, add, 0, 0, m, 0, add, 0, 0, 0, 1, 0]);
@@ -60,8 +65,10 @@ Skeleton drawHumanoid(Canvas c, Look look, Pose pose, double t, DrawOptions o, {
   if (aura != null) {
     // Enchanted wyrmscale: a slow, soft glow in its dragon's colour.
     final pulse = still ? .85 : .7 + .3 * math.sin(t / 520);
-    c.drawOval(Rect.fromCenter(center: sk.chest, width: b.chest * 4.4, height: b.spine * 3.8), Paint()..color = aura.withValues(alpha: .26 * pulse * o.alpha)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 16));
-    c.drawCircle(sk.head, b.head * 1.9, Paint()..color = aura.withValues(alpha: .2 * pulse * o.alpha)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10));
+    if (!lightGlows) {
+      c.drawOval(Rect.fromCenter(center: sk.chest, width: b.chest * 4.4, height: b.spine * 3.8), Paint()..color = aura.withValues(alpha: .26 * pulse * o.alpha)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 16));
+      c.drawCircle(sk.head, b.head * 1.9, Paint()..color = aura.withValues(alpha: .2 * pulse * o.alpha)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10));
+    }
   }
   final alpha = o.alpha * (look.ghostly ? .74 : 1);
   final layered = alpha < 1 || o.tint != null;
@@ -1684,16 +1691,21 @@ void drawWeapon(Canvas c, Offset at, double angleDeg, Weapon kind, Look look, {d
   // back at the knight. Mirrored, the axe bit, the halberd's blade and the falchion's belly lead.
   if (const {Weapon.axe, Weapon.greataxe, Weapon.halberd, Weapon.tomahawk, Weapon.falchion, Weapon.cleaver, Weapon.glaive}.contains(kind)) c.scale(-1, 1);
   final span = _glowSpan(kind);
-  // A soft highlight in the weapon's rarity colour (green, blue, purple, orange), under any element.
-  if (rarity != null && span != null) {
+  // (On a struggling screen, glows are drawn as plain soft strokes: a blur, replayed for every pass
+  // of the backlit figures, is the dearest thing a weapon draws.)
+  final soft = lightGlows ? null : const MaskFilter.blur(BlurStyle.normal, 10), softer = lightGlows ? null : const MaskFilter.blur(BlurStyle.normal, 7);
+  // A soft highlight in the weapon's rarity colour (green, blue, purple, orange), unless an element
+  // glows there instead. (Two blurred strokes on one blade, drawn again for every pass of the
+  // backlit figures, were a long weapon's whole frame budget mid-swing.)
+  if (rarity != null && span != null && glow == null) {
     c.drawLine(
       span.$1,
       span.$2,
       Paint()
-        ..color = rarity.withValues(alpha: .45)
+        ..color = rarity.withValues(alpha: lightGlows ? .22 : .45)
         ..strokeWidth = span.$3 + 14
         ..strokeCap = StrokeCap.round
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10),
+        ..maskFilter = soft,
     );
   }
   if (glow != null && span != null) {
@@ -1702,10 +1714,10 @@ void drawWeapon(Canvas c, Offset at, double angleDeg, Weapon kind, Look look, {d
       span.$1,
       span.$2,
       Paint()
-        ..color = glow.withValues(alpha: .55 * pulse)
+        ..color = glow.withValues(alpha: (lightGlows ? .3 : .55) * pulse)
         ..strokeWidth = span.$3 + 6
         ..strokeCap = StrokeCap.round
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7),
+        ..maskFilter = softer,
     );
   }
   final wooden = const {Weapon.staff, Weapon.wand, Weapon.bow, Weapon.longbow}.contains(kind);
@@ -2667,8 +2679,8 @@ void _gem(Canvas c, Offset at, double r, Color col, double t, bool still) {
     at,
     r * 2.2 * pulse,
     Paint()
-      ..color = col.withValues(alpha: .4)
-      ..maskFilter = MaskFilter.blur(BlurStyle.normal, r),
+      ..color = col.withValues(alpha: lightGlows ? .2 : .4)
+      ..maskFilter = lightGlows ? null : MaskFilter.blur(BlurStyle.normal, r),
   );
   c.drawCircle(at, r, Paint()..shader = ui.Gradient.radial(at - Offset(r * .3, r * .3), r * 1.2, [const Color(0xFFFFFFFF), shade(col, .15), shade(col, -.4)], const [0, .4, 1]));
   c.drawCircle(at, r, strokePaint(outline, 1));

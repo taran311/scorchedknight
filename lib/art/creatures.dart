@@ -94,7 +94,7 @@ void drawFoeDragon(Canvas c, DragonLook look, Offset at, double scale, double t,
   if (layered) {
     final p = Paint()..color = Color.fromRGBO(0, 0, 0, alpha);
     if (tint != null) p.colorFilter = tint;
-    c.saveLayer(null, p);
+    c.saveLayer(const Rect.fromLTRB(-700, -900, 700, 300), p);
   }
   c.drawOval(Rect.fromCenter(center: const Offset(-20, 46), width: 220, height: 22), Paint()..color = const Color(0x55000000));
   paintDragon(c, look, flap: flap, fly: true, breathing: false, lineScale: s, flapScale: .55);

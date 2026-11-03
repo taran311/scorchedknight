@@ -35,7 +35,7 @@ void drawGriffin(Canvas c, GriffinLook look, Offset at, double scale, double t, 
   c.rotate(dying * .9);
   c.scale(scale * look.scale, scale * look.scale);
   final layered = alpha < 1 || tint != null;
-  if (layered) c.saveLayer(null, Paint()..color = Color.fromRGBO(0, 0, 0, alpha)..colorFilter = tint);
+  if (layered) c.saveLayer(_layerBounds, Paint()..color = Color.fromRGBO(0, 0, 0, alpha)..colorFilter = tint);
   final body = look.body, dark = [for (final x in body) shade(x, -.3)];
   final wingDark = [for (final x in look.wing) shade(x, -.25)];
 
@@ -151,3 +151,8 @@ void _wing(Canvas c, Offset root, Ramp col, double flap, {required bool far}) {
     ..close();
   fillPath(c, covert, [shade(col[0], .1), col[0], col[1]], root, root + const Offset(60, -60));
 }
+
+
+/// A fading or flashing figure's layer, in its own (scaled) space: round the figure with room to
+/// spare, not the whole scene (an unbounded layer is the size of the screen, every frame).
+const _layerBounds = Rect.fromLTRB(-700, -900, 700, 300);

@@ -63,7 +63,7 @@ void drawHorse(Canvas c, HorseLook look, Offset at, double scale, double t, {dou
   }
   if (!look.ghost) c.drawOval(Rect.fromCenter(center: const Offset(6, 2), width: 150, height: 14), Paint()..color = Color.fromRGBO(0, 0, 0, .4 * alpha));
   final layered = a < 1;
-  if (layered) c.saveLayer(null, Paint()..color = Color.fromRGBO(0, 0, 0, a));
+  if (layered) c.saveLayer(_layerBounds, Paint()..color = Color.fromRGBO(0, 0, 0, a));
   final coat = look.coat, dark = [for (final x in coat) shade(x, -.28)];
   final breathe = still ? 0.0 : math.sin(t / 420) * 1.5;
   final run = gallop == 0 ? 0.0 : math.sin(gallop * math.pi * 2);
@@ -481,3 +481,8 @@ void drawDust(Canvas c, Offset at, double t, double strength) {
     c.drawCircle(Offset(x, at.dy - 6 - math.sin(t / 90 + i) * 4), r, p..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6));
   }
 }
+
+
+/// A fading or flashing figure's layer, in its own (scaled) space: round the figure with room to
+/// spare, not the whole scene (an unbounded layer is the size of the screen, every frame).
+const _layerBounds = Rect.fromLTRB(-700, -900, 700, 300);

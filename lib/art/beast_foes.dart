@@ -63,7 +63,7 @@ void drawBeastFoe(Canvas c, String look, Offset at, double t, {double hit = 0, d
   c.scale(-1, 1); // face the hero
   c.rotate(-dying * .5);
   final layered = alpha < 1 || tint != null;
-  if (layered) c.saveLayer(null, Paint()..color = Color.fromRGBO(0, 0, 0, alpha)..colorFilter = tint);
+  if (layered) c.saveLayer(_layerBounds, Paint()..color = Color.fromRGBO(0, 0, 0, alpha)..colorFilter = tint);
   switch (look) {
     case 'wolf' || 'alphawolf' || 'jackal' || 'snowwolf':
       drawHound(c, switch (look) { 'wolf' => wolfLook, 'jackal' => _jackal, 'snowwolf' => _snowWolf, _ => _alphaWolf }, Offset.zero, scale, t, still: still);
@@ -86,3 +86,8 @@ void drawBeastFoe(Canvas c, String look, Offset at, double t, {double hit = 0, d
   if (layered) c.restore();
   c.restore();
 }
+
+
+/// A fading or flashing figure's layer, in its own (scaled) space: round the figure with room to
+/// spare, not the whole scene (an unbounded layer is the size of the screen, every frame).
+const _layerBounds = Rect.fromLTRB(-700, -900, 700, 300);

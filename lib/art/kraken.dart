@@ -85,7 +85,7 @@ void drawKraken(Canvas c, Offset at, double scale, double t, {double hit = 0, do
   c.translate(at.dx + hit * 18, at.dy + dying * 260);
   c.scale(scale, scale);
   final layered = alpha < 1 || tint != null;
-  if (layered) c.saveLayer(null, Paint()..color = Color.fromRGBO(0, 0, 0, alpha)..colorFilter = tint);
+  if (layered) c.saveLayer(_layerBounds, Paint()..color = Color.fromRGBO(0, 0, 0, alpha)..colorFilter = tint);
   if (dying > 0) c.clipRect(const Rect.fromLTRB(-400, -600, 400, 8)); // sinking below the shore
 
   // A dark pool of churned seawater around it.
@@ -268,7 +268,7 @@ void drawSerpent(Canvas c, SerpentLook look, Offset at, double scale, double t, 
   c.translate(at.dx + hit * 18, at.dy + dying * 280);
   c.scale(scale * look.scale, scale * look.scale);
   final layered = alpha < 1 || tint != null;
-  if (layered) c.saveLayer(null, Paint()..color = Color.fromRGBO(0, 0, 0, alpha)..colorFilter = tint);
+  if (layered) c.saveLayer(_layerBounds, Paint()..color = Color.fromRGBO(0, 0, 0, alpha)..colorFilter = tint);
   if (dying > 0) c.clipRect(const Rect.fromLTRB(-400, -600, 400, 8));
   final body = look.body, dark = [for (final x in body) shade(x, -.25)];
 
@@ -347,3 +347,8 @@ void drawSerpent(Canvas c, SerpentLook look, Offset at, double scale, double t, 
   if (layered) c.restore();
   c.restore();
 }
+
+
+/// A fading or flashing figure's layer, in its own (scaled) space: round the figure with room to
+/// spare, not the whole scene (an unbounded layer is the size of the screen, every frame).
+const _layerBounds = Rect.fromLTRB(-700, -900, 700, 300);
