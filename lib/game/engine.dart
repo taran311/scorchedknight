@@ -3032,7 +3032,7 @@ class GameEngine {
       // (A bed at the inn mid-trip, then back out at the same depth on full health, would take the
       // risk out of the wilds.)
       : state.wild != null
-      ? "You're still out in ${wildAreas[state.wild!].name}: head home first"
+      ? "You're still out in ${wildAreas[state.wild!].name}: abandon it first"
       : null;
 
   /// On Hob's job: the inn needs patching up, and Cindervale has only goblins in it until it is.

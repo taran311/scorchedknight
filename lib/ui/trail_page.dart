@@ -93,6 +93,15 @@ class _TrailPageState extends State<TrailPage> {
     if (c.state.inBattle) return _go();
     // Knocked out: you wake up back at the inn.
     if (exit == BattleExit.inn) Navigator.of(context).popUntil((r) => r.isFirst);
+    // The boss is down: on to the land it opened, its own trail in place of this one.
+    if (exit == BattleExit.onward) _onward();
+  }
+
+  void _onward() {
+    final to = nextLand;
+    nextLand = null;
+    if (to == null || c.whyNotTravel(to) != null) return;
+    Navigator.of(context).pushReplacement(MaterialPageRoute<void>(builder: (_) => TrailPage(controller: c, land: to)));
   }
 
   /// Onto the land's Heroic trail.
@@ -102,6 +111,7 @@ class _TrailPageState extends State<TrailPage> {
     final exit = await openBattle(context, c, c.state.inBattle ? BattleStart.resume : BattleStart.heroic);
     if (!mounted) return;
     if (exit == BattleExit.inn) Navigator.of(context).popUntil((r) => r.isFirst);
+    if (exit == BattleExit.onward) _onward();
   }
 
   @override

@@ -482,6 +482,9 @@ class ForgeWares extends StatelessWidget {
           if (s.mat(trophyKey(f.trophy)) > 0 || setPieceSlots.any((slot) => s.mat(blueprintKey(f.id, slot)) > 0)) ...[
             x.heading('${gearSetById(f.id)!.name} set · blueprints from ${f.from}'),
             SetChips(set: gearSetById(f.id)!, dense: true, named: false),
+            // Where its trophies come from, so a shortfall says where to go.
+            if (trophyLands(f.trophy).isNotEmpty)
+              Padding(padding: const EdgeInsets.only(top: 4), child: Text('${f.trophy.label}: from foes in ${trophyLands(f.trophy).join(', ')}', style: Txt.onStone(size: 12.5, color: Palette.parch))),
             // An order's suit is a class: say so, and what kind of knight it makes you.
             if (knightClassById(f.id) case final cls?)
               Padding(
@@ -541,6 +544,7 @@ class ForgeWares extends StatelessWidget {
                           TextSpan(text: gearSetById(f.id)!.name, style: Txt.label(size: 13.5, color: Palette.cream)),
                           if (knightClassById(f.id) case final cls?) TextSpan(text: '  ${cls.name}', style: Txt.label(size: 12, color: Color(cls.argb))),
                           TextSpan(text: '\nfrom ${f.from}', style: Txt.onStone(size: 12)),
+                          if (trophyLands(f.trophy).isNotEmpty) TextSpan(text: '\n${f.trophy.label} in ${trophyLands(f.trophy).join(', ')}', style: Txt.onStone(size: 12, color: Palette.parch)),
                         ]),
                       ),
                     ),

@@ -2245,7 +2245,7 @@ class _ScenePainter extends CustomPainter {
       final glow = auraColour(aura), pulse = still ? .8 : .7 + .3 * math.sin(t / 380);
       final centre = Offset(fx0 + (s._isDragon ? 30 : 0), fy - s._foeHeight * .5), r = s._foeHeight * .85;
       canvas.drawCircle(centre, r, Paint()..shader = ui.Gradient.radial(centre, r, [glow.withValues(alpha: .38 * pulse * fx['alpha']!), glow.withValues(alpha: .12 * pulse * fx['alpha']!), glow.withValues(alpha: 0)], const [0, .5, 1]));
-      canvas.drawOval(Rect.fromCenter(center: Offset(fx0 + (s._isDragon ? 30 : 0), fy + 2), width: s._foeHeight * .9, height: 18), Paint()..color = glow.withValues(alpha: .35 * pulse * fx['alpha']!)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6));
+      _softOval(canvas, Rect.fromCenter(center: Offset(fx0 + (s._isDragon ? 30 : 0), fy + 2), width: s._foeHeight * .9 + 12, height: 30), glow.withValues(alpha: .35 * pulse * fx['alpha']!));
     }
     if (s._foe.pack && (s._isBeast || (!s._isKraken && !s._isHound && !s._isDragon))) {
       // The rest of the pack stands behind the leader, a little smaller and in shade.
@@ -2275,7 +2275,7 @@ class _ScenePainter extends CustomPainter {
       final a = fx['alpha']! * (1 - fx['dying']!), pulse = still ? .85 : .75 + .25 * math.sin(t / 420);
       final fh = s._foeHeight, cx = fx0 + (s._isDragon ? 30 : 0);
       final glow = menace > 1 ? const Color(0xFFB0101A) : const Color(0xFF7A1A2A);
-      canvas.drawOval(Rect.fromCenter(center: Offset(cx, fy + 2), width: fh * (menace > 1 ? 1.1 : .9), height: 22), Paint()..color = glow.withValues(alpha: .55 * pulse * a)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8));
+      _softOval(canvas, Rect.fromCenter(center: Offset(cx, fy + 2), width: fh * (menace > 1 ? 1.1 : .9) + 16, height: 38), glow.withValues(alpha: .55 * pulse * a));
       final c0 = Offset(cx, fy - fh * .45);
       canvas.drawCircle(c0, fh * .8, Paint()..shader = ui.Gradient.radial(c0, fh * .8, [glow.withValues(alpha: (menace > 1 ? .3 : .18) * pulse * a), glow.withValues(alpha: 0)]));
       final wisps = menace > 1 ? 9 : 6;
@@ -2284,7 +2284,9 @@ class _ScenePainter extends CustomPainter {
         final x = cx + (i - (wisps - 1) / 2) * fh * .14 + math.sin(t / 500 + i * 1.7) * 8 * (still ? 0 : 1);
         final y = fy - ph * fh * 1.05;
         final r = (5 + 11 * (1 - ph)) * (menace > 1 ? 1.2 : 1);
-        canvas.drawCircle(Offset(x, y), r, Paint()..color = const Color(0xFF1A0608).withValues(alpha: .4 * (1 - ph) * a)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5));
+        // (A soft-edged puff from a gradient: cheaper than a blur, and it looks the same.)
+        final puff = const Color(0xFF1A0608).withValues(alpha: .4 * (1 - ph) * a);
+        canvas.drawCircle(Offset(x, y), r + 5, Paint()..shader = ui.Gradient.radial(Offset(x, y), r + 5, [puff, puff.withValues(alpha: 0)], const [.45, 1]));
         if (menace > 1 && i.isEven) canvas.drawCircle(Offset(x + 6, y - 4), 1.8, Paint()..color = const Color(0xFFFF5A2A).withValues(alpha: (1 - ph) * a));
       }
     }
@@ -3281,4 +3283,15 @@ double _outAndBack(double p) {
   if (p < .4) return easeOut(p / .4);
   if (p <= .6) return 1;
   return 1 - easeInOut((p - .6) / .4);
+}
+
+/// A soft-edged glow on the ground: a radial gradient squashed into [r], in place of a blurred
+/// oval (a blur every frame is costly on a phone; this looks the same).
+void _softOval(Canvas canvas, Rect r, Color colour) {
+  canvas.save();
+  canvas.translate(r.center.dx, r.center.dy);
+  canvas.scale(1, r.height / r.width);
+  final rad = r.width / 2;
+  canvas.drawCircle(Offset.zero, rad, Paint()..shader = ui.Gradient.radial(Offset.zero, rad, [colour, colour.withValues(alpha: colour.a * .5), colour.withValues(alpha: 0)], const [0, .5, 1]));
+  canvas.restore();
 }

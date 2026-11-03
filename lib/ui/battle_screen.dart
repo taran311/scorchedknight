@@ -37,7 +37,12 @@ import 'trail_data.dart';
 enum BattleStart { explore, boss, resume, raid, heroic, wild, dungeon }
 
 /// What the screen hands back when it closes: back to the map, or (knocked out) to the Inn.
-enum BattleExit { map, inn }
+/// How the fight screen was left: back to the trail or map, home to the inn, or on to the land a
+/// boss just opened ([nextLand] says which).
+enum BattleExit { map, inn, onward }
+
+/// The land a fallen boss opened, when the fight screen was left with [BattleExit.onward].
+int? nextLand;
 
 class BattleScreen extends StatefulWidget {
   const BattleScreen({super.key, required this.controller, required this.start});
@@ -685,6 +690,36 @@ class _BattleScreenState extends State<BattleScreen> {
     // On a Heroic trail, onward means the next elite (or the risen boss).
     final land = c.state.continent, risen = (c.state.heroicWins[land] ?? 0) >= heroicStops;
     final onward = _heroic ? (risen ? 'Face ${continents[land].boss.name}, Risen' : 'Onward · Heroic') : trailAction(c.state, land);
+    // A land's boss just fell and the road runs on: the way onward is the new land, not more of
+    // this one (its Heroic trail waits, and says so, as the second choice).
+    final opened = [for (final l in c.lastKill?.opened ?? const <int>[]) if (!isSideLand(l)) l];
+    if (o == Outcome.won && !_heroic && !waiting && c.lastKill?.boss == true && opened.isNotEmpty) {
+      final to = opened.first;
+      return [
+        Expanded(
+          flex: 3,
+          child: StoneButton(
+            title: isPhone(context) ? 'Onward' : 'Onward to ${continents[to].name}',
+            caption: isPhone(context) ? continents[to].name : 'A new land',
+            tone: ButtonTone.blood,
+            onPressed: () {
+              nextLand = to;
+              _close(BattleExit.onward);
+            },
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          flex: 2,
+          child: c.heroicOpen(land)
+              ? StoneButton(title: 'Heroic trail', caption: 'Elites, back here', onPressed: () {
+                  _heroic = true;
+                  _fightOn();
+                })
+              : StoneButton(title: isPhone(context) ? 'Back' : 'Back to the trail', caption: isPhone(context) ? 'to the trail' : null, onPressed: () => _close(BattleExit.map)),
+        ),
+      ];
+    }
     switch (o) {
       // The lair has fallen (or you're patrolling a land whose lair has): onward is the Heroic
       // trail's elites, or home to rest up first.

@@ -174,7 +174,13 @@ class _InnPageState extends State<InnPage> with RouteAware {
   }
 
   Future<void> _resume() async {
-    await openBattle(context, c, BattleStart.resume);
+    final exit = await openBattle(context, c, BattleStart.resume);
+    // A boss finished off from town: onward goes to the land it opened.
+    if (exit == BattleExit.onward && mounted && nextLand != null) {
+      final to = nextLand!;
+      nextLand = null;
+      await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => TrailPage(controller: c, land: to)));
+    }
   }
 
   void _openKit() => openTent(context, c);
@@ -198,6 +204,8 @@ class _InnPageState extends State<InnPage> with RouteAware {
         if (s.raid == 'stall') TownSpot.stall: 'Raided! Go and help',
         if ((hurt || !s.day) && c.whyNotRest == null && !job && !offered) TownSpot.inn: hurt ? 'Rest and heal' : 'Sleep till morning',
         if (unspentPoints(k) > 0) TownSpot.tent: '${unspentPoints(k)} point${unspentPoints(k) == 1 ? '' : 's'} to train',
+        // Worn pieces fallen behind your level: Dunstan can bring them back up.
+        if (c.whyShut('forge') == null && c.temperables.isNotEmpty) TownSpot.forge: '${c.temperables.length} piece${c.temperables.length == 1 ? '' : 's'} to temper',
       };
       final taps = <TownSpot, VoidCallback?>{
                             TownSpot.gate: s.inBattle ? _resume : (offered ? _talk : (s.wild != null ? _openWilds : _openMap)),
@@ -1381,6 +1389,7 @@ const _placeAccent = <TownSpot, Color>{
 /// One of the town's places as a big button (on a phone, under the scene).
 /// A place's plain name, for a button that says what's waiting on a line of its own.
 String _plainLabel(TownSpot spot, int home) => switch (spot) {
+  TownSpot.forge => '$smithName\'s Forge',
   TownSpot.stall => 'Mags\' Stall',
   TownSpot.inn => 'Soot & Kettle',
   TownSpot.tent => 'Your ${homes[home].name}',

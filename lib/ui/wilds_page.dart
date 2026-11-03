@@ -830,14 +830,16 @@ Future<bool> headHomeFirst(BuildContext context, GameController c) async {
   final s = c.state;
   if (s.wild == null || s.inBattle) return true;
   final share = c.leaveShare, area = wildAreas[s.wild!].name, carrying = s.packGold > 0 || s.pack.isNotEmpty;
+  // "Abandon the Smoking Marches": the area's name, mid-sentence.
+  final there = area.startsWith('The ') ? 'the ${area.substring(4)}' : area;
   final (gold, items) = lossOf(share, s.packGold, s.pack.length);
   final go = await showDialog<bool>(
     context: context,
     builder: (_) => _Confirm(
-      title: 'Head home from $area?',
+      title: 'Abandon $there?',
       text:
-          'You\'re still out in $area, ${s.wildDepth} step${s.wildDepth == 1 ? '' : 's'} in. To go anywhere else you head home first, and next time the wilds start again from the edge.\n\n${!carrying ? 'Your pack is empty: nothing to lose.' : share == 0 ? 'You\'re at a waystone: your pack comes home safe.' : 'You\'re between waystones, so bandits will snatch about ${(share * 100).round()}% of your pack on the way: $gold gold${items > 0 ? ' and $items piece${items == 1 ? '' : 's'} of gear' : ''}.'}',
-      yes: 'Head home',
+          'You\'re still out in $there, ${s.wildDepth} step${s.wildDepth == 1 ? '' : 's'} in. To fight anywhere else you abandon the trip and head home, and next time it starts again from the edge.\n\n${!carrying ? 'Your pack is empty: nothing to lose.' : share == 0 ? 'You\'re at a waystone: your pack comes home safe.' : 'You\'re between waystones, so bandits will snatch about ${(share * 100).round()}% of your pack on the way: $gold gold${items > 0 ? ' and $items piece${items == 1 ? '' : 's'} of gear' : ''}.'}',
+      yes: 'Abandon $there',
       no: 'Stay out there',
     ),
   );

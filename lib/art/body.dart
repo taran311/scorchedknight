@@ -68,7 +68,10 @@ Skeleton drawHumanoid(Canvas c, Look look, Pose pose, double t, DrawOptions o, {
   if (layered) {
     final p = Paint()..color = Color.fromRGBO(0, 0, 0, alpha);
     if (o.tint != null) p.colorFilter = o.tint;
-    c.saveLayer(null, p);
+    // Bounded to the figure and all it carries (weapons, wings, a cape), with room to spare: an
+    // unbounded layer is the size of the whole scene, every frame, which a phone feels.
+    final reach = b.thighLen + b.shinLen + b.spine + b.neck + b.upperArm + b.forearm + b.head * 2;
+    c.saveLayer(Rect.fromCenter(center: sk.pelvis, width: reach * 3.2, height: reach * 2.8), p);
   }
   final cape = look.cape;
   if (look.tail != null) _tail(c, sk, look.tail!, t, still);
@@ -547,7 +550,7 @@ void _torso(Canvas c, Skeleton sk, Look look) {
         for (final p in pts.skip(1)) {
           vein.lineTo(p.dx, p.dy);
         }
-        c.drawPath(vein, strokePaint(ore.withValues(alpha: .45), 6)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3));
+        c.drawPath(vein, strokePaint(ore.withValues(alpha: .3), 7));
         c.drawPath(vein, strokePaint(ore, 2.4));
         for (final (i, s) in const [(1, 5.5), (3, 6.5), (4, 4.5)]) {
           final p = pts[i];

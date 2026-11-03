@@ -195,6 +195,12 @@ extension TrophyInfo on Trophy {
 
 String trophyKey(Trophy t) => 'trophy:${t.name}';
 
+/// The lands where [t] can be found: any land whose foes leave it, or whose places hold it.
+List<String> trophyLands(Trophy t) => [
+  for (var l = 0; l < continents.length; l++)
+    if (landTrophyName(l) == t.name || continents[l].foes.any((f) => trophyLooks[f.look] == t)) continents[l].name,
+];
+
 /// Who leaves which trophy, by look.
 const trophyLooks = <String, Trophy>{
   'ashenKnight': Trophy.ashenSteel,

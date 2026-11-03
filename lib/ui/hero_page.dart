@@ -570,7 +570,7 @@ class _Satchel extends StatelessWidget {
       for (final m in Metal.values) mat(oreKey(m), m.ore, MatIcon.ore(m), '$smithName smelts it into bars'),
       for (final m in Metal.values) mat(barKey(m), m.bar, MatIcon.bar(m), '$smithName forges and tempers with it'),
       for (final e in Elemental.values) mat(coreKey(e), e.core, MatIcon.core(switch (e) { Elemental.ember => const Color(0xFFFF7A2A), Elemental.frost => const Color(0xFF9ADFFF), Elemental.mire => const Color(0xFF8FD36A) }), 'Old Wick makes a rune from it'),
-      for (final t in Trophy.values) mat(trophyKey(t), t.label, MatIcon.trophy(t), '$smithName forges set pieces from it'),
+      for (final t in Trophy.values) mat(trophyKey(t), t.label, MatIcon.trophy(t), '$smithName forges set pieces from it. Found in ${trophyLands(t).join(', ')}'),
       for (final key in s.mats.keys.where((k) => k.startsWith('bp:')))
         _Slot(tooltip: '${_blueprintTitle(key)}: take it to $smithName', child: MatIcon.blueprint()),
     ].whereType<Widget>().toList();
