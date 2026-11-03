@@ -85,6 +85,7 @@ class _BattleScreenState extends State<BattleScreen> {
   }
 
   void _braced(double quality) {
+    c.state.did.add('brace');
     c.brace(quality);
     setState(() => _bracedTurn = c.state.turn);
   }
@@ -389,7 +390,7 @@ class _BattleScreenState extends State<BattleScreen> {
                                     moves: over
                                         ? null
                                         : _braceDue
-                                        ? [Expanded(child: BraceRing(key: ValueKey('brace${c.state.turn}'), speed: c.state.settings.fastFights ? 1.3 : 1, onBrace: _braced))]
+                                        ? [Expanded(child: BraceRing(key: ValueKey('brace${c.state.turn}'), first: !c.state.did.contains('brace'), speed: !c.state.did.contains('brace') ? .55 : (c.state.settings.fastFights ? 1.3 : 1), onBrace: _braced))]
                                         : _aiming
                                         ? [Expanded(child: _AimBar(speed: c.state.settings.fastFights ? 1.6 : 1, zone: bullseyeFor(c.state.knight), onLoose: _loose, onCancel: () => setState(() => _aiming = false)))]
                                         : _actionRows().first,
@@ -1732,9 +1733,12 @@ class _PickedCard extends StatelessWidget {
 /// a perfect brace (a sure block), close is in time (no heavier than an ordinary blow), and a miss
 /// (or no tap at all) takes the heavy blow full on.
 class BraceRing extends StatefulWidget {
-  const BraceRing({super.key, required this.onBrace, this.speed = 1});
+  const BraceRing({super.key, required this.onBrace, this.speed = 1, this.first = false});
   final ValueChanged<double> onBrace;
   final double speed;
+
+  /// Your very first brace: slower, and it says what it's for.
+  final bool first;
 
   @override
   State<BraceRing> createState() => BraceRingState();
@@ -1789,8 +1793,8 @@ class BraceRingState extends State<BraceRing> with SingleTickerProviderStateMixi
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTapDown: (_) => _tap(),
-        child: SizedBox(
-          height: 66,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 66),
           child: Row(
             children: [
               SizedBox(
@@ -1806,7 +1810,7 @@ class BraceRingState extends State<BraceRing> with SingleTickerProviderStateMixi
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('BRACE!', style: Txt.label(size: 18, color: const Color(0xFFFF8A6A), weight: FontWeight.w900)),
-                    Text('Tap as the ring meets your shield', style: Txt.onStone(size: 13.5)),
+                    Text(widget.first ? 'A heavy blow is coming! Tap as the ring meets your shield to take it on the shield.' : 'Tap as the ring meets your shield', style: Txt.onStone(size: 13.5)),
                   ],
                 ),
               ),
