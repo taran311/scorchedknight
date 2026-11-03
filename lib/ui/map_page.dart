@@ -387,6 +387,7 @@ class _MapPageState extends State<MapPage> {
                                                   pins: [for (final p in places) if (c.placeShown(p) || (!p.hidden && p.relic == null)) (p, s.explored.contains(p.id), c.whyNotExplore(p.id) == null)],
                                                   pinPicked: _placePick,
                                                   lockedLands: {for (var i = 0; i < continents.length; i++) if (c.whyNotTravel(i) != null) i},
+                                                  levelGates: {for (var i = 0; i < continents.length; i++) if (c.whyNotTravel(i)?.startsWith('Reach level') ?? false) i: continents[i].minLevel},
                                                   nameLand: focus,
                                                   allNames: close,
                                                   beaten: s.bossesDown,
@@ -876,7 +877,7 @@ class _WildPanel extends StatelessWidget {
 const _done = Color(0xFF9BE27A);
 
 class _MapPainter extends CustomPainter {
-  _MapPainter({required this.open, required this.selected, required this.beaten, this.cleared = const {}, required this.wildsOpen, this.wildPicked, this.trip, this.pins = const [], this.pinPicked, this.delves = const [], this.delvePicked, this.lockedLands = const {}, this.nameLand, this.allNames = true, this.arena = (false, 0), this.arenaPicked = false, this.hall = (false, 0), this.hallPicked = false});
+  _MapPainter({required this.open, required this.selected, required this.beaten, this.cleared = const {}, required this.wildsOpen, this.wildPicked, this.trip, this.pins = const [], this.pinPicked, this.delves = const [], this.delvePicked, this.lockedLands = const {}, this.levelGates = const {}, this.nameLand, this.allNames = true, this.arena = (false, 0), this.arenaPicked = false, this.hall = (false, 0), this.hallPicked = false});
 
   /// The Hall of the Slain: whether it's open, and waves won.
   final (bool, int) hall;
@@ -889,6 +890,10 @@ class _MapPainter extends CustomPainter {
   /// Lands you can't reach yet: their spots are small, dim and nameless (a hint of what's out there,
   /// not a wall of padlocks).
   final Set<int> lockedLands;
+
+  /// Lands whose road is open but whose level you haven't reached: the level, shown under the
+  /// padlock (so a lit road to a locked land says why).
+  final Map<int, int> levelGates;
 
   /// Whose spots are named: every open land's ([allNames], on a big screen or zoomed in), or just
   /// [nameLand]'s (the land you're looking at, on a phone), plus whatever's picked.
@@ -1005,6 +1010,12 @@ class _MapPainter extends CustomPainter {
               ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8));
         _padlock(canvas, at + const Offset(0, -6));
         _taken.add(Rect.fromCenter(center: at + const Offset(0, -6), width: 30, height: 34));
+        if (levelGates[i] case final lv?) {
+          final tp = TextPainter(text: TextSpan(text: 'Lv $lv', style: Txt.label(size: 14, color: Palette.cream)), textDirection: TextDirection.ltr)..layout();
+          final tag = Rect.fromCenter(center: at + const Offset(0, 22), width: tp.width + 14, height: tp.height + 4);
+          canvas.drawRRect(RRect.fromRectAndRadius(tag, const Radius.circular(4)), Paint()..color = const Color(0xE02A1A0E));
+          tp.paint(canvas, tag.topLeft + const Offset(7, 2));
+        }
       }
       if (beaten.contains(i)) {
         _flag(canvas, at + const Offset(52, -44));
@@ -1763,6 +1774,7 @@ class _RoadOpensState extends State<_RoadOpens> with SingleTickerProviderStateMi
                                       beaten: s.bossesDown,
                                       wildsOpen: [for (var w = 0; w < wildAreas.length; w++) c.wildOpen(w)],
                                       lockedLands: {for (var i = 0; i < continents.length; i++) if (c.whyNotTravel(i) != null) i},
+                                                  levelGates: {for (var i = 0; i < continents.length; i++) if (c.whyNotTravel(i)?.startsWith('Reach level') ?? false) i: continents[i].minLevel},
                                       nameLand: widget.to,
                                       allNames: false,
                                     ),
