@@ -683,7 +683,8 @@ Look lookFor(HeroClass c, Loadout l, {String dye = 'crimson', bool gloves = fals
         fore: m ?? ramp(0xFF6E4A2E),
         hand: gl ?? (plate ? m! : (gloves ? helmSteel : ramp(0xFF5A3A22, .25, .5))),
         thigh: m ?? cloth,
-        shin: plate ? m! : boot,
+        // Worn sabatons carry their own greaves; bare, plate legs match the suit.
+        shin: plate ? (bt != null && l.boots!.tint != null ? bt : m!) : boot,
         boot: boot,
         knee: plate ? m : null,
         elbow: plate ? m : null,
@@ -693,7 +694,9 @@ Look lookFor(HeroClass c, Loadout l, {String dye = 'crimson', bool gloves = fals
         trim: livery != null ? Color(livery.trim) : (tier.look == ArmourLook.lamellar ? const Color(0xFFE8C060) : (wyrmKit ? null : const Color(0xFFC9A24E))),
         cape: capeCol ?? shade(dyeCol, -.15),
         head: head,
-        helm: _wyrmHelm(l.helm) ?? (head == HeadKind.kabuto ? _lacquer : null) ?? (livery != null && helmRarity != Rarity.legendary ? _toward(helmSteel, Color(livery.metal), .55) : null) ?? ((plate || blackIron) && head != HeadKind.nasal ? (blackIron ? _knightMetals['plate']! : m) : helmSteel),
+        helm: _wyrmHelm(l.helm) ?? (head == HeadKind.kabuto ? _lacquer : null) ?? (livery != null && helmRarity != Rarity.legendary ? _toward(helmSteel, Color(livery.metal), .55) : null) ?? // A helm you've put on is worn in its own steel (or its own colour), not the suit's: only the
+        // bare suit's matching helm takes the armour's metal.
+        (l.helm != null ? (l.helm!.tint != null ? gearRamp(l.helm!) : helmSteel) : ((plate || blackIron) && head != HeadKind.nasal ? (blackIron ? _knightMetals['plate']! : m) : helmSteel)),
         plume: head == HeadKind.greathelm || head == HeadKind.sallet ? dyeCol : null,
         order: head == HeadKind.orderhelm ? l.helm?.gearSet : null,
         armourGlow: _wyrmGlow(l),
