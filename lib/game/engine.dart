@@ -407,7 +407,7 @@ class GameEngine {
     final need = continents[next].minLevel;
     if (k.level >= need) return boss.blocked(shut);
     final reachable = [for (var i = 0; i < continents.length; i++) if (whyNotTravel(i) == null) i];
-    final meanwhile = 'Meanwhile · ${continents[next].name} at level $need';
+    final meanwhile = 'Until ${continents[next].name.replaceFirst('The ', 'the ')} opens at level $need';
     for (final p in [...places]..sort((a, b) => a.land.compareTo(b.land))) {
       if (reachable.contains(p.land) && placeShown(p) && whyNotExplore(p.id) == null) {
         return RoadStep(RoadKind.place, 'Explore ${p.name}', meanwhile, p.land, id: p.id);

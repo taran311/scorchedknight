@@ -65,6 +65,10 @@ class _BattleScreenState extends State<BattleScreen> {
   /// A fight in a dungeon room: afterwards it's back to the doors.
   late final bool _dungeon = widget.start == BattleStart.dungeon || c.state.dungeonFight;
 
+  /// A guarded place's guardian (from the map): won, the way on is back to the map, not into the
+  /// land's trail.
+  late final bool _place;
+
   /// On the land's Heroic trail (picked up again from a saved fight too, or stepped onto from a
   /// patrol once the boss is down).
   late bool _heroic = widget.start == BattleStart.heroic || c.state.heroicFight;
@@ -91,6 +95,7 @@ class _BattleScreenState extends State<BattleScreen> {
   @override
   void initState() {
     super.initState();
+    _place = c.state.place != null;
     c.addListener(_watch);
     // The stage subscribes during the first build; start once it is listening.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -678,6 +683,17 @@ class _BattleScreenState extends State<BattleScreen> {
               ? StoneButton(title: 'Wake up at the Soot & Kettle', tone: ButtonTone.blood, onPressed: () => _close(BattleExit.inn))
               : StoneButton(title: 'Back to the path', caption: 'Step ${c.state.wildDepth} of ${wildAreas[c.state.wild ?? 0].name}', tone: ButtonTone.blood, onPressed: () => _close(BattleExit.map)),
         ),
+      ];
+    }
+    if (_place && o == Outcome.won) {
+      return [
+        if (waiting)
+          Expanded(child: StoneButton(title: 'Choose your spoils', tone: ButtonTone.blood, onPressed: () => resolvePendingLoot(context, c).then((_) => mounted ? setState(() {}) : null)))
+        else ...[
+          Expanded(flex: 3, child: StoneButton(title: 'Back to the map', tone: ButtonTone.blood, onPressed: () => _close(BattleExit.map))),
+          const SizedBox(width: 8),
+          Expanded(flex: 2, child: StoneButton(title: 'Rest in town', onPressed: () => _close(BattleExit.inn))),
+        ],
       ];
     }
     if (widget.start == BattleStart.raid) {
