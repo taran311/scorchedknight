@@ -72,23 +72,21 @@ class _BattleScreenState extends State<BattleScreen> {
   /// The crossbow's timing bar is up, waiting for you to loose the bolt.
   bool _aiming = false;
 
-  /// A heavy blow coming: the move you picked waits while you brace (the ring closing on your
-  /// shield), then goes.
-  VoidCallback? _bracing;
+  /// The turn you last braced on. The moment the foe rears back for a heavy blow, the brace ring
+  /// comes up in place of the moves (you set your guard as it winds up), and your move follows as
+  /// usual; the brace holds for the blow when it comes.
+  int? _bracedTurn;
+  bool get _braceDue => c.state.inBattle && c.state.foeWindup && !c.busy && c.outcome == null && _bracedTurn != c.state.turn;
 
-  /// Runs [go], after a brace if the foe has a heavy blow wound up. (Running away needs no brace.)
+  /// Runs [go], unless the brace ring is up (a tap meant for it mustn't fire a move).
   void _withBrace(VoidCallback go) {
-    if (_bracing != null) return;
-    if (!c.state.foeWindup || c.busy || c.outcome != null || !c.state.inBattle) return go();
-    setState(() => _bracing = go);
+    if (_braceDue) return;
+    go();
   }
 
   void _braced(double quality) {
-    final go = _bracing;
-    if (go == null) return;
-    setState(() => _bracing = null);
     c.brace(quality);
-    go();
+    setState(() => _bracedTurn = c.state.turn);
   }
 
   /// On a phone (no hover): a tap uses a move straight away; holding one (or tapping one you can't
@@ -174,7 +172,6 @@ class _BattleScreenState extends State<BattleScreen> {
         ..showSnackBar(SnackBar(content: Text(why), duration: const Duration(milliseconds: 1400)));
       return;
     }
-    if (a == BattleAction.flee) return c.act(a);
     _withBrace(() => c.act(a));
   }
 
@@ -226,7 +223,7 @@ class _BattleScreenState extends State<BattleScreen> {
   }
 
   void _shoot() {
-    if (_aiming) return;
+    if (_aiming || _braceDue) return;
     if (c.busy || c.outcome != null || !c.state.inBattle || c.whyNot(BattleAction.shoot) != null) return;
     setState(() => _aiming = true);
   }
@@ -391,8 +388,8 @@ class _BattleScreenState extends State<BattleScreen> {
                                     lines: lines,
                                     moves: over
                                         ? null
-                                        : _bracing != null
-                                        ? [Expanded(child: BraceRing(speed: c.state.settings.fastFights ? 1.4 : 1, onBrace: _braced))]
+                                        : _braceDue
+                                        ? [Expanded(child: BraceRing(key: ValueKey('brace${c.state.turn}'), speed: c.state.settings.fastFights ? 1.3 : 1, onBrace: _braced))]
                                         : _aiming
                                         ? [Expanded(child: _AimBar(speed: c.state.settings.fastFights ? 1.6 : 1, zone: bullseyeFor(c.state.knight), onLoose: _loose, onCancel: () => setState(() => _aiming = false)))]
                                         : _actionRows().first,
@@ -1746,7 +1743,7 @@ class BraceRing extends StatefulWidget {
 class BraceRingState extends State<BraceRing> with SingleTickerProviderStateMixin {
   // The ring meets the shield at [_beat] of the way through; a little after, it's too late.
   static const _beat = .8;
-  late final _t = AnimationController(vsync: this, duration: Duration(milliseconds: (1100 / widget.speed).round()));
+  late final _t = AnimationController(vsync: this, duration: Duration(milliseconds: (850 / widget.speed).round()));
   final _focus = FocusNode();
   var _done = false;
 
@@ -1774,7 +1771,7 @@ class BraceRingState extends State<BraceRing> with SingleTickerProviderStateMixi
     if (_done) return;
     _done = true;
     _t.stop();
-    final off = (_t.value - _beat).abs() * (1100 / widget.speed);
+    final off = (_t.value - _beat).abs() * (850 / widget.speed);
     // (Windows in real time, whatever the speed: about a tenth of a second for perfect.)
     final q = late ? 0.0 : (off <= 110 ? bracePerfect : (off <= 240 ? braceGood : 0.0));
     Audio.play(q >= bracePerfect ? Sfx.block : (q > 0 ? Sfx.clang : Sfx.miss));

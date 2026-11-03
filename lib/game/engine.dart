@@ -1690,6 +1690,7 @@ class GameEngine {
   void _begin(int foe, Rare? rare, {int above = 0}) {
     final k = state.knight, level = foeLevelFor(realmAt(rare?.base ?? foe), k.level) + above;
     _fightHits = 0;
+    braceNext = 0;
     _undyingUsed = false;
     rankUp = null;
     _fightPotions = 0;
