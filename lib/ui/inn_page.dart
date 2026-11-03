@@ -19,6 +19,7 @@ import '../art/town_props.dart';
 import '../audio/audio.dart';
 import '../build_info.dart';
 import '../game/loot.dart';
+import '../game/errands.dart' show retainerName;
 import '../game/vault.dart';
 import '../game/catalog.dart';
 import '../game/events.dart';
@@ -203,7 +204,11 @@ class _InnPageState extends State<InnPage> with RouteAware {
       final notes = <TownSpot, String>{
         if (s.raid == 'stall') TownSpot.stall: 'Raided! Go and help',
         if ((hurt || !s.day) && c.whyNotRest == null && !job && !offered) TownSpot.inn: hurt ? 'Rest and heal' : 'Sleep till morning',
-        if (unspentPoints(k) > 0) TownSpot.tent: '${unspentPoints(k)} point${unspentPoints(k) == 1 ? '' : 's'} to train',
+        if (unspentPoints(k) > 0)
+          TownSpot.tent: '${unspentPoints(k)} point${unspentPoints(k) == 1 ? '' : 's'} to train'
+        // Wren out on an errand is news, not a job: a word on her home's button, not a card.
+        else if (s.home >= 1 && s.errand != null && !c.errandBack)
+          TownSpot.tent: '$retainerName back in ${c.errandLeft} ${c.errandLeft == 1 ? 'fight' : 'fights'}',
         // Worn pieces fallen behind your level: Dunstan can bring them back up.
         if (c.whyShut('forge') == null && c.temperables.isNotEmpty) TownSpot.forge: '${c.temperables.length} piece${c.temperables.length == 1 ? '' : 's'} to temper',
       };
@@ -323,13 +328,15 @@ class _InnPageState extends State<InnPage> with RouteAware {
                           TaskCard(controller: c, onGo: (t) => goToTask(context, c, t)),
                           const SizedBox(height: 10),
                         ],
-                        // Wren, your housekeeper (from the cottage): out on an errand, back, or idle.
-                        if (s.home >= 1) ...[
+                        // Wren, your housekeeper (from the cottage): a card when there's something to do
+                        // (she's back, or idle and waiting to be sent); out on an errand, a phone just
+                        // notes it on the home button, so the square isn't a stack of cards.
+                        if (s.home >= 1 && (!phone || s.errand == null || c.errandBack)) ...[
                           WrenCard(controller: c, onOpen: () => openTent(context, c, tab: 'home')),
                           const SizedBox(height: 10),
                         ],
-                        // Hob's cellar: once you've a Cinder key (or have ever opened it).
-                        if (s.keys > 0 || s.vaultFound.isNotEmpty) ...[
+                        // Hob's cellar: while you've a Cinder key to use in it.
+                        if (s.keys > 0) ...[
                           _VaultCard(controller: c, compact: phone),
                           const SizedBox(height: 10),
                         ],
