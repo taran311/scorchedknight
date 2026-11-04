@@ -1,6 +1,6 @@
-// The map of the burned world, to wander as you like. Roads branch out from the Soot & Kettle: beat
-// a land's boss and every road out of it opens, so you choose your own way to the Ember Throne
-// (each land's level still has to be reached). Off the roads: two side lands, three wilds, and
+// The map of the burned world, to wander as you like. One road runs from the Soot & Kettle to the
+// Ember Throne, land by land: beat a land's boss and the road on opens, with tracks off it to the
+// side lands (each land's level still has to be reached). Off the roads: two side lands, three wilds, and
 // places to explore (caches, shrines, and things guarded by named foes), one red pin each.
 
 import 'dart:math' as math;

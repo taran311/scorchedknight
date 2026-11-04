@@ -475,11 +475,15 @@ class GameEngine {
     return beaten && risenParts.every(have);
   }
 
+  /// You've set foot in land [c] before (fought on its trail, or beaten its boss).
+  bool _beenTo(int c) => state.bossesDown.contains(c) || (c < state.wins.length && state.wins[c] > 0);
+
   /// Why you can't go to continent [c] yet (null: you can).
   String? whyNotTravel(int c) {
     if (c < 0 || c >= continents.length) return 'No such land';
     final from = openers(c);
-    if (from.isNotEmpty && !from.any(state.bossesDown.contains)) {
+    // (A land you've already been into stays open: saves from when the road forked.)
+    if (from.isNotEmpty && !from.any(state.bossesDown.contains) && !_beenTo(c)) {
       return 'Beat ${from.map((f) => '${continents[f].boss.name} (${continents[f].name})').join(' or ')} to find the way';
     }
     final need = continents[c].minLevel;
@@ -721,7 +725,7 @@ class GameEngine {
   /// explored.
   bool placeShown(Place p) {
     final from = openers(p.land);
-    final open = from.isEmpty || from.any(state.bossesDown.contains);
+    final open = from.isEmpty || from.any(state.bossesDown.contains) || _beenTo(p.land);
     // A relic guardian only shows while you hold the blueprint and still need what it guards.
     if (p.relic case (final r, final i) when !relicPartWanted(r, i) && !state.explored.contains(p.id)) return false;
     return open && (!p.hidden || places.every((o) => o.hidden || o.relic != null || state.explored.contains(o.id)));

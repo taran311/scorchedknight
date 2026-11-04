@@ -1429,7 +1429,8 @@ String _plainLabel(TownSpot spot, int home) => switch (spot) {
   TownSpot.stall => 'Mags\' Stall',
   TownSpot.inn => 'Soot & Kettle',
   TownSpot.tent => 'Your ${homes[home].name}',
-  _ => '',
+  TownSpot.enchanter => '$mageName\'s Tower',
+  TownSpot.gate => 'Set out',
 };
 
 class _PlaceButton extends StatelessWidget {

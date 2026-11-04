@@ -383,11 +383,12 @@ const mainLands = 7;
 /// Off the road: Ravenmoor and the Howling Weald.
 bool isSideLand(int continent) => continent >= mainLands;
 
-/// The roads between the lands: a land opens once the boss of ANY land listed for it is down (the
-/// side lands, the one that leads to them). Cindervale's boss opens two ways at once, and from
-/// there you pick your own route; only the Ember Throne waits behind the Cinderreach alone. Each
-/// land's own level still has to be reached.
-const _roads = <int, List<int>>{1: [0], 2: [0], 3: [1, 2], 4: [2, 3], 5: [3, 4], 6: [5]};
+/// The roads between the lands: a land opens once the boss of the land before it is down (the side
+/// lands, the one that leads to them). The road is one line, land by land, in the order of their
+/// levels: it used to fork (Cindervale opened two ways, the Thornwild reached the Sunken Sands),
+/// but every land's level gate made the forks no real choice, and their crossing roads only
+/// cluttered the map. Each land's own level still has to be reached.
+const _roads = <int, List<int>>{1: [0], 2: [1], 3: [2], 4: [3], 5: [4], 6: [5]};
 
 /// The trophy a land's foes leave (and its places hold), if any.
 String? landTrophyName(int land) => switch (land) {

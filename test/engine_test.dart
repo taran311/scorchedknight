@@ -1156,17 +1156,20 @@ void main() {
     expect(continents[frostLand].name, 'The Frostmarch');
   });
 
-  test('the roads branch: choose your own way, and only the Ember Throne waits on one land', () {
+  test('the road is one line: each land opens behind the one before it', () {
     final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(2));
     final s = e.state..knight.level = 40;
-    s.bossesDown.addAll({0, 2});
-    // The Badlands and the Sands both open off the Thornwild, without the Gloomfen.
-    expect(e.whyNotTravel(3), isNull);
-    expect(e.whyNotTravel(4), isNull);
-    expect(e.whyNotTravel(5), isNotNull);
-    s.bossesDown.add(4);
-    expect(e.whyNotTravel(5), isNull);
+    expect(e.whyNotTravel(1), contains('Gorbo'));
+    s.bossesDown.add(0);
+    expect(e.whyNotTravel(1), isNull);
+    expect(e.whyNotTravel(2), isNotNull);
+    s.bossesDown.add(1);
+    expect(e.whyNotTravel(2), isNull);
+    expect(e.whyNotTravel(3), isNotNull);
     expect(e.whyNotTravel(6), contains('Scorchmaw'));
+    // A land already set foot in stays open (saves from when the road forked).
+    s.wins[4] = 2;
+    expect(e.whyNotTravel(4), isNull);
   });
 
   test('places on the map: explored once, guards fought for, the Lost Isle last', () {
@@ -1737,13 +1740,12 @@ void main() {
     expect(r.kill, isNotNull);
     expect(r.kill!.boss, isTrue);
     expect(s.bossesDown, contains(0));
-    // Gorbo opens two roads at once: the Gloomfen and the Thornwild.
-    expect(r.kill!.opened, [1, 2]);
+    // Gorbo opens the road on: the Gloomfen.
+    expect(r.kill!.opened, [1]);
     expect(s.knight.pets.containsKey(Pet.wolf.name), isTrue);
     expect(s.pendingLoot.any((g) => g.art == 'cyclopseye'), isTrue);
     expect(e.travel(1), isTrue);
-    expect(e.travel(2), isTrue);
-    expect(e.travel(3), isFalse);
+    expect(e.travel(2), isFalse);
   });
 
   test('a knockout ends the fight back at the Inn, healed and a little poorer', () {
