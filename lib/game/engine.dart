@@ -379,7 +379,9 @@ class GameEngine {
   /// dungeons and the relic parts that turn up there (each done/all).
   ({bool boss, bool risen, int places, int placesAll, int delves, int delvesAll, int parts, int partsAll}) landProgress(int c) {
     final s = state;
-    final here = [for (final p in places) if (p.land == c) p], delves = [for (final d in dungeons) if (d.land == c) d], parts = relicPartsOn(c);
+    // (The Lost Isle isn't counted for Cindervale: it's the whole map's secret, hidden until every
+    // other place is explored, so it kept Cindervale from ever looking finished.)
+    final here = [for (final p in places) if (p.land == c && !p.hidden) p], delves = [for (final d in dungeons) if (d.land == c) d], parts = relicPartsOn(c);
     return (
       boss: s.bossesDown.contains(c),
       risen: heroicCleared(c),
