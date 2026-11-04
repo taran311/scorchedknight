@@ -69,6 +69,9 @@ class _BattleScreenState extends State<BattleScreen> {
   /// land's trail.
   late final bool _place;
 
+  /// A bout in the Colosseum or a wave in the Hall: they keep their own count, not a trail's.
+  late final bool _side;
+
   /// On the land's Heroic trail (picked up again from a saved fight too, or stepped onto from a
   /// patrol once the boss is down).
   late bool _heroic = widget.start == BattleStart.heroic || c.state.heroicFight;
@@ -96,6 +99,7 @@ class _BattleScreenState extends State<BattleScreen> {
   void initState() {
     super.initState();
     _place = c.state.place != null;
+    _side = c.state.arenaFight || c.state.hallFight;
     c.addListener(_watch);
     // The stage subscribes during the first build; start once it is listening.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -381,6 +385,7 @@ class _BattleScreenState extends State<BattleScreen> {
                                         ? [Expanded(child: _AimBar(speed: c.state.settings.fastFights ? 1.6 : 1, zone: bullseyeFor(c.state.knight), onLoose: _loose, onCancel: () => setState(() => _aiming = false)))]
                                         : _actionRows().first,
                                     result: over ? _resultButtons() : null,
+                                    progress: over ? _trailProgress() : null,
                                     detail: !over && !_aiming && _peek && _pickedInfo != null ? _PickedCard(info: _pickedInfo!, ready: _pickedReady) : null,
                                   ),
                                   ),
@@ -657,6 +662,50 @@ class _BattleScreenState extends State<BattleScreen> {
         ),
       ],
     ];
+  }
+
+  /// After a win on a trail, how far along it you are: a pip a stop, then the lair (or, on a
+  /// Heroic trail, a pip an elite, then the boss risen). Nothing for one-off fights.
+  Widget? _trailProgress() {
+    final s = c.state, land = s.continent;
+    if (c.outcome != Outcome.won || _dungeon || _wild || _place || _side || widget.start == BattleStart.raid || c.lastKill?.boss == true) return null;
+    final l = continents[land], col = Color(l.argb);
+    final int done, of;
+    final String label;
+    if (_heroic) {
+      (done, of, label) = ((s.heroicWins[land] ?? 0).clamp(0, heroicStops), heroicStops, 'Heroic trail');
+    } else if (!s.bossesDown.contains(land)) {
+      (done, of, label) = (trailAt(s, land), winsForBoss, l.name);
+    } else {
+      return null;
+    }
+    Widget pip(bool on) => Container(
+      width: 9,
+      height: 9,
+      margin: const EdgeInsets.only(right: 4),
+      decoration: BoxDecoration(shape: BoxShape.circle, color: on ? col : Colors.transparent, border: Border.all(color: on ? col : Palette.stone3, width: 1.4)),
+    );
+    final next = done >= of;
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        children: [
+          Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.label(size: 12.5, color: Palette.parch2))),
+          const SizedBox(width: 8),
+          for (var i = 0; i < of; i++) pip(i < done),
+          Icon(_heroic ? Icons.whatshot : Icons.castle, size: 15, color: next ? col : Palette.stone3),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              next ? (_heroic ? 'The risen boss is next' : 'The lair is next') : '$done of $of',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Txt.label(size: 12.5, color: next ? col : Palette.parch2, weight: FontWeight.w800),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   List<Widget> _resultButtons() {
@@ -1246,7 +1295,10 @@ class _ArmedState extends State<_Armed> {
 }
 
 class _CommandDeck extends StatelessWidget {
-  const _CommandDeck({required this.controller, required this.lines, this.moves, this.result, this.detail, this.fill = false});
+  const _CommandDeck({required this.controller, required this.lines, this.moves, this.result, this.detail, this.progress, this.fill = false});
+
+  /// After a trail win: how far along it you are (see _trailProgress).
+  final Widget? progress;
 
   /// Filling a tall phone screen: more of the log shows, and the moves sit at the very bottom.
   final bool fill;
@@ -1297,6 +1349,7 @@ class _CommandDeck extends StatelessWidget {
               )
             else
               _Result(controller: c, onDark: true),
+            if (progress != null) progress!,
             const SizedBox(height: 8),
             // A beat before the way on can be pressed: a tap meant for the last blow mustn't land on it.
             _Armed(child: Row(children: result!)),
