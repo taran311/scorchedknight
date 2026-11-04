@@ -15,6 +15,7 @@ import '../art/silhouette.dart';
 import '../game/catalog.dart';
 import '../game/classes.dart' show HeroClass;
 import '../game/controller.dart';
+import '../game/crafting.dart' show smithName;
 import '../game/dungeons.dart' show dungeonById;
 import '../game/models.dart' show GameState;
 import '../game/rules.dart';
@@ -539,7 +540,7 @@ class _Heroic extends StatelessWidget {
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0xFF7A2418), border: Border.all(color: gold, width: 2)),
-                child: const Center(child: Icon(Icons.workspace_premium, color: gold, size: 28)),
+                child: const Center(child: Icon(Icons.local_fire_department, color: gold, size: 28)),
               ),
             ],
           ),
@@ -735,14 +736,18 @@ class _Lurking extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = controller.state, l = continents[land], beaten = s.bossesDown.contains(land);
-    final (rewardIcon, reward) = switch (l.companion) {
-      Companion.wolf => (Icons.pets, 'a wolf pup companion'),
-      Companion.nightmare => (Icons.nights_stay, 'the Nightmare, a ghostly steed'),
-      Companion.fairy => (Icons.auto_awesome, 'a fairy companion'),
-      Companion.hellhound => (Icons.pets, 'a hellhound pup companion'),
-      Companion.dragon => (Icons.egg, 'a dragon egg'),
-      Companion.none => (Icons.emoji_events, 'the end of the Great Burning'),
+    // What the boss gives the first time, by name on its pill (it used to read only "Reward",
+    // with the prize in a tooltip). What it carries when it rises again stays a surprise until
+    // then: the risen boss's card names it once the boss is down.
+    final (rewardIcon, rewardName, reward) = switch (l.companion) {
+      Companion.wolf => (Icons.pets, 'Wolf pup', 'a wolf pup companion'),
+      Companion.nightmare => (Icons.nights_stay, 'Nightmare steed', 'the Nightmare, a ghostly steed'),
+      Companion.fairy => (Icons.auto_awesome, 'Fairy', 'a fairy companion'),
+      Companion.hellhound => (Icons.pets, 'Hellhound pup', 'a hellhound pup companion'),
+      Companion.dragon => (Icons.egg, 'Dragon egg', 'a dragon egg'),
+      Companion.none => (Icons.emoji_events, 'The end of it all', 'the end of the Great Burning'),
     };
+    final relic = relics[land];
     Widget portrait(FoeType f, double size) => Tooltip(
       message: [
         f.name,
@@ -791,7 +796,8 @@ class _Lurking extends StatelessWidget {
                       runSpacing: 6,
                       children: [
                         _Pill(icon: Icons.shield_moon, text: 'Lv ${bossLevel(land)}', tip: 'Best faced at level ${bossLevel(land)}'),
-                        _Pill(icon: rewardIcon, text: 'Reward', tip: 'It guards $reward'),
+                        _Pill(icon: rewardIcon, text: rewardName, tip: 'It guards $reward'),
+                        if (relic != null && !beaten) _Pill(icon: Icons.description, text: 'Relic blueprint', tip: 'A blueprint for ${relic.name}: its parts are found around the world, and $smithName forges it'),
                         if (l.hazard != null)
                           s.warded.contains(land)
                               ? _Pill(icon: Icons.verified_user, colour: const Color(0xFF9BE27A), text: 'Warded', tip: '${l.hazard}: your ${l.ward} keeps it off you')
