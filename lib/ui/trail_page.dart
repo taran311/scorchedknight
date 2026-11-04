@@ -682,10 +682,15 @@ class _RelicReward extends StatelessWidget {
                           builder: (context) {
                             // Three looks: found (green, ticked), waiting in this land (gold and
                             // glowing: this is the one to go after here), and elsewhere (greyed out).
-                            final local = !has[i] && parts[i].land == here;
+                            // (On a card about one way in, a part in this land kept somewhere else is
+                            // named by where, not lit as "here": the Heroic card's gold chips are
+                            // only what its own trail gives.)
+                            final local = !has[i] && parts[i].land == here && (spell == null || spell!.contains(i));
+                            final keeper = parts[i].source == PartSource.dungeon ? dungeonById(parts[i].at)?.name : placeById(parts[i].at)?.name;
+                            final elsewhere = !has[i] && !local && parts[i].land == here && keeper != null;
                             final col = has[i] ? green : (local ? gold : Palette.parch2);
                             return Opacity(
-                              opacity: has[i] || local ? 1 : .45,
+                              opacity: has[i] || local ? 1 : (elsewhere ? .75 : .45),
                               child: Tooltip(
                                 message: has[i] ? 'Found' : 'Held by ${parts[i].where}',
                                 child: Container(
@@ -699,10 +704,10 @@ class _RelicReward extends StatelessWidget {
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(has[i] ? Icons.check : (local ? Icons.place : Icons.lock_outline), size: 14, color: col),
+                                      Icon(has[i] ? Icons.check : (local || elsewhere ? Icons.place : Icons.lock_outline), size: 14, color: col),
                                       const SizedBox(width: 4),
                                       Text(
-                                        has[i] ? parts[i].name : (local ? '${parts[i].name} · HERE' : '${parts[i].name} · ${continents[parts[i].land].name}'),
+                                        has[i] ? parts[i].name : (local ? '${parts[i].name} · HERE' : '${parts[i].name} · ${elsewhere ? keeper : continents[parts[i].land].name}'),
                                         style: Txt.label(size: 12.5, color: col, weight: local ? FontWeight.w800 : FontWeight.w700),
                                       ),
                                     ],
