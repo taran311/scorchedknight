@@ -775,7 +775,10 @@ class GameEngine {
       for (final c in contracts)
         if (placeById(c.place) case final p? when !state.explored.contains(p.id) && placeShown(p) && whyNotTravel(p.land) == null) (c, p),
     ]..sort((a, b) => continents[a.$2.land].minLevel.compareTo(continents[b.$2.land].minLevel));
-    return [for (final (c, _) in open.take(boardSize)) c];
+    final shown = [for (final (c, _) in open.take(boardSize)) c];
+    // (One you can take now first: a guard that only comes out at night waits its turn by day.)
+    bool now(Contract c) => !state.day || placeById(c.place)?.foe == null || !foeAt(lookIndex(placeById(c.place)!.foe!.$1, placeById(c.place)!.land)).night;
+    return [...shown.where(now), ...shown.where((c) => !now(c))];
   }
 
   /// Why you can't explore place [id] now (null: you can).

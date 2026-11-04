@@ -351,7 +351,9 @@ class _InnPageState extends State<InnPage> with RouteAware {
                           _RoadCard(controller: c, step: spot, header: 'RELIC PART', icon: Icons.extension, onGo: () => _goRoad(spot)),
                           const SizedBox(height: 10),
                         ]
-                        else if (s.innRepaired && c.engine.board.isNotEmpty) ...[
+                        // (Every contract on the board waiting for night: somewhere to explore meanwhile,
+                        // and the board again once it's dark.)
+                        else if (s.innRepaired && c.engine.board.isNotEmpty && (!s.day || c.engine.board.any((j) => c.engine.whyNotExplore(j.place) == null) || c.engine.exploreStep() == null)) ...[
                           _BoardCard(controller: c),
                           const SizedBox(height: 10),
                         ]
