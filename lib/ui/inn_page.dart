@@ -140,7 +140,7 @@ class _InnPageState extends State<InnPage> with RouteAware {
         await nav.push(MaterialPageRoute<void>(builder: (_) => MapPage(controller: c, dungeon: step.id)));
       case RoadKind.wild:
         await nav.push(MaterialPageRoute<void>(builder: (_) => MapPage(controller: c, wild: int.tryParse(step.id ?? ''))));
-      case RoadKind.boss || RoadKind.heroic || RoadKind.train:
+      case RoadKind.boss || RoadKind.heroic || RoadKind.train || RoadKind.side:
         if (c.whyNotTravel(step.land) != null) return _openMap();
         c.travel(step.land);
         await nav.push(MaterialPageRoute<void>(builder: (_) => TrailPage(controller: c, land: step.land)));
@@ -1920,7 +1920,7 @@ class _RoadCard extends StatelessWidget {
     final s = controller.state, l = continents[step.land], at = trailAt(s, step.land), col = Color(l.argb), boss = step.kind == RoadKind.boss;
     final road = [for (var i = 0; i < mainLands; i++) i].where((i) => !s.bossesDown.contains(i)).firstOrNull ?? mainLands - 1;
     final art = switch (step.kind) {
-      RoadKind.boss || RoadKind.heroic => SizedBox.expand(child: TypePortrait(type: l.boss)),
+      RoadKind.boss || RoadKind.heroic || RoadKind.side => SizedBox.expand(child: TypePortrait(type: l.boss)),
       RoadKind.place => const Icon(Icons.place, color: Palette.amber, size: 30),
       RoadKind.dungeon => const Icon(Icons.stairs, color: Palette.amber, size: 30),
       RoadKind.train => const Icon(Icons.trending_up, color: Palette.amber, size: 30),

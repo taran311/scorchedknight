@@ -546,6 +546,9 @@ class _Heroic extends StatelessWidget {
                         has: [for (var i = 0; i < relics[r]!.parts.length; i++) hasRelicPart(s.relicParts, r, i)],
                         here: land,
                         forged: s.forged.contains(r),
+                        // (Only what this trail's risen boss carries is spelled out here: a part at a
+                        // place has its own card below.)
+                        spell: [for (var i = 0; i < relics[r]!.parts.length; i++) if (relics[r]!.parts[i].risen) i],
                       ),
                     ],
                   ],
@@ -579,6 +582,9 @@ class _RelicLead extends StatelessWidget {
     final dungeon = p.source == PartSource.dungeon;
     final spot = dungeon ? dungeonById(p.at)?.name : placeById(p.at)?.name;
     const gold = Color(0xFFFFD98A);
+    // The Heroic trail's card above already shows this relic and its parts: here, just the one.
+    final onHeroic = controller.heroicOpen(land) &&
+        (relic == land || relicPartsOn(land).any((e) => e.$1 == relic && relics[relic]!.parts[e.$2].risen && s.bossesDown.contains(relic)));
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
@@ -600,13 +606,23 @@ class _RelicLead extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 6),
-              _RelicReward(
-                name: relic == 2 && s.knight.heroClass == HeroClass.ranger ? 'Briarsong' : r.name,
-                relic: r,
-                has: [for (var i = 0; i < r.parts.length; i++) hasRelicPart(s.relicParts, relic, i)],
-                here: land,
-                forged: false,
-              ),
+              if (onHeroic)
+                Row(
+                  children: [
+                    const Icon(Icons.place, size: 15, color: gold),
+                    const SizedBox(width: 4),
+                    Expanded(child: Text('${p.name}, for ${relic == 2 && s.knight.heroClass == HeroClass.ranger ? 'Briarsong' : r.name} · held by ${p.where}', style: Txt.label(size: 12.5, color: gold))),
+                  ],
+                )
+              else
+                _RelicReward(
+                  name: relic == 2 && s.knight.heroClass == HeroClass.ranger ? 'Briarsong' : r.name,
+                  relic: r,
+                  has: [for (var i = 0; i < r.parts.length; i++) hasRelicPart(s.relicParts, relic, i)],
+                  here: land,
+                  forged: false,
+                  spell: [part],
+                ),
             ],
           ),
         ),
@@ -618,8 +634,11 @@ class _RelicLead extends StatelessWidget {
 /// The Heroic trail's prize: a chest, the relic it builds, and its parts as chips (found ones
 /// ticked). Elites on the trail drop the parts; Dunstan forges the relic once you have them all.
 class _RelicReward extends StatelessWidget {
-  const _RelicReward({required this.name, required this.relic, required this.has, required this.here, required this.forged});
+  const _RelicReward({required this.name, required this.relic, required this.has, required this.here, required this.forged, this.spell});
   final String name;
+
+  /// The parts whose keeper is spelled out under the chips (by default every one waiting here).
+  final List<int>? spell;
   final Relic relic;
 
   /// Which parts you hold, and the land whose trail this is.
@@ -697,7 +716,7 @@ class _RelicReward extends StatelessWidget {
                   ),
                   // The one waiting in this land, spelled out.
                   for (var i = 0; i < parts.length; i++)
-                    if (!has[i] && parts[i].land == here) ...[
+                    if (!has[i] && parts[i].land == here && (spell == null || spell!.contains(i))) ...[
                       const SizedBox(height: 5),
                       Row(
                         children: [

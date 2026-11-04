@@ -952,6 +952,12 @@ void main() {
     k.level = continents[1].minLevel;
     expect(e.roadStep()!.kind, RoadKind.boss);
     expect(e.roadStep()!.land, 1);
+    // Waiting on the Badlands' level with Ravenmoor open and its boss standing: Ravenmoor first.
+    s.bossesDown.addAll({1, 2});
+    s.explored.clear();
+    k.level = continents[3].minLevel - 4;
+    expect(e.roadStep()!.kind, RoadKind.side);
+    expect(continents[e.roadStep()!.land].name, 'Ravenmoor');
   });
 
   test('classes: a whole order suit makes you its knight, with ranks, rites and a passive', () {

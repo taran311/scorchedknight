@@ -408,6 +408,10 @@ class GameEngine {
     if (k.level >= need) return boss.blocked(shut);
     final reachable = [for (var i = 0; i < continents.length; i++) if (whyNotTravel(i) == null) i];
     final meanwhile = 'Until ${continents[next].name.replaceFirst('The ', 'the ')} opens at level $need';
+    // A whole side land open to you with its boss still standing comes first: a trail of fights,
+    // its own gear and a boss, more to grow on than a single place (the gentlest one first).
+    final sides = [for (final i in reachable) if (isSideLand(i) && !state.bossesDown.contains(i)) i]..sort((a, b) => continents[a].minLevel - continents[b].minLevel);
+    if (sides.firstOrNull case final i?) return RoadStep(RoadKind.side, 'Beat ${continents[i].boss.name}', '${continents[i].name} · $meanwhile', i);
     for (final p in [...places]..sort((a, b) => a.land.compareTo(b.land))) {
       if (reachable.contains(p.land) && placeShown(p) && whyNotExplore(p.id) == null) {
         return RoadStep(RoadKind.place, 'Explore ${p.name}', meanwhile, p.land, id: p.id);
@@ -4666,7 +4670,7 @@ String shineLine(int level) => switch (level) {
   _ => 'You brush a little soot off your shoulders.',
 };
 
-enum RoadKind { boss, place, dungeon, heroic, train, wild }
+enum RoadKind { boss, place, dungeon, heroic, train, wild, side }
 
 /// One step on the road (see GameEngine.roadStep): what, a line under it, and where.
 class RoadStep {
