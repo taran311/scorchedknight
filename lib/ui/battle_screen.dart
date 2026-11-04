@@ -807,6 +807,18 @@ class _BattleScreenState extends State<BattleScreen> {
       ];
     }
     switch (o) {
+      // The risen boss beaten: that land's work is done, and patrolling it is the least of what's
+      // left. Home, to heal up (the town's road card says what's next), or back to the trail.
+      case Outcome.won when _heroic && !waiting:
+        final kn = c.state.knight, hurt = kn.hp < maxHp(kn);
+        return [
+          Expanded(
+            flex: 3,
+            child: StoneButton(title: 'Back to town', caption: hurt ? 'Rest and heal' : 'See what\'s next', tone: ButtonTone.blood, onPressed: () => _close(BattleExit.inn)),
+          ),
+          const SizedBox(width: 8),
+          Expanded(flex: 2, child: StoneButton(title: isPhone(context) ? 'Back' : 'Back to the trail', caption: isPhone(context) ? 'to the trail' : null, onPressed: () => _close(BattleExit.map))),
+        ];
       // Patrolling a land whose boss has risen again (you're a few levels on): it's the fight to
       // take, or patrol on.
       case Outcome.won when !_heroic && !waiting && trailStep(c.state, land) == TrailStep.patrol && c.risenReady(land):
