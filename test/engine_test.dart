@@ -937,10 +937,17 @@ void main() {
     expect(e.roadStep()!.land, 1);
     // Waiting on the Badlands' level with Ravenmoor open and its boss standing: Ravenmoor first.
     s.bossesDown.addAll({1, 2});
+    s.risenDown.add(0);
     s.explored.clear();
     k.level = continents[3].minLevel - 4;
     expect(e.roadStep()!.kind, RoadKind.side);
     expect(continents[e.roadStep()!.land].name, 'Ravenmoor');
+    // ...unless a risen boss is up carrying a relic part you're after: that first.
+    k.level = continents[2].minLevel + risenAfter;
+    if (k.level < continents[3].minLevel) {
+      expect(e.roadStep()!.kind, RoadKind.heroic);
+      expect(e.roadStep()!.land, 2);
+    }
   });
 
   test('classes: a whole order suit makes you its knight, with ranks, rites and a passive', () {

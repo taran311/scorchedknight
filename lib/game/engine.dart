@@ -410,7 +410,14 @@ class GameEngine {
     if (k.level >= need) return boss.blocked(shut);
     final reachable = [for (var i = 0; i < continents.length; i++) if (whyNotTravel(i) == null) i];
     final meanwhile = 'Until ${continents[next].name.replaceFirst('The ', 'the ')} opens at level $need';
-    // A whole side land open to you with its boss still standing comes first: a trail of fights,
+    // A risen boss carrying a relic part you're after comes first: one fight, and a step towards
+    // the relic (otherwise it waited behind every side land, place and dungeon).
+    for (final c in reachable) {
+      if (!risenReady(c)) continue;
+      final part = [for (final (r, i) in relicPartsOn(c)) if (relics[r]!.parts[i].risen && relicPartWanted(r, i)) relics[r]!.parts[i].name].firstOrNull;
+      if (part != null) return RoadStep(RoadKind.heroic, 'Beat ${continents[c].boss.name}, risen · $part', meanwhile, c);
+    }
+    // Then a whole side land open to you with its boss still standing: a trail of fights,
     // its own gear and a boss, more to grow on than a single place (the gentlest one first).
     final sides = [for (final i in reachable) if (isSideLand(i) && !state.bossesDown.contains(i)) i]..sort((a, b) => continents[a].minLevel - continents[b].minLevel);
     if (sides.firstOrNull case final i?) return RoadStep(RoadKind.side, 'Beat ${continents[i].boss.name}', '${continents[i].name} · $meanwhile', i);

@@ -89,7 +89,7 @@ void drawBat(Canvas c, BatLook look, Offset at, double scale, double t, {double 
   fillPath(c, Path()..addOval(Rect.fromLTWH(h.dx - 15, h.dy - 14, 30, 26)), fur, h + const Offset(-15, -14), h + const Offset(15, 12), width: 1.5);
   fillPath(c, Path()..addOval(Rect.fromLTWH(h.dx + 6, h.dy - 4, 14, 11)), [shade(look.fur, .3), shade(look.fur, .1), shade(look.fur, -.3)], h + const Offset(6, -4), h + const Offset(20, 7), width: 1.2);
   c.drawPath(poly([h + const Offset(15, -8), h + const Offset(19, -1), h + const Offset(13, -1)]), Paint()..color = shade(look.fur, -.3));
-  c.drawCircle(h + const Offset(5, -5), 4.5, Paint()..color = look.eye.withValues(alpha: .6)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3));
+  softGlow(c, h + const Offset(5, -5), 4.5, look.eye.withValues(alpha: .6), 3);
   c.drawCircle(h + const Offset(5, -5), 2.4, Paint()..color = look.eye);
   c.drawPath(poly([h + const Offset(8, 5), h + const Offset(19, 6), h + const Offset(10, 10)]), Paint()..color = const Color(0xFF1A0E10));
   for (final fx in const [11.0, 16.0]) {

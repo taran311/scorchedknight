@@ -29,6 +29,11 @@ class DrawOptions {
 /// instead of blurs.
 bool lightGlows = false;
 
+/// Set while a fight's figures are recorded in runs (battle_stage): a ghost's see-through fade is
+/// then laid on its run once, not as a layer of its own inside the picture, drawn again in every
+/// pass of the backlight.
+bool ghostFadeOutside = false;
+
 ColorFilter flashFilter(double k) {
   final m = 1 + k * 1.4, add = k * 40;
   return ColorFilter.matrix([m, 0, 0, 0, add, 0, m, 0, 0, add, 0, 0, m, 0, add, 0, 0, 0, 1, 0]);
@@ -59,18 +64,18 @@ Skeleton drawHumanoid(Canvas c, Look look, Pose pose, double t, DrawOptions o, {
   if (look.ghostly) {
     // A cold glow around a spirit.
     final glow = look.eyeGlow ?? const Color(0xFFB8E0F0);
-    c.drawOval(Rect.fromCenter(center: sk.chest, width: b.chest * 5, height: b.spine * 4.5), Paint()..color = glow.withValues(alpha: .22 * o.alpha)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18));
+    softOvalGlow(c, Rect.fromCenter(center: sk.chest, width: b.chest * 5, height: b.spine * 4.5), glow.withValues(alpha: .22 * o.alpha), 18);
   }
   final aura = look.armourGlow;
   if (aura != null) {
     // Enchanted wyrmscale: a slow, soft glow in its dragon's colour.
     final pulse = still ? .85 : .7 + .3 * math.sin(t / 520);
     if (!lightGlows) {
-      c.drawOval(Rect.fromCenter(center: sk.chest, width: b.chest * 4.4, height: b.spine * 3.8), Paint()..color = aura.withValues(alpha: .26 * pulse * o.alpha)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 16));
-      c.drawCircle(sk.head, b.head * 1.9, Paint()..color = aura.withValues(alpha: .2 * pulse * o.alpha)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10));
+      softOvalGlow(c, Rect.fromCenter(center: sk.chest, width: b.chest * 4.4, height: b.spine * 3.8), aura.withValues(alpha: .26 * pulse * o.alpha), 16);
+      softGlow(c, sk.head, b.head * 1.9, aura.withValues(alpha: .2 * pulse * o.alpha), 10);
     }
   }
-  final alpha = o.alpha * (look.ghostly ? .74 : 1);
+  final alpha = o.alpha * (look.ghostly && !ghostFadeOutside ? .74 : 1);
   final layered = alpha < 1 || o.tint != null;
   if (layered) {
     final p = Paint()..color = Color.fromRGBO(0, 0, 0, alpha);
@@ -198,7 +203,7 @@ void _shine(Canvas c, Skeleton sk, double t, bool still) {
       ..quadraticBezierTo(at.dx, at.dy, at.dx, at.dy - r)
       ..close();
     c.drawPath(star, Paint()..color = Color.fromRGBO(255, 248, 220, .9 * k));
-    c.drawCircle(at, r * .9, Paint()..color = Color.fromRGBO(255, 236, 170, .35 * k)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4));
+    softGlow(c, at, r * .9, Color.fromRGBO(255, 236, 170, .35 * k), 4);
   }
 }
 
@@ -740,12 +745,8 @@ void _ribcage(Canvas c, Skeleton sk, Look look) {
   final fire = look.embers;
   if (fire != null) {
     final heart = sk.at(sk.chest, b.chest * .3, -b.spine * .3);
-    c.drawCircle(heart, b.chest * .7, Paint()
-      ..color = fire.withValues(alpha: .45)
-      ..maskFilter = MaskFilter.blur(BlurStyle.normal, b.chest * .35));
-    c.drawCircle(heart, b.chest * .22, Paint()
-      ..color = Color.lerp(fire, const Color(0xFFFFFFFF), .5)!.withValues(alpha: .8)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3));
+    softGlow(c, heart, b.chest * .7, fire.withValues(alpha: .45), b.chest * .35);
+    softGlow(c, heart, b.chest * .22, Color.lerp(fire, const Color(0xFFFFFFFF), .5)!.withValues(alpha: .8), 3);
   }
   // Ribs: curved arcs from the spine forward, longest in the middle.
   final edge = strokePaint(outline, 4.6), fill = strokePaint(bone[1], 3), hi = strokePaint(bone[0], 1.1);
@@ -1064,7 +1065,7 @@ void _armourWork(Canvas c, Skeleton sk, Look look, double t, bool still) {
     if (fine >= 3) {
       // The ember sigil over the heart: a small flame in a ring, breathing with a soft glow.
       final at = pt(.1, .22), pulse = still ? .8 : .6 + .4 * math.sin(t / 450);
-      c.drawCircle(at, 9, Paint()..color = const Color(0xFFFF8A3A).withValues(alpha: .35 * pulse)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5));
+      softGlow(c, at, 9, const Color(0xFFFF8A3A).withValues(alpha: .35 * pulse), 5);
       c.drawCircle(at, 5.6, strokePaint(ink, 1.3));
       final flame = Path()
         ..moveTo(at.dx, at.dy + 3.6)
@@ -1368,7 +1369,7 @@ void drawShield(Canvas c, Offset at, double tiltDeg, ShieldLook s) {
       for (final x in const [-21.0, -17.0, -13.0, -9.0]) {
         c.drawPath(poly([Offset(x, 1.2), Offset(x + 1.1, 3.8), Offset(x + 2.1, 1.5)]), Paint()..color = const Color(0xFFF0E8D4));
       }
-      c.drawCircle(const Offset(-4, -5.5), 4, Paint()..color = const Color(0xAAFF7A2A)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5));
+      softGlow(c, const Offset(-4, -5.5), 4, const Color(0xAAFF7A2A), 2.5);
       c.drawPath(poly(const [Offset(-8, -5), Offset(-.5, -8.2), Offset(-2.5, -4.4)]), Paint()..color = const Color(0xFFFFC04A));
       // The hilt above the head, and the blade again below its jaw: run through.
       fillPath(c, poly(const [Offset(-12, -19), Offset(12, -19), Offset(10, -15), Offset(-10, -15)]), rampOf(s.trim, .35, .45), const Offset(0, -19), const Offset(0, -15), width: 1);
@@ -2707,7 +2708,7 @@ void _kingsfall(Canvas c, double t, bool still) {
   _wraps(c, -26, 6, 3.6);
   // Pommel: a gold claw holding an ember.
   fillPath(c, poly(const [Offset(0, -42), Offset(6, -35), Offset(0, -29), Offset(-6, -35)]), _goldRamp, const Offset(-6, -42), const Offset(6, -29));
-  c.drawCircle(const Offset(0, -35.5), 6, Paint()..color = Color.fromRGBO(255, 120, 40, .45 * pulse)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4));
+  softGlow(c, const Offset(0, -35.5), 6, Color.fromRGBO(255, 120, 40, .45 * pulse), 4);
   c.drawCircle(const Offset(0, -35.5), 2.6, Paint()..color = const Color(0xFFFFC060));
   // The blade: black steel, broad at the guard, a long taper to a hard point.
   final blade = poly(const [Offset(-w, 12), Offset(w, 12), Offset(w - .5, 40), Offset(w - 2, len - 22), Offset(0, len), Offset(-w + 2, len - 22), Offset(-w + .5, 40)]);
@@ -3107,7 +3108,7 @@ void _smoulder(Canvas c, Skeleton sk, Look look, double t, bool still) {
   // Embers caught in the seams.
   for (final (i, at) in [sk.at(sk.chest, b.chest * .5, -b.spine * .62), Offset.lerp(sk.legNear.knee, sk.legNear.ankle, .2)!, sk.armNear.elbow + const Offset(2, 3)].indexed) {
     final k = still ? .6 : (.5 + .5 * math.sin(t / 400 + i * 2.2)).clamp(0.0, 1.0);
-    c.drawCircle(at, 3.2, Paint()..color = Color.fromRGBO(255, 120, 40, .3 * k)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5));
+    softGlow(c, at, 3.2, Color.fromRGBO(255, 120, 40, .3 * k), 2.5);
     c.drawCircle(at, 1, Paint()..color = Color.fromRGBO(255, 210, 120, .9 * k));
   }
 }

@@ -4,6 +4,7 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
@@ -1392,6 +1393,9 @@ class _SettingsWindowState extends State<_SettingsWindow> {
               _toggle('Vibration', Icons.vibration_rounded, _s.vibrate, (v) => _set((s) => s.vibrate = v)),
               _toggle('Sell junk where it falls', Icons.sell_rounded, _s.autoSellJunk, (v) => _set((s) => s.autoSellJunk = v)),
               _toggle('Mute all', Icons.volume_off_rounded, _s.muted, (v) => _set((s) => s.muted = v)),
+              // (Two graphs at the top of the screen: the upper one is drawing to the screen, the
+              // lower one is the game working out each frame. Red bars are frames that ran late.)
+              if (!kIsWeb) _toggle('Show frame timings', Icons.speed_rounded, _s.frameTimes, (v) => _set((s) => s.frameTimes = v)),
               _slider(Icons.music_note_rounded, _s.music, (v) => _set((s) => s.music = v)),
               _slider(Icons.volume_up_rounded, _s.sound, (v) => _set((s) => s.sound = v), onEnd: () => Audio.play(Sfx.hit)),
               const SizedBox(height: 6),

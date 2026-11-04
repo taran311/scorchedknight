@@ -534,7 +534,7 @@ void _pumpkinHead(Canvas c, double r, double t, bool still) {
   );
   // The carving, lit from inside: triangle eyes and a jagged grin.
   final glow = Color.lerp(const Color(0xFFFF8A1A), const Color(0xFFFFE07A), flicker)!;
-  c.drawCircle(const Offset(0, 0), r * 1.1, Paint()..color = const Color(0xFFFFA040).withValues(alpha: .25 * flicker)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8));
+  softGlow(c, const Offset(0, 0), r * 1.1, const Color(0xFFFFA040).withValues(alpha: .25 * flicker), 8);
   final carve = Paint()..color = glow;
   c.save();
   c.translate(r * .28, 0);
@@ -703,9 +703,7 @@ void _golemHead(Canvas c, double r, Look look, double t, bool still) {
   final pulse = still ? 1.0 : .8 + .2 * math.sin(t / 380);
   for (final x in const [.55, 1.05]) {
     final eye = Offset(r * x, -r * .05);
-    c.drawCircle(eye, r * .22, Paint()
-      ..color = glow.withValues(alpha: .45 * pulse)
-      ..maskFilter = MaskFilter.blur(BlurStyle.normal, r * .15));
+    softGlow(c, eye, r * .22, glow.withValues(alpha: .45 * pulse), r * .15);
     _ellipse(c, eye, r * .13, r * .07, Paint()..color = glow);
   }
   // A dark slit of a mouth, and a crack across the crown.
@@ -782,9 +780,7 @@ void _veiledHead(Canvas c, double r, Look look, double t, bool still) {
   final slit = Offset(r * .84, -r * .2);
   final glow = look.eyeGlow;
   if (glow != null) {
-    c.drawOval(Rect.fromCenter(center: slit, width: r * .6, height: r * .3), Paint()
-      ..color = glow.withValues(alpha: .55)
-      ..maskFilter = MaskFilter.blur(BlurStyle.normal, r * .2));
+    softOvalGlow(c, Rect.fromCenter(center: slit, width: r * .6, height: r * .3), glow.withValues(alpha: .55), r * .2);
   }
   c.drawPath(
     Path()
@@ -1008,7 +1004,7 @@ void _orkHead(Canvas c, double r, Look look, double t, bool still) {
     strokePaint(shade(look.skin[2], -.25), 4.2),
   );
   final eye = Offset(r * .64, -r * .26);
-  c.drawCircle(eye, r * .13, Paint()..color = const Color(0xFFFF4A2A).withValues(alpha: .5)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3));
+  softGlow(c, eye, r * .13, const Color(0xFFFF4A2A).withValues(alpha: .5), 3);
   _ellipse(c, eye, r * .11, r * .07, Paint()..color = const Color(0xFFFF5A2A));
   c.drawCircle(eye + Offset(r * .03, 0), 1.3, Paint()..color = const Color(0xFF1A0E08));
   // Flat nose and underbite.
@@ -1127,7 +1123,7 @@ void _skullHead(Canvas c, double r, Look look) {
   for (final (x, y, w) in [(.62, -.22, .3), (.12, -.24, .24)]) {
     final centre = Offset(r * x, r * y);
     _ellipse(c, centre, r * w / 1.4, r * .2, Paint()..color = const Color(0xFF120C08));
-    c.drawCircle(centre, r * .12, Paint()..color = glow.withValues(alpha: .7)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3));
+    softGlow(c, centre, r * .12, glow.withValues(alpha: .7), 3);
     c.drawCircle(centre, r * .055, Paint()..color = glow);
   }
   c.drawPath(poly([Offset(r * .95, r * .05), Offset(r * .82, r * .3), Offset(r * 1.0, r * .3)]), Paint()..color = const Color(0xFF120C08));
@@ -1275,7 +1271,7 @@ void _entHead(Canvas c, double r, Look look) {
   final glow = look.eyeGlow ?? const Color(0xFFE8F07A);
   for (final (e, size) in [(Offset(r * .42, -r * .22), r * .2), (Offset(r * .88, -r * .2), r * .14)]) {
     c.drawOval(Rect.fromCenter(center: e, width: size * 2.2, height: size * 1.7), Paint()..color = const Color(0xFF140C06));
-    c.drawCircle(e, size * 1.3, Paint()..color = glow.withValues(alpha: .45)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3));
+    softGlow(c, e, size * 1.3, glow.withValues(alpha: .45), 3);
     c.drawCircle(e, size * .55, Paint()..color = glow);
   }
   // Twig nose.
@@ -1434,7 +1430,7 @@ void _gargoyleHead(Canvas c, double r, Look look) {
   c.drawPath(Path()..moveTo(r * .1, -r * .5)..quadraticBezierTo(r * .55, -r * .2, r * 1.05, -r * .48), strokePaint(shade(stone[2], -.3), 4));
   final glow = look.eyeGlow ?? const Color(0xFFB07AFF);
   final eye = Offset(r * .66, -r * .28);
-  c.drawCircle(eye, r * .2, Paint()..color = glow.withValues(alpha: .5)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3));
+  softGlow(c, eye, r * .2, glow.withValues(alpha: .5), 3);
   _ellipse(c, eye, r * .14, r * .08, Paint()..color = glow);
   // Snarling mouth with fangs.
   c.drawPath(Path()..moveTo(r * .35, r * .5)..quadraticBezierTo(r * .8, r * .7, r * 1.2, r * .45), strokePaint(const Color(0xFF1A1418), 2.4));
@@ -1478,7 +1474,7 @@ void _demonHead(Canvas c, double r, Look look) {
   c.drawPath(Path()..moveTo(r * .1, -r * .52)..lineTo(r * .65, -r * .3)..lineTo(r * 1.05, -r * .5), strokePaint(shade(hide[2], -.3), 3.6));
   final glow = look.eyeGlow ?? const Color(0xFFFFD45A);
   final eye = Offset(r * .66, -r * .2);
-  c.drawCircle(eye, r * .22, Paint()..color = glow.withValues(alpha: .55)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3));
+  softGlow(c, eye, r * .22, glow.withValues(alpha: .55), 3);
   _ellipse(c, eye, r * .15, r * .07, Paint()..color = glow);
   // Cheekbone, a darker snout, and a goatee.
   c.save();
@@ -1541,7 +1537,7 @@ void _bullHead(Canvas c, double r, Look look) {
   // Angry little eye under a heavy brow, and a shaggy forelock.
   final glow = look.eyeGlow ?? const Color(0xFFE84A2A);
   final eye = Offset(r * .55, -r * .25);
-  c.drawCircle(eye, r * .16, Paint()..color = glow.withValues(alpha: .5)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2));
+  softGlow(c, eye, r * .16, glow.withValues(alpha: .5), 2);
   _ellipse(c, eye, r * .12, r * .08, Paint()..color = glow);
   c.drawPath(Path()..moveTo(r * .2, -r * .5)..quadraticBezierTo(r * .55, -r * .65, r * .95, -r * .42), strokePaint(shade(hide[2], -.3), 4));
   final tuft = Path()..moveTo(-r * .2, -r * .9);
@@ -1570,7 +1566,7 @@ void _ghoulHead(Canvas c, double r, Look look) {
   c.drawPath(Path()..moveTo(r * .2, r * .25)..quadraticBezierTo(r * .45, r * .55, r * .3, r * .8), strokePaint(const Color(0x55000000), 2.4));
   _ellipse(c, Offset(r * .62, -r * .25), r * .26, r * .2, Paint()..color = const Color(0xAA0E1210));
   final glow = look.eyeGlow ?? const Color(0xFFD8F07A);
-  c.drawCircle(Offset(r * .66, -r * .25), r * .15, Paint()..color = glow.withValues(alpha: .5)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2));
+  softGlow(c, Offset(r * .66, -r * .25), r * .15, glow.withValues(alpha: .5), 2);
   c.drawCircle(Offset(r * .66, -r * .25), r * .08, Paint()..color = glow);
   // A gaping mouth full of needles.
   c.drawPath(Path()..moveTo(r * .4, r * .55)..lineTo(r * 1.0, r * .5)..lineTo(r * .95, r * .95)..lineTo(r * .45, r * .85)..close(), Paint()..color = const Color(0xFF2A0A0A));
@@ -1610,7 +1606,7 @@ void _bansheeHead(Canvas c, double r, Look look, double t, bool still) {
   final glow = look.eyeGlow ?? const Color(0xFF9ADFFF);
   _ellipse(c, Offset(r * .6, -r * .22), r * .2, r * .26, Paint()..color = const Color(0xFF0A0E14));
   c.drawCircle(Offset(r * .64, -r * .2), r * .07, Paint()..color = glow);
-  c.drawCircle(Offset(r * .64, -r * .2), r * .2, Paint()..color = glow.withValues(alpha: .4)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3));
+  softGlow(c, Offset(r * .64, -r * .2), r * .2, glow.withValues(alpha: .4), 3);
   // The wail: a long dark open mouth.
   _ellipse(c, Offset(r * .72, r * .55), r * .18, r * .34, Paint()..color = const Color(0xFF0A0E14));
   // A hood of hair over the brow.
@@ -1653,7 +1649,7 @@ void _witchHead(Canvas c, double r, Look look) {
   fillPath(c, nose, skin, Offset(r * .85, -r * .15), Offset(r * 1.5, r * .5));
   c.drawCircle(Offset(r * 1.22, r * .12), r * .07, Paint()..color = shade(skin[1], -.3));
   final glow = look.eyeGlow ?? const Color(0xFFB8F05A);
-  c.drawCircle(Offset(r * .58, -r * .25), r * .14, Paint()..color = glow.withValues(alpha: .45)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2));
+  softGlow(c, Offset(r * .58, -r * .25), r * .14, glow.withValues(alpha: .45), 2);
   _ellipse(c, Offset(r * .58, -r * .25), r * .1, r * .06, Paint()..color = glow);
   c.drawPath(Path()..moveTo(r * .4, r * .66)..quadraticBezierTo(r * .75, r * .78, r * .95, r * .58), strokePaint(const Color(0xFF2A1010), 1.8));
   // A tall, bent, pointed hat with a broad brim.
@@ -1696,7 +1692,7 @@ void _mageMask(Canvas c, double r, Look look, double t, bool still) {
     ..quadraticBezierTo(r * .78, -r * .18, r * .48, -r * .28)
     ..close();
   c.drawPath(eye, Paint()..color = const Color(0xFF0A0C12));
-  c.drawCircle(Offset(r * .8, -r * .29), r * .18, Paint()..color = glow.withValues(alpha: .45 * pulse)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3));
+  softGlow(c, Offset(r * .8, -r * .29), r * .18, glow.withValues(alpha: .45 * pulse), 3);
   c.drawCircle(Offset(r * .8, -r * .29), r * .05, Paint()..color = glow);
   // A gem on the brow.
   c.drawCircle(Offset(r * .55, -r * .7), r * .13, Paint()..color = glow);
@@ -1854,7 +1850,7 @@ void _mummyHead(Canvas c, double r, Look look, double t, bool still) {
   final pulse = still ? 1.0 : .8 + .2 * math.sin(t / 260);
   for (final x in const [.42, .82]) {
     final at = Offset(r * x, -r * .22);
-    c.drawCircle(at, r * .16 * pulse, Paint()..color = glow.withValues(alpha: .45)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3));
+    softGlow(c, at, r * .16 * pulse, glow.withValues(alpha: .45), 3);
     c.drawCircle(at, r * .065, Paint()..color = glow);
   }
   // A rotted gap at the jaw.
@@ -1954,7 +1950,7 @@ void _vampireHead(Canvas c, double r, Look look) {
   c.drawPath(Path()..moveTo(-r * .7, -r * .55)..quadraticBezierTo(-r * .2, -r * 1.05, r * .55, -r * .95), strokePaint(shade(col, .55).withValues(alpha: .5), 1.4));
   // Red eyes, glowing.
   final glow = look.eyeGlow ?? const Color(0xFFFF2A3A);
-  c.drawCircle(Offset(r * .64, -r * .22), r * .17, Paint()..color = glow.withValues(alpha: .45)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2));
+  softGlow(c, Offset(r * .64, -r * .22), r * .17, glow.withValues(alpha: .45), 2);
   c.drawCircle(Offset(r * .66, -r * .22), r * .06, Paint()..color = glow);
   // Fangs.
   final fang = Paint()..color = const Color(0xFFF8F4EA);
@@ -2005,7 +2001,7 @@ void _wolfHead(Canvas c, double r, Look look) {
   c.drawPath(Path()..moveTo(r * .3, -r * .52)..quadraticBezierTo(r * .65, -r * .6, r * 1.0, -r * .4), strokePaint(shade(fur[2], -.35), 3.6));
   final glow = look.eyeGlow ?? const Color(0xFFFFD84A);
   final eye = Offset(r * .66, -r * .3);
-  c.drawCircle(eye, r * .2, Paint()..color = glow.withValues(alpha: .5)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5));
+  softGlow(c, eye, r * .2, glow.withValues(alpha: .5), 2.5);
   _ellipse(c, eye, r * .14, r * .07, Paint()..color = glow, -.25);
   c.drawCircle(eye.translate(r * .03, 0), r * .035, Paint()..color = const Color(0xFF1A0A06));
 }
@@ -2033,7 +2029,7 @@ void _elfHead(Canvas c, double r, Look look) {
   fillPath(c, ear, look.skin, Offset(-r, -r * .8), Offset(0, r * .2));
   c.drawPath(Path()..moveTo(-r * .3, r * .05)..quadraticBezierTo(-r * .55, -r * .3, -r * .85, -r * .65), strokePaint(const Color(0x33000000), 1));
   if (look.eyeGlow case final glow?) {
-    c.drawCircle(Offset(r * .64, -r * .22), r * .14, Paint()..color = glow.withValues(alpha: .45)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2));
+    softGlow(c, Offset(r * .64, -r * .22), r * .14, glow.withValues(alpha: .45), 2);
     c.drawCircle(Offset(r * .66, -r * .22), r * .05, Paint()..color = glow);
   }
 }
@@ -2087,7 +2083,7 @@ void _dwarfHead(Canvas c, double r, Look look) {
     c.drawCircle(Offset(r * x, -r * .45 + x.abs() * r * .05), r * .06, Paint()..color = helm[0]);
   }
   if (look.eyeGlow case final glow?) {
-    c.drawCircle(Offset(r * .64, -r * .22), r * .12, Paint()..color = glow.withValues(alpha: .5)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2));
+    softGlow(c, Offset(r * .64, -r * .22), r * .12, glow.withValues(alpha: .5), 2);
   }
 }
 
@@ -2159,7 +2155,7 @@ void _kabuto(Canvas c, double r, Look look) {
   c.drawCircle(Offset(r * .62, -r * 1.12), r * .16, strokePaint(outline, 1));
   c.drawCircle(Offset(r * .62, -r * 1.12), r * .07, Paint()..color = lace);
   if (look.eyeGlow case final glow?) {
-    c.drawCircle(Offset(r * .64, -r * .22), r * .14, Paint()..color = glow.withValues(alpha: .5)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2));
+    softGlow(c, Offset(r * .64, -r * .22), r * .14, glow.withValues(alpha: .5), 2);
     c.drawCircle(Offset(r * .66, -r * .22), r * .05, Paint()..color = glow);
   }
 }
@@ -2361,7 +2357,7 @@ void _shifterHead(Canvas c, double r, Look look, double t, bool still) {
     (Offset(r * .7, r * .2 + r * .05 * math.sin(drift * .8 + 2)), r * .08, 2),
   ];
   for (final (p, s, kind) in eyes) {
-    c.drawCircle(p, s * 1.7, Paint()..color = glow.withValues(alpha: .35)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2));
+    softGlow(c, p, s * 1.7, glow.withValues(alpha: .35), 2);
     c.drawCircle(p, s, Paint()..color = kind == 2 ? const Color(0xFFFF6A5A) : const Color(0xFFF2F6F0));
     if (kind == 1) {
       c.drawRect(Rect.fromCenter(center: p, width: s * 1.4, height: s * .45), Paint()..color = const Color(0xFF14101A));
@@ -2459,7 +2455,7 @@ void _batHead(Canvas c, double r, Look look) {
   }
   c.drawPath(Path()..moveTo(r * .2, -r * .52)..quadraticBezierTo(r * .55, -r * .66, r * .9, -r * .46), strokePaint(shade(fur[2], -.35), 3.2));
   final glow = look.eyeGlow ?? const Color(0xFFFFB04A), eye = Offset(r * .6, -r * .28);
-  c.drawCircle(eye, r * .24, Paint()..color = glow.withValues(alpha: .55)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5));
+  softGlow(c, eye, r * .24, glow.withValues(alpha: .55), 2.5);
   _ellipse(c, eye, r * .16, r * .12, Paint()..color = glow);
 }
 
@@ -2512,7 +2508,7 @@ void _yetiHead(Canvas c, double r, Look look) {
     c.drawPath(poly([Offset(r * x0, -r * .6), Offset(r * (x0 + .15), -r * .85), Offset(r * (x0 + len), -r * .42), Offset(r * (x0 + .2), -r * .5)]), Paint()..color = fur[0]);
   }
   final glow = look.eyeGlow ?? const Color(0xFF9ADFFF), eye = Offset(r * .62, -r * .28);
-  c.drawCircle(eye, r * .22, Paint()..color = glow.withValues(alpha: .55)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5));
+  softGlow(c, eye, r * .22, glow.withValues(alpha: .55), 2.5);
   _ellipse(c, eye, r * .14, r * .1, Paint()..color = glow);
   _ellipse(c, Offset(r * 1.0, r * .08), r * .13, r * .09, Paint()..color = const Color(0xFF1A2230));
   c.drawPath(poly([Offset(r * 1.0, r * .42), Offset(r * .35, r * .45), Offset(r * .85, r * .68)]), Paint()..color = const Color(0xFF14101A));
@@ -2750,7 +2746,7 @@ void _orderHelm(Canvas c, double r, Look look, double t, bool still, String orde
       );
       final blink = still ? 1.0 : (math.sin(t / 900) > .9 ? .2 : 1.0);
       final eye = Rect.fromCenter(center: Offset(-r * .6, -r * .25), width: r * .45, height: r * .22 * blink);
-      c.drawOval(eye.inflate(1.5), Paint()..color = const Color(0x99C080FF)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3));
+      softOvalGlow(c, eye.inflate(1.5), const Color(0x99C080FF), 3);
       c.drawOval(eye, Paint()..color = const Color(0xFFF2E0FF));
       c.drawCircle(eye.center, r * .07 * blink, Paint()..color = const Color(0xFF3A1060));
     case 'sunscale':

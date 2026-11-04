@@ -2022,6 +2022,28 @@ final _perf = Uri.base.queryParameters['perf'] ?? '';
 double _perfMs = 0;
 int _perfFrames = 0;
 
+/// The battleground drawn once into an image, for the scene and resolution asked (see _paint).
+ui.Image? _bgImage, _bgOld;
+Setting? _bgScene;
+int _bgW = 0;
+ui.Image _backdrop(Setting scene, double px) {
+  final w = (sceneSize.width * px).round(), h = (sceneSize.height * px).round();
+  final have = _bgImage;
+  if (have != null && _bgScene == scene && (_bgW - w).abs() < 8) return have;
+  final rec = ui.PictureRecorder();
+  Canvas(rec)
+    ..scale(w / sceneSize.width, h / sceneSize.height)
+    ..drawPicture(battlegroundOf(scene));
+  final img = rec.endRecording().toImageSync(w, h);
+  // (The one before last is let go; the last may still be on its way to the screen.)
+  _bgOld?.dispose();
+  _bgOld = _bgImage;
+  _bgImage = img;
+  _bgScene = scene;
+  _bgW = w;
+  return img;
+}
+
 /// Text laid out once and kept (damage numbers, speech bubbles, aura tags): laying text out again
 /// every frame, for every number on screen, was a good part of a phone's frame during a hit.
 final _textCache = <String, TextPainter>{};
@@ -2045,6 +2067,8 @@ class _ScenePainter extends CustomPainter {
       // Something in the frame failed: put the canvas back as it was and say what, rather than
       // leave half a picture (on Android, that left the Reaper on screen and the fighters gone).
       canvas.restoreToCount(depth);
+      lightGlows = false;
+      ghostFadeOutside = false;
       s._fault('paint', e, st);
     }
     final fault = s._faultText;
@@ -2102,7 +2126,14 @@ class _ScenePainter extends CustomPainter {
     }
     final ground = specFor(s._scene);
     // (Recorded once per battleground and replayed: the landscape's shapes are only built once.)
-    if (!_perf.contains('b')) canvas.drawPicture(battlegroundOf(s._scene));
+    if (!_perf.contains('b')) {
+      // The landscape as a picture of its pixels, made once per battleground and screen size, and
+      // laid down each frame: replaying its hundreds of shapes every frame (on Android's renderer,
+      // cutting each one into triangles again every frame) was a steady cost under every fight.
+      final px = math.min(2.6, size.width / visibleW * MediaQuery.devicePixelRatioOf(s.context));
+      final img = _backdrop(s._scene, px);
+      canvas.drawImageRect(img, Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble()), Offset.zero & sceneSize, Paint()..filterQuality = FilterQuality.low);
+    }
     for (final (at, r, col, start) in s._stains) {
       final a = (1 - ((t - start) / 6000)).clamp(0.0, 1.0);
       canvas.drawOval(Rect.fromCenter(center: at, width: r * 2.6, height: r * .9), Paint()..color = col.withValues(alpha: col.a * math.min(1.0, a * 2)));
@@ -2144,6 +2175,7 @@ class _ScenePainter extends CustomPainter {
 
     // Every figure is drawn into a picture first, then laid down as a backlit silhouette.
     lightGlows = s._lite;
+    ghostFadeOutside = !dying;
     final outer = canvas, runs = dying ? null : _Runs();
     if (runs != null) canvas = runs.begin();
     // A tint or fade on one figure goes on its run, laid once in the body's pass (see FigureRun),
@@ -2340,7 +2372,7 @@ class _ScenePainter extends CustomPainter {
       const shade = ColorFilter.matrix([.74, 0, 0, 0, 0, 0, .74, 0, 0, 0, 0, 0, .8, 0, 0, 0, 0, 0, 1, 0]);
       final packTint = fx['flash']! > .02 ? flashFilter(fx['flash']! * .6) : shade;
       final packAlpha = fx['alpha']! * (1 - fx['dying']! * .3);
-      runAs(tint: packTint, alpha: packAlpha);
+      runAs(tint: packTint, alpha: packAlpha * (!s._isBeast && s._foeLook.ghostly ? .74 : 1));
       final tint = inline(packTint), a = inlineAlpha(packAlpha);
       for (final (dx, dy, sc, ph) in const [(74.0, -12.0, .84, 2.9), (-38.0, -20.0, .78, .6)]) {
         final at = Offset(fx0 + dx, fy + dy);
@@ -2390,7 +2422,7 @@ class _ScenePainter extends CustomPainter {
     // Its flash when struck (or its darker hue, or your own shadow's), and its fade: on its run.
     final humanoidFoe = !(s._isBeast || s._isKraken || s._isHound || s._isDragon);
     final foeTint = fx['flash']! > .02 ? flashFilter(fx['flash']!) : (humanoidFoe && s._isYou ? _BattleStageState._shadowYou : dread);
-    runAs(tint: foeTint, alpha: fx['alpha']!);
+    runAs(tint: foeTint, alpha: fx['alpha']! * (humanoidFoe && s._foeLook.ghostly ? .74 : 1));
     final ownTint = inline(foeTint), ownAlpha = inlineAlpha(fx['alpha']!);
     canvas.save();
     canvas.translate(fx0, fy);
@@ -2537,6 +2569,7 @@ class _ScenePainter extends CustomPainter {
 
     canvas = outer;
     lightGlows = false;
+    ghostFadeOutside = false;
     if (runs != null) {
       final figures = runs.finish();
       // (Not disposed: on the web the frame is drawn later, and still needs them.)
@@ -2561,7 +2594,7 @@ class _ScenePainter extends CustomPainter {
       }
       canvas.drawPath(path, strokePaint(const Color(0xFFB8D8FF).withValues(alpha: .6 * storm), 16)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10));
       canvas.drawPath(path, strokePaint(const Color(0xFFFFFFFF).withValues(alpha: storm), 4));
-      canvas.drawCircle(end, 60 * storm, Paint()..color = const Color(0xFFCFE8FF).withValues(alpha: .5 * storm)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 20));
+      softGlow(canvas, end, 60 * storm, const Color(0xFFCFE8FF).withValues(alpha: .5 * storm), 20);
     }
     final ice = fx['ice']!;
     if (ice > 0) {
@@ -2770,7 +2803,7 @@ class _ScenePainter extends CustomPainter {
     for (final (at, start, col, size) in s._bursts) {
       final age = ((t - start) / 420).clamp(0.0, 1.0), a = 1 - age;
       final r = (14 + 70 * Curves.easeOut.transform(age)) * size;
-      canvas.drawCircle(at, r * .45 * (1 - age * .6), Paint()..color = const Color(0xFFFFFFFF).withValues(alpha: .9 * a * a)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6));
+      softGlow(canvas, at, r * .45 * (1 - age * .6), const Color(0xFFFFFFFF).withValues(alpha: .9 * a * a), 6);
       canvas.drawCircle(at, r, strokePaint(col.withValues(alpha: .85 * a), 5 * a * size + 1));
       for (var i = 0; i < 8; i++) {
         final ang = i * math.pi / 4 + start * .01, d = Offset(math.cos(ang), math.sin(ang));

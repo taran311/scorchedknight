@@ -4,6 +4,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/painting.dart';
 
+import 'paint_kit.dart';
+
 /// A fairy companion: a glowing body, four flickering wings and a trail of motes. [stage] 0 (a
 /// wisp) to 3 (a seraph, golden, with a halo).
 void drawFairy(Canvas c, Offset at, int stage, double t, {bool still = false}) {
@@ -11,7 +13,7 @@ void drawFairy(Canvas c, Offset at, int stage, double t, {bool still = false}) {
   final core = gold ? const Color(0xFFFFE9A8) : const Color(0xFFF4D0FF), rim = gold ? const Color(0xFFF2C14E) : const Color(0xFFC88AF0);
   final size = 7.0 + stage * 1.6;
   // Glow.
-  c.drawCircle(at, size * 3.2, Paint()..color = rim.withValues(alpha: .22)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14));
+  softGlow(c, at, size * 3.2, rim.withValues(alpha: .22), 14);
   // Wings (not on a wisp): two pairs, flapping.
   if (stage >= 1) {
     final flap = still ? .7 : .55 + .45 * math.sin(t / 45).abs();
@@ -35,7 +37,7 @@ void drawFairy(Canvas c, Offset at, int stage, double t, {bool still = false}) {
   // Body: a small glowing figure.
   c.drawOval(Rect.fromCenter(center: at + Offset(0, size * .55), width: size * .9, height: size * 1.5), Paint()..color = core.withValues(alpha: .9));
   c.drawCircle(at - Offset(0, size * .45), size * .5, Paint()..color = core);
-  c.drawCircle(at, size * .55, Paint()..color = const Color(0xFFFFFFFF).withValues(alpha: .85)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3));
+  softGlow(c, at, size * .55, const Color(0xFFFFFFFF).withValues(alpha: .85), 3);
   if (gold) {
     c.drawOval(Rect.fromCenter(center: at - Offset(0, size * 1.15), width: size * 1.2, height: size * .38), Paint()
       ..color = const Color(0xFFFFE08A)

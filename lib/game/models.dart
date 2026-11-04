@@ -8,13 +8,16 @@ import 'loot.dart';
 import 'nemesis.dart';
 
 class Settings {
-  Settings({this.name = 'Sir Smudge', this.guest = false, this.tourSeen = false, this.fastFights = false, this.gore = true, this.music = .5, this.sound = .8, this.muted = false, this.autoSellJunk = true, this.vibrate = true});
+  Settings({this.name = 'Sir Smudge', this.guest = false, this.tourSeen = false, this.fastFights = false, this.gore = true, this.music = .5, this.sound = .8, this.muted = false, this.autoSellJunk = true, this.vibrate = true, this.frameTimes = false});
 
   /// Common and uncommon drops that are no upgrade are sold where they fall.
   bool autoSellJunk;
 
   /// Short buzzes on blows, kills and level-ups (phones only).
   bool vibrate;
+
+  /// The renderer's own frame graphs over the game (the app on a phone): for finding what's slow.
+  bool frameTimes;
 
   String name;
 
@@ -48,6 +51,7 @@ class Settings {
     if (muted) 'mute': true,
     if (!autoSellJunk) 'junk': false,
     if (!vibrate) 'vibe': false,
+    if (frameTimes) 'frames': true,
   };
 
   factory Settings.fromJson(Map<String, dynamic> j) => Settings(
@@ -61,6 +65,7 @@ class Settings {
     muted: j['mute'] == true,
     autoSellJunk: j['junk'] != false,
     vibrate: j['vibe'] != false,
+    frameTimes: j['frames'] == true,
   );
 }
 

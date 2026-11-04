@@ -689,7 +689,10 @@ class _LevelBadge extends StatelessWidget {
 
 /// Small badges for status effects, poison, the dragon and Peaceful mode.
 class StatusBadges extends StatelessWidget {
-  const StatusBadges({super.key, required this.state, this.boons = true, this.onBolts});
+  const StatusBadges({super.key, required this.state, this.boons = true, this.onBolts, this.bolts = true});
+
+  /// Whether the loaded bolts show at all (in a fight they're picked on the aiming bar instead).
+  final bool bolts;
   final GameState state;
 
   /// In a fight: the bolt badge becomes a button that swaps bolts (shown whenever you carry any).
@@ -727,7 +730,7 @@ class StatusBadges extends StatelessWidget {
           },
           pet.$1 == Pet.fairy ? 'Your fairy strikes with every attack and casts a charm every ${pet.$2.charm} attacks' : 'Your companion bites with every attack',
         ),
-      if (onBolts == null && ammoById(k.ammoLoaded) != null)
+      if (bolts && onBolts == null && ammoById(k.ammoLoaded) != null)
         (
           '${ammoById(k.ammoLoaded)!.label(Missile.bolt)} ×${k.ammo[k.ammoLoaded] ?? 0}',
           Color(ammoById(k.ammoLoaded)!.argb),
@@ -745,7 +748,7 @@ class StatusBadges extends StatelessWidget {
       spacing: 5,
       runSpacing: 4,
       children: [
-        if (onBolts != null && carried)
+        if (bolts && onBolts != null && carried)
           Tooltip(
             message: 'Tap to swap bolts (no turn used)',
             child: GestureDetector(

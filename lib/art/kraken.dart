@@ -121,7 +121,7 @@ void drawKraken(Canvas c, Offset at, double scale, double t, {double hit = 0, do
   // Eyes, facing the hero: huge, gold, with goat-slit pupils.
   for (final (p, r) in const [(Offset(-58, -132), 19.0), (Offset(-8, -122), 16.0)]) {
     c.drawCircle(p, r + 4, Paint()..color = const Color(0xFF3A0E22));
-    c.drawCircle(p, r + 10, Paint()..color = const Color(0x66FFD24A)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8));
+    softGlow(c, p, r + 10, const Color(0x66FFD24A), 8);
     c.drawCircle(p, r, Paint()..shader = ui.Gradient.radial(p, r, const [Color(0xFFFFF0A0), Color(0xFFF2B830), Color(0xFF9A5A10)], const [0, .6, 1]));
     final blink = still ? 1.0 : (math.sin(t / 2300 + p.dx) > .985 ? .15 : 1.0);
     c.drawOval(Rect.fromCenter(center: p, width: r * 1.5, height: r * .34 * blink + 1), Paint()..color = const Color(0xFF140408));
@@ -333,7 +333,7 @@ void drawSerpent(Canvas c, SerpentLook look, Offset at, double scale, double t, 
   }
   // The eye: glowing, slit.
   final eye = const Offset(-18, -14);
-  c.drawCircle(eye, 11, Paint()..color = look.eye.withValues(alpha: .5)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5));
+  softGlow(c, eye, 11, look.eye.withValues(alpha: .5), 5);
   c.drawOval(Rect.fromCenter(center: eye, width: 14, height: 9), Paint()..color = look.eye);
   c.drawOval(Rect.fromCenter(center: eye, width: 3, height: 8), Paint()..color = const Color(0xFF0A0A10));
   c.drawPath(Path()..moveTo(-34, -22)..quadraticBezierTo(-18, -28, -4, -22), strokePaint(dark[2], 3));

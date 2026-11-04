@@ -148,6 +148,7 @@ class _ScorchedKnightAppState extends State<ScorchedKnightApp> {
 
   Widget _app(BuildContext context) => MaterialApp(
     navigatorKey: _nav,
+    showPerformanceOverlay: _game.loaded && _game.state.settings.frameTimes,
     title: 'Scorched Knight',
     builder: (context, child) {
       // Phones have no hover: every little tip in the game opens with a tap instead.

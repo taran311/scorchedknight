@@ -59,7 +59,7 @@ void drawHorse(Canvas c, HorseLook look, Offset at, double scale, double t, {dou
   c.scale(scale, scale);
   final a = look.ghost ? alpha * .7 : alpha;
   if (look.glow != null) {
-    c.drawOval(Rect.fromCenter(center: const Offset(4, -70), width: 220, height: 130), Paint()..color = look.glow!.withValues(alpha: (look.ghost ? .35 : .18) * alpha)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 22));
+    softOvalGlow(c, Rect.fromCenter(center: const Offset(4, -70), width: 220, height: 130), look.glow!.withValues(alpha: (look.ghost ? .35 : .18) * alpha), 22);
   }
   if (!look.ghost) c.drawOval(Rect.fromCenter(center: const Offset(6, 2), width: 150, height: 14), Paint()..color = Color.fromRGBO(0, 0, 0, .4 * alpha));
   final layered = a < 1;
@@ -103,7 +103,7 @@ void drawHorse(Canvas c, HorseLook look, Offset at, double scale, double t, {dou
       ..lineTo(hoof.dx - 6, hoof.dy + 5)
       ..close();
     fillPath(c, h, [shade(look.hoof, .2), look.hoof, shade(look.hoof, -.4)], hoof + const Offset(0, -2), hoof + const Offset(0, 5));
-    if (look.fire) c.drawCircle(hoof, 5, Paint()..color = const Color(0x88FF6A1A)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3));
+    if (look.fire) softGlow(c, hoof, 5, const Color(0x88FF6A1A), 3);
   }
 
   final y0 = -66 + bob;
@@ -180,7 +180,7 @@ void drawHorse(Canvas c, HorseLook look, Offset at, double scale, double t, {dou
     c.drawPath(poly([Offset(70, -150 + bob), Offset(74, -166 + bob), Offset(80, -150 + bob)]), Paint()..color = coat[1]);
     c.drawCircle(Offset(88, -140 + bob), 2.8, Paint()..color = look.eye);
     if (look.ghost || look.fire || look.horn != null) {
-      c.drawCircle(Offset(88, -140 + bob), 6, Paint()..color = (look.fire ? const Color(0xFFFFD24A) : (look.glow ?? look.eye)).withValues(alpha: .45)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3));
+      softGlow(c, Offset(88, -140 + bob), 6, (look.fire ? const Color(0xFFFFD24A) : (look.glow ?? look.eye)).withValues(alpha: .45), 3);
     }
     c.drawCircle(Offset(110, -112 + bob), 1.8, Paint()..color = const Color(0xFF1A1210));
     if (look.horn != null) {
@@ -191,7 +191,7 @@ void drawHorse(Canvas c, HorseLook look, Offset at, double scale, double t, {dou
         final p = Offset.lerp(Offset(84, -154 + bob), Offset(110, -196 + bob), i / 5)!;
         c.drawLine(p + const Offset(-3, 1), p + const Offset(3, -2), strokePaint(shade(look.horn!, -.35), 1));
       }
-      c.drawCircle(Offset(110, -196 + bob), 6, Paint()..color = (look.glow ?? look.horn!).withValues(alpha: .6)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4));
+      softGlow(c, Offset(110, -196 + bob), 6, (look.glow ?? look.horn!).withValues(alpha: .6), 4);
     }
     // Mane along the neck, flowing back with the stride (flames for the Nightmare).
     for (var i = 0; i < 7; i++) {
@@ -348,7 +348,7 @@ void drawBear(Canvas c, BearLook look, Offset at, double scale, double t, {doubl
   c.drawCircle(const Offset(61, 0), 1.5, Paint()..color = const Color(0x99FFFFFF));
   c.drawOval(Rect.fromCenter(center: const Offset(28, -9), width: 6, height: 5), Paint()..color = look.eye);
   c.drawCircle(const Offset(29, -9), 1.4, Paint()..color = const Color(0xFF0A0604));
-  if (look.eye != const Color(0xFF1A0E08)) c.drawCircle(const Offset(28, -9), 7, Paint()..color = look.eye.withValues(alpha: .4)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3));
+  if (look.eye != const Color(0xFF1A0E08)) softGlow(c, const Offset(28, -9), 7, look.eye.withValues(alpha: .4), 3);
   // A snarl when struck.
   c.drawPath(Path()..moveTo(40, 14)..lineTo(60, 12), strokePaint(const Color(0xFF140C08), 1.8));
   if (hit > .1) {
@@ -428,7 +428,7 @@ void drawSpider(Canvas c, SpiderLook look, Offset at, double scale, double t, {d
   for (var i = 0; i < 4; i++) {
     c.drawArc(Rect.fromCenter(center: Offset(-26.0 + i * 6, -70 + lift), width: 40.0 + i * 22, height: 96), math.pi * .62, math.pi * .76, false, strokePaint(body[2].withValues(alpha: .5), 1.6));
   }
-  c.drawOval(Rect.fromCenter(center: Offset(-58, -90 + lift), width: 36, height: 16), Paint()..color = const Color(0x38FFFFFF)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5));
+  softOvalGlow(c, Rect.fromCenter(center: Offset(-58, -90 + lift), width: 36, height: 16), const Color(0x38FFFFFF), 5);
   c.restore();
   for (var i = 0; i < 14; i++) {
     final a = math.pi * (.85 + i * .07);
@@ -451,12 +451,12 @@ void drawSpider(Canvas c, SpiderLook look, Offset at, double scale, double t, {d
   // Eyes: two big, four small, glowing.
   for (final (p, r) in [(const Offset(36, -64), 4.6), (const Offset(28, -68), 4.0), (const Offset(40, -56), 2.4), (const Offset(32, -58), 2.2), (const Offset(22, -62), 2.0), (const Offset(42, -66), 2.0)]) {
     final q = p + Offset(0, lift);
-    c.drawCircle(q, r + 3, Paint()..color = look.eyes.withValues(alpha: .4)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2));
+    softGlow(c, q, r + 3, look.eyes.withValues(alpha: .4), 2);
     c.drawCircle(q, r, Paint()..color = look.eyes);
   }
   // A groove across the carapace, and two short feelers in front of the jaws.
   c.drawArc(Rect.fromCenter(center: Offset(10, -58 + lift), width: 30, height: 34), -math.pi * .4, math.pi * .8, false, strokePaint(body[2].withValues(alpha: .6), 1.4));
-  c.drawOval(Rect.fromCenter(center: Offset(14, -72 + lift), width: 22, height: 8), Paint()..color = const Color(0x30FFFFFF)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3));
+  softOvalGlow(c, Rect.fromCenter(center: Offset(14, -72 + lift), width: 22, height: 8), const Color(0x30FFFFFF), 3);
   for (final (dx, sw) in const [(30.0, 0.0), (40.0, 1.2)]) {
     final wig = still ? 0.0 : math.sin(t / 200 + sw) * 2;
     limb(c, [(Offset(dx, -46 + lift), 3.2), (Offset(dx + 10, -48 + lift + wig), 2.6), (Offset(dx + 14, -36 + lift + wig), 2.2)], [dark, dark]);

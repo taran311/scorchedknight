@@ -215,12 +215,6 @@ class _BattleScreenState extends State<BattleScreen> {
   bool get _hasCompanion => petStage(c.state.knight) != null || dragonStage(c.state.knight) != null;
 
   /// Shoot: up comes the timing bar. Every bolt is aimed by hand (no auto-aim: your timing is the skill).
-  /// The bolt badge: on to the next kind you carry (no turn spent).
-  void _swapBolts() {
-    c.cycleAmmo();
-    Audio.play(Sfx.click);
-  }
-
   void _shoot() {
     if (_aiming) return;
     if (c.busy || c.outcome != null || !c.state.inBattle || c.whyNot(BattleAction.shoot) != null) return;
@@ -352,7 +346,7 @@ class _BattleScreenState extends State<BattleScreen> {
                                     children: [
                                       BattleStage(controller: c, aspectRatio: aspect, fill: fill),
                                       if (phone)
-                                        Positioned(left: 6, top: 6, child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 260), child: StatusBadges(state: s, boons: false, onBolts: _swapBolts))),
+                                        Positioned(left: 6, top: 6, child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 260), child: StatusBadges(state: s, boons: false, bolts: false))),
                                       // You top-left, the foe top-right, like facing cards.
                                       if (!phone)
                                       Positioned(
@@ -363,7 +357,7 @@ class _BattleScreenState extends State<BattleScreen> {
                                           children: [
                                             MouseRegion(cursor: SystemMouseCursors.click, child: Tooltip(message: 'Your gear', child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => showGearGlance(context, c), child: AbsorbPointer(child: HeroCard(controller: c, mana: true))))),
                                             const SizedBox(height: 6),
-                                            ConstrainedBox(constraints: const BoxConstraints(maxWidth: 300), child: StatusBadges(state: s, onBolts: _swapBolts)),
+                                            ConstrainedBox(constraints: const BoxConstraints(maxWidth: 300), child: StatusBadges(state: s, bolts: false)),
                                           ],
                                         ),
                                       ),
@@ -389,7 +383,7 @@ class _BattleScreenState extends State<BattleScreen> {
                                     moves: over
                                         ? null
                                         : _aiming
-                                        ? [Expanded(child: _AimBar(speed: c.state.settings.fastFights ? 1.6 : 1, zone: bullseyeFor(c.state.knight), onLoose: _loose, onCancel: () => setState(() => _aiming = false)))]
+                                        ? [Expanded(child: _AimBar(controller: c, speed: c.state.settings.fastFights ? 1.6 : 1, zone: bullseyeFor(c.state.knight), onLoose: _loose, onCancel: () => setState(() => _aiming = false)))]
                                         : _actionRows().first,
                                     result: over ? _resultButtons() : null,
                                     progress: over ? _trailProgress() : null,
@@ -620,6 +614,8 @@ class _BattleScreenState extends State<BattleScreen> {
           ]),
           badge: '~${(swing * crossbowShare(k) * boltEdge * aimBoost(k)).round()}',
           badgeColour: edgeColour(boltEdge),
+          // The bolts loaded, on the tile itself (swapped on the aiming bar).
+          figure: ammoById(k.ammoLoaded) == null ? null : '${k.ammoLoaded![0].toUpperCase()}${k.ammoLoaded!.substring(1)} ×${k.ammo[k.ammoLoaded] ?? 0}',
           glow: boltEdge > 1,
           // The crossbow's own colour: hunter green (blades red, rites blue).
           tint: const Color(0xFF263A20),
@@ -1659,7 +1655,8 @@ Future<BattleExit?> openBattle(BuildContext context, GameController c, BattleSta
 /// with it in the gold centre for a bullseye, anywhere in the amber for a true shot, out at the
 /// red edges for a graze.
 class _AimBar extends StatefulWidget {
-  const _AimBar({required this.onLoose, required this.onCancel, this.speed = 1, this.zone = bullseyeZone});
+  const _AimBar({required this.controller, required this.onLoose, required this.onCancel, this.speed = 1, this.zone = bullseyeZone});
+  final GameController controller;
   final ValueChanged<double> onLoose;
 
   /// The bullseye's half-width (Aim training widens it).
@@ -1713,6 +1710,9 @@ class _AimBarState extends State<_AimBar> with SingleTickerProviderStateMixin {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Which bolts are loaded, big enough to read, and the others a tap away (no turn spent).
+          ListenableBuilder(listenable: widget.controller, builder: (context, _) => _BoltPicker(controller: widget.controller)),
+          const SizedBox(height: 6),
           Row(
             children: [
               const Icon(Icons.gps_fixed, size: 18, color: Color(0xFFFFD98A)),
@@ -1740,6 +1740,73 @@ class _AimBarState extends State<_AimBar> with SingleTickerProviderStateMixin {
       ),
     ),
   );
+}
+
+/// The bolts you carry, as chips: the loaded one lit in its colour, the rest a tap to load.
+class _BoltPicker extends StatelessWidget {
+  const _BoltPicker({required this.controller});
+  final GameController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final k = controller.state.knight;
+    final kinds = [for (final a in AmmoType.values) if ((k.ammo[a.name] ?? 0) > 0) a];
+    Widget chip(AmmoType? a) {
+      final on = k.ammoLoaded == a?.name || (a == null && ammoById(k.ammoLoaded) == null);
+      final col = a == null ? Palette.parch : Color(a.argb);
+      final name = a == null ? 'Plain' : '${a.name[0].toUpperCase()}${a.name.substring(1)} ×${k.ammo[a.name]}';
+      // (No tooltip: on a phone a tooltip takes the tap, and the chip wouldn't load. What the
+      // loaded bolt does is spelled out under the chips instead.)
+      return GestureDetector(
+          onTap: on
+              ? null
+              : () {
+                  if (a == null) {
+                    // (Plain sits first in the swap order: step round to it.)
+                    while (ammoById(controller.state.knight.ammoLoaded) != null) {
+                      controller.cycleAmmo();
+                    }
+                  } else {
+                    controller.loadAmmo(a.name);
+                  }
+                  Audio.play(Sfx.click);
+                },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: on ? col.withValues(alpha: .22) : const Color(0xC70F0C09),
+              border: Border.all(color: on ? col : col.withValues(alpha: .35), width: on ? 2 : 1),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(on ? Icons.check_circle : Icons.circle_outlined, size: 15, color: on ? col : col.withValues(alpha: .6)),
+                const SizedBox(width: 5),
+                Text(name, style: Txt.label(size: 13.5, color: on ? col : Palette.parch2, weight: on ? FontWeight.w800 : FontWeight.w700)),
+              ],
+            ),
+          ),
+      );
+    }
+
+    final loaded = ammoById(k.ammoLoaded);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text('BOLTS', style: Txt.label(size: 11.5, color: Palette.parch2)),
+            const SizedBox(width: 8),
+            Expanded(child: Wrap(spacing: 6, runSpacing: 6, children: [chip(null), for (final a in kinds) chip(a)])),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(loaded == null ? 'Plain bolts: no effect, and they never run out.' : '${loaded.desc}.', style: Txt.onStone(size: 12.5, color: loaded == null ? Palette.parch2 : Color(loaded.argb))),
+      ],
+    );
+  }
 }
 
 class _AimPainter extends CustomPainter {

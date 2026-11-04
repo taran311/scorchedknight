@@ -269,3 +269,35 @@ class SeededRandom {
 
   static int _imul(int a, int b) => (a * b) & 0xFFFFFFFF;
 }
+
+/// A soft glow: a disc of [colour] at [centre], [radius] across, its edge softened by about
+/// [sigma] as a blur would, drawn as a radial gradient. (A blurred circle costs a pass of its own
+/// on a phone's renderer every frame, and the figures in a fight are drawn more than once, so a
+/// few glowing eyes on a foe were enough to make it stutter.)
+void softGlow(Canvas c, Offset centre, double radius, Color colour, double sigma) {
+  final outer = radius + 2 * sigma;
+  if (outer <= 0 || colour.a <= 0) return;
+  final full = (math.max(0.0, radius - sigma) / outer).clamp(0.0, .98);
+  final half = (radius / outer).clamp(full + .01, .99);
+  c.drawCircle(
+    centre,
+    outer,
+    Paint()
+      ..shader = ui.Gradient.radial(
+        centre,
+        outer,
+        [colour, colour, colour.withValues(alpha: colour.a * .5), colour.withValues(alpha: 0)],
+        [0, full, half, 1],
+      ),
+  );
+}
+
+/// [softGlow] squashed into the oval [r].
+void softOvalGlow(Canvas c, Rect r, Color colour, double sigma) {
+  if (r.width <= 0 || r.height <= 0) return;
+  c.save();
+  c.translate(r.center.dx, r.center.dy);
+  c.scale(1, r.height / r.width);
+  softGlow(c, Offset.zero, r.width / 2, colour, sigma);
+  c.restore();
+}

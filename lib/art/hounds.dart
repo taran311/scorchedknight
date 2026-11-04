@@ -260,7 +260,7 @@ void drawHound(Canvas c, HoundLook look, Offset at, double scale, double t, {dou
   }
   // A heavy brow over a narrow, glinting eye.
   c.drawLine(const Offset(14, -11), const Offset(26, -8), strokePaint(coat[2], 2));
-  c.drawCircle(const Offset(21, -6), 4.5, Paint()..color = look.eye.withValues(alpha: .5)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3));
+  softGlow(c, const Offset(21, -6), 4.5, look.eye.withValues(alpha: .5), 3);
   c.drawOval(Rect.fromCenter(center: const Offset(21, -6), width: 6, height: 3.6), Paint()..color = look.eye);
   c.drawCircle(const Offset(22, -6), 1.1, Paint()..color = const Color(0xFF140C0A));
   c.drawOval(Rect.fromCenter(center: const Offset(46, -1), width: 6, height: 5), Paint()..color = const Color(0xFF140C0A));
