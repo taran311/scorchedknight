@@ -453,6 +453,10 @@ class GameEngine {
         if (d.id != skip && open(d.land) && !state.dungeonsDone.contains(d.id) && whyNotDungeon(d.id) == null) d,
     ]..sort((a, b) => continents[a.land].minLevel - continents[b.land].minLevel);
     if (delves.firstOrNull case final d?) return RoadStep(RoadKind.dungeon, 'Delve into ${d.name}', 'A dungeon · ${continents[d.land].name}', d.land, id: d.id);
+    // Nothing left to find: the wilds, which never run dry (the furthest open, the best gear).
+    for (var a = wildAreas.length - 1; a >= 0; a--) {
+      if (wildOpen(a)) return RoadStep(RoadKind.wild, 'Roam ${wildAreas[a].name}', 'The wilds · gold, gear and a warlord', wildAreas[a].lands.first, id: '$a');
+    }
     return null;
   }
 
@@ -4658,7 +4662,7 @@ String shineLine(int level) => switch (level) {
   _ => 'You brush a little soot off your shoulders.',
 };
 
-enum RoadKind { boss, place, dungeon, heroic, train }
+enum RoadKind { boss, place, dungeon, heroic, train, wild }
 
 /// One step on the road (see GameEngine.roadStep): what, a line under it, and where.
 class RoadStep {

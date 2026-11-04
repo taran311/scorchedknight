@@ -136,7 +136,7 @@ class _PhoneMapState extends State<_PhoneMap> {
 }
 
 class MapPage extends StatefulWidget {
-  const MapPage({super.key, required this.controller, this.place, this.dungeon, this.land});
+  const MapPage({super.key, required this.controller, this.place, this.dungeon, this.land, this.wild});
   final GameController controller;
 
   /// A place or dungeon to open on, picked (the Road card's "explore this" or "delve into that").
@@ -144,6 +144,9 @@ class MapPage extends StatefulWidget {
 
   /// Or a land to open on, picked (a recipe's "find on map": where its materials come from).
   final int? land;
+
+  /// Or a wild area, picked (the town board's "roam the wilds").
+  final int? wild;
 
   @override
   State<MapPage> createState() => _MapPageState();
@@ -154,7 +157,7 @@ class _MapPageState extends State<MapPage> {
   late int _pick = placeById(widget.place)?.land ?? dungeonById(widget.dungeon)?.land ?? widget.land ?? c.state.continent;
 
   /// A wild area picked on the map (shown in the panel instead of a land).
-  int? _wildPick;
+  late int? _wildPick = widget.wild;
 
   /// A place picked on the map (shown in the panel instead of a land).
   late String? _placePick = widget.place;

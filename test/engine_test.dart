@@ -227,7 +227,7 @@ void main() {
     final seen = <String>{};
     for (var i = 0; i < 40; i++) {
       final step = e.exploreStep();
-      if (step == null) break;
+      if (step == null || step.kind == RoadKind.wild) break;
       expect(step.id, isNot(e.roadStep()?.id));
       expect(seen.add(step.id!), isTrue, reason: 'offered ${step.id} twice');
       if (step.kind == RoadKind.place) {
@@ -237,6 +237,8 @@ void main() {
       }
     }
     expect(seen, isNotEmpty);
+    // Every place and dungeon done: the wilds, once they're open.
+    if (List.generate(wildAreas.length, e.wildOpen).any((o) => o)) expect(e.exploreStep()?.kind, RoadKind.wild);
   });
 
   test('contracts: every guarded place is someone\'s trouble, on the board, and pays a bounty', () {
