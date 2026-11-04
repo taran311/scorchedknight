@@ -1024,14 +1024,9 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     final back = move.clip[move.clip.length - 2].ms - 20;
     void dust(double delay, double size) => _at(delay, () => _spark('smoke', _knightFeet + const Offset(-10, -4), (6 * size).round(), dir: -math.pi / 2, spread: 2.6, speed: 2.5 * size, life: 520, radius: 7 * size, gravity: .02));
     switch (move.dash) {
-      case DashStyle.low:
-        // Utterly still, then across in a burst.
-        _tween('dash', reach, 110, delay: swingHitMs - 130, ease: easeOut);
-        dust(swingHitMs - 130, 1);
-        _tween('dash', 0, 420, delay: back, ease: easeInOut);
       case DashStyle.blink:
         // Gone in a swirl of mist, and there at the foe; and back the same way.
-        final blood = move.stroke == 'cross', col = blood ? 'blood' : (move.stroke == 'twin' ? 'curse' : 'holy');
+        final blood = move.stroke == 'cross', col = blood ? 'blood' : 'holy';
         void puff() {
           // A soft cloud the knight's shape is lost in, and a few motes of the class's colour.
           _spark(blood ? 'bloodveil' : 'veil', _knightFeet + const Offset(0, -110), 14, spread: 6.3, speed: 1.6, life: 700, radius: 26, gravity: -.01, lift: .2);
@@ -1050,10 +1045,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       default:
         _tween('dash', reach, swingHitMs - 60, ease: easeInOut);
         _tween('dash', 0, 380, delay: back, ease: easeInOut);
-        if (move.dash == DashStyle.leap || move.dash == DashStyle.dive) {
-          dust(120, 1);
-          dust(swingHitMs, 1.4);
-        } else if (move.dash == DashStyle.stomp) {
+        if (move.dash == DashStyle.stomp) {
           // Iron boots stamping in.
           for (final at in [90.0, 200.0, swingHitMs]) {
             dust(at, .8);
@@ -1063,8 +1055,8 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     }
   }
 
-  /// A class's own flourishes on its blow, beyond the stroke itself: fire on the dragon's cleave,
-  /// the ground burning under the Ashen slam, a geyser for the Tidecaller, wind for the Skyborn…
+  /// A class's own flourishes on its blow, beyond the stroke itself: fire on the Dragon Knight's
+  /// cleave and his breath, runes ringing out of the Forge Knight's anvil blow.
   void _classFx(ClassMove move, double d0, bool bash) {
     final chest = _foeChest, feet = const Offset(_foeX - 40, _groundY);
     switch (move.stroke) {
@@ -1081,52 +1073,12 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
             _spark('fire', from, 4, dir: math.atan2(chest.dy - from.dy, chest.dx - from.dx), spread: .45, speed: 9, life: 420, radius: 9, lift: 0, gravity: -.01);
           });
         }
-      case 'slam':
-        // The ground catches fire either side of where it lands.
-        _at(d0 + swingHitMs, () {
-          for (var i = -3; i <= 3; i++) {
-            _spark('fire', feet + Offset(i * 34.0, -6), 3, spread: .8, speed: 3, life: 700, radius: 8, lift: 1, gravity: -.04);
-          }
-        });
       case 'anvil':
         // Runes ring out from the blow.
         _at(d0 + swingHitMs, () {
           _spark('holy', feet + const Offset(0, -10), 22, dir: -math.pi / 2, spread: 3.2, speed: 6, life: 520, radius: 3.5, gravity: .15);
           _impact(.5);
         });
-      case 'geyser':
-        // A column of water bursts up under the foe.
-        for (var i = 0; i < 6; i++) {
-          _at(d0 + swingHitMs - 20 + i * 40, () {
-            _spark('rime', feet + Offset(-10 + (i % 3) * 10.0, -10), 7, dir: -math.pi / 2, spread: .5, speed: 9, life: 560, radius: 4.5, gravity: .2);
-            _spark('mist', feet + const Offset(0, -30), 3, dir: -math.pi / 2, spread: .8, speed: 5, life: 700, radius: 10, gravity: .02);
-          });
-        }
-      case 'gale':
-        // Wind streaming off the somersault.
-        for (var i = 0; i < 4; i++) {
-          _at(d0 + 180 + i * 40, () => _spark('mist', _knightFeet + Offset(0, -200 + i * 30.0), 4, dir: math.pi, spread: .3, speed: 6, life: 420, radius: 5, gravity: 0, lift: 0));
-        }
-      case 'dive':
-        // Down out of the sky like a falling star.
-        _at(d0 + swingHitMs, () {
-          _spark('holy', _knightFeet + const Offset(40, -20), 26, dir: -math.pi / 2, spread: 3, speed: 7, life: 520, radius: 4, gravity: .25);
-          _impact(.7);
-        });
-      case 'iaido':
-        // The cut is only seen a moment after it's made: then the foe flinches, and the blade
-        // goes back in its sheath with a click.
-        _at(d0 + swingHitMs + 180, () {
-          _spark('spark', chest, 20, dir: 0, spread: 3.4, speed: 7, life: 380, radius: 3.5);
-          _tween('flash', 1, 40);
-          _tween('flash', 0, 260, delay: 40);
-        });
-        _at(d0 + 640, () => Audio.play(Sfx.clang, power: .5));
-      case 'claw' || 'maul':
-        if (_gore) _at(d0 + swingHitMs + 20, () => _spark('blood', chest, 10, dir: .6, spread: 1.2, speed: 4, life: 600, radius: 3, gravity: .3));
-      case 'twin':
-        // A ghost of you, somewhere else, strikes too.
-        _at(d0 + swingHitMs + 160, () => _spark('curse', chest + const Offset(20, -10), 14, dir: math.pi, spread: 1.6, speed: 5, life: 420, radius: 3.5));
     }
   }
 
@@ -1282,7 +1234,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         if (bash) {
           // The ground cracks where it lands: dust thrown out both ways, and the screen jolts.
           // (Only where the blow comes down into the ground: a thrust or a spin raises no dust.)
-          final ground = move == null || const {'slam', 'anvil', 'maul', 'dive', 'chop'}.contains(move.stroke);
+          final ground = move == null || const {'anvil', 'chop'}.contains(move.stroke);
           _at(d0 + swingHitMs, () {
             if (ground) _spark('smoke', const Offset(_foeX - 70, _groundY - 4), 14, dir: -math.pi / 2, spread: 2.8, speed: 4, life: 600, radius: 9, gravity: .05);
             if (ground) _spark('spark', const Offset(_foeX - 70, _groundY - 10), 12, dir: -math.pi / 2, spread: 2.2, speed: 6, life: 380, radius: 3.5, gravity: .2);
@@ -2524,7 +2476,7 @@ class _ScenePainter extends CustomPainter {
       final flee = fx['flee']!, ko = fx['ko']!, dash = fx['dash']!;
       final kx = _knightX - flee * 560 + dash * _dashReach - fx['kback']! * 22;
       final vanish = fx['vanish']!;
-      if (dash > .08 && !still && const {DashStyle.run, DashStyle.leap, DashStyle.low, DashStyle.dive}.contains(s._dashStyle)) {
+      if (dash > .08 && !still && s._dashStyle == DashStyle.run) {
         // Afterimages streaming behind the charge (just one on a phone: each is a whole extra knight
         // to draw, and three of them dropped frames mid-swing).
         // (All of them in one faint run, unlit: each used to be a layer of its own in every pass.)
@@ -2999,7 +2951,7 @@ class _ScenePainter extends CustomPainter {
       } else if (age >= 0) {
         final centre = s._foeChest + const Offset(-110, 10);
         if (kind != 'arc') {
-          drawClassStroke(canvas, kind, age, s._foeChest, col, crit, knightX: s._knightFeet.dx);
+          drawClassStroke(canvas, kind, age, s._foeChest, col, crit);
         } else if (bash) {
           final r = 30 + 120 * Curves.easeOut.transform(age), a = (1 - age);
           // (A soft wide ring under a firm one, rather than a blurred ring: a blur on a ring this big
@@ -3701,11 +3653,10 @@ Pose inClassStance(Pose idle, Map<J, double> stance) {
   return p;
 }
 
-/// How long a class's stroke lingers, in milliseconds (the iaido's line hangs in the air).
+/// How long a class's stroke lingers, in milliseconds.
 double classStrokeMs(String kind) => switch (kind) {
-  'iaido' => 900,
-  'cross' || 'maul' || 'twin' || 'fangs' || 'wave' => 440,
-  'spin' || 'dive' || 'slam' || 'anvil' || 'geyser' => 460,
+  'cross' => 440,
+  'anvil' => 460,
   _ => 360,
 };
 
@@ -3734,7 +3685,7 @@ void _smear(Canvas canvas, Offset Function(double) path, double age, Color col, 
 
 /// A class's stroke through the foe at [f] (its chest): each has its own shape. (The plain arc and
 /// the bash's shockwave are drawn where the trail is.)
-void drawClassStroke(Canvas canvas, String kind, double age, Offset f, Color col, bool crit, {double? knightX}) {
+void drawClassStroke(Canvas canvas, String kind, double age, Offset f, Color col, bool crit) {
   Offset Function(double) curve(Offset a, Offset b, Offset c) => (u) => _bez(f + a, f + b, f + c, u);
   Offset Function(double) line(Offset a, Offset c) => (u) => Offset.lerp(f + a, f + c, u)!;
   void ring(Offset at, double r, double a, {double sy = 1}) {
@@ -3744,80 +3695,22 @@ void drawClassStroke(Canvas canvas, String kind, double age, Offset f, Color col
     canvas.drawOval(rect.deflate(r * .25), strokePaint(const Color(0xFFFFFFFF).withValues(alpha: .6 * a), 3 * a + 1));
   }
   switch (kind) {
-    case 'wide':
-      // A low, flat sweep right through.
-      _smear(canvas, curve(const Offset(-230, 10), const Offset(-30, 120), const Offset(150, -20)), age, col, 26, crit: crit);
     case 'rise':
+      // The Blood Knight's rising backhand.
       _smear(canvas, curve(const Offset(-150, 110), const Offset(40, 100), const Offset(50, -140)), age, col, 18, crit: crit);
     case 'chop':
+      // The Forge Knight's short downward chop.
       _smear(canvas, curve(const Offset(-40, -160), const Offset(10, -40), const Offset(-10, 110)), age, col, 24, crit: crit, speed: 2.2);
-    case 'kesa':
-      // A clean slanting cut, thin and bright.
-      _smear(canvas, curve(const Offset(-80, -160), const Offset(10, -40), const Offset(70, 140)), age, col, 9, crit: crit, speed: 2.4, tailLen: .9);
-    case 'claw' || 'maul':
-      // Three rakes side by side (and the maul's three more, the other way).
-      for (final dx in const [-28.0, 0.0, 28.0]) {
-        _smear(canvas, curve(Offset(-50 + dx, -130), Offset(10 + dx, -20), Offset(20 + dx, 100)), age, col, 9, crit: crit, speed: 2.2);
-        if (kind == 'maul') _smear(canvas, curve(Offset(60 + dx, -120), Offset(10 + dx, -20), Offset(-40 + dx, 100)), age, col, 9, crit: crit, speed: 2.2, delay: .18);
-      }
-    case 'thrust':
-      _smear(canvas, line(const Offset(-230, 0), const Offset(80, -6)), age, col, 14, crit: crit, speed: 2.6, tailLen: .5);
-    case 'stab':
-      _smear(canvas, line(const Offset(-170, 80), const Offset(50, -130)), age, col, 12, crit: crit, speed: 2.6, tailLen: .5);
-    case 'fangs':
-      // Two darting stabs, one after the other.
-      _smear(canvas, line(const Offset(-200, -18), const Offset(60, -24)), age, col, 10, crit: crit, speed: 2.8, tailLen: .4);
-      _smear(canvas, line(const Offset(-200, 18), const Offset(70, 14)), age, col, 10, crit: crit, speed: 2.8, tailLen: .4, delay: .16);
     case 'cross':
+      // Blood Rend: down, then back up.
       _smear(canvas, curve(const Offset(-90, -130), const Offset(10, -10), const Offset(50, 120)), age, col, 15, crit: crit, speed: 2.2);
       _smear(canvas, curve(const Offset(-90, 120), const Offset(10, 10), const Offset(50, -130)), age, col, 15, crit: crit, speed: 2.2, delay: .14);
-    case 'twin':
-      // Your cut, and a ghost of it from the other side.
-      _smear(canvas, curve(const Offset(-60, -150), const Offset(70, -40), const Offset(-20, 120)), age, col, 16, crit: crit);
-      _smear(canvas, curve(const Offset(60, -150), const Offset(-70, -40), const Offset(20, 120)), age, const Color(0xFFC89AFF), 16, crit: crit, delay: .3);
-    case 'line':
-      // A single thin line, gone almost as soon as it's there.
-      _smear(canvas, line(const Offset(-280, -8), const Offset(130, -8)), age, col, 5, crit: crit, speed: 3, tailLen: .8);
-    case 'iaido':
-      // One long line clean across the field, hanging there.
-      final a = age.clamp(0.0, 1.0), lead = Curves.easeOut.transform(math.min(1, a * 6)), fade = a < .6 ? 1.0 : 1 - (a - .6) / .4;
-      final from = f + const Offset(-480, -4), to = Offset.lerp(from, f + const Offset(300, -4), lead)!;
-      canvas.drawLine(from, to, strokePaint(col.withValues(alpha: .35 * fade), (crit ? 12 : 9) * fade + 1));
-      canvas.drawLine(from, to, strokePaint(const Color(0xFFFFFFFF).withValues(alpha: fade), 2.4));
-    case 'spin':
-      // A full circle of silver about you as you turn.
-      _smear(canvas, (u) => f + const Offset(-110, 0) + Offset(math.cos(-math.pi / 2 + u * 2 * math.pi), math.sin(-math.pi / 2 + u * 2 * math.pi)) * 130, age, col, 14, crit: crit, tailLen: .75, speed: 2);
-    case 'wave':
-      // Down, and back up: a figure of eight through the foe.
-      _smear(
-        canvas,
-        (u) => u < .5 ? _bez(f + const Offset(-150, -110), f + const Offset(-60, 130), f + const Offset(0, 20), u * 2) : _bez(f + const Offset(0, 20), f + const Offset(60, -90), f + const Offset(120, -120), u * 2 - 1),
-        age,
-        col,
-        16,
-        crit: crit,
-        tailLen: .7,
-        speed: 1.6,
-      );
-    case 'geyser':
-      _smear(canvas, curve(const Offset(-110, 130), const Offset(20, 120), const Offset(10, -170)), age, col, 22, crit: crit);
-    case 'gale':
-      _smear(canvas, curve(const Offset(-110, -170), const Offset(60, -60), const Offset(10, 110)), age, col, 18, crit: crit);
-    case 'dive':
-      // Straight down out of the sky.
-      // (Where you come down, just in front of you.)
-      final x = (knightX ?? f.dx - 150) + 40 - f.dx;
-      _smear(canvas, line(Offset(x, -620), Offset(x, 120)), age, col, 22, crit: crit, speed: 2.4, tailLen: .5);
     case 'flame':
+      // The Dragon Knight's burning cleave.
       _smear(canvas, curve(const Offset(-100, -170), const Offset(80, -50), const Offset(10, 130)), age, col, 26, crit: crit);
       _smear(canvas, curve(const Offset(-100, -170), const Offset(80, -50), const Offset(10, 130)), age, const Color(0xFFFFF3C4), 8, crit: crit);
     case 'breath':
       _smear(canvas, line(const Offset(-220, -4), const Offset(80, -4)), age, col, 18, crit: crit, speed: 2.4, tailLen: .55);
-    case 'slam':
-      // A ring of fire racing out along the ground.
-      final a = age.clamp(0.0, 1.0);
-      ring(Offset(f.dx - 60, _groundY - 6), 40 + 170 * Curves.easeOut.transform(a), 1 - a, sy: .2);
-      _smear(canvas, curve(const Offset(-60, -170), const Offset(10, -60), const Offset(-20, 110)), age, col, 22, crit: crit, speed: 2.4);
     case 'anvil':
       // The shockwave, and a second ring of runes behind it along the ground.
       final a = age.clamp(0.0, 1.0);

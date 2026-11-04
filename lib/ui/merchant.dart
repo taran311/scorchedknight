@@ -437,8 +437,12 @@ class MerchantWares extends StatelessWidget {
 
 /// The smith's forge: smelting golems' ore into bars, forging armour from them, and relics.
 class ForgeWares extends StatelessWidget {
-  const ForgeWares({super.key, required this.controller, this.tab});
+  const ForgeWares({super.key, required this.controller, this.tab, this.focus});
   final GameController controller;
+
+  /// What you were sent here for ('relic:0'): it's scrolled to and lit up, whether or not you can
+  /// pay for it yet.
+  final String? focus;
 
   /// The forge's one section on show ('forge', 'temper', 'suits'), or all of them.
   final String? tab;
@@ -622,7 +626,9 @@ class ForgeWares extends StatelessWidget {
         if (relics.keys.any((l) => c.heroicOpen(l) && !s.forged.contains(l))) x.heading('Relics'),
         for (final e in relics.entries)
           if (c.heroicOpen(e.key) && !s.forged.contains(e.key)) ...[
-            x.ware(
+            Spotlit(
+              on: focus == 'relic:${e.key}',
+              child: x.ware(
               const Icon(Icons.hardware, color: Color(0xFFFFB04A), size: 26),
               'Forge ${e.key == 2 && k.heroClass == HeroClass.ranger ? 'Briarsong' : e.value.name}',
               '${[for (var i = 0; i < e.value.parts.length; i++) '${hasRelicPart(s.relicParts, e.key, i) ? '✓' : '·'} ${e.value.parts[i].name}'].join('  ')} · Lv ${e.value.minLevel}+',
@@ -637,6 +643,12 @@ class ForgeWares extends StatelessWidget {
                       }
                     : null,
               ),
+              // What's still in the way, when something is (the gold, most often).
+              extra: switch (c.whyNotForge(e.key)) {
+                final why? => Text(why == 'Needs ${e.value.gold} gold' ? '$why (you have ${k.coins})' : why, style: Txt.onStone(size: 12.5, color: const Color(0xFFFF9A7A))),
+                _ => null,
+              },
+            ),
             ),
           ],
         ],
@@ -1094,7 +1106,7 @@ Future<void> showMerchantWindow(BuildContext context, GameController c, {String?
 );
 
 /// The forge, from the square.
-Future<void> showForgeWindow(BuildContext context, GameController c, {String? tab}) => _showShop(
+Future<void> showForgeWindow(BuildContext context, GameController c, {String? tab, String? focus}) => _showShop(
   open: tab,
   context,
   c,
@@ -1105,7 +1117,7 @@ Future<void> showForgeWindow(BuildContext context, GameController c, {String? ta
   glow: const [Color(0xFFB0501E), Color(0xFF2A0E06)],
   colour: const Color(0xFFFFB04A),
   tabs: const [('forge', 'Forge', Icons.hardware), ('temper', 'Upgrade', Icons.trending_up), ('suits', 'Suits', Icons.shield)],
-  wares: (tab) => ForgeWares(controller: c, tab: tab),
+  wares: (tab) => ForgeWares(controller: c, tab: tab, focus: focus),
 );
 
 /// The hedge-mage's tower, from the square.
@@ -1209,6 +1221,61 @@ Future<bool> promptRelicForge(BuildContext context, GameController c) async {
   nav.popUntil((route) => route.isFirst);
   // (The navigator outlives the page the prompt came from: the forge opens over the town.)
   // ignore: use_build_context_synchronously
-  if (c.whyShut('forge') == null) await showForgeWindow(nav.context, c, tab: 'forge');
+  if (c.whyShut('forge') == null) await showForgeWindow(nav.context, c, tab: 'forge', focus: 'relic:$r');
   return true;
+}
+
+/// A ware you were sent for: scrolled into view as the window opens, and ringed in a glow that
+/// pulses a few times, so it's the first thing you see. [on] false: just the child.
+class Spotlit extends StatefulWidget {
+  const Spotlit({super.key, required this.on, required this.child});
+  final bool on;
+  final Widget child;
+
+  @override
+  State<Spotlit> createState() => _SpotlitState();
+}
+
+class _SpotlitState extends State<Spotlit> with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 900));
+
+  @override
+  void initState() {
+    super.initState();
+    if (!widget.on) return;
+    _pulse.repeat(reverse: true);
+    // Three pulses, then a steady glow.
+    Future.delayed(const Duration(milliseconds: 5400), () {
+      if (mounted) _pulse.animateTo(1, duration: const Duration(milliseconds: 300));
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) Scrollable.ensureVisible(context, alignment: .3, duration: const Duration(milliseconds: 350), curve: Curves.easeOut);
+    });
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.on) return widget.child;
+    return AnimatedBuilder(
+      animation: _pulse,
+      builder: (context, child) {
+        final k = Curves.easeInOut.transform(_pulse.value);
+        return Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: Palette.amber.withValues(alpha: .55 + .45 * k), width: 2),
+            boxShadow: [BoxShadow(color: Palette.amber.withValues(alpha: .15 + .3 * k), blurRadius: 6 + 10 * k)],
+          ),
+          child: child,
+        );
+      },
+      child: widget.child,
+    );
+  }
 }

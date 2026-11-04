@@ -121,7 +121,6 @@ class _MovePainter extends CustomPainter {
     double ease(double x) => easeInOut(x.clamp(0.0, 1.0));
     final reach = move.reach;
     var dash = switch (move.dash) {
-      DashStyle.low => at < _hit - 130 ? 0.0 : reach * easeOut(((at - _hit + 130) / 110).clamp(0.0, 1.0)),
       DashStyle.blink => at < _hit - 110 ? 0.0 : reach,
       _ => reach * ease(at / (_hit - 60)),
     };
@@ -131,7 +130,7 @@ class _MovePainter extends CustomPainter {
     drawHumanoid(canvas, look, pose, 0, DrawOptions(at: Offset(_knightX + dash * _reach, _groundY), scale: _scale, alpha: 1 - vanish), still: true);
     final start = _hit - 110, age = (at - start) / classStrokeMs(move.stroke);
     final col = Color(suitArts[id]!.argb);
-    if (age >= 0 && age <= 1) drawClassStroke(canvas, move.stroke, age, chest, skill ? col : Color.lerp(col, Colors.white, .3)!, false, knightX: _knightX + dash * _reach);
+    if (age >= 0 && age <= 1) drawClassStroke(canvas, move.stroke, age, chest, skill ? col : Color.lerp(col, Colors.white, .3)!, false);
     canvas.restore();
     final tp = TextPainter(text: TextSpan(text: '${at.round()}', style: TextStyle(fontSize: 9, color: at == _hit ? const Color(0xFFFF7070) : const Color(0xFFB0A090))), textDirection: TextDirection.ltr)..layout();
     tp.paint(canvas, const Offset(2, 2));

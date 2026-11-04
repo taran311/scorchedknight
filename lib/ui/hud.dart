@@ -17,6 +17,7 @@ import '../game/brews.dart';
 import '../game/catalog.dart';
 import '../game/controller.dart';
 import '../game/encounters.dart' show inspiredBoost;
+import '../game/knight_classes.dart';
 import '../game/loot.dart' show specialChanceAt;
 import '../game/models.dart';
 import '../game/rules.dart';
@@ -75,6 +76,7 @@ class HeroCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 HeroName(s, style: Txt.label(size: 15, color: Palette.cream, weight: FontWeight.w800)),
+                if (classOf(k) case final cls?) Padding(padding: const EdgeInsets.only(top: 2), child: Align(alignment: Alignment.centerLeft, child: ClassTag(knight: k, cls: cls))),
                 const SizedBox(height: 3),
                 Tooltip(message: 'Health', child: Bar(value: hp, max: mh, height: 14, colours: const [Color(0xFFE0604A), Color(0xFF8E2117)], label: 'HP ${fmt(hp)} / ${fmt(mh)}')),
                 if (!compact) ...[
@@ -365,6 +367,26 @@ class FoeFace extends StatelessWidget {
 
 /// On a phone in battle: your side in a slim strip (name and level, HP, mana) to sit beside the
 /// foe's card, so the fight itself gets the screen.
+/// The class you're fighting as, and your rank in it, in the class's colour: 'BLOOD KNIGHT · R4'.
+class ClassTag extends StatelessWidget {
+  const ClassTag({super.key, required this.knight, required this.cls});
+  final Knight knight;
+  final KnightClass cls;
+
+  @override
+  Widget build(BuildContext context) {
+    final col = Color(cls.argb), rank = classRank(knight, cls.id);
+    return Tooltip(
+      message: '${cls.name}, rank $rank of $maxRank · ${cls.focus}',
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(5, 1, 6, 1),
+        decoration: BoxDecoration(color: col.withValues(alpha: .16), borderRadius: BorderRadius.circular(3), border: Border.all(color: col.withValues(alpha: .75))),
+        child: Text('${cls.name.toUpperCase()} · R$rank', maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.label(size: 10.5, color: col, weight: FontWeight.w800)),
+      ),
+    );
+  }
+}
+
 class HeroStrip extends StatelessWidget {
   const HeroStrip({super.key, required this.controller});
   final GameController controller;
@@ -436,6 +458,8 @@ class HeroStrip extends StatelessWidget {
               ],
             ),
           ),
+          // Fighting as a class: which, and your rank in it.
+          if (classOf(k) case final cls?) Padding(padding: const EdgeInsets.only(top: 5), child: Align(alignment: Alignment.centerLeft, child: ClassTag(knight: k, cls: cls))),
           // What you're carrying into the next few fights: brews, cards, songs.
           if (HeroBuffs.of(s).isNotEmpty) Padding(padding: const EdgeInsets.only(top: 5), child: HeroBuffs(state: s)),
         ],
