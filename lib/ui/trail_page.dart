@@ -488,9 +488,14 @@ class _Heroic extends StatelessWidget {
     final shown = {for (final (r, i) in relicPartsOn(land)) if (s.bossesDown.contains(r) && relics[r]!.parts[i].risen) r, if (relics.containsKey(land)) land}.toList()..sort();
     const gold = Color(0xFFFFD98A);
     return MouseRegion(
-      cursor: ready ? SystemMouseCursors.click : MouseCursor.defer,
+      cursor: SystemMouseCursors.click,
       child: GestureDetector(
-        onTap: ready ? onGo : null,
+        // (Not ready yet: a tap says why, rather than doing nothing.)
+        onTap: ready
+            ? onGo
+            : () => ScaffoldMessenger.of(context)
+              ..hideCurrentSnackBar()
+              ..showSnackBar(SnackBar(content: Text('${boss.name} $why.'.replaceFirst('Rises again', 'rises again')), duration: const Duration(seconds: 3))),
         child: Opacity(
           opacity: ready ? 1 : .8,
           child: Container(
@@ -531,8 +536,19 @@ class _Heroic extends StatelessWidget {
               Container(
                 width: 52,
                 height: 52,
-                decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0xFF7A2418), border: Border.all(color: gold, width: 2)),
-                child: const Center(child: Icon(Icons.local_fire_department, color: gold, size: 28)),
+                decoration: BoxDecoration(shape: BoxShape.circle, color: ready ? const Color(0xFF7A2418) : const Color(0xFF2A1C14), border: Border.all(color: ready ? gold : gold.withValues(alpha: .4), width: 2)),
+                // Ready: its flame. Not yet: a lock and the level it rises at.
+                child: Center(
+                  child: ready
+                      ? const Icon(Icons.local_fire_department, color: gold, size: 28)
+                      : Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.lock, color: gold.withValues(alpha: .8), size: 18),
+                            Text('Lv ${controller.engine.risenLevel(land)}', style: Txt.label(size: 11.5, color: gold)),
+                          ],
+                        ),
+                ),
               ),
             ],
           ),
@@ -1083,7 +1099,8 @@ class _TrailPainter extends CustomPainter {
     final you = switch (step) {
       TrailStep.stop => at == 0 ? const Offset(48, 316) : _nodes[at - 1],
       TrailStep.lair => _nodes.last,
-      TrailStep.patrol => _lair + const Offset(70, 0),
+      // (Clear of the marker's point over the lair: closer in, his weapon crossed it.)
+      TrailStep.patrol => _lair + const Offset(108, 0),
     };
     silhouette(
       canvas,
