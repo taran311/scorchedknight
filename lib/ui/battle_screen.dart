@@ -72,8 +72,8 @@ class _BattleScreenState extends State<BattleScreen> {
   /// A bout in the Colosseum or a wave in the Hall: they keep their own count, not a trail's.
   late final bool _side;
 
-  /// On the land's Heroic trail (picked up again from a saved fight too, or stepped onto from a
-  /// patrol once the boss is down).
+  /// Against the land's boss, risen (picked up again from a saved fight too, or stepped into from
+  /// a patrol once it's back).
   late bool _heroic = widget.start == BattleStart.heroic || c.state.heroicFight;
 
   /// The crossbow's timing bar is up, waiting for you to loose the bolt.
@@ -245,7 +245,8 @@ class _BattleScreenState extends State<BattleScreen> {
   /// On to the next stop on the trail (or into the lair, once it's open).
   void _fightOn() {
     c.leaveBattle();
-    if (_heroic) return _begin(BattleStart.heroic);
+    if (_heroic && c.risenReady(c.state.continent)) return _begin(BattleStart.heroic);
+    _heroic = false;
     _begin(trailStep(c.state, c.state.continent) == TrailStep.lair ? BattleStart.boss : BattleStart.explore);
   }
 
@@ -664,17 +665,15 @@ class _BattleScreenState extends State<BattleScreen> {
     ];
   }
 
-  /// After a win on a trail, how far along it you are: a pip a stop, then the lair (or, on a
-  /// Heroic trail, a pip an elite, then the boss risen). Nothing for one-off fights.
+  /// After a win on a trail, how far along it you are: a pip a stop, then the lair. Nothing for
+  /// one-off fights (the risen boss among them).
   Widget? _trailProgress() {
     final s = c.state, land = s.continent;
-    if (c.outcome != Outcome.won || _dungeon || _wild || _place || _side || widget.start == BattleStart.raid || c.lastKill?.boss == true) return null;
+    if (c.outcome != Outcome.won || _heroic || _dungeon || _wild || _place || _side || widget.start == BattleStart.raid || c.lastKill?.boss == true) return null;
     final l = continents[land], col = Color(l.argb);
     final int done, of;
     final String label;
-    if (_heroic) {
-      (done, of, label) = ((s.heroicWins[land] ?? 0).clamp(0, heroicStops), heroicStops, 'Heroic trail');
-    } else if (!s.bossesDown.contains(land)) {
+    if (!s.bossesDown.contains(land)) {
       (done, of, label) = (trailAt(s, land), winsForBoss, l.name);
     } else {
       return null;
@@ -693,11 +692,11 @@ class _BattleScreenState extends State<BattleScreen> {
           Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.label(size: 12.5, color: Palette.parch2))),
           const SizedBox(width: 8),
           for (var i = 0; i < of; i++) pip(i < done),
-          Icon(_heroic ? Icons.whatshot : Icons.castle, size: 15, color: next ? col : Palette.stone3),
+          Icon(Icons.castle, size: 15, color: next ? col : Palette.stone3),
           const SizedBox(width: 6),
           Flexible(
             child: Text(
-              next ? (_heroic ? 'The risen boss is next' : 'The lair is next') : '$done of $of',
+              next ? 'The lair is next' : '$done of $of',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: Txt.label(size: 12.5, color: next ? col : Palette.parch2, weight: FontWeight.w800),
@@ -756,11 +755,9 @@ class _BattleScreenState extends State<BattleScreen> {
           Expanded(child: StoneButton(title: o == Outcome.knockedOut ? 'Wake up in town' : 'Back to town', tone: ButtonTone.blood, onPressed: () => _close(o == Outcome.knockedOut ? BattleExit.inn : BattleExit.map))),
       ];
     }
-    // On a Heroic trail, onward means the next elite (or the risen boss).
-    final land = c.state.continent, risen = (c.state.heroicWins[land] ?? 0) >= heroicStops;
-    final onward = _heroic ? (risen ? 'Face ${continents[land].boss.name}, Risen' : 'Onward · Heroic') : trailAction(c.state, land);
+    final land = c.state.continent, onward = trailAction(c.state, land);
     // A land's boss just fell and the road runs on: the way onward is the new land, not more of
-    // this one (its Heroic trail waits, and says so, as the second choice).
+    // this one.
     final opened = [for (final l in c.lastKill?.opened ?? const <int>[]) if (!isSideLand(l)) l];
     if (o == Outcome.won && !_heroic && !waiting && c.lastKill?.boss == true && opened.isNotEmpty) {
       final to = opened.first;
@@ -780,17 +777,12 @@ class _BattleScreenState extends State<BattleScreen> {
         const SizedBox(width: 8),
         Expanded(
           flex: 2,
-          child: c.heroicOpen(land)
-              ? StoneButton(title: 'Heroic trail', caption: 'Tougher foes, more loot', onPressed: () {
-                  _heroic = true;
-                  _fightOn();
-                })
-              : StoneButton(title: isPhone(context) ? 'Back' : 'Back to the trail', caption: isPhone(context) ? 'to the trail' : null, onPressed: () => _close(BattleExit.map)),
+          child: StoneButton(title: isPhone(context) ? 'Back' : 'Back to the trail', caption: isPhone(context) ? 'to the trail' : null, onPressed: () => _close(BattleExit.map)),
         ),
       ];
     }
     // The road's next land, open to you now and not yet set foot in (you've just reached its level,
-    // say, out on an earlier land's Heroic trail): that's the way on, ahead of more of this land,
+    // say, patrolling an earlier land): that's the way on, ahead of more of this land,
     // which stays the second choice.
     final ahead = o == Outcome.won && !waiting ? _roadAhead(c, land) : null;
     if (ahead != null) {
@@ -810,20 +802,20 @@ class _BattleScreenState extends State<BattleScreen> {
         const SizedBox(width: 8),
         Expanded(
           flex: 2,
-          child: StoneButton(title: _heroic ? 'Stay Heroic' : 'Stay here', caption: 'Next fight', onPressed: _fightOn),
+          child: StoneButton(title: 'Stay here', caption: 'Next fight', onPressed: _fightOn),
         ),
       ];
     }
     switch (o) {
-      // The lair has fallen (or you're patrolling a land whose lair has): onward is the Heroic
-      // trail's elites, or home to rest up first.
-      case Outcome.won when !_heroic && !waiting && trailStep(c.state, land) == TrailStep.patrol && c.heroicOpen(land):
+      // Patrolling a land whose boss has risen again (you're a few levels on): it's the fight to
+      // take, or patrol on.
+      case Outcome.won when !_heroic && !waiting && trailStep(c.state, land) == TrailStep.patrol && c.risenReady(land):
         return [
           Expanded(
             flex: 3,
             child: StoneButton(
-              title: risen ? 'Face ${continents[land].boss.name}, Risen' : 'Heroic trail',
-              caption: risen ? null : 'Elite foes · stop ${(c.state.heroicWins[land] ?? 0) + 1} of $heroicStops',
+              title: isPhone(context) ? 'Face it, risen' : 'Face ${continents[land].boss.name}, Risen',
+              caption: isPhone(context) ? continents[land].boss.name : 'One fight, tougher than before',
               tone: ButtonTone.blood,
               onPressed: () {
                 _heroic = true;
@@ -832,7 +824,7 @@ class _BattleScreenState extends State<BattleScreen> {
             ),
           ),
           const SizedBox(width: 8),
-          Expanded(flex: 2, child: StoneButton(title: 'Rest in town', onPressed: () => _close(BattleExit.inn))),
+          Expanded(flex: 2, child: StoneButton(title: 'Patrol on', caption: 'Next fight', onPressed: _fightOn)),
         ];
       case Outcome.won:
         // Badly hurt with nothing to drink: home to rest becomes the lit button, not onward.

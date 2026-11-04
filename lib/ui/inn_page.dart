@@ -128,7 +128,7 @@ class _InnPageState extends State<InnPage> with RouteAware {
     await showDialog<void>(context: context, builder: (_) => const _StoryWindow());
   }
 
-  /// Onto the road's next step: a land's trail (its boss, its Heroic trail, or patrols to grow
+  /// Onto the road's next step: a land's trail (its boss, its boss risen, or patrols to grow
   /// stronger), or the map with the place or dungeon picked; the map too when the way's shut.
   Future<void> _goRoad(RoadStep step) async {
     if (c.state.inBattle) return _resume();

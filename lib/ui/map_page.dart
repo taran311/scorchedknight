@@ -579,7 +579,7 @@ class _ContinentPanel extends StatelessWidget {
                             message: 'Nothing new left to find here. Still good for gear, gold, XP and Cinder keys.',
                             child: InfoChip(icon: Icon(Icons.check_circle, size: 14, color: Palette.amber), text: 'Cleared', colour: Palette.amber, dense: true),
                           ),
-                        if (p.boss) chip(Icons.workspace_premium, p.risen ? 1 : 0, 1, 'The boss beaten risen, on the Heroic trail'),
+                        if (p.boss) chip(Icons.workspace_premium, p.risen ? 1 : 0, 1, 'The boss beaten again, risen'),
                         if (p.placesAll > 0) chip(Icons.place, p.places, p.placesAll, 'Places explored'),
                         if (p.delvesAll > 0) chip(Icons.stairs, p.delves, p.delvesAll, 'Dungeons beaten'),
                         if (p.partsAll > 0) chip(Icons.hardware, p.parts, p.partsAll, 'Relic parts found'),

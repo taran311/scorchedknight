@@ -111,8 +111,9 @@ class _TrailPageState extends State<TrailPage> {
     Navigator.of(context).pushReplacement(MaterialPageRoute<void>(builder: (_) => TrailPage(controller: c, land: to)));
   }
 
-  /// Onto the land's Heroic trail.
+  /// Against the land's boss, risen.
   Future<void> _goHeroic() async {
+    if (!c.state.inBattle && c.engine.whyNotRisen(land) != null) return;
     if (!await _readyToFight() || !mounted) return;
     c.travel(land);
     final exit = await openBattle(context, c, c.state.inBattle ? BattleStart.resume : BattleStart.heroic);
@@ -267,11 +268,13 @@ class _TrailPageState extends State<TrailPage> {
                           ),
                           const SizedBox(height: 10),
                         ],
-                        // Once the lair has fallen, the Heroic trail is the way on: it goes first,
-                        // and patrolling shrinks to a slim row under it.
+                        // Once the lair has fallen: its boss, risen (once you're a few levels on), and
+                        // patrolling in a slim row under it.
                         if (c.heroicOpen(land)) ...[
-                          _Heroic(controller: c, land: land, onGo: _goHeroic),
-                          const SizedBox(height: 10),
+                          if (_risenCard(c, land)) ...[
+                            _Heroic(controller: c, land: land, onGo: _goHeroic),
+                            const SizedBox(height: 10),
+                          ],
                           _Patrol(controller: c, land: land, onGo: _go),
                         ] else
                           _NextStop(controller: c, land: land, onGo: _go),
@@ -411,7 +414,7 @@ class _NextStop extends StatelessWidget {
   }
 }
 
-/// Patrolling a land whose lair has fallen: one slim row (the Heroic trail above is the way on).
+/// Patrolling a land whose lair has fallen: one slim row (the risen boss, when it's back, above).
 class _Patrol extends StatelessWidget {
   const _Patrol({required this.controller, required this.land, required this.onGo});
   final GameController controller;
@@ -450,7 +453,6 @@ class _Patrol extends StatelessWidget {
   }
 }
 
-/// The land's Heroic trail: elites all the way, the boss risen at the end, and the relic's parts.
 /// After a few knock-outs on this trail: a nudge towards the wilds, where the gear is better.
 class _GearUp extends StatelessWidget {
   const _GearUp({required this.area, required this.onGo});
@@ -488,21 +490,23 @@ class _Heroic extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final s = controller.state, at = s.heroicWins[land] ?? 0, risen = at >= heroicStops;
-    // Every relic with a part on this trail (whose blueprint you've found), and this land's own.
+    final s = controller.state, why = controller.engine.whyNotRisen(land), ready = why == null, boss = continents[land].boss;
+    // Every relic with a part this boss carries (whose blueprint you've found), and this land's own.
     final shown = {for (final (r, i) in relicPartsOn(land)) if (s.bossesDown.contains(r) && relics[r]!.parts[i].risen) r, if (relics.containsKey(land)) land}.toList()..sort();
     const gold = Color(0xFFFFD98A);
     return MouseRegion(
-      cursor: SystemMouseCursors.click,
+      cursor: ready ? SystemMouseCursors.click : MouseCursor.defer,
       child: GestureDetector(
-        onTap: onGo,
-        child: Container(
+        onTap: ready ? onGo : null,
+        child: Opacity(
+          opacity: ready ? 1 : .8,
+          child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF3A1A12), Color(0xFF1A0C08)]),
-            border: Border.all(color: gold, width: 1.5),
+            border: Border.all(color: ready ? gold : gold.withValues(alpha: .4), width: 1.5),
             borderRadius: BorderRadius.circular(4),
-            boxShadow: [BoxShadow(color: const Color(0xFFFF8A3A).withValues(alpha: .25), blurRadius: 14)],
+            boxShadow: ready ? [BoxShadow(color: const Color(0xFFFF8A3A).withValues(alpha: .25), blurRadius: 14)] : null,
           ),
           child: Row(
             children: [
@@ -510,34 +514,10 @@ class _Heroic extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Text('HEROIC TRAIL', style: Txt.label(size: 12, color: gold)),
-                        // Its risen boss beaten and its prize won: still there to farm.
-                        if (controller.heroicCleared(land)) ...[
-                          const SizedBox(width: 8),
-                          const Tooltip(
-                            message: 'Its risen boss is beaten and its relic part found. Still good for elite loot.',
-                            child: InfoChip(icon: Icon(Icons.check_circle, size: 13, color: Color(0xFF9BE27A)), text: 'Cleared', colour: Color(0xFF9BE27A), dense: true),
-                          ),
-                        ],
-                      ],
-                    ),
-                    Text(risen ? '${continents[land].boss.name}, Risen' : 'Elite foes · stop ${at + 1} of $heroicStops', style: Txt.label(size: 19, color: Palette.cream, weight: FontWeight.w800)),
-                    const SizedBox(height: 6),
-                    // The stops, then the crown of the risen boss.
-                    Row(
-                      children: [
-                        for (var i = 0; i < heroicStops; i++)
-                          Container(
-                            width: 14,
-                            height: 14,
-                            margin: const EdgeInsets.only(right: 5),
-                            decoration: BoxDecoration(shape: BoxShape.circle, color: i < at ? gold : const Color(0xFF2A1A12), border: Border.all(color: gold.withValues(alpha: .7))),
-                          ),
-                        Icon(Icons.workspace_premium, size: 20, color: risen ? const Color(0xFFFF8A3A) : gold.withValues(alpha: .5)),
-                      ],
-                    ),
+                    Text('THE BOSS, RISEN', style: Txt.label(size: 12, color: gold)),
+                    Text('${boss.name}, Risen', style: Txt.label(size: 19, color: Palette.cream, weight: FontWeight.w800)),
+                    const SizedBox(height: 2),
+                    Text(ready ? 'One fight, tougher than before' : why, style: Txt.label(size: 13, color: ready ? Palette.parch2 : gold)),
                     for (final r in shown) ...[
                       const SizedBox(height: 10),
                       _RelicReward(
@@ -559,10 +539,11 @@ class _Heroic extends StatelessWidget {
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0xFF7A2418), border: Border.all(color: gold, width: 2)),
-                child: Center(child: risen ? const Icon(Icons.workspace_premium, color: gold, size: 28) : const ItemIcon(Item.swords, size: 30)),
+                child: const Center(child: Icon(Icons.workspace_premium, color: gold, size: 28)),
               ),
             ],
           ),
+        ),
         ),
       ),
     );
@@ -570,7 +551,7 @@ class _Heroic extends StatelessWidget {
 }
 
 /// A relic part waiting at a place or in a dungeon in this land: the relic and its parts (the one
-/// here glowing, as on a Heroic trail), and a tap to go straight there on the map.
+/// here glowing, as on the risen boss's card), and a tap to go straight there on the map.
 class _RelicLead extends StatelessWidget {
   const _RelicLead({required this.controller, required this.relic, required this.part, required this.land});
   final GameController controller;
@@ -582,8 +563,8 @@ class _RelicLead extends StatelessWidget {
     final dungeon = p.source == PartSource.dungeon;
     final spot = dungeon ? dungeonById(p.at)?.name : placeById(p.at)?.name;
     const gold = Color(0xFFFFD98A);
-    // The Heroic trail's card above already shows this relic and its parts: here, just the one.
-    final onHeroic = controller.heroicOpen(land) &&
+    // The risen boss's card above already shows this relic and its parts: here, just the one.
+    final onHeroic = _risenCard(controller, land) &&
         (relic == land || relicPartsOn(land).any((e) => e.$1 == relic && relics[relic]!.parts[e.$2].risen && s.bossesDown.contains(relic)));
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -631,8 +612,8 @@ class _RelicLead extends StatelessWidget {
   }
 }
 
-/// The Heroic trail's prize: a chest, the relic it builds, and its parts as chips (found ones
-/// ticked). Elites on the trail drop the parts; Dunstan forges the relic once you have them all.
+/// The risen boss's prize: a chest, the relic it builds, and its parts as chips (found ones
+/// ticked). Risen bosses, guardians and dungeons hold the parts; Dunstan forges the relic once you have them all.
 class _RelicReward extends StatelessWidget {
   const _RelicReward({required this.name, required this.relic, required this.has, required this.here, required this.forged, this.spell});
   final String name;
@@ -683,7 +664,7 @@ class _RelicReward extends StatelessWidget {
                             // Three looks: found (green, ticked), waiting in this land (gold and
                             // glowing: this is the one to go after here), and elsewhere (greyed out).
                             // (On a card about one way in, a part in this land kept somewhere else is
-                            // named by where, not lit as "here": the Heroic card's gold chips are
+                            // named by where, not lit as "here": the risen boss's card's gold chips are
                             // only what its own trail gives.)
                             final local = !has[i] && parts[i].land == here && (spell == null || spell!.contains(i));
                             final keeper = parts[i].source == PartSource.dungeon ? dungeonById(parts[i].at)?.name : placeById(parts[i].at)?.name;
@@ -1187,3 +1168,6 @@ class _Generals extends StatelessWidget {
     );
   }
 }
+
+/// Whether the land's risen boss gets its card: its boss beaten, and not yet beaten risen.
+bool _risenCard(GameController c, int land) => c.heroicOpen(land) && !c.heroicCleared(land) && !c.state.risenDown.contains(land);

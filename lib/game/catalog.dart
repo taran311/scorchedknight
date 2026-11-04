@@ -280,14 +280,16 @@ const homes = [
   HomeTier('Keep', 80, '80-piece chest · an armoury: save two outfits, swap in one tap · Wren searches the ruins', gold: 4500, timber: 10, iron: 8, after: 2),
 ];
 
-/// Heroic trails: once a land's boss falls, its trail can be walked again the hard way. Every foe
-/// on it is an elite (a rare, with an aura), and at the end the boss rises again, stronger.
-const heroicStops = 5;
+/// Levels past its land's own that a beaten boss rises again, to be faced once more (once).
+const risenAfter = 4;
 
-/// Heroic foes fight this many levels above you.
-const heroicLevels = 3;
+/// A risen boss fights this many levels above you (none: it's tougher in itself, see risenHp).
+const heroicLevels = 0;
 
-/// Where a relic part waits: carried by a land's risen boss (its Heroic trail's end), guarded at
+/// A risen boss's HP and blows against the boss's own the first time.
+const risenHp = 1.15, risenHit = 1.15;
+
+/// Where a relic part waits: carried by a land's risen boss, guarded at
 /// a place on the map (it appears once you hold the blueprint), or in a dungeon boss's hoard.
 enum PartSource { risen, place, dungeon }
 
@@ -317,12 +319,12 @@ const relics = <int, Relic>{
   0: Relic(
     'Kingsfall',
     [
-      RelicPart('Crown Shard', 0, 'Gorbo the One-Eyed, risen, at the end of Cindervale\'s Heroic trail'),
+      RelicPart('Crown Shard', 0, 'Gorbo the One-Eyed, risen, in Cindervale'),
       RelicPart('Ember Core', 3, 'Skarr the Ember-Keeper, in the Ember Pit in the Grimtusk Badlands', source: PartSource.place, at: 'emberpit'),
       RelicPart('Old King\'s Hilt', 4, 'the hoard at the bottom of the Tomb of Kings, under the Sunken Sands', source: PartSource.dungeon, at: 'kingstomb'),
     ],
     2400,
-    'Among Gorbo\'s hoard: a scorched blueprint for a greatsword called Kingsfall, forged from the shards of the old king\'s crown. Gorbo kept the crown shard (beat him again, risen, on Cindervale\'s Heroic trail); an ork fire-priest stole its ember core and keeps it in a pit in the Grimtusk Badlands; and the old king\'s hilt was buried with him in the Tomb of Kings.',
+    'Among Gorbo\'s hoard: a scorched blueprint for a greatsword called Kingsfall, forged from the shards of the old king\'s crown. Gorbo kept the crown shard (beat him again, risen, in Cindervale); an ork fire-priest stole its ember core and keeps it in a pit in the Grimtusk Badlands; and the old king\'s hilt was buried with him in the Tomb of Kings.',
     minLevel: 28,
   ),
   2: Relic(
@@ -330,7 +332,7 @@ const relics = <int, Relic>{
     [
       RelicPart('Living Briar', 2, 'the Briar Heart, deep in the Thornwild', source: PartSource.place, at: 'briarheart'),
       RelicPart('Heartwood Grip', 9, 'Warden Aelindor, at the Elder Heartwood in the Silverwood', source: PartSource.place, at: 'elderheart'),
-      RelicPart('First Bloom', 2, 'Grandmother Bramblecrown, risen, at the end of the Thornwild\'s Heroic trail'),
+      RelicPart('First Bloom', 2, 'Grandmother Bramblecrown, risen, in the Thornwild'),
     ],
     4200,
     'Tucked in Grandmother Bramblecrown\'s roots: a pressed-leaf blueprint for the Bramblelash, a whip of living briar. The briar grows from a heart of thorns somewhere deep in the Thornwild, the grip is heartwood the elves of the Silverwood guard, and the first bloom is Grandmother Bramblecrown\'s own, when she rises again.',
@@ -344,7 +346,7 @@ bool hasRelicPart(Map<int, int> parts, int relic, int i) => ((parts[relic] ?? 0)
 /// How many parts of relic [relic] you hold.
 int relicPartsFound(Map<int, int> parts, int relic) => [for (var i = 0; i < relics[relic]!.parts.length; i++) if (hasRelicPart(parts, relic, i)) i].length;
 
-/// The relic parts that turn up on land [land]'s Heroic trail: (relic, part index).
+/// The relic parts land [land]'s risen boss carries: (relic, part index).
 List<(int, int)> relicPartsOn(int land) => [
   for (final e in relics.entries)
     for (var i = 0; i < e.value.parts.length; i++)

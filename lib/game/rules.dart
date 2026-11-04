@@ -269,7 +269,9 @@ double ngFoeHit(int ng) => 1 + .2 * math.min(ng, 3);
 int spawnHp(int foeIndex, int level, [Rare? rare]) {
   // A rare in its own clothes (the Hidden Ones, golems) has its own HP; the base foe sets the land.
   final i = rare?.base ?? foeIndex, f = rare?.type ?? foeAt(i);
-  final variant = rare == null ? 1.0 : (rare.name != null && !rare.pack ? namedRareHp : rareHp) * (f.boss ? .7 : 1);
+  // (A boss risen again: a step tougher than the first time, not a named rare's whole lift on top
+  // of a boss's, which made it all but unbeatable when it rose.)
+  final variant = rare == null ? 1.0 : (f.boss ? risenHp : (rare.name != null && !rare.pack ? namedRareHp : rareHp));
   return ((8 + 2 * level) * turnsPerFoe * (f.boss ? bossTurns : 1) * f.hp * variant * toughness(landTier(realmAt(i)), level) * (f.boss || ownTuning(rare) ? 1 : continents[realmAt(i)].foeHp)).round();
 }
 
@@ -438,7 +440,7 @@ int foeAttack(int foeIndex, Rare? rare, int level) {
   if (f.boss) a *= (realm == 0 ? 1.2 : bossHit) * f.hit;
   if (!f.boss && !ownTuning(rare)) a *= continents[realmAt(rare?.base ?? foeIndex)].foeHit;
   if (f.dragon) a += 1;
-  if (f.rare) a *= f.named ? 1.35 : 1.2;
+  if (f.rare) a *= f.boss ? risenHit : (f.named ? 1.35 : 1.2);
   if (f.pack) a *= 1.1;
   if (f.look == 'cyclops') a *= cyclopsHits;
   return a.round();

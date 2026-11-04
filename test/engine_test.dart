@@ -1162,6 +1162,27 @@ void main() {
     expect(continents[frostLand].name, 'The Frostmarch');
   });
 
+  test('a beaten boss rises again a few levels on: one fight, once, with its relic part', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(3));
+    final s = e.state, k = s.knight;
+    s.bossesDown.add(0);
+    k.level = continents[0].minLevel + risenAfter - 1;
+    expect(e.risenReady(0), isFalse);
+    expect(e.whyNotRisen(0), contains('level'));
+    k.level++;
+    expect(e.risenReady(0), isTrue);
+    s.continent = 0;
+    e.exploreHeroic();
+    expect(foeIn(s).boss, isTrue);
+    expect(s.foeMax, greaterThan(spawnHp(bossIndex(0), s.foeLevel)), reason: 'tougher than the first time');
+    s.foeHp = 1;
+    k.hp = maxHp(k);
+    e.takeTurn(BattleAction.skill);
+    expect(s.risenDown, contains(0));
+    expect(hasRelicPart(s.relicParts, 0, 0), isTrue, reason: 'Gorbo, risen, carries the crown shard');
+    expect(e.risenReady(0), isFalse);
+  });
+
   test('the road is one line: each land opens behind the one before it', () {
     final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(2));
     final s = e.state..knight.level = 40;
@@ -2398,7 +2419,7 @@ void main() {
     e.leaveDungeon();
     // The crown shard: Gorbo, risen.
     s.continent = 0;
-    s.heroicWins[0] = heroicStops;
+    expect(e.risenReady(0), isTrue);
     e.exploreHeroic();
     s.foeHp = 1;
     k.hp = maxHp(k);

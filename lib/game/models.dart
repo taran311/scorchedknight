@@ -557,9 +557,9 @@ class GameState {
   int home;
   List<List<String>> gearSets;
 
-  /// Heroic trails: stops cleared on each land's (reset when its risen boss falls), relic parts
-  /// found for each land, the lands whose relic Mags has forged, and whether the fight under way
-  /// is a heroic one.
+  /// Stops cleared on each land's old Heroic trail (no longer used: its elites were cut, and only
+  /// the risen boss is left), relic parts found for each land, the lands whose relic has been
+  /// forged, and whether the fight under way is against a risen boss.
   Map<int, int> heroicWins, relicParts;
   Set<int> forged;
   bool heroicFight;
@@ -647,7 +647,7 @@ class GameState {
   /// The way you struck last turn (blade, rite or bolt), which the Faceless brace for.
   String? lastStyle;
 
-  /// Lands whose boss you've beaten risen, at the end of the Heroic trail.
+  /// Lands whose boss you've beaten again, risen.
   final Set<int> risenDown;
 
   /// Places on the map you've explored (by id), and the one whose guard you're fighting now.

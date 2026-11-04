@@ -273,14 +273,15 @@ class GameController extends ChangeNotifier {
     _arrive();
   }
 
-  /// The next fight on the current land's Heroic trail (call with the battle screen open).
+  /// The current land's boss, risen (call with the battle screen open).
   void exploreHeroic() {
-    if (busy || state.inBattle || !engine.heroicOpen(state.continent)) return;
+    if (busy || state.inBattle || !engine.risenReady(state.continent)) return;
     engine.exploreHeroic();
     _arrive();
   }
 
   bool heroicOpen(int c) => engine.heroicOpen(c);
+  bool risenReady(int c) => engine.risenReady(c);
   bool heroicCleared(int c) => engine.heroicCleared(c);
   String? whyNotForge(int c) => engine.whyNotForge(c);
 

@@ -114,7 +114,7 @@ class KillResult {
   /// For Hob's job: what this foe was carrying ('Charred Timber' or 'Iron Scrap').
   final String? jobFind;
 
-  /// A relic part found on a Heroic trail.
+  /// A relic part a risen boss carried.
   final String? relicPart;
 
   /// A dungeon boss's hoard: what was in it (empty for any other foe).
@@ -396,7 +396,7 @@ class GameEngine {
 
   /// The road's next step, for the square's Road card. Mostly the next land's boss; but while that
   /// land is still shut (a level to reach first), something worth doing at your level meanwhile:
-  /// a place to explore, then a dungeon, then a Heroic trail (and the relic part at its end), or
+  /// a side land, a place to explore, then a dungeon, then a risen boss (and its relic part), or
   /// at worst a few more fights to grow stronger. Null once the Ember King is down.
   RoadStep? roadStep() {
     final k = state.knight;
@@ -425,7 +425,7 @@ class GameEngine {
       }
     }
     for (final c in reachable) {
-      if (heroicOpen(c) && !heroicCleared(c) && k.level >= continents[c].minLevel + 4) {
+      if (risenReady(c)) {
         final part = [for (final (r, i) in relicPartsOn(c)) if (relics[r]!.parts[i].risen && !hasRelicPart(state.relicParts, r, i) && !state.forged.contains(r)) relics[r]!.parts[i].name].firstOrNull;
         return RoadStep(RoadKind.heroic, 'Beat ${continents[c].boss.name}, risen${part == null ? '' : ' · $part'}', meanwhile, c);
       }
@@ -472,8 +472,8 @@ class GameEngine {
     return p.boss && p.risen && p.places == p.placesAll && p.delves == p.delvesAll && p.parts == p.partsAll;
   }
 
-  /// Region [c]'s Heroic trail is done: its boss beaten risen (saves from before this was kept
-  /// show it by the relic part the risen boss carried), and every part the trail gives found.
+  /// Region [c]'s boss has been beaten risen (saves from before this was kept show it by the relic
+  /// part the risen boss carried), and every part it carries found.
   bool heroicCleared(int c) {
     final s = state, risenParts = [for (final (r, i) in relicPartsOn(c)) if (relics[r]!.parts[i].risen) (r, i)];
     bool have((int, int) e) => s.forged.contains(e.$1) || hasRelicPart(s.relicParts, e.$1, e.$2);
@@ -985,37 +985,45 @@ class GameEngine {
     }
   }
 
-  // ---------------- heroic trails and relics ----------------
+  // ---------------- risen bosses and relics ----------------
 
-  /// A land's Heroic trail opens once its boss is down.
+  /// A land's boss is down: its relic's blueprint is yours, and in time the boss rises again.
+  /// (Named for the Heroic trails that used to open here.)
   bool heroicOpen(int c) => state.bossesDown.contains(c);
 
-  /// The next fight on the current land's Heroic trail: an elite, or at the end the boss, risen.
+  /// The level land [c]'s boss rises again at: a few past the land's own.
+  int risenLevel(int c) => continents[c].minLevel + risenAfter;
+
+  /// Land [c]'s boss is ready to face again, risen: beaten once, not yet risen and beaten, and
+  /// you're a few levels on. One fight, tougher than the first, with the relic part it carries.
+  /// (It replaced the Heroic trail: five elites before it, the same land again only harder, which
+  /// the wilds and the side lands already did better.)
+  bool risenReady(int c) => heroicOpen(c) && !heroicCleared(c) && !state.risenDown.contains(c) && state.knight.level >= risenLevel(c);
+
+  /// Why land [c]'s boss can't be faced risen (null: it can).
+  String? whyNotRisen(int c) {
+    if (!heroicOpen(c)) return 'Beat ${continents[c].boss.name} first';
+    if (heroicCleared(c) || state.risenDown.contains(c)) return 'Already beaten, risen';
+    if (state.knight.level < risenLevel(c)) return 'Rises again at level ${risenLevel(c)}';
+    return null;
+  }
+
+  /// The current land's boss, risen: one fight (call with the battle screen open).
   FoeType exploreHeroic() {
-    final c = state.continent, idx = foeIndexes(c);
-    final Rare rare;
-    final int at;
-    if ((state.heroicWins[c] ?? 0) >= heroicStops) {
-      at = bossIndex(c);
-      rare = Rare(at, Aura.ancient, name: '${continents[c].boss.name}, Risen');
-    } else {
-      at = idx[_rng.nextInt(idx.length)];
-      rare = Rare(at, Aura.values[_rng.nextInt(Aura.values.length)]);
-    }
+    final c = state.continent, at = bossIndex(c);
+    final rare = Rare(at, Aura.ancient, name: '${continents[c].boss.name}, Risen');
     _begin(at, rare, above: heroicLevels);
     state.heroicFight = true;
     final f = encounterType(at, rare);
-    _note(f.boss ? '${f.name} claws its way back out of the ash!' : 'Heroic trail: ${withArticle(f.name)} bars the way!', EntryKind.gold);
+    _note('${f.name} claws its way back out of the ash!', EntryKind.gold);
     return f;
   }
 
-  /// A win on a Heroic trail: a step along it (or, for the risen boss, back to the start), and
-  /// perhaps the next part of the land's relic.
+  /// The risen boss beaten: and the relic part it carried.
   String? _heroicWin(int c, bool risen) {
-    state.heroicWins[c] = risen ? 0 : (state.heroicWins[c] ?? 0) + 1;
-    if (risen) state.risenDown.add(c);
-    // A risen boss always carries the relic part it's keeping (if you hold that relic's blueprint).
     if (!risen) return null;
+    state.risenDown.add(c);
+    // A risen boss always carries the relic part it's keeping (if you hold that relic's blueprint).
     for (final (r, i) in relicPartsOn(c)) {
       if (relics[r]!.parts[i].risen && _grantPart(r, i)) return relics[r]!.parts[i].name;
     }
@@ -3079,7 +3087,7 @@ class GameEngine {
     }
     final chest = f.boss || _rng.nextDouble() < (single ? rareChestChance : chestChance) ? openChest(rare: single ? rare : null, grand: f.boss) : null;
     // Now and then a Cinder key for the Ember Vault: likelier the tougher the foe was.
-    // (A Heroic trail's foes are lifted above you by design: that lift doesn't count as tougher.)
+    // (A risen boss is lifted above you by design: that lift doesn't count as tougher.)
     final over = state.foeLevel - k.level - (state.heroicFight ? heroicLevels : 0);
     final key = _rng.nextDouble() < (f.boss ? keyChanceBoss : keyChance[over >= 6 ? 2 : (over >= 3 ? 1 : 0)]);
     if (key) {
@@ -3243,7 +3251,7 @@ class GameEngine {
       }
     }
     if (firstBoss && relics[c] != null) _note(relics[c]!.blueprint, EntryKind.gold);
-    if (firstBoss) _note('${land.name}\'s Heroic trail is open: elite foes, and ${f.name} waiting at the end, risen.', EntryKind.gold);
+    if (firstBoss) _note('${f.name} will be back, risen, once you reach level ${risenLevel(c)}.', EntryKind.gold);
     if (placeWon != null) {
       _note(placeWon.after, EntryKind.gold);
       _placeReward(placeWon);
