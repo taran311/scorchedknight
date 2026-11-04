@@ -417,6 +417,29 @@ class GameEngine {
   /// a side land, a place to explore, then a dungeon, then a risen boss (and its relic part), or
   /// at worst a few more fights to grow stronger. Null once the Ember King is down.
   RoadStep? roadStep() {
+    final step = _roadStep();
+    // A boss that keeps beating you, and Dunstan with upgrades waiting: the forge first. (Players
+    // who never looked in at the forge hit a wall in the later lands and kept walking into it.)
+    if (step != null && step.why == null && const {RoadKind.boss, RoadKind.side, RoadKind.heroic}.contains(step.kind)) {
+      final lost = state.bossLosses[step.kind == RoadKind.heroic ? risenLossKey(step.land) : step.land] ?? 0;
+      final key = step.kind == RoadKind.heroic ? risenLossKey(step.land) : step.land;
+      if (lost >= forgeHintLosses && lost > (_forgeLooked[key] ?? 0) && whyShut('forge') == null && (forgeReady || upgradesReady > 0)) {
+        final who = continents[step.land].boss.name;
+        return RoadStep(RoadKind.forge, 'Upgrade your gear at $smithName\'s forge', '$who has beaten you ${lost == 2 ? 'twice' : '$lost times'}', step.land);
+      }
+    }
+    return step;
+  }
+
+  /// The losses to each boss when you last looked in at the forge: the road's nudge there is
+  /// spent once you've been, until the boss beats you again. (Not saved: after a restart it may
+  /// nudge once more.)
+  final _forgeLooked = <int, int>{};
+
+  /// You've looked in at Dunstan's forge (see [roadStep]).
+  void lookedInForge() => _forgeLooked.addAll(state.bossLosses);
+
+  RoadStep? _roadStep() {
     final k = state.knight;
     final next = [for (var i = 0; i < mainLands; i++) i].where((i) => !state.bossesDown.contains(i)).firstOrNull;
     if (next == null) return null;
@@ -426,31 +449,40 @@ class GameEngine {
     // Only the level holds it back (the way's open): find something to do meanwhile.
     final need = continents[next].minLevel;
     if (k.level >= need) return boss.blocked(shut);
+    return _meanwhile('Until ${continents[next].name.replaceFirst('The ', 'the ')} opens at level $need', need);
+  }
+
+  /// Something worth doing at your level while the road waits for you to reach level [need]: a
+  /// risen boss with a relic part, a side land, a place to explore, a dungeon, any risen boss, or
+  /// at worst a few more fights to grow stronger. [meanwhile] says what you're waiting for.
+  RoadStep _meanwhile(String meanwhile, int need) {
     final reachable = [for (var i = 0; i < continents.length; i++) if (whyNotTravel(i) == null) i];
-    final meanwhile = 'Until ${continents[next].name.replaceFirst('The ', 'the ')} opens at level $need';
     // A risen boss carrying a relic part you're after comes first: one fight, and a step towards
     // the relic (otherwise it waited behind every side land, place and dungeon).
+    // (A risen boss or side land boss that's beaten you [giveUpLosses] times is left for later:
+    // they're on the way, not the way, and walking into one again and again only costs you.)
+    bool wall(int key) => (state.bossLosses[key] ?? 0) >= giveUpLosses;
     for (final c in reachable) {
-      if (!risenReady(c)) continue;
+      if (!risenReady(c) || wall(risenLossKey(c))) continue;
       final part = [for (final (r, i) in relicPartsOn(c)) if (relics[r]!.parts[i].risen && relicPartWanted(r, i)) relics[r]!.parts[i].name].firstOrNull;
       if (part != null) return RoadStep(RoadKind.heroic, 'Beat ${continents[c].boss.name}, risen · $part', meanwhile, c);
     }
     // Then a whole side land open to you with its boss still standing: a trail of fights,
     // its own gear and a boss, more to grow on than a single place (the gentlest one first).
-    final sides = [for (final i in reachable) if (isSideLand(i) && !state.bossesDown.contains(i)) i]..sort((a, b) => continents[a].minLevel - continents[b].minLevel);
+    final sides = [for (final i in reachable) if (isSideLand(i) && !state.bossesDown.contains(i) && !wall(i)) i]..sort((a, b) => continents[a].minLevel - continents[b].minLevel);
     if (sides.firstOrNull case final i?) return RoadStep(RoadKind.side, 'Beat ${continents[i].boss.name}', '${continents[i].name} · $meanwhile', i);
     for (final p in [...places]..sort((a, b) => a.land.compareTo(b.land))) {
-      if (reachable.contains(p.land) && placeShown(p) && whyNotExplore(p.id) == null) {
+      if (reachable.contains(p.land) && placeShown(p) && whyNotExplore(p.id) == null && (state.setbacks['place:${p.id}'] ?? 0) < giveUpLosses) {
         return RoadStep(RoadKind.place, 'Explore ${p.name}', meanwhile, p.land, id: p.id);
       }
     }
     for (final d in dungeons) {
-      if (reachable.contains(d.land) && !state.dungeonsDone.contains(d.id) && whyNotDungeon(d.id) == null) {
+      if (reachable.contains(d.land) && !state.dungeonsDone.contains(d.id) && whyNotDungeon(d.id) == null && (state.setbacks['dungeon:${d.id}'] ?? 0) < giveUpLosses) {
         return RoadStep(RoadKind.dungeon, 'Delve into ${d.name}', meanwhile, d.land, id: d.id);
       }
     }
     for (final c in reachable) {
-      if (risenReady(c)) {
+      if (risenReady(c) && !wall(risenLossKey(c))) {
         final part = [for (final (r, i) in relicPartsOn(c)) if (relics[r]!.parts[i].risen && !hasRelicPart(state.relicParts, r, i) && !state.forged.contains(r)) relics[r]!.parts[i].name].firstOrNull;
         return RoadStep(RoadKind.heroic, 'Beat ${continents[c].boss.name}, risen${part == null ? '' : ' · $part'}', meanwhile, c);
       }
@@ -1076,11 +1108,18 @@ class GameEngine {
     return null;
   }
 
-  /// The current land's boss, risen: one fight (call with the battle screen open).
+  /// The current land's boss, risen: one fight (call with the battle screen open). Each time it's
+  /// beaten you, it comes back a little weaker, like a boss the first time round (see doggedFor).
   FoeType exploreHeroic() {
     final c = state.continent, at = bossIndex(c);
     final rare = Rare(at, Aura.ancient, name: '${continents[c].boss.name}, Risen');
     _begin(at, rare, above: heroicLevels);
+    final dogged = 1 - math.min(doggedMax, doggedStep * (state.bossLosses[risenLossKey(c)] ?? 0));
+    if (dogged < 1) {
+      state
+        ..foeMax = (state.foeMax * dogged).round()
+        ..foeHp = state.foeMax;
+    }
     state.heroicFight = true;
     final f = encounterType(at, rare);
     _note('${f.name} claws its way back out of the ash!', EntryKind.gold);
@@ -1091,6 +1130,7 @@ class GameEngine {
   String? _heroicWin(int c, bool risen) {
     if (!risen) return null;
     state.risenDown.add(c);
+    state.bossLosses.remove(risenLossKey(c));
     // A risen boss always carries the relic part it's keeping (if you hold that relic's blueprint).
     for (final (r, i) in relicPartsOn(c)) {
       if (relics[r]!.parts[i].risen && _grantPart(r, i)) return relics[r]!.parts[i].name;
@@ -1635,6 +1675,7 @@ class GameEngine {
       }
     }
     final first = s.dungeonsDone.add(d.id);
+    s.setbacks.remove('dungeon:${d.id}');
     final gold = bossHoardGold(k.level);
     k.coins += gold;
     final g = loot.roll(k.heroClass, k.level, wielding: k.loadout.weapon, odds: first ? hoardOdds : hoardOddsAgain);
@@ -2850,6 +2891,14 @@ class GameEngine {
       final c = realmAt(state.foe);
       state.bossLosses[c] = (state.bossLosses[c] ?? 0) + 1;
     }
+    // A dungeon run or a guarded place that ends with you flat on your back: the road notes it.
+    if (dungeon && state.dungeon != null) state.setbacks['dungeon:${state.dungeon}'] = (state.setbacks['dungeon:${state.dungeon}'] ?? 0) + 1;
+    if (state.place != null) state.setbacks['place:${state.place}'] = (state.setbacks['place:${state.place}'] ?? 0) + 1;
+    // (A risen boss you lose to is counted too, apart: it weakens the same way, a little each time.)
+    if (state.heroicFight) {
+      final key = risenLossKey(realmAt(state.foe));
+      state.bossLosses[key] = (state.bossLosses[key] ?? 0) + 1;
+    }
     if (!wild && !dungeon && !state.raidFight && !state.heroicFight && !state.arenaFight && !state.hallFight) {
       final c = realmAt(state.rare?.base ?? state.foe);
       state.struggle[c] = (state.struggle[c] ?? 0) + 1;
@@ -3075,6 +3124,7 @@ class GameEngine {
       _passTime();
     } else if (placeWon != null) {
       state.explored.add(placeWon.id);
+      state.setbacks.remove('place:${placeWon.id}');
       if (placeWon.relic case (final r, final i)) _grantPart(r, i);
       _passTime();
     } else if (state.raidFight) {
@@ -4845,9 +4895,20 @@ String shineLine(int level) => switch (level) {
   _ => 'You brush a little soot off your shoulders.',
 };
 
-enum RoadKind { boss, place, dungeon, heroic, train, wild, side }
+enum RoadKind { boss, place, dungeon, heroic, train, wild, side, forge }
 
 /// One step on the road (see GameEngine.roadStep): what, a line under it, and where.
+/// Losses to the road's boss before the road sends you to the forge first (when it has something).
+const forgeHintLosses = 2;
+
+/// Losses to a side land's boss or a risen boss, or runs lost in a dungeon or at a guarded place,
+/// before the road leaves it for later.
+const giveUpLosses = 3;
+
+/// Where losses to land [c]'s boss, risen, are kept in [GameState.bossLosses] (apart from the first
+/// time round's).
+int risenLossKey(int c) => 100 + c;
+
 class RoadStep {
   const RoadStep(this.kind, this.title, this.sub, this.land, {this.id, this.why});
   final RoadKind kind;

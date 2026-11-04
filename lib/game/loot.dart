@@ -382,6 +382,19 @@ const specialCharge = 4;
 const specialBase = .15, specialStep = .045;
 double specialChanceAt(int since) => math.min(1, specialBase + specialStep * since);
 
+/// Attacks a special takes to fire, on average, from one firing to the next (about four): what
+/// the rising chance comes to. (The chance shown in a fight is this attack's, and starts low
+/// again each time it fires, so it reads lower than it plays.)
+final double specialEvery = () {
+  var left = 1.0, mean = 0.0;
+  for (var n = 0; left > 1e-9; n++) {
+    final c = specialChanceAt(n);
+    mean += (n + 1) * left * c;
+    left *= 1 - c;
+  }
+  return mean;
+}();
+
 /// A quest weapon's special attack. It charges with each full swing and fires on its own.
 class Special {
   const Special(this.name, this.desc, this.mult, this.argb, {this.heal = 0, this.coins = 0, this.crit = false, this.sure = false, this.volley = 0, this.element, this.meteor = false, this.wave = false, this.kraken = false, this.rain = false, this.cleave = false, this.dragon = false, this.dice = false, this.deadrun = false, this.storm = false, this.bats = false, this.demon = false, this.legion = false, this.wolves = false, this.avalanche = false, this.stun = 0, this.selfHurt = 0, this.summon = 0, this.expose = 0});

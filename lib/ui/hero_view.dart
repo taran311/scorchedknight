@@ -232,7 +232,7 @@ class GearDetails extends StatelessWidget {
         if (g.specialMove != null)
           Padding(
             padding: const EdgeInsets.only(top: 6),
-            child: Text('⚡ ${g.specialMove!.name}: ${g.specialMove!.desc}', style: note.copyWith(color: Color(g.specialMove!.argb), fontWeight: FontWeight.w700)),
+            child: Text('⚡ ${g.specialMove!.name}: ${g.specialMove!.desc}. Fires about one attack in ${specialEvery.round()}.', style: note.copyWith(color: Color(g.specialMove!.argb), fontWeight: FontWeight.w700)),
           ),
         if (g.lore != null && !dense)
           Padding(

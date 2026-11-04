@@ -13,7 +13,7 @@ import '../game/controller.dart';
 import '../game/ammo.dart';
 import '../game/crafting.dart' show smithName, coresPerRune, Gem, GemInfo, Elemental, ElementalInfo, Metal, MetalInfo;
 import '../game/engine.dart';
-import '../game/loot.dart' show specialChanceAt, Stat, Rarity, RarityInfo, GearSlotLabel;
+import '../game/loot.dart' show specialChanceAt, specialEvery, Stat, Rarity, RarityInfo, GearSlotLabel;
 import '../game/models.dart';
 import '../game/nemesis.dart' show nemesisTitle;
 import '../game/rules.dart';
@@ -570,7 +570,9 @@ class _BattleScreenState extends State<BattleScreen> {
             ('⚔️', '~${(swing * bladeEdge * mightBoost(k)).round()} damage', plain),
             if (aloft) ('🦅', 'Out of reach ${pct(aloftMelee)}', bad),
             if (triangle(kind, AttackStyle.blade) != 1) edgeLine(triangle(kind, AttackStyle.blade), 'blades'),
-            if (special != null) ('⚡', '${(specialChanceAt(s.specialCharge) * 100).round()}% chance of ${special.name}', soft),
+            // (This attack's chance; it climbs each time it doesn't fire, so it comes round about
+            // one attack in four.)
+            if (special != null) ('⚡', '${special.name}: ${(specialChanceAt(s.specialCharge) * 100).round()}% now, rising · ~1 in ${specialEvery.round()} attacks', soft),
           ]),
           badge: '~${(swing * bladeEdge * mightBoost(k)).round()}',
           badgeColour: edgeColour(bladeEdge),

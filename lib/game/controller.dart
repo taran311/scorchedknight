@@ -577,6 +577,16 @@ class GameController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Called by the stage as a heal plays on your side (life steal as the blade bites, a drink, a
+  /// potion): the bar rises then, not later with the foe's blow. ([amount] on top of what's shown;
+  /// nothing to do when the bar isn't being held.)
+  void revealHeal(int amount) {
+    final held = _heldHeroHp;
+    if (held == null || amount <= 0) return;
+    _heldHeroHp = (held + amount).clamp(0, maxHp(state.knight));
+    hpShown.value++;
+  }
+
   /// Called by the stage as the kill plays: the HP the win gives back shows on the bar now.
   void revealHeroHp() {
     _heldHeroHp = null;

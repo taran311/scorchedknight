@@ -1106,7 +1106,12 @@ Future<void> showMerchantWindow(BuildContext context, GameController c, {String?
 );
 
 /// The forge, from the square.
-Future<void> showForgeWindow(BuildContext context, GameController c, {String? tab, String? focus}) => _showShop(
+Future<void> showForgeWindow(BuildContext context, GameController c, {String? tab, String? focus}) {
+  c.engine.lookedInForge();
+  return _showForge(context, c, tab: tab, focus: focus);
+}
+
+Future<void> _showForge(BuildContext context, GameController c, {String? tab, String? focus}) => _showShop(
   open: tab,
   context,
   c,

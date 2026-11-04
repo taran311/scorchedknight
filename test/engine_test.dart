@@ -964,6 +964,59 @@ void main() {
     }
   });
 
+  test('the road learns: the forge after a boss keeps winning, and walls left for later', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(4));
+    final s = e.state, k = s.knight;
+    s.innRepaired = true;
+    s.bossesDown.addAll({0, 1, 2});
+    k.level = continents[3].minLevel;
+    expect(e.roadStep()!.kind, RoadKind.boss);
+    // Krugg beats you twice, and Dunstan has something for you: the forge first, once.
+    s.bossLosses[3] = forgeHintLosses;
+    k.coins = 100000;
+    s.addMat(oreKey(Metal.iron), 6);
+    expect(e.roadStep()!.kind, RoadKind.forge);
+    expect(e.roadStep()!.sub, contains('beaten you twice'));
+    e.lookedInForge();
+    expect(e.roadStep()!.kind, RoadKind.boss, reason: 'been to the forge: back to the boss');
+    s.bossLosses[3] = forgeHintLosses + 1;
+    expect(e.roadStep()!.kind, RoadKind.forge, reason: 'beaten again: the forge again');
+    // Waiting on a level, a side land's boss that keeps winning is left for later.
+    s.bossLosses.clear();
+    s.bossesDown.add(3);
+    s.risenDown.addAll({0, 1, 2, 3});
+    k.level = continents[4].minLevel - 1;
+    final side = e.roadStep()!;
+    expect(side.kind, RoadKind.side);
+    s.bossLosses[side.land] = giveUpLosses;
+    expect(e.roadStep()!.land, isNot(side.land));
+    // A dungeon that keeps ending your runs, likewise.
+    s.explored.addAll(places.map((p) => p.id));
+    for (var i = mainLands; i < continents.length; i++) {
+      s.bossesDown.add(i);
+    }
+    final delve = e.roadStep()!;
+    if (delve.kind == RoadKind.dungeon) {
+      s.setbacks['dungeon:${delve.id}'] = giveUpLosses;
+      expect(e.roadStep()!.id, isNot(delve.id));
+    }
+  });
+
+  test('a risen boss that beats you comes back a little weaker', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(4));
+    final s = e.state;
+    s.bossesDown.add(0);
+    s.knight.level = e.risenLevel(0);
+    e.travel(0);
+    e.exploreHeroic();
+    final full = s.foeMax;
+    s.inBattle = false;
+    s.bossLosses[risenLossKey(0)] = 2;
+    e.exploreHeroic();
+    expect(s.foeMax, lessThan(full));
+    expect(s.foeHp, s.foeMax);
+  });
+
   test('classes: a whole order suit makes you its knight, with ranks, rites and a passive', () {
     GameEngine suited(String set, int seed) {
       final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(seed));

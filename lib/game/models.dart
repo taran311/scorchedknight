@@ -402,6 +402,7 @@ class GameState {
     this.cratesToday = 0,
     Set<String>? generalsDown,
     Map<int, int>? bossLosses,
+    Map<String, int>? setbacks,
     this.seasonSeen = '',
     this.encounter,
     this.encounterCalm = 0,
@@ -515,6 +516,7 @@ class GameState {
        forged = forged ?? {},
        generalsDown = generalsDown ?? {},
        bossLosses = bossLosses ?? {},
+       setbacks = setbacks ?? {},
        knight = knight ?? Knight(),
        wins = wins ?? List.filled(continents.length, 0),
        bossesDown = bossesDown ?? {},
@@ -599,6 +601,11 @@ class GameState {
   /// Times each land's boss has knocked you out (until you beat it): it gets no easier to look at,
   /// but you learn its ways.
   final Map<int, int> bossLosses;
+
+  /// Times a dungeon run ('dungeon:warrens') or a guarded place ('place:briarheart') has ended
+  /// with you knocked out, until you get the better of it: the road leaves one that keeps
+  /// beating you for later.
+  final Map<String, int> setbacks;
 
   /// The last seasonal event you were welcomed to ('hallowash-2026'), so it's announced once.
   String seasonSeen;
@@ -812,6 +819,7 @@ class GameState {
     if (cratesToday != 0) 'cratesToday': cratesToday,
     if (generalsDown.isNotEmpty) 'generals': generalsDown.toList(),
     if (bossLosses.isNotEmpty) 'bossLosses': {for (final e in bossLosses.entries) '${e.key}': e.value},
+    if (setbacks.isNotEmpty) 'setbacks': setbacks,
     'seasonSeen': seasonSeen,
     if (encounter != null) 'encounter': encounter,
     'encounterCalm': encounterCalm,
@@ -958,6 +966,7 @@ class GameState {
       cratesToday: n('cratesToday'),
       generalsDown: {...((j['generals'] as List?) ?? const []).whereType<String>()},
       bossLosses: {for (final e in ((j['bossLosses'] as Map?) ?? const {}).entries) int.parse(e.key as String): (e.value as num).toInt()},
+      setbacks: {for (final e in ((j['setbacks'] as Map?) ?? const {}).entries) e.key as String: (e.value as num).toInt()},
       seasonSeen: j['seasonSeen'] as String? ?? '',
       encounter: j['encounter'] as String?,
       encounterCalm: n('encounterCalm'),

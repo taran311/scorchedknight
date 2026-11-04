@@ -378,6 +378,12 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   /// HP back as a heart floating up with the number in it.
   void _heart(int n, Offset at) => _marks.add(_Mark('+$n', const [], at, now, heart: true));
 
+  /// A heal on your side: its heart, and the bar rising with it, there and then.
+  void _heal(int n, Offset at) {
+    _heart(n, at);
+    c.revealHeal(n);
+  }
+
   bool get _gore => c.state.settings.gore;
 
   /// What spills out of this foe when struck.
@@ -918,7 +924,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         for (var i = 0; i < 6; i++) {
           _at(d0 + hit + 80.0 * i, () => _shots.add(_Projectile('bolt', _foeChest + Offset(0, 10.0 * (i % 3) - 10), const Offset(_knightX + 10, _groundY - 140), now, 380, colour)));
         }
-        if (r.drained > 0) _at(d0 + hit + 500, () => _heart(r.drained, const Offset(_knightX + 10, _groundY - 270)));
+        if (r.drained > 0) _at(d0 + hit + 500, () => _heal(r.drained, const Offset(_knightX + 10, _groundY - 270)));
       case SpellKind.blast:
         _at(d0 + hit, () => _spark(spell.element == Stat.burn ? 'fire' : 'bolt', _foeChest, 18, speed: 5.5, life: 500, radius: 4));
       case SpellKind.warcry:
@@ -958,7 +964,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
           _spark('holy', const Offset(_knightX, _groundY - 40), 26, dir: -math.pi / 2, spread: .9, speed: 3, life: 1100, radius: 4, lift: 2, gravity: -.03);
           _spark('mend', const Offset(_knightX, _groundY - 140), 18, lift: 2.5, speed: 2.5, life: 900, gravity: -.02);
         });
-        if (r.mended > 0) _at(d0 + castReleaseMs + 300, () => _heart(r.mended, const Offset(_knightX + 10, _groundY - 270)));
+        if (r.mended > 0) _at(d0 + castReleaseMs + 300, () => _heal(r.mended, const Offset(_knightX + 10, _groundY - 270)));
       case SpellKind.slow || SpellKind.weaken || SpellKind.expose:
         // A hex settles on the foe.
         _at(d0 + hit, () {
@@ -1109,7 +1115,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       _spark('smoke', const Offset(_foeX - 60, _groundY - 6), 10, dir: -math.pi / 2, spread: 2, speed: 2, life: 700, radius: 8, gravity: -.01);
       _mark('${r.chargeHit}', const [Color(0xFFF2C14E), Color(0xFF8A5A1A)], _foeChest + const Offset(-40, -40));
       c.revealDamage(r.chargeHit);
-      if (m.mend > 0) _heart(r.mended, const Offset(_knightX + 10, _groundY - 270));
+      if (m.mend > 0) _heal(r.mended, const Offset(_knightX + 10, _groundY - 270));
     });
     _at(d0 + 1200, () {
       fx['charge'] = 0;
@@ -1182,7 +1188,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     }
     _playLingering(r, d0 + end - 520);
     if (r.froze) _at(d0 + end - 520, () => _mark('Frozen!', const [Color(0xFF9ADFFF), Color(0xFF2A5A8A)], _foeChest + const Offset(0, -90)));
-    if (r.regrown > 0) _at(d0 + end - 300, () => _heart(r.regrown, const Offset(_knightX + 10, _groundY - 250)));
+    if (r.regrown > 0) _at(d0 + end - 300, () => _heal(r.regrown, const Offset(_knightX + 10, _groundY - 250)));
     final k = c.state.knight, look = heroLook(k);
     final sp = r.damage.special;
     if (sp != null) _playSpecial(sp, mode, d0);
@@ -1375,7 +1381,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
             _spark('spark', chest, 26, dir: 0, spread: 3, speed: 7, life: 420, radius: 4.5);
         }
         if (r.artHit > 0) _at(280, () => _mark('+${r.artHit}', [col, shade(col, -.55)], chest + const Offset(24, -36)));
-        if (r.artHeal > 0) _at(320, () => _heart(r.artHeal, const Offset(_knightX, _groundY - 190)));
+        if (r.artHeal > 0) _at(320, () => _heal(r.artHeal, const Offset(_knightX, _groundY - 190)));
       }
       // Its weaknesses: the right tool for the job, or the wrong one.
       // (The pop-up says what it's about: the damage, not any daze or hex that comes with it.)
@@ -1430,7 +1436,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       }
       if (r.healed > 0) {
         _at(120, () {
-          _heart(r.healed, const Offset(_knightX + 10, _groundY - 250));
+          _heal(r.healed, const Offset(_knightX + 10, _groundY - 250));
           _spark('mend', const Offset(_knightX, _groundY - 140), 8, lift: 2, speed: 2, life: 700, gravity: -.02);
         });
       }
@@ -1476,7 +1482,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
             c.revealDamage(r.charmHit);
           }
           if (r.charmHeal > 0) {
-            _heart(r.charmHeal, const Offset(_knightX + 10, _groundY - 250));
+            _heal(r.charmHeal, const Offset(_knightX + 10, _groundY - 250));
             _spark('mend', const Offset(_knightX, _groundY - 140), 12, lift: 2.5, speed: 2.5, life: 900, gravity: -.02);
           }
         });
@@ -1806,7 +1812,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     switch (r.action) {
       case BattleAction.potion:
         _at(d0 + 100, () {
-          _heart(r.potion, const Offset(_knightX + 10, _groundY - 250));
+          _heal(r.potion, const Offset(_knightX + 10, _groundY - 250));
           if (r.cured) _at(240, () => _mark('Cured!', _green, const Offset(_knightX + 10, _groundY - 290)));
           Audio.play(Sfx.potion);
           _spark('mend', const Offset(_knightX, _groundY - 140), 18, lift: 2.5, speed: 2.5, life: 900, gravity: -.02);
@@ -1824,7 +1830,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         break;
     }
     _playLingering(r, d0 + act - 120);
-    if (r.regrown > 0) _at(d0 + act + tail + 120, () => _heart(r.regrown, const Offset(_knightX + 10, _groundY - 250)));
+    if (r.regrown > 0) _at(d0 + act + tail + 120, () => _heal(r.regrown, const Offset(_knightX + 10, _groundY - 250)));
     if (r.counter != null) _playCounter(r, d0 + act);
     _at(d0 + act + tail + 300, () => c.swingFinished(r));
   }
@@ -1845,7 +1851,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
           _mark('${r.charmHit}', _holy, _foeChest + const Offset(-10, -40));
           c.revealDamage(r.charmHit);
         }
-        if (r.charmHeal > 0) _heart(r.charmHeal, const Offset(_knightX + 10, _groundY - 250));
+        if (r.charmHeal > 0) _heal(r.charmHeal, const Offset(_knightX + 10, _groundY - 250));
       });
       _at(d0 + 720, () => fx['pounce'] = 0);
       return;

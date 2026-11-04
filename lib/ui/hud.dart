@@ -18,7 +18,7 @@ import '../game/catalog.dart';
 import '../game/controller.dart';
 import '../game/encounters.dart' show inspiredBoost;
 import '../game/knight_classes.dart';
-import '../game/loot.dart' show specialChanceAt;
+import '../game/loot.dart' show specialChanceAt, specialEvery, specialStep;
 import '../game/models.dart';
 import '../game/rules.dart';
 import '../game/spells.dart';
@@ -381,7 +381,8 @@ class ClassTag extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.fromLTRB(5, 1, 6, 1),
         decoration: BoxDecoration(color: col.withValues(alpha: .16), borderRadius: BorderRadius.circular(3), border: Border.all(color: col.withValues(alpha: .75))),
-        child: Text('${cls.name.toUpperCase()} · R$rank', maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.label(size: 10.5, color: col, weight: FontWeight.w800)),
+        // (Shrinks to fit a narrow card rather than lose the end of the name.)
+        child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text('${cls.name.toUpperCase()} · R$rank', maxLines: 1, style: Txt.label(size: 10.5, color: Color.lerp(col, const Color(0xFFFFFFFF), .3)!, weight: FontWeight.w800))),
       ),
     );
   }
@@ -731,9 +732,9 @@ class StatusBadges extends StatelessWidget {
     final items = <(String, Color, String)>[
       if (move != null)
         (
-          '${move.name} · ${(specialChanceAt(state.specialCharge) * 100).round()}%',
+          '${move.name} · ${(specialChanceAt(state.specialCharge) * 100).round()}%${state.specialCharge > 0 ? ' ↑' : ''}',
           Color(move.argb),
-          'Special attack: ${move.desc}. A chance on every attack, a little higher each time it doesn\'t fire.',
+          'Special attack: ${move.desc}. ${(specialChanceAt(state.specialCharge) * 100).round()}% on this attack, rising ${(specialStep * 100).toStringAsFixed(1)}% with each one it doesn\'t fire: about one attack in ${specialEvery.round()} on average.',
         ),
       if (boons && k.poisonFights > 0) ('Poisoned blade · ${k.poisonFights}', const Color(0xFF9BE27A), 'Poison on every attack for ${k.poisonFights} more ${k.poisonFights == 1 ? 'fight' : 'fights'}'),
       if (boons)
