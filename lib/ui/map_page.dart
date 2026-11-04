@@ -1039,12 +1039,15 @@ class _MapPainter extends CustomPainter {
           tp.paint(canvas, tag.topLeft + const Offset(7, 2));
         }
       }
+      // Its boss down: a gold flag. Everything in it done too (risen boss, places, dungeons, relic
+      // parts): the flag turns green with a tick on it, so a land with more to find doesn't look
+      // the same as one that's finished.
       if (beaten.contains(i)) {
-        _flag(canvas, at + const Offset(52, -44));
-        _taken.add(Rect.fromLTWH(at.dx + 50, at.dy - 46, 20, 30));
+        final done = cleared.contains(i);
+        _flag(canvas, at + const Offset(52, -44), done: done);
+        if (done) _tick(canvas, at + const Offset(67, -22));
+        _taken.add(Rect.fromLTWH(at.dx + 50, at.dy - 46, done ? 24 : 20, 30));
       }
-      // Nothing new left here (still good to farm): a small gold tick by the flag.
-      if (cleared.contains(i)) _tick(canvas, at + const Offset(76, -36));
       final tp = TextPainter(
         text: TextSpan(text: land.name, style: Txt.inkLabel(size: isSideLand(i) ? 17 : 21, color: open ? const Color(0xFF2A1A0E) : const Color(0xFF6A5A44))),
         textDirection: TextDirection.ltr,
@@ -1538,14 +1541,14 @@ class _MapPainter extends CustomPainter {
 
   /// A cleared region's mark: a small gold tick in an ink ring, beside its flag.
   void _tick(Canvas c, Offset at) {
-    c.drawCircle(at, 9, Paint()..color = const Color(0xFFE3A548));
+    c.drawCircle(at, 9, Paint()..color = const Color(0xFF9BE27A));
     c.drawCircle(at, 9, strokePaint(const Color(0xFF3A2614), 1.6));
     c.drawPath(Path()..moveTo(at.dx - 4, at.dy + .3)..lineTo(at.dx - 1, at.dy + 3.4)..lineTo(at.dx + 4.4, at.dy - 3.2), strokePaint(const Color(0xFF3A2614), 2.2));
   }
 
-  void _flag(Canvas c, Offset at) {
+  void _flag(Canvas c, Offset at, {bool done = false}) {
     c.drawLine(at, at + const Offset(0, 26), strokePaint(const Color(0xFF3A2614), 2));
-    c.drawPath(poly([at, at + const Offset(16, 5), at + const Offset(0, 10)]), Paint()..color = const Color(0xFFE3A548));
+    c.drawPath(poly([at, at + const Offset(16, 5), at + const Offset(0, 10)]), Paint()..color = done ? const Color(0xFF6ABF4A) : const Color(0xFFE3A548));
   }
 
   void _inn(Canvas c, Offset at) {
