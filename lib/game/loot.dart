@@ -4,6 +4,7 @@
 import 'dart:math' as math;
 
 import 'classes.dart';
+import 'crafting.dart' show forgedSetById;
 import 'enchants.dart';
 import 'vault.dart';
 
@@ -174,6 +175,36 @@ const gearSets = <GearSet>[
 ];
 
 GearSet? gearSetById(String? id) => gearSets.where((s) => s.id == id).firstOrNull;
+
+/// How rare set [id]'s pieces are: a forged class suit's are legendary, the rest epic.
+Rarity setRarity(String id) => forgedSetById(id) != null ? Rarity.legendary : Rarity.epic;
+
+/// Honing steps a relic comes out of Dunstan's forge with, free: it took three parts, a boss and a
+/// dungeon to make, and should stand above the legendaries that simply drop.
+const relicHone = 3;
+
+/// [g] as a legendary set piece, if it's a forged suit's piece from before they were legendary
+/// (its stats grown by as much as the rarity adds); otherwise null.
+GearItem? asLegendSetPiece(GearItem g) {
+  if (g.rarity != Rarity.epic || g.gearSet == null || setRarity(g.gearSet!) != Rarity.legendary) return null;
+  final k = Rarity.legendary.power / Rarity.epic.power;
+  return GearItem(
+    id: g.id,
+    name: g.name,
+    slot: g.slot,
+    art: g.art,
+    rarity: Rarity.legendary,
+    level: g.level,
+    heroClass: g.heroClass,
+    lore: g.lore,
+    tint: g.tint,
+    special: g.special,
+    enchant: g.enchant,
+    gearSet: g.gearSet,
+    value: (g.value * Rarity.legendary.valueMult / Rarity.epic.valueMult).round(),
+    stats: {for (final e in g.stats.entries) e.key: (e.value * k).round()},
+  )..hone = g.hone;
+}
 
 /// Chance a rare-or-better pair of gloves, boots or ring belongs to a set.
 const gearSetChance = .25;
@@ -1851,7 +1882,8 @@ class LootTable {
     if (slot == GearSlot.armour) {
       // The suit's body armour: its protection is the armour tier's, its worth the set's.
       final t = armourTierById(setArmourId(setId)), set = gearSetById(setId)!;
-      return GearItem(id: _id(), name: t.name, slot: GearSlot.armour, art: t.id, rarity: Rarity.epic, level: level, heroClass: heroClass, gearSet: setId, lore: 'Forged by Dunstan from a blueprint. Damage taken −${(t.reduction * 100).round()}%. Part of the ${set.name} suit.', value: _value(level, Rarity.epic, GearSlot.armour), stats: const {});
+      final r = setRarity(setId);
+      return GearItem(id: _id(), name: t.name, slot: GearSlot.armour, art: t.id, rarity: r, level: level, heroClass: heroClass, gearSet: setId, lore: 'Forged by Dunstan from a blueprint. Damage taken −${(t.reduction * 100).round()}%. Part of the ${set.name} suit.', value: _value(level, r, GearSlot.armour), stats: const {});
     }
     final set = gearSetById(setId)!;
     // (A suit's helm rolls like its sabatons: the sturdy pieces.)
@@ -1901,8 +1933,10 @@ class LootTable {
       (_, GearSlot.boots) => (Stat.dodge, Stat.crit, Stat.vigour),
       _ => (Stat.crit, Stat.damage, Stat.regen),
     };
-    const rarity = Rarity.epic;
-    // A little better than a random epic piece (it's farmed for), with the set's bonus on top.
+    // A class suit's pieces are legendary: one of a kind, forged once, the armour of an order. They
+    // come out between a random epic piece and a random legendary one, with the set's bonus and the
+    // class on top. (The arena's prize suit stays epic.)
+    final rarity = setRarity(setId);
     final scale = switch (main) {
       Stat.damage || Stat.leech => .5,
       Stat.guard => .7,

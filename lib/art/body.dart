@@ -56,6 +56,18 @@ Skeleton drawHumanoid(Canvas c, Look look, Pose pose, double t, DrawOptions o, {
   if (o.shadow && o.legs) {
     c.drawOval(Rect.fromCenter(center: Offset(sk.pelvis.dx + 4, 1), width: b.hip * 4.6, height: 14), Paint()..color = Color.fromRGBO(0, 0, 0, (look.ghostly ? .2 : .45) * o.alpha));
   }
+  // A somersault or a spin (the class moves): about the waist, the shadow left on the ground.
+  final spin = pose[J.rot], turn = pose[J.turn];
+  if (spin != 0 || turn != 0) {
+    final pivot = sk.pelvis - Offset(0, b.spine * .45);
+    c.translate(pivot.dx, pivot.dy);
+    if (spin != 0) c.rotate(spin * deg);
+    if (turn != 0) {
+      final x = math.cos(turn * deg);
+      c.scale(x.abs() < .08 ? (x < 0 ? -.08 : .08) : x, 1);
+    }
+    c.translate(-pivot.dx, -pivot.dy);
+  }
   if (look.ghostly) {
     // A cold glow around a spirit.
     final glow = look.eyeGlow ?? const Color(0xFFB8E0F0);

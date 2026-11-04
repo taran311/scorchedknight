@@ -190,15 +190,23 @@ class _PaperDoll extends StatelessWidget {
                   ),
                   child: Opacity(opacity: idle ? .4 : 1, child: Center(child: GearIcon(item: g, size: box - 16, heroClass: k.heroClass, dye: k.dye, empty: ''))),
                 ),
-                    // Spares for this slot in your chest.
+                    // Spares for this slot in your chest: a little chest and how many. (It used
+                    // to read '+6', which looked like the weapon's honing.)
                     if (spare > 0)
                       Positioned(
                         right: -6,
                         bottom: -6,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          padding: const EdgeInsets.fromLTRB(4, 1, 5, 1),
                           decoration: BoxDecoration(color: const Color(0xFF6A4A1A), border: Border.all(color: Palette.amber), borderRadius: BorderRadius.circular(8)),
-                          child: Text('+$spare', style: Txt.label(size: 11, color: const Color(0xFFFFE6A0))),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.inventory_2, size: 11, color: Color(0xFFFFE6A0)),
+                              const SizedBox(width: 3),
+                              Text('$spare', style: Txt.label(size: 11, color: const Color(0xFFFFE6A0))),
+                            ],
+                          ),
                         ),
                       ),
                   ],

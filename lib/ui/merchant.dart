@@ -563,7 +563,7 @@ class ForgeWares extends StatelessWidget {
                     final g? when c.canReforge(f.id, slot) => 'Yours, level ${g.level}: reforge to your level',
                     final g? => 'Forged, level ${g.level}: yours to keep',
                     _ when c.hasSetPiece(f.id, slot) => 'Forged: yours to keep',
-                    _ => slot == GearSlot.armour ? '−${(armourTierById(setArmourId(f.id)).reduction * 100).round()}% damage taken' : 'Epic, at your level',
+                    _ => slot == GearSlot.armour ? '−${(armourTierById(setArmourId(f.id)).reduction * 100).round()}% damage taken' : 'Legendary, at your level',
                   },
                   CostButton(
                     label: c.canReforge(f.id, slot) ? 'Reforge' : (c.hasSetPiece(f.id, slot) ? 'Forged' : 'Forge'),

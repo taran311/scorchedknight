@@ -182,7 +182,9 @@ const builds = <String, Build>{
 
 /// Joint angles for one frame. n = near limb (toward the viewer), f = far limb.
 /// S/E/W = shoulder/elbow/wrist(weapon); H/K = hip/knee.
-enum J { dx, dy, lean, head, nS, nE, nW, fS, fE, fW, nH, nK, fH, fK }
+/// The joints. [rot] turns the whole body about the waist (a somersault, positive head-first
+/// toward the foe); [turn] spins it round on the spot (90: edge-on, 180: facing away).
+enum J { dx, dy, lean, head, nS, nE, nW, fS, fE, fW, nH, nK, fH, fK, rot, turn }
 
 class Pose {
   Pose(List<double> v) : v = List.of(v, growable: false);

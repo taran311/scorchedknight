@@ -378,6 +378,11 @@ class _BattleScreenState extends State<BattleScreen> {
                                             ? Text('${wildAreas[s.wild!].name} · step ${s.wildDepth}', style: Txt.label(size: 13, color: Color(wildAreas[s.wild!].argb)))
                                             : Text(land.name, style: Txt.label(size: 13, color: Color(land.argb))),
                                       ),
+                                      // On a phone, the picked move's card floats over the foot of the
+                                      // fight, rather than pushing in above the moves and squeezing the
+                                      // fight smaller while it's open.
+                                      if (!over && !_aiming && _peek && _pickedInfo != null)
+                                        Positioned(left: 6, right: 6, bottom: 6, child: _PickedCard(info: _pickedInfo!, ready: _pickedReady)),
                                     ],
                                   ),
                                   ),
@@ -394,7 +399,6 @@ class _BattleScreenState extends State<BattleScreen> {
                                         : _actionRows().first,
                                     result: over ? _resultButtons() : null,
                                     progress: over ? _trailProgress() : null,
-                                    detail: !over && !_aiming && _peek && _pickedInfo != null ? _PickedCard(info: _pickedInfo!, ready: _pickedReady) : null,
                                   ),
                                   ),
                                 ],
@@ -1324,7 +1328,7 @@ class _ArmedState extends State<_Armed> {
 }
 
 class _CommandDeck extends StatelessWidget {
-  const _CommandDeck({required this.controller, required this.lines, this.moves, this.result, this.detail, this.progress, this.fill = false});
+  const _CommandDeck({required this.controller, required this.lines, this.moves, this.result, this.progress, this.fill = false});
 
   /// After a trail win: how far along it you are (see _trailProgress).
   final Widget? progress;
@@ -1332,8 +1336,6 @@ class _CommandDeck extends StatelessWidget {
   /// Filling a tall phone screen: more of the log shows, and the moves sit at the very bottom.
   final bool fill;
 
-  /// On a phone: the picked move's card, shown above the moves.
-  final Widget? detail;
   final GameController controller;
   final List<JournalEntry> lines;
   final List<Widget>? moves, result;
@@ -1434,7 +1436,6 @@ class _CommandDeck extends StatelessWidget {
               },
             ),
             const SizedBox(height: 8),
-            if (detail != null) ...[detail!, const SizedBox(height: 8)],
             _moves(context, yourMove, grow: fill),
           ],
         ],
@@ -1904,8 +1905,9 @@ class _PickedCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.fromLTRB(10, 7, 10, 7),
     decoration: BoxDecoration(
-      color: const Color(0xFF171310),
+      color: const Color(0xF0171310),
       borderRadius: BorderRadius.circular(6),
+      boxShadow: const [BoxShadow(color: Color(0x99000000), blurRadius: 10, offset: Offset(0, 2))],
       border: Border.all(color: info.colour.withValues(alpha: .6), width: 1.5),
     ),
     child: Column(

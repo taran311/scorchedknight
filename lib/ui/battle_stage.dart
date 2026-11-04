@@ -14,6 +14,7 @@ import '../art/silhouette.dart';
 import '../art/beast_foes.dart';
 import '../art/beasts.dart';
 import '../art/body.dart';
+import '../art/class_moves.dart';
 import '../art/creatures.dart';
 import '../art/hounds.dart';
 import '../art/fairy.dart';
@@ -166,7 +167,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   bool _reduceMotion = false;
 
   // animation state
-  final Map<String, double> fx = {'flash': 0, 'kflash': 0, 'alpha': 1, 'enter': 0, 'dying': 0, 'slash': 0, 'fire': 0, 'lunge': 0, 'wyrm': 0, 'bones': 0, 'ward': 0, 'pounce': 0, 'wave': 0, 'grasp': 0, 'charge': 0, 'spectral': 0, 'flee': 0, 'ko': 0, 'dash': 0, 'screen': 0, 'zoom': 0, 'swoop': 0, 'kback': 0, 'gloom': 0, 'reaper': 0, 'reap': 0, 'soul': 0, 'scar': 0, 'wolf': 0, 'deadrun': 0, 'legion': 0, 'demon': 0, 'wolves': 0, 'bats': 0, 'storm': 0, 'die': 0, 'blade': 0, 'ice': 0, 'elder': 0};
+  final Map<String, double> fx = {'flash': 0, 'kflash': 0, 'alpha': 1, 'enter': 0, 'dying': 0, 'slash': 0, 'fire': 0, 'lunge': 0, 'wyrm': 0, 'bones': 0, 'ward': 0, 'pounce': 0, 'wave': 0, 'grasp': 0, 'charge': 0, 'spectral': 0, 'flee': 0, 'ko': 0, 'dash': 0, 'screen': 0, 'zoom': 0, 'swoop': 0, 'kback': 0, 'gloom': 0, 'reaper': 0, 'reap': 0, 'soul': 0, 'scar': 0, 'wolf': 0, 'deadrun': 0, 'legion': 0, 'demon': 0, 'wolves': 0, 'bats': 0, 'storm': 0, 'die': 0, 'blade': 0, 'ice': 0, 'elder': 0, 'vanish': 0};
 
   /// The elder wyrm of Cataclysm is pouring out its fire (jaw dropped).
   bool _elderBreath = false;
@@ -731,7 +732,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     if (sp.cleave) {
       // A great sweeping arc through the foe.
       _at(d0 + hit - 40, () {
-        _trail = (now, colour, false, true);
+        _trail = (now, colour, false, true, 'arc');
         for (var i = 0; i < 5; i++) {
           _spark('spark', _foeChest + Offset(-30 + i * 14.0, -50 + i * 22.0), 6, dir: .3, spread: 1, speed: 6, life: 380, radius: 3.5);
         }
@@ -981,9 +982,22 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   /// The crossbow is in your hands for a shot.
   bool _shooting = false;
 
-  /// The blade's stroke as it plays: when it began, its colour, and whether it was a bash or a
-  /// critical (wider, brighter).
-  (double, Color, bool, bool)? _trail;
+  /// The blade's stroke as it plays: when it began, its colour, whether it was a bash or a
+  /// critical (wider, brighter), and its shape: 'arc' for the plain knight's, or a class's own
+  /// (see [ClassMove.stroke]).
+  (double, Color, bool, bool, String)? _trail;
+
+  /// How the knight is crossing to the foe for this blow (a class's own way, or a plain run).
+  DashStyle _dashStyle = DashStyle.run;
+
+  /// The class you fight as (your whole suit's), and so your stance and moves; none in wolf form.
+  ClassMoves? get _classMoves => fx['wolf']! > .5 ? null : movesFor(suitWorn(c.state.knight));
+
+  /// The class's colour, for its strokes.
+  Color? get _classColour => switch (suitArtFor(c.state.knight)) {
+    final a? => Color(a.argb),
+    _ => null,
+  };
 
   /// Impact bursts where blows land: where, when, colour and size.
   final List<(Offset, double, Color, double)> _bursts = [];
@@ -998,6 +1012,122 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   void _burst(Offset at, Color col, double size) {
     if (_reduceMotion) return;
     _bursts.add((at, now, col, size));
+  }
+
+  /// Where the knight's feet are now (the dash carries him toward the foe).
+  Offset get _knightFeet => Offset(_knightX + fx['dash']! * _dashReach, _groundY);
+
+  /// Crosses to the foe a class's own way for [move], to [reach], and back once its hold is done.
+  void _classDash(ClassMove move, double reach) {
+    _dashStyle = move.dash;
+    // Home again once the blow's hold is over (the clip's last pose but one).
+    final back = move.clip[move.clip.length - 2].ms - 20;
+    void dust(double delay, double size) => _at(delay, () => _spark('smoke', _knightFeet + const Offset(-10, -4), (6 * size).round(), dir: -math.pi / 2, spread: 2.6, speed: 2.5 * size, life: 520, radius: 7 * size, gravity: .02));
+    switch (move.dash) {
+      case DashStyle.low:
+        // Utterly still, then across in a burst.
+        _tween('dash', reach, 110, delay: swingHitMs - 130, ease: easeOut);
+        dust(swingHitMs - 130, 1);
+        _tween('dash', 0, 420, delay: back, ease: easeInOut);
+      case DashStyle.blink:
+        // Gone in a swirl of mist, and there at the foe; and back the same way.
+        final blood = move.stroke == 'cross', col = blood ? 'blood' : (move.stroke == 'twin' ? 'curse' : 'holy');
+        void puff() {
+          // A soft cloud the knight's shape is lost in, and a few motes of the class's colour.
+          _spark(blood ? 'bloodveil' : 'veil', _knightFeet + const Offset(0, -110), 14, spread: 6.3, speed: 1.6, life: 700, radius: 26, gravity: -.01, lift: .2);
+          _spark(col, _knightFeet + const Offset(0, -120), 10, spread: 6.3, speed: 3.5, life: 520, radius: 3, gravity: 0, lift: .2);
+        }
+        _at(swingHitMs - 170, puff);
+        _tween('vanish', 1, 60, delay: swingHitMs - 170);
+        _tween('dash', reach, 1, delay: swingHitMs - 110);
+        _at(swingHitMs - 100, puff);
+        _tween('vanish', 0, 70, delay: swingHitMs - 100);
+        _at(back, puff);
+        _tween('vanish', 1, 60, delay: back);
+        _tween('dash', 0, 1, delay: back + 70);
+        _at(back + 80, puff);
+        _tween('vanish', 0, 90, delay: back + 80);
+      default:
+        _tween('dash', reach, swingHitMs - 60, ease: easeInOut);
+        _tween('dash', 0, 380, delay: back, ease: easeInOut);
+        if (move.dash == DashStyle.leap || move.dash == DashStyle.dive) {
+          dust(120, 1);
+          dust(swingHitMs, 1.4);
+        } else if (move.dash == DashStyle.stomp) {
+          // Iron boots stamping in.
+          for (final at in [90.0, 200.0, swingHitMs]) {
+            dust(at, .8);
+          }
+          _at(200, () => _impact(.25));
+        }
+    }
+  }
+
+  /// A class's own flourishes on its blow, beyond the stroke itself: fire on the dragon's cleave,
+  /// the ground burning under the Ashen slam, a geyser for the Tidecaller, wind for the Skyborn…
+  void _classFx(ClassMove move, double d0, bool bash) {
+    final chest = _foeChest, feet = const Offset(_foeX - 40, _groundY);
+    switch (move.stroke) {
+      case 'flame':
+        // The cleave burns as it goes.
+        for (var i = 0; i < 5; i++) {
+          _at(d0 + swingHitMs - 60 + i * 22, () => _spark('fire', chest + Offset(-60 + i * 12.0, -110 + i * 50.0), 3, speed: 1.4, life: 520, radius: 7, lift: .6, gravity: -.03));
+        }
+      case 'breath':
+        // Rearing back, then fire: a cone of it out of the knight, along the thrust.
+        for (var i = 0; i < 8; i++) {
+          _at(d0 + swingHitMs - 70 + i * 30, () {
+            final from = _knightFeet + const Offset(70, -205);
+            _spark('fire', from, 4, dir: math.atan2(chest.dy - from.dy, chest.dx - from.dx), spread: .45, speed: 9, life: 420, radius: 9, lift: 0, gravity: -.01);
+          });
+        }
+      case 'slam':
+        // The ground catches fire either side of where it lands.
+        _at(d0 + swingHitMs, () {
+          for (var i = -3; i <= 3; i++) {
+            _spark('fire', feet + Offset(i * 34.0, -6), 3, spread: .8, speed: 3, life: 700, radius: 8, lift: 1, gravity: -.04);
+          }
+        });
+      case 'anvil':
+        // Runes ring out from the blow.
+        _at(d0 + swingHitMs, () {
+          _spark('holy', feet + const Offset(0, -10), 22, dir: -math.pi / 2, spread: 3.2, speed: 6, life: 520, radius: 3.5, gravity: .15);
+          _impact(.5);
+        });
+      case 'geyser':
+        // A column of water bursts up under the foe.
+        for (var i = 0; i < 6; i++) {
+          _at(d0 + swingHitMs - 20 + i * 40, () {
+            _spark('rime', feet + Offset(-10 + (i % 3) * 10.0, -10), 7, dir: -math.pi / 2, spread: .5, speed: 9, life: 560, radius: 4.5, gravity: .2);
+            _spark('mist', feet + const Offset(0, -30), 3, dir: -math.pi / 2, spread: .8, speed: 5, life: 700, radius: 10, gravity: .02);
+          });
+        }
+      case 'gale':
+        // Wind streaming off the somersault.
+        for (var i = 0; i < 4; i++) {
+          _at(d0 + 180 + i * 40, () => _spark('mist', _knightFeet + Offset(0, -200 + i * 30.0), 4, dir: math.pi, spread: .3, speed: 6, life: 420, radius: 5, gravity: 0, lift: 0));
+        }
+      case 'dive':
+        // Down out of the sky like a falling star.
+        _at(d0 + swingHitMs, () {
+          _spark('holy', _knightFeet + const Offset(40, -20), 26, dir: -math.pi / 2, spread: 3, speed: 7, life: 520, radius: 4, gravity: .25);
+          _impact(.7);
+        });
+      case 'iaido':
+        // The cut is only seen a moment after it's made: then the foe flinches, and the blade
+        // goes back in its sheath with a click.
+        _at(d0 + swingHitMs + 180, () {
+          _spark('spark', chest, 20, dir: 0, spread: 3.4, speed: 7, life: 380, radius: 3.5);
+          _tween('flash', 1, 40);
+          _tween('flash', 0, 260, delay: 40);
+        });
+        _at(d0 + 640, () => Audio.play(Sfx.clang, power: .5));
+      case 'claw' || 'maul':
+        if (_gore) _at(d0 + swingHitMs + 20, () => _spark('blood', chest, 10, dir: .6, spread: 1.2, speed: 4, life: 600, radius: 3, gravity: .3));
+      case 'twin':
+        // A ghost of you, somewhere else, strikes too.
+        _at(d0 + swingHitMs + 160, () => _spark('curse', chest + const Offset(20, -10), 14, dir: math.pi, spread: 1.6, speed: 5, life: 420, radius: 3.5));
+    }
   }
 
   /// A big moment: the whole screen flashes and the camera punches in on the foe.
@@ -1131,31 +1261,43 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       case HeroClass.knight:
         hitMs = swingHitMs;
         final bash = r.action == BattleAction.skill;
+        // A class fights its own way (a special attack keeps its own build-up and blow).
+        final move = special != null && !special.dice ? null : (bash ? _classMoves?.skill : _classMoves?.attack);
         _at(d0, () {
           // A quick slash, or for the stunning blow, an overhead crush.
-          _knightClip = special != null && !special.dice ? specialClip : (bash ? crushClip : swingClip);
+          _knightClip = special != null && !special.dice ? specialClip : (move?.clip ?? (bash ? crushClip : swingClip));
           _knightClipStart = now;
           // Run in to the foe on one smooth curve, arriving just before the blade comes down (the
           // clip raises the sword on the way), then glide back to your mark after the hold.
           // (Bigger foes are wider, so you stop shorter: you used to run into a giant's belly.)
-          final reach = ((bash ? crushDash : swingDash) - .28 * (_foeHeight - 160) / _dashReach).clamp(.55, 1.16);
-          _tween('dash', reach, swingHitMs - 60, ease: easeInOut);
-          _tween('dash', 0, 380, delay: swingHitMs + 100, ease: easeInOut);
+          final reach = ((move?.reach ?? (bash ? crushDash : swingDash)) - .28 * (_foeHeight - 160) / _dashReach).clamp(.55, math.max(1.16, move?.reach ?? 0)).toDouble();
+          if (move == null) {
+            _dashStyle = DashStyle.run;
+            _tween('dash', reach, swingHitMs - 60, ease: easeInOut);
+            _tween('dash', 0, 380, delay: swingHitMs + 100, ease: easeInOut);
+          } else {
+            _classDash(move, reach);
+          }
         });
         if (bash) {
           // The ground cracks where it lands: dust thrown out both ways, and the screen jolts.
+          // (Only where the blow comes down into the ground: a thrust or a spin raises no dust.)
+          final ground = move == null || const {'slam', 'anvil', 'maul', 'dive', 'chop'}.contains(move.stroke);
           _at(d0 + swingHitMs, () {
-            _spark('smoke', const Offset(_foeX - 70, _groundY - 4), 14, dir: -math.pi / 2, spread: 2.8, speed: 4, life: 600, radius: 9, gravity: .05);
-            _spark('spark', const Offset(_foeX - 70, _groundY - 10), 12, dir: -math.pi / 2, spread: 2.2, speed: 6, life: 380, radius: 3.5, gravity: .2);
+            if (ground) _spark('smoke', const Offset(_foeX - 70, _groundY - 4), 14, dir: -math.pi / 2, spread: 2.8, speed: 4, life: 600, radius: 9, gravity: .05);
+            if (ground) _spark('spark', const Offset(_foeX - 70, _groundY - 10), 12, dir: -math.pi / 2, spread: 2.2, speed: 6, life: 380, radius: 3.5, gravity: .2);
             // (A softer punch than a crit's: the full one washed the whole screen white.)
             _punch(.55);
             _impact(.6);
           });
         }
         _at(d0 + swingHitMs - 110, () {
-          _trail = (now, bash ? const Color(0xFFFFF2C0) : _bladeColour, bash, r.damage.crit);
+          final own = move == null ? null : _classColour;
+          final col = own == null ? (bash ? const Color(0xFFFFF2C0) : _bladeColour) : (bash ? own : Color.lerp(own, const Color(0xFFFFFFFF), .3)!);
+          _trail = (now, col, bash && move == null, r.damage.crit, move?.stroke ?? 'arc');
           Audio.play(Sfx.swing, power: bash ? 1.3 : 1);
         });
+        if (move != null) _classFx(move, d0, bash);
       case HeroClass.mage:
         const flight = 200.0;
         hitMs = castReleaseMs + flight;
@@ -1211,7 +1353,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       _at(d0 + hitMs + 260, () {
         _mark('Opening!', const [Color(0xFFFFE27A), Color(0xFF8A5A10)], _foeChest + const Offset(-40, -100));
         _mark('${r.opening}', _orange, _foeChest + const Offset(10, -30));
-        _trail = (now, const Color(0xFFFFE27A), false, false);
+        _trail = (now, const Color(0xFFFFE27A), false, false, 'arc');
         _foeClip = hitClip;
         _foeClipStart = now;
         Audio.play(Sfx.hit, power: .8);
@@ -1484,7 +1626,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
             _mark('Parry!', _holy, at);
             c.revealCounter();
             if (r.action == BattleAction.attack || r.action == BattleAction.skill) {
-              _knightClip = swingClip;
+              _knightClip = _classMoves?.attack.clip ?? swingClip;
               _knightClipStart = now - swingHitMs + 120;
             }
             _at(140, () {
@@ -2355,7 +2497,9 @@ class _ScenePainter extends CustomPainter {
     // As the wolf (the Bloodmoon Pelt), you're all fur and claws until it passes.
     final blade = fx['blade']!;
     final hero = s.fx['wolf']! > .5 && k.hp > 0 ? wolfformLook : (s._shooting ? _crossbowLook(k) : heroLook(k, glow: blade > .05 ? Color.lerp(s._bladeTint, const Color(0xFFFFFFFF), .3) : null));
-    final kPose = s._sample(idlePose(hero.stance, t, still: still), s._knightClip, s._knightClipStart, () => s._knightClip = null);
+    // A class suit stands its own way (breathing on top). (The crossbow's clip sets the arms.)
+    final moves = s._classMoves;
+    final kPose = s._sample(moves == null ? idlePose(hero.stance, t, still: still) : inClassStance(idlePose(hero.stance, t, still: still), moves.stance), s._knightClip, s._knightClipStart, () => s._knightClip = null);
     final riding = s._riding, charge = fx['charge']!;
     if (riding != null && charge > 0 && !riding.flying) {
       // The charge: you gallop at the foe, run it down, and wheel back to your place.
@@ -2379,11 +2523,12 @@ class _ScenePainter extends CustomPainter {
       // Fleeing: you turn tail and run off the left of the field. Knocked out: flat on your back.
       final flee = fx['flee']!, ko = fx['ko']!, dash = fx['dash']!;
       final kx = _knightX - flee * 560 + dash * _dashReach - fx['kback']! * 22;
-      if (dash > .08 && !still) {
+      final vanish = fx['vanish']!;
+      if (dash > .08 && !still && const {DashStyle.run, DashStyle.leap, DashStyle.low, DashStyle.dive}.contains(s._dashStyle)) {
         // Afterimages streaming behind the charge (just one on a phone: each is a whole extra knight
         // to draw, and three of them dropped frames mid-swing).
         // (All of them in one faint run, unlit: each used to be a layer of its own in every pass.)
-        runAs(alpha: .24 * math.min(dash, 1), rim: false, bounds: const Rect.fromLTRB(_knightX - 420, _groundY - 380, _knightX + _dashReach + 260, _groundY + 60));
+        runAs(alpha: .24 * math.min(dash, 1), rim: false, bounds: const Rect.fromLTRB(_knightX - 420, _groundY - 900, _knightX + _dashReach + 340, _groundY + 60));
         for (var i = s._lite ? 1 : 3; i >= 1; i--) {
           drawHumanoid(canvas, hero, kPose, t, DrawOptions(at: Offset(kx - i * 48 * math.min(dash, 1), _groundY), scale: _knightScale, alpha: runs == null ? .32 / i * math.min(dash, 1) : 1, shadow: false), still: true);
         }
@@ -2396,7 +2541,7 @@ class _ScenePainter extends CustomPainter {
         final red = math.max(fx['kflash']!, low);
         return red > .02 ? hurtFilter(red) : null;
       }();
-      runAs(tint: hurt, bounds: const Rect.fromLTRB(_knightX - 600, _groundY - 380, _knightX + _dashReach + 260, _groundY + 60));
+      runAs(tint: hurt, alpha: 1 - vanish, bounds: const Rect.fromLTRB(_knightX - 600, _groundY - 900, _knightX + _dashReach + 340, _groundY + 60));
       drawHumanoid(
         canvas,
         hero,
@@ -2406,6 +2551,7 @@ class _ScenePainter extends CustomPainter {
           at: Offset(kx, _groundY),
           scale: _knightScale,
           flip: flee > .15,
+          alpha: runs == null ? 1 - vanish : 1,
           // Reaped from behind, you pitch forward onto your face.
           rotation: fx['gloom']! > 0 ? ko * 80 : -ko * 82,
           tint: inline(hurt),
@@ -2846,13 +2992,15 @@ class _ScenePainter extends CustomPainter {
     // whiter on a crit, a broad shockwave on a bash.
     final trail = s._trail;
     if (trail != null) {
-      final (start, col, bash, crit) = trail;
-      final age = (t - start) / (bash ? 420 : 340);
+      final (start, col, bash, crit, kind) = trail;
+      final age = (t - start) / (bash ? 420 : classStrokeMs(kind));
       if (age > 1) {
         s._trail = null;
       } else if (age >= 0) {
         final centre = s._foeChest + const Offset(-110, 10);
-        if (bash) {
+        if (kind != 'arc') {
+          drawClassStroke(canvas, kind, age, s._foeChest, col, crit, knightX: s._knightFeet.dx);
+        } else if (bash) {
           final r = 30 + 120 * Curves.easeOut.transform(age), a = (1 - age);
           // (A soft wide ring under a firm one, rather than a blurred ring: a blur on a ring this big
           // was a costly draw at the very moment of the blow.)
@@ -2896,6 +3044,9 @@ class _ScenePainter extends CustomPainter {
           canvas.drawCircle(p.pos, rr * .35, Paint()..color = Color.fromRGBO(255, 243, 196, alpha));
         case 'miasma':
           canvas.drawCircle(p.pos, p.radius * (1.6 - kk * .6), Paint()..color = Color.fromRGBO(182, 200, 106, kk * .25));
+        case 'veil' || 'bloodveil':
+          // A blink's cloud: soft, see-through, swelling as it thins.
+          canvas.drawCircle(p.pos, p.radius * (1.5 - kk * .5), Paint()..color = p.kind == 'veil' ? Color.fromRGBO(120, 110, 130, kk * .3) : Color.fromRGBO(150, 24, 34, kk * .32));
         default:
           final col = switch (p.kind) {
             'venom' => const Color(0xFF8FD36A),
@@ -3540,4 +3691,139 @@ void _softOval(Canvas canvas, Rect r, Color colour) {
   final rad = r.width / 2;
   canvas.drawCircle(Offset.zero, rad, Paint()..shader = ui.Gradient.radial(Offset.zero, rad, [colour, colour.withValues(alpha: colour.a * .5), colour.withValues(alpha: 0)], const [0, .5, 1]));
   canvas.restore();
+}
+
+/// [idle] in a class's [stance]: its joints moved by as much as the stance differs from the
+/// knight's own, so the breathing and fidgeting still play on top.
+Pose inClassStance(Pose idle, Map<J, double> stance) {
+  final base = stances[Stance.knight]!, p = idle.copy();
+  stance.forEach((j, v) => p[j] += v - base[j]);
+  return p;
+}
+
+/// How long a class's stroke lingers, in milliseconds (the iaido's line hangs in the air).
+double classStrokeMs(String kind) => switch (kind) {
+  'iaido' => 900,
+  'cross' || 'maul' || 'twin' || 'fangs' || 'wave' => 440,
+  'spin' || 'dive' || 'slam' || 'anvil' || 'geyser' => 460,
+  _ => 360,
+};
+
+/// A quadratic curve from [a] through the pull of [b] to [c], at [u].
+Offset _bez(Offset a, Offset b, Offset c, double u) => a * ((1 - u) * (1 - u)) + b * (2 * (1 - u) * u) + c * (u * u);
+
+/// A smear along [path] (u from 0 to 1): it races from 0 to 1, a bright head and a tail that thins
+/// and fades behind it, then the whole thing fades. [age] runs 0 to 1 over the stroke; [delay]
+/// (a share of it) holds this one back, for a second cut.
+void _smear(Canvas canvas, Offset Function(double) path, double age, Color col, double width, {double delay = 0, double tailLen = .65, double speed = 1.8, bool crit = false}) {
+  final a = (age - delay) / (1 - delay);
+  if (a <= 0 || a >= 1) return;
+  final lead = Curves.easeOut.transform(math.min(1, a * speed)), tail = math.max(0.0, lead - tailLen);
+  final fade = a < .55 ? 1.0 : 1 - (a - .55) / .45;
+  if (lead <= tail) return;
+  const n = 14;
+  final w = width * (crit ? 1.35 : 1);
+  var prev = path(tail);
+  for (var i = 1; i <= n; i++) {
+    final k = i / n, next = path(tail + (lead - tail) * k);
+    canvas.drawLine(prev, next, strokePaint(col.withValues(alpha: (.15 + .7 * k) * fade), w * (.3 + .7 * k))..strokeCap = StrokeCap.round);
+    if (k > .55) canvas.drawLine(prev, next, strokePaint(const Color(0xFFFFFFFF).withValues(alpha: (k - .4) * fade), w * .28 * k)..strokeCap = StrokeCap.round);
+    prev = next;
+  }
+}
+
+/// A class's stroke through the foe at [f] (its chest): each has its own shape. (The plain arc and
+/// the bash's shockwave are drawn where the trail is.)
+void drawClassStroke(Canvas canvas, String kind, double age, Offset f, Color col, bool crit, {double? knightX}) {
+  Offset Function(double) curve(Offset a, Offset b, Offset c) => (u) => _bez(f + a, f + b, f + c, u);
+  Offset Function(double) line(Offset a, Offset c) => (u) => Offset.lerp(f + a, f + c, u)!;
+  void ring(Offset at, double r, double a, {double sy = 1}) {
+    final rect = Rect.fromCenter(center: at, width: 2 * r, height: 2 * r * sy);
+    canvas.drawOval(rect, strokePaint(col.withValues(alpha: .3 * a), 16 * a + 4));
+    canvas.drawOval(rect, strokePaint(col.withValues(alpha: .85 * a), 7 * a + 2));
+    canvas.drawOval(rect.deflate(r * .25), strokePaint(const Color(0xFFFFFFFF).withValues(alpha: .6 * a), 3 * a + 1));
+  }
+  switch (kind) {
+    case 'wide':
+      // A low, flat sweep right through.
+      _smear(canvas, curve(const Offset(-230, 10), const Offset(-30, 120), const Offset(150, -20)), age, col, 26, crit: crit);
+    case 'rise':
+      _smear(canvas, curve(const Offset(-150, 110), const Offset(40, 100), const Offset(50, -140)), age, col, 18, crit: crit);
+    case 'chop':
+      _smear(canvas, curve(const Offset(-40, -160), const Offset(10, -40), const Offset(-10, 110)), age, col, 24, crit: crit, speed: 2.2);
+    case 'kesa':
+      // A clean slanting cut, thin and bright.
+      _smear(canvas, curve(const Offset(-80, -160), const Offset(10, -40), const Offset(70, 140)), age, col, 9, crit: crit, speed: 2.4, tailLen: .9);
+    case 'claw' || 'maul':
+      // Three rakes side by side (and the maul's three more, the other way).
+      for (final dx in const [-28.0, 0.0, 28.0]) {
+        _smear(canvas, curve(Offset(-50 + dx, -130), Offset(10 + dx, -20), Offset(20 + dx, 100)), age, col, 9, crit: crit, speed: 2.2);
+        if (kind == 'maul') _smear(canvas, curve(Offset(60 + dx, -120), Offset(10 + dx, -20), Offset(-40 + dx, 100)), age, col, 9, crit: crit, speed: 2.2, delay: .18);
+      }
+    case 'thrust':
+      _smear(canvas, line(const Offset(-230, 0), const Offset(80, -6)), age, col, 14, crit: crit, speed: 2.6, tailLen: .5);
+    case 'stab':
+      _smear(canvas, line(const Offset(-170, 80), const Offset(50, -130)), age, col, 12, crit: crit, speed: 2.6, tailLen: .5);
+    case 'fangs':
+      // Two darting stabs, one after the other.
+      _smear(canvas, line(const Offset(-200, -18), const Offset(60, -24)), age, col, 10, crit: crit, speed: 2.8, tailLen: .4);
+      _smear(canvas, line(const Offset(-200, 18), const Offset(70, 14)), age, col, 10, crit: crit, speed: 2.8, tailLen: .4, delay: .16);
+    case 'cross':
+      _smear(canvas, curve(const Offset(-90, -130), const Offset(10, -10), const Offset(50, 120)), age, col, 15, crit: crit, speed: 2.2);
+      _smear(canvas, curve(const Offset(-90, 120), const Offset(10, 10), const Offset(50, -130)), age, col, 15, crit: crit, speed: 2.2, delay: .14);
+    case 'twin':
+      // Your cut, and a ghost of it from the other side.
+      _smear(canvas, curve(const Offset(-60, -150), const Offset(70, -40), const Offset(-20, 120)), age, col, 16, crit: crit);
+      _smear(canvas, curve(const Offset(60, -150), const Offset(-70, -40), const Offset(20, 120)), age, const Color(0xFFC89AFF), 16, crit: crit, delay: .3);
+    case 'line':
+      // A single thin line, gone almost as soon as it's there.
+      _smear(canvas, line(const Offset(-280, -8), const Offset(130, -8)), age, col, 5, crit: crit, speed: 3, tailLen: .8);
+    case 'iaido':
+      // One long line clean across the field, hanging there.
+      final a = age.clamp(0.0, 1.0), lead = Curves.easeOut.transform(math.min(1, a * 6)), fade = a < .6 ? 1.0 : 1 - (a - .6) / .4;
+      final from = f + const Offset(-480, -4), to = Offset.lerp(from, f + const Offset(300, -4), lead)!;
+      canvas.drawLine(from, to, strokePaint(col.withValues(alpha: .35 * fade), (crit ? 12 : 9) * fade + 1));
+      canvas.drawLine(from, to, strokePaint(const Color(0xFFFFFFFF).withValues(alpha: fade), 2.4));
+    case 'spin':
+      // A full circle of silver about you as you turn.
+      _smear(canvas, (u) => f + const Offset(-110, 0) + Offset(math.cos(-math.pi / 2 + u * 2 * math.pi), math.sin(-math.pi / 2 + u * 2 * math.pi)) * 130, age, col, 14, crit: crit, tailLen: .75, speed: 2);
+    case 'wave':
+      // Down, and back up: a figure of eight through the foe.
+      _smear(
+        canvas,
+        (u) => u < .5 ? _bez(f + const Offset(-150, -110), f + const Offset(-60, 130), f + const Offset(0, 20), u * 2) : _bez(f + const Offset(0, 20), f + const Offset(60, -90), f + const Offset(120, -120), u * 2 - 1),
+        age,
+        col,
+        16,
+        crit: crit,
+        tailLen: .7,
+        speed: 1.6,
+      );
+    case 'geyser':
+      _smear(canvas, curve(const Offset(-110, 130), const Offset(20, 120), const Offset(10, -170)), age, col, 22, crit: crit);
+    case 'gale':
+      _smear(canvas, curve(const Offset(-110, -170), const Offset(60, -60), const Offset(10, 110)), age, col, 18, crit: crit);
+    case 'dive':
+      // Straight down out of the sky.
+      // (Where you come down, just in front of you.)
+      final x = (knightX ?? f.dx - 150) + 40 - f.dx;
+      _smear(canvas, line(Offset(x, -620), Offset(x, 120)), age, col, 22, crit: crit, speed: 2.4, tailLen: .5);
+    case 'flame':
+      _smear(canvas, curve(const Offset(-100, -170), const Offset(80, -50), const Offset(10, 130)), age, col, 26, crit: crit);
+      _smear(canvas, curve(const Offset(-100, -170), const Offset(80, -50), const Offset(10, 130)), age, const Color(0xFFFFF3C4), 8, crit: crit);
+    case 'breath':
+      _smear(canvas, line(const Offset(-220, -4), const Offset(80, -4)), age, col, 18, crit: crit, speed: 2.4, tailLen: .55);
+    case 'slam':
+      // A ring of fire racing out along the ground.
+      final a = age.clamp(0.0, 1.0);
+      ring(Offset(f.dx - 60, _groundY - 6), 40 + 170 * Curves.easeOut.transform(a), 1 - a, sy: .2);
+      _smear(canvas, curve(const Offset(-60, -170), const Offset(10, -60), const Offset(-20, 110)), age, col, 22, crit: crit, speed: 2.4);
+    case 'anvil':
+      // The shockwave, and a second ring of runes behind it along the ground.
+      final a = age.clamp(0.0, 1.0);
+      ring(f + const Offset(-50, 10), 30 + 120 * Curves.easeOut.transform(a), 1 - a);
+      ring(Offset(f.dx - 60, _groundY - 6), 30 + 150 * Curves.easeOut.transform(a), 1 - a, sy: .22);
+    default:
+      _smear(canvas, curve(const Offset(-60, -150), const Offset(70, -40), const Offset(-20, 120)), age, col, 18, crit: crit);
+  }
 }

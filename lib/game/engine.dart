@@ -266,6 +266,22 @@ class GameEngine {
   GameEngine(this.state, {math.Random? random, DateTime Function()? clock}) : _rng = random ?? math.Random(), loot = LootTable(random), clock = clock ?? DateTime.now {
     loot.ng = state.ng;
     sellSpareSetPieces();
+    _raiseOldPieces();
+  }
+
+  /// Saves from before: a class suit's pieces become legendary, and a relic already forged gets
+  /// the honing it now comes with.
+  void _raiseOldPieces() {
+    final k = state.knight;
+    final all = [for (final l in k.loadouts.values) ...[for (final s in GearSlot.values) l.inSlot(s)], k.trinket, k.ring, ...k.stash, ...state.pendingLoot].whereType<GearItem>().toList();
+    for (final g in all) {
+      if (asLegendSetPiece(g) case final better?) _replaceItem(g.id, better);
+      if (const {'Kingsfall', 'Bramblelash', 'Briarsong'}.contains(g.name) && g.rarity == Rarity.legendary) {
+        while (g.hone < relicHone) {
+          honeOnce(g);
+        }
+      }
+    }
   }
 
   /// Today, for seasonal events (swapped out in tests and the simulator).
@@ -1124,6 +1140,9 @@ class GameEngine {
     k.coins -= relic.gold;
     state.forged.add(c);
     final item = loot.relicWeapon(c, k.level, k.heroClass);
+    for (var i = 0; i < relicHone; i++) {
+      honeOnce(item);
+    }
     state.pendingLoot.add(item);
     _note('Dunstan works the forge all night. At dawn he hands you ${item.name}, still smoking. "Don\'t say I never make you anything."', EntryKind.gold);
     return item;

@@ -1347,7 +1347,7 @@ void main() {
       ..addMat(barKey(Metal.iron), pieceBars);
     final ring = e.forgePiece('nightblood', GearSlot.ring)!;
     expect(ring.gearSet, 'nightblood');
-    expect(ring.rarity, Rarity.epic);
+    expect(ring.rarity, Rarity.legendary);
     expect(ring.level, 20);
     expect(s.mat(trophyKey(Trophy.fang)), 0);
     // The blueprint is kept.
@@ -2473,7 +2473,22 @@ void main() {
       ..level = 20;
     expect(e.whyNotForge(0), contains('level'));
     k.level = 30;
-    expect(e.forgeRelic(0), isNotNull);
+    final kingsfall = e.forgeRelic(0)!;
+    // It comes out of the forge already honed: above the legendaries that simply drop.
+    expect(kingsfall.hone, relicHone);
+  });
+
+  test('class suits are legendary, and old epic pieces become legendary on loading', () {
+    final s = GameEngine.newGame(heroClass: HeroClass.knight), loot = LootTable(Random(2));
+    expect(loot.setPiece('nightblood', GearSlot.helm, HeroClass.knight, 30).rarity, Rarity.legendary);
+    expect(loot.setPiece('arena', GearSlot.helm, HeroClass.knight, 30).rarity, Rarity.epic);
+    final old = loot.setPiece('nightblood', GearSlot.gloves, HeroClass.knight, 30);
+    final epic = GearItem(id: old.id, name: old.name, slot: old.slot, art: old.art, rarity: Rarity.epic, level: 30, gearSet: 'nightblood', value: 10, stats: {Stat.damage: 100});
+    s.knight.stash.add(epic);
+    GameEngine(s);
+    final now = s.knight.stash.single;
+    expect(now.rarity, Rarity.legendary);
+    expect(now.stats[Stat.damage], 120);
   });
 
   group('dungeons', () {
