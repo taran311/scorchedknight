@@ -25,7 +25,7 @@ import '../game/catalog.dart';
 import '../game/events.dart';
 import '../game/controller.dart';
 import '../game/engine.dart' show RoadStep, RoadKind;
-import '../game/crafting.dart' show smithName, mageName;
+import '../game/crafting.dart' show smithName, mageName, Gem, Elemental;
 import '../game/models.dart';
 import '../game/rules.dart';
 import 'account_panel.dart';
@@ -211,11 +211,21 @@ class _InnPageState extends State<InnPage> with RouteAware {
         if ((hurt || !s.day) && c.whyNotRest == null && !job && !offered) TownSpot.inn: hurt ? 'Rest and heal' : 'Sleep till morning',
         if (unspentPoints(k) > 0)
           TownSpot.tent: '${unspentPoints(k)} point${unspentPoints(k) == 1 ? '' : 's'} to train'
+        // Everything in hand for the next home up: say so (the cottage, then the keep).
+        else if (c.engine.whyNotBuild == null && c.engine.nextHome != null)
+          TownSpot.tent: '${c.engine.nextHome!.name} ready to build'
         // Wren out on an errand is news, not a job: a word on her home's button, not a card.
         else if (s.home >= 1 && s.errand != null && !c.errandBack)
           TownSpot.tent: '$retainerName back in ${c.errandLeft} ${c.errandLeft == 1 ? 'fight' : 'fights'}',
         // Worn pieces Dunstan could make stronger right now (honed, or brought up to your level),
         // and you've the gold for it.
+        // Old Wick: a free scroll to spend first, else bolts or a rune you could have made now.
+        if (c.whyShut('tower') == null && k.scrolls > 0)
+          TownSpot.enchanter: '${k.scrolls} scroll${k.scrolls == 1 ? '' : 's'} to use'
+        else if (c.whyShut('tower') == null && Gem.values.any((g) => c.whyNotFletch(g) == null))
+          TownSpot.enchanter: 'Bolts to make'
+        else if (c.whyShut('tower') == null && Elemental.values.any((el) => c.whyNotBind(el) == null))
+          TownSpot.enchanter: 'A rune to bind',
         if (c.whyShut('forge') == null && c.engine.upgradesReady > 0) TownSpot.forge: '${c.engine.upgradesReady} upgrade${c.engine.upgradesReady == 1 ? '' : 's'} ready',
       };
       final taps = <TownSpot, VoidCallback?>{
