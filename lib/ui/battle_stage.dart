@@ -2814,7 +2814,8 @@ class _ScenePainter extends CustomPainter {
       final spot = s._bubbleBox ??= _place(
         Size(w, h + 14),
         Offset(head.dx - w * .2, head.dy - h / 2 - 14),
-        Rect.fromLTRB(left + 6, -above + 6, left + visibleW - 6, sceneSize.height + below - 6),
+        // (Clear of the chips along the stage's top edge too: the bolts loaded, the companion.)
+        Rect.fromLTRB(left + 6, -above + 6 + 40 * visibleW / size.width, left + visibleW - 6, sceneSize.height + below - 6),
         // Only the banner moves it: damage numbers make way for the bubble (see below), not the
         // other way round, or a flurry of blows would chase it off the top of the screen.
         [if (s._banner != null) Rect.fromLTWH(left, 96, visibleW, 76)],

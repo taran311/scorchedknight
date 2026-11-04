@@ -60,10 +60,13 @@ class _BattleScreenState extends State<BattleScreen> {
   bool _spoilsShown = false;
 
   /// A fight out in the wilds: its winnings go into your pack, and afterwards it's back to the path.
-  late final bool _wild = widget.start == BattleStart.wild || c.state.wildFight;
+  // (These three are set as the screen opens, not lazily: read first after the fight, they used to
+  // find the fight's flags already cleared, so a risen boss beaten from a resumed fight offered a
+  // patrol, and a resumed wilds or dungeon fight forgot where it was.)
+  late final bool _wild;
 
   /// A fight in a dungeon room: afterwards it's back to the doors.
-  late final bool _dungeon = widget.start == BattleStart.dungeon || c.state.dungeonFight;
+  late final bool _dungeon;
 
   /// A guarded place's guardian (from the map): won, the way on is back to the map, not into the
   /// land's trail.
@@ -74,7 +77,7 @@ class _BattleScreenState extends State<BattleScreen> {
 
   /// Against the land's boss, risen (picked up again from a saved fight too, or stepped into from
   /// a patrol once it's back).
-  late bool _heroic = widget.start == BattleStart.heroic || c.state.heroicFight;
+  late bool _heroic;
 
   /// The crossbow's timing bar is up, waiting for you to loose the bolt.
   bool _aiming = false;
@@ -100,6 +103,9 @@ class _BattleScreenState extends State<BattleScreen> {
     super.initState();
     _place = c.state.place != null;
     _side = c.state.arenaFight || c.state.hallFight;
+    _wild = widget.start == BattleStart.wild || c.state.wildFight;
+    _dungeon = widget.start == BattleStart.dungeon || c.state.dungeonFight;
+    _heroic = widget.start == BattleStart.heroic || c.state.heroicFight;
     c.addListener(_watch);
     // The stage subscribes during the first build; start once it is listening.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1497,7 +1503,7 @@ class _Result extends StatelessWidget {
     final String title;
     switch (c.outcome!) {
       case Outcome.won:
-        title = k?.won == true ? 'The Ember King is no more!' : (k?.boss == true ? 'Boss defeated!' : 'Victory!');
+        title = k?.won == true ? 'The Ember King is no more!' : (k?.boss == true ? 'Boss defeated!' : (k?.foe?.boss == true ? 'Risen boss defeated!' : 'Victory!'));
         if (k != null) {
           final chest = k.chest;
           spoils.addAll([
@@ -1529,8 +1535,19 @@ class _Result extends StatelessWidget {
                 _ => const _Spoil(Icon(Icons.description, size: 17, color: Color(0xFFB8A0FF)), 'Enchanting scroll', Color(0xFFB8A0FF), tip: 'A free rune at the enchanter'),
               },
             if (k.companion != null) _Spoil(const Icon(Icons.pets, size: 17, color: _green), 'New companion!', _green, big: true, tip: k.companion),
+            if (k.relicPart != null) _Spoil(const Icon(Icons.extension, size: 17, color: Color(0xFFFFB04A)), k.relicPart!, const Color(0xFFFFB04A), big: true, tip: 'A relic part. With them all, $smithName forges the relic'),
             if (k.prize != null) _Spoil(const Icon(Icons.diamond, size: 17, color: Color(0xFFFFB04A)), k.prize!.name, Color(k.prize!.rarity.argb), big: true),
-            for (final l in k.opened) _Spoil(const Icon(Icons.map, size: 17, color: _gold), isSideLand(l) ? 'Found: ${continents[l].name}' : 'Open: ${continents[l].name}', _gold, big: true),
+            // (A land still beyond your level says so, rather than "Open".)
+            for (final l in k.opened)
+              _Spoil(
+                const Icon(Icons.map, size: 17, color: _gold),
+                c.whyNotTravel(l)?.startsWith('Reach level') ?? false
+                    ? '${continents[l].name} · Lv ${continents[l].minLevel}'
+                    : (isSideLand(l) ? 'Found: ${continents[l].name}' : 'Open: ${continents[l].name}'),
+                _gold,
+                big: true,
+                tip: c.whyNotTravel(l)?.startsWith('Reach level') ?? false ? 'The way is open; you can go in at level ${continents[l].minLevel}' : null,
+              ),
             for (final h in k.hoard) _Spoil(const Icon(Icons.diamond, size: 17, color: _gold), h, _gold, big: true),
             if (k.trophy != null) _Spoil(const Icon(Icons.emoji_events, size: 17, color: Palette.cream), k.trophy!, Palette.cream, tip: 'For $smithName\'s forge'),
             if (k.blueprint != null) _Spoil(const Icon(Icons.description, size: 17, color: Color(0xFF8AB8F0)), k.blueprint!, const Color(0xFF8AB8F0), big: true, tip: 'A blueprint. Take it to $smithName'),

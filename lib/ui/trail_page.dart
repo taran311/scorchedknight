@@ -157,11 +157,7 @@ class _TrailPageState extends State<TrailPage> {
                             children: [
                               Expanded(child: Text(l.name, style: Txt.logo().copyWith(fontSize: 22))),
                               if (_nightPill(s, l) case final p?) ...[p, const SizedBox(width: 6)],
-                              _Pill(
-                                icon: Icons.flag,
-                                text: step == TrailStep.patrol ? 'Cleared' : '$at / $winsForBoss',
-                                tip: step == TrailStep.patrol ? 'The lair has fallen. The roads still need watching.' : 'Stops cleared on the way to ${trailLairs[land]}',
-                              ),
+                              _landPill(c, land, step, at),
                             ],
                           ),
                           Text('Foes level $level', style: Txt.label(size: 13, color: Palette.parch)),
@@ -231,11 +227,7 @@ class _TrailPageState extends State<TrailPage> {
                                       children: [
                                         InnBackButton(label: 'World', icon: Icons.public, onPressed: () => Navigator.of(context).pop()),
                                         const SizedBox(height: 8),
-                                        _Pill(
-                                          icon: Icons.flag,
-                                          text: step == TrailStep.patrol ? 'Cleared' : '$at / $winsForBoss',
-                                          tip: step == TrailStep.patrol ? 'The lair has fallen. The roads still need watching.' : 'Stops cleared on the way to ${trailLairs[land]}',
-                                        ),
+                                        _landPill(c, land, step, at),
                                         if (_nightPill(s, l) case final p?) ...[const SizedBox(height: 6), p],
                                       ],
                                     ),
@@ -1177,3 +1169,15 @@ class _Generals extends StatelessWidget {
 
 /// Whether the land's risen boss gets its card: its boss beaten, and not yet beaten risen.
 bool _risenCard(GameController c, int land) => c.heroicOpen(land) && !c.heroicCleared(land) && !c.state.risenDown.contains(land);
+
+/// The land's state, by its flag as on the map: stops so far, its boss down (gold), or everything
+/// in it done (green, "Cleared"). It used to say "Cleared" as soon as the boss fell, while the
+/// map's flag stayed gold with more still to do.
+Widget _landPill(GameController c, int land, TrailStep step, int at) {
+  if (step != TrailStep.patrol) return _Pill(icon: Icons.flag, text: '$at / $winsForBoss', tip: 'Stops cleared on the way to ${trailLairs[land]}');
+  if (c.engine.landCleared(land)) {
+    return const _Pill(icon: Icons.flag, text: 'Cleared', colour: Color(0xFF9BE27A), tip: 'Everything here done. Still good for gear, gold and XP.');
+  }
+  final left = c.engine.landLeft(land);
+  return _Pill(icon: Icons.flag, text: 'Boss down', tip: left.isEmpty ? 'The lair has fallen.' : 'Still to do: ${left.join(' · ')}');
+}

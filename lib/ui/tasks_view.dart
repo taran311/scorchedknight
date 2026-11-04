@@ -127,10 +127,16 @@ class TaskCard extends StatelessWidget {
               ],
             ),
           ),
+          // (Several done at once: claim them together, not one tap and one card at a time.)
           if (done)
             SizedBox(
-              width: 88,
-              child: StoneButton(title: 'Claim', compact: true, tone: ButtonTone.amber, onPressed: () => _claim(context, c, t)),
+              width: more > 0 ? 112 : 88,
+              child: StoneButton(
+                title: more > 0 ? 'Claim all · ${more + 1}' : 'Claim',
+                compact: true,
+                tone: ButtonTone.amber,
+                onPressed: () => more > 0 ? _claimAll(context, c) : _claim(context, c, t),
+              ),
             ),
           if (go) const Icon(Icons.chevron_right, color: Palette.parch2, size: 26),
         ],

@@ -583,6 +583,14 @@ class _ContinentPanel extends StatelessWidget {
                         if (p.placesAll > 0) chip(Icons.place, p.places, p.placesAll, 'Places explored'),
                         if (p.delvesAll > 0) chip(Icons.stairs, p.delves, p.delvesAll, 'Dungeons beaten'),
                         if (p.partsAll > 0) chip(Icons.hardware, p.parts, p.partsAll, 'Relic parts found'),
+                        // What's still keeping its flag gold, by name (the counts alone left you
+                        // guessing which place it was).
+                        if (p.boss && !c.engine.landCleared(index))
+                          if (c.engine.landLeft(index) case final left when left.isNotEmpty)
+                            Text(
+                              'Still to do: ${left.take(3).join(' · ')}${left.length > 3 ? ' · +${left.length - 3} more' : ''}',
+                              style: Txt.label(size: 12.5, color: Palette.amber),
+                            ),
                       ],
                     ),
                   );

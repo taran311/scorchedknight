@@ -384,7 +384,7 @@ class GameEngine {
     final here = [for (final p in places) if (p.land == c && !p.hidden) p], delves = [for (final d in dungeons) if (d.land == c) d], parts = relicPartsOn(c);
     return (
       boss: s.bossesDown.contains(c),
-      risen: heroicCleared(c),
+      risen: heroicCleared(c) || s.risenDown.contains(c),
       places: here.where((p) => s.explored.contains(p.id)).length,
       placesAll: here.length,
       delves: delves.where((d) => s.dungeonsDone.contains(d.id)).length,
@@ -466,10 +466,27 @@ class GameEngine {
     return null;
   }
 
+  /// What's still to do in land [c] before it counts as cleared (its flag turns green), by name:
+  /// its boss risen, then places, dungeons and relic parts.
+  List<String> landLeft(int c) {
+    final s = state;
+    return [
+      if (!s.bossesDown.contains(c)) continents[c].boss.name,
+      if (s.bossesDown.contains(c) && !heroicCleared(c) && !s.risenDown.contains(c)) '${continents[c].boss.name}, risen${s.knight.level < risenLevel(c) ? ' (level ${risenLevel(c)})' : ''}',
+      for (final p in places)
+        if (p.land == c && !p.hidden && !s.explored.contains(p.id)) p.name,
+      for (final d in dungeons)
+        if (d.land == c && !s.dungeonsDone.contains(d.id)) d.name,
+    ];
+  }
+
   /// Region [c] is cleared: its boss down, every place and dungeon done, every relic part found.
   bool landCleared(int c) {
     final p = landProgress(c);
-    return p.boss && p.risen && p.places == p.placesAll && p.delves == p.delvesAll && p.parts == p.partsAll;
+    // (Relic parts aren't asked for on their own: each is held at a place, in a dungeon or by the
+    // risen boss, all counted already, and a part missed for want of its blueprint at the time
+    // mustn't keep a land from ever being finished.)
+    return p.boss && p.risen && p.places == p.placesAll && p.delves == p.delvesAll;
   }
 
   /// Region [c]'s boss has been beaten risen (saves from before this was kept show it by the relic
@@ -3264,7 +3281,8 @@ class GameEngine {
     if (raidWon == 'stall') {
       _givePotions();
       // Among what you brought back: a sealed crate she'd given up for lost (one more today).
-      state.cratesToday--;
+      // (One extra at most, however many raids: it used to pile up, a crate a raid.)
+      state.cratesToday = math.max(-1, state.cratesToday - 1);
       _note('You haul Mags\' stock back to her stall. She presses a health potion into your hand: "On the house. Don\'t tell anyone." And there\'s a sealed crate in the haul she\'d given up for lost: one more for sale today.', EntryKind.gold);
     } else if (raidWon == 'inn') {
       k.coins += r.coins;
@@ -4227,11 +4245,13 @@ class GameEngine {
     ];
   }
 
-  /// Worn pieces $smithName could improve right now, honed or tempered (and you can pay for it):
-  /// the number on the forge's button.
+  /// Worn pieces $smithName could improve right now, and you can pay for it: the number on the
+  /// forge's button. Tempering, and honing epic or legendary gear (pieces worth keeping). Rare gear
+  /// can still be honed at the forge, but isn't pressed on you: it's usually replaced within a few
+  /// levels, and the button counting every piece made the gold feel always spoken for.
   int get upgradesReady => [
     for (final g in state.knight.gear)
-      if (whyNotTemper(g) == null || (honeables.any((h) => h.id == g.id) && whyNotHone(g) == null)) g,
+      if (whyNotTemper(g) == null || (g.rarity.index >= Rarity.epic.index && honeables.any((h) => h.id == g.id) && whyNotHone(g) == null)) g,
   ].length;
 
   /// A rite you know, left off a hotbar that still has room for it.

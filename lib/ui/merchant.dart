@@ -353,7 +353,7 @@ class MerchantWares extends StatelessWidget {
         // Sealed crates: gear for the slot you pick, rare or finer, sight unseen.
         if (on('crates')) ...[
           x.heading('Sealed crates · rare or finer, now and then legendary'),
-          Text(c.state.cratesToday >= cratesPerDay ? 'Sold out. Mags restocks overnight: sleep at the inn after dark.' : '${cratesPerDay - c.state.cratesToday} left today · Mags restocks overnight (and gets one back from every raid you chase down)', style: Txt.onStone(size: 12.5, color: Palette.parch)),
+          Text(c.state.cratesToday >= cratesPerDay ? 'Sold out. Mags restocks overnight: sleep at the inn after dark.' : '${cratesPerDay - c.state.cratesToday} left today · Mags restocks overnight (one extra if you chase off a raid on her stall)', style: Txt.onStone(size: 12.5, color: Palette.parch)),
           for (final (slot, label) in const [(GearSlot.weapon, 'Weapon'), (GearSlot.offhand, 'Off-hand'), (GearSlot.helm, 'Helm'), (GearSlot.gloves, 'Gloves'), (GearSlot.boots, 'Boots'), (GearSlot.ring, 'Ring'), (GearSlot.trinket, 'Trinket')])
             x.ware(
               const Icon(Icons.inventory_2, color: Color(0xFFC89A5A), size: 26),

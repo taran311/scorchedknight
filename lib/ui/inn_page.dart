@@ -233,8 +233,9 @@ class _InnPageState extends State<InnPage> with RouteAware {
                             TownSpot.stall: s.inBattle ? null : () => showMerchantWindow(context, c),
                             TownSpot.inn: () => visitInn(context, c, onHunt: _hunt),
                             TownSpot.tent: _openKit,
-                            TownSpot.forge: s.inBattle ? null : () => c.whyShut('forge') == null ? showForgeWindow(context, c) : _shut(c.whyShut('forge')!),
-                            TownSpot.enchanter: s.inBattle ? null : () => c.whyShut('tower') == null ? showEnchanterWindow(context, c) : _shut(c.whyShut('tower')!),
+                            TownSpot.forge: s.inBattle ? null : () => c.whyShut('forge') == null ? showForgeWindow(context, c, tab: c.engine.upgradesReady > 0 ? 'temper' : null) : _shut(c.whyShut('forge')!),
+                            // (Opened where its note points: bolts to make opens on the bolts.)
+                            TownSpot.enchanter: s.inBattle ? null : () => c.whyShut('tower') == null ? showEnchanterWindow(context, c, tab: notes[TownSpot.enchanter] == 'Bolts to make' ? 'bolts' : null) : _shut(c.whyShut('tower')!),
                           };
       return Scaffold(
         body: Column(
@@ -336,13 +337,16 @@ class _InnPageState extends State<InnPage> with RouteAware {
                         ],
                         // The road: the next land's boss, so there's always a way on. (Not until Hob's
                         // job is done: on a new game, the job is the way on, offered or taken.)
-                        if (c.engine.roadStep() case final step? when s.innRepaired || step.land != 0) ...[
+                        // (Not mid-fight: the fight is the way on, and the cards' suggestions skip
+                        // whatever can't be started mid-fight, so they read oddly.)
+                        if (c.engine.roadStep() case final step? when !s.inBattle && (s.innRepaired || step.land != 0)) ...[
                           _RoadCard(controller: c, step: step, onGo: () => _goRoad(step)),
                           const SizedBox(height: 10),
                         ],
                         // The notice board: the village's troubles, a contract each. (Like the road, not
                         // until Hob's job is done: a new knight has one thing to do first.)
-                        if (s.innRepaired && c.engine.board.isNotEmpty) ...[
+                        if (s.inBattle) ...[]
+                        else if (s.innRepaired && c.engine.board.isNotEmpty) ...[
                           _BoardCard(controller: c),
                           const SizedBox(height: 10),
                         ]
