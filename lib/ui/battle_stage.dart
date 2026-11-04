@@ -630,8 +630,9 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     _at(d0 + until + 120, () => _tween('elder', 0, 650, ease: easeIn));
   }
 
-  /// How long a special's build-up lasts before its blow (the dice need a little longer to fall).
-  static double _specialLead(Special sp) => sp.dice ? 1500 : 950;
+  /// How long a special's build-up lasts before its blow: about as long as a whole plain attack, so
+  /// the special takes twice as long as one (for the Roll of Fate, the dice take the first half).
+  static double _specialLead(Special sp) => sp.dice ? 1000 : 950;
 
   /// A special's build-up, before the blow: its name over the field, the weapon raised and held,
   /// blazing in the special's colour as its power gathers. For the Roll of Fate, the dice are
@@ -650,7 +651,8 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     final off = lead + hitAt + 250;
     _at(d0, () {
       _banner = ('${sp.name}!', colour, now);
-      if (knight) {
+      // (While the dice roll you stand and watch them: the blow comes after they land, not with them.)
+      if (knight && !sp.dice) {
         _knightClip = readyClip;
         _knightClipStart = now;
       }
@@ -1130,7 +1132,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         final bash = r.action == BattleAction.skill;
         _at(d0, () {
           // A quick slash, or for the stunning blow, an overhead crush.
-          _knightClip = special != null ? specialClip : (bash ? crushClip : swingClip);
+          _knightClip = special != null && !special.dice ? specialClip : (bash ? crushClip : swingClip);
           _knightClipStart = now;
           // Run in to the foe on one smooth curve, arriving just before the blade comes down (the
           // clip raises the sword on the way), then glide back to your mark after the hold.
