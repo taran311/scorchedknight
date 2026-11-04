@@ -1749,7 +1749,7 @@ class _VaultCard extends StatelessWidget {
                       Text('${s.keys} ${s.keys == 1 ? 'key' : 'keys'}', style: Txt.onStone(size: 12.5)),
                       const SizedBox(width: 10),
                       Tooltip(
-                        message: sworn ? 'Guardian\'s Oath: each fight\'s first heavy blow hits no harder than a normal one' : 'Vault pieces found · all six: the Guardian\'s Oath',
+                        message: sworn ? 'Guardian\'s Oath: each fight\'s first heavy blow hits no harder than a normal one, and the vault keeps its best gear for you' : 'Vault pieces found · all six: the Guardian\'s Oath',
                         triggerMode: TooltipTriggerMode.tap,
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -1848,7 +1848,7 @@ class _VaultCard extends StatelessWidget {
               children: [
                 const Icon(Icons.verified_user_rounded, size: 15, color: _ember),
                 const SizedBox(width: 4),
-                Flexible(child: Text('Guardian\'s Oath: each fight\'s first heavy blow hits no harder than a normal one', textAlign: TextAlign.center, style: Txt.onStone(size: 11.5, color: _ember))),
+                Flexible(child: Text('Guardian\'s Oath: each fight\'s first heavy blow hits no harder than a normal one, and the vault keeps its best gear for you', textAlign: TextAlign.center, style: Txt.onStone(size: 11.5, color: _ember))),
               ],
             )
           else

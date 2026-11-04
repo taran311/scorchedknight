@@ -4122,12 +4122,13 @@ class GameEngine {
       final g = loot.vaultPiece(piece, k.level);
       if (!s.vaultFound.contains(piece.name)) {
         s.vaultFound.add(piece.name);
-        if (guardianSworn(s.vaultFound)) _note('The last of the vault\'s treasures is yours. You swear the Guardian\'s Oath: from now on, the first heavy blow in every fight lands no harder than a normal one.', EntryKind.good);
+        if (guardianSworn(s.vaultFound)) _note('The last of the vault\'s treasures is yours. You swear the Guardian\'s Oath: from now on, the first heavy blow in every fight lands no harder than a normal one, and the vault keeps its best gear for you.', EntryKind.good);
       }
       find = VaultFind((gold * .5).round(), g, piece: true);
     } else if (roll < vaultPieceChance + vaultGearChance) {
       s.vaultDry++;
-      find = VaultFind((gold * .6).round(), loot.roll(k.heroClass, k.level, wielding: k.loadout.weapon, odds: const [0, 0, 60, 35, 5]));
+      // (The Oath sworn, the vault keeps its best for you: more epics, and legendaries now and then.)
+      find = VaultFind((gold * .6).round(), loot.roll(k.heroClass, k.level, wielding: k.loadout.weapon, odds: guardianSworn(s.vaultFound) ? vaultOathOdds : const [0, 0, 60, 35, 5]));
     } else {
       s.vaultDry++;
       find = VaultFind((gold * 1.6).round(), null);

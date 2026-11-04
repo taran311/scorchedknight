@@ -28,6 +28,10 @@ int? nextVaultPieceLevel(int found, int level) => found >= vaultPieces.length ||
 /// the next one is sure to be one (while any are left to find).
 const vaultSure = 2;
 
+/// Once all six are found and the Guardian's Oath sworn, the vault keeps its best for you: its gear
+/// is epic more often than not, and now and then legendary (rare, epic, legendary in 100).
+const vaultOathOdds = [0, 0, 30, 55, 15];
+
 /// One of the six pieces only the vault holds: each carries a stat no ordinary piece of its kind
 /// ever rolls (dodge on a pendant, crit on boots, block on gauntlets, guard on a ring, lifesteal
 /// on a helm, block and thorns on a charm), about a
