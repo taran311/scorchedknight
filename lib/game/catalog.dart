@@ -330,12 +330,12 @@ const relics = <int, Relic>{
   2: Relic(
     'Bramblelash',
     [
-      RelicPart('Living Briar', 2, 'the Briar Heart, deep in the Thornwild', source: PartSource.place, at: 'briarheart'),
+      RelicPart('Living Briar', 2, 'the Briar Heart, at the edge of the Thornwild', source: PartSource.place, at: 'briarheart'),
       RelicPart('Heartwood Grip', 9, 'Warden Aelindor, at the Elder Heartwood in the Silverwood', source: PartSource.place, at: 'elderheart'),
       RelicPart('First Bloom', 2, 'Grandmother Bramblecrown, risen, in the Thornwild'),
     ],
     4200,
-    'Tucked in Grandmother Bramblecrown\'s roots: a pressed-leaf blueprint for the Bramblelash, a whip of living briar. The briar grows from a heart of thorns somewhere deep in the Thornwild, the grip is heartwood the elves of the Silverwood guard, and the first bloom is Grandmother Bramblecrown\'s own, when she rises again.',
+    'Tucked in Grandmother Bramblecrown\'s roots: a pressed-leaf blueprint for the Bramblelash, a whip of living briar. The briar grows from a heart of thorns somewhere at the edge of the Thornwild, the grip is heartwood the elves of the Silverwood guard, and the first bloom is Grandmother Bramblecrown\'s own, when she rises again.',
     minLevel: 32,
   ),
 };
@@ -1607,7 +1607,7 @@ const places = <Place>[
   Place('eyrie', 'The Elder\'s Eyrie', 6, 755, 175, PlaceKind.guarded, 'A spire of red rock above the Throne, and on top of it, an old gold wyrm, older than the Ember King, watching him burn the world and doing nothing about it.', 'The Elder Wyrm sighs, a long, hot, tired sigh, and lies down for the last time. Her gold is your gold now. So are her scales.', foe: ('elderWyrm', null, Aura.ancient, 'Aurumvex the Elder'), purses: 5, gems: 2, wyrm: 5),
   // Relic guardians: they show once you hold the blueprint that needs what they guard.
   Place('emberpit', 'The Ember Pit', 3, 600, 140, PlaceKind.guarded, 'A pit in the red rock, glowing from the bottom. An ork fire-priest sits in it, cross-legged, a coal the size of your head cupped in his hands. It is the old king\'s ember core, and he has been praying to it.', 'Skarr the Ember-Keeper falls into his own fire and doesn\'t come out. The ember core is still warm. It will be warm for a thousand years.', foe: ('orkShaman', null, Aura.blazing, 'Skarr the Ember-Keeper'), purses: 3, relic: (0, 1), above: 3),
-  Place('briarheart', 'The Briar Heart', 2, 140, 215, PlaceKind.guarded, 'Deep in the Thornwild, the brambles twist into a knot the size of a house, and the knot is breathing. Something at its heart keeps the whole wood growing.', 'The Briar Heart shudders, and lets go of the one living strand it was holding. It coils round your wrist, gently, like it\'s decided you\'ll do.', foe: ('thornEnt', null, Aura.venom, 'The Briar Heart'), purses: 2, relic: (2, 0), above: 3),
+  Place('briarheart', 'The Briar Heart', 2, 140, 215, PlaceKind.guarded, 'At the edge of the Thornwild, the brambles twist into a knot the size of a house, and the knot is breathing. Something at its heart keeps the whole wood growing.', 'The Briar Heart shudders, and lets go of the one living strand it was holding. It coils round your wrist, gently, like it\'s decided you\'ll do.', foe: ('thornEnt', null, Aura.venom, 'The Briar Heart'), purses: 2, relic: (2, 0), above: 3),
   Place('elderheart', 'The Elder Heartwood', 9, 285, 160, PlaceKind.guarded, 'The oldest tree in the Silverwood, hollowed out by the elves into a hall. An elf in silver-leaf armour stands at its door, and has done for three hundred years.', 'Warden Aelindor kneels, and offers you a grip of heartwood with both hands. "The Grandmother asked for it back, once. I told her no. I find I can\'t tell you no."', foe: ('elfWarden', null, Aura.ancient, 'Warden Aelindor'), purses: 3, relic: (2, 1), above: 3),
   Place('orchardroost', 'The Orchard Roost', 17, 300, 612, PlaceKind.guarded, 'An old orchard sank into the caves when the hill fell in. The fruit bats found it. Their king has eaten every fig in it, and is still hungry.', 'The Fig King flaps off into the dark, much too full to fight. Under the trees: a pile of seeds, a pile of coins, and fangs he lost in the figs.', foe: ('cavebat', null, Aura.gilded, 'The Fig King'), purses: 2, trophies: 3),
   Place('lostisle', 'The Lost Isle', 0, 228, 20, PlaceKind.cache, 'Out past the coast, an island that isn\'t on any map but yours, now you\'ve been everywhere else. A rowing boat waits on the shore.', 'On the island, under a crooked tree: the old king\'s last treasure, buried before the Burning.', purses: 6, legendary: true, hidden: true),

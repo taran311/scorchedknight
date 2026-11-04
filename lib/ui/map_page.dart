@@ -410,6 +410,10 @@ class _MapPageState extends State<MapPage> {
                                                   pinPicked: _placePick,
                                                   lockedLands: {for (var i = 0; i < continents.length; i++) if (c.whyNotTravel(i) != null) i},
                                                   levelGates: {for (var i = 0; i < continents.length; i++) if (c.whyNotTravel(i)?.startsWith('Reach level') ?? false) i: continents[i].minLevel},
+                                                  relicSpots: {
+                                                    for (final p in places) if (relicPartsAt(p.id).any((e) => c.engine.relicPartWanted(e.$1, e.$2))) p.id,
+                                                    for (final d in dungeons) if (relicPartsAt(d.id).any((e) => c.engine.relicPartWanted(e.$1, e.$2))) d.id,
+                                                  },
                                                   nameLand: focus,
                                                   allNames: close,
                                                   beaten: s.bossesDown,
@@ -907,7 +911,7 @@ class _WildPanel extends StatelessWidget {
 const _done = Color(0xFF9BE27A);
 
 class _MapPainter extends CustomPainter {
-  _MapPainter({required this.open, required this.selected, required this.beaten, this.cleared = const {}, required this.wildsOpen, this.wildPicked, this.trip, this.pins = const [], this.pinPicked, this.delves = const [], this.delvePicked, this.lockedLands = const {}, this.levelGates = const {}, this.nameLand, this.allNames = true, this.arena = (false, 0), this.arenaPicked = false, this.hall = (false, 0), this.hallPicked = false});
+  _MapPainter({required this.open, required this.selected, required this.beaten, this.cleared = const {}, required this.wildsOpen, this.wildPicked, this.trip, this.pins = const [], this.pinPicked, this.delves = const [], this.delvePicked, this.lockedLands = const {}, this.levelGates = const {}, this.relicSpots = const {}, this.nameLand, this.allNames = true, this.arena = (false, 0), this.arenaPicked = false, this.hall = (false, 0), this.hallPicked = false});
 
   /// The Hall of the Slain: whether it's open, and waves won.
   final (bool, int) hall;
@@ -924,6 +928,9 @@ class _MapPainter extends CustomPainter {
   /// Lands whose road is open but whose level you haven't reached: the level, shown under the
   /// padlock (so a lit road to a locked land says why).
   final Map<int, int> levelGates;
+
+  /// Places and dungeons holding a relic part you're after: a gold diamond on their marker.
+  final Set<String> relicSpots;
 
   /// Whose spots are named: every open land's ([allNames], on a big screen or zoomed in), or just
   /// [nameLand]'s (the land you're looking at, on a phone), plus whatever's picked.
@@ -1071,10 +1078,12 @@ class _MapPainter extends CustomPainter {
     bool named(int land, bool picked) => picked || (!lockedLands.contains(land) && (allNames || land == nameLand));
     for (final (p, done, ready) in pins) {
       _pin(canvas, Offset(p.x, p.y), p.name, p.kind, done, ready, p.id == pinPicked, locked: lockedLands.contains(p.land), named: named(p.land, p.id == pinPicked));
+      if (relicSpots.contains(p.id) && !lockedLands.contains(p.land)) _relicMark(canvas, Offset(p.x, p.y) + const Offset(10, -10));
     }
     // Dungeons: a stair down into the dark, under a stone arch.
     for (final (d, open, done, here) in delves) {
       _delve(canvas, Offset(d.x, d.y), d.name, open, done, here, d.id == delvePicked, locked: lockedLands.contains(d.land), named: named(d.land, d.id == delvePicked));
+      if (relicSpots.contains(d.id) && !lockedLands.contains(d.land)) _relicMark(canvas, Offset(d.x, d.y) + const Offset(-15, -16));
     }
     // The Ash Colosseum: a ring of arches.
     _arenaMark(canvas, const Offset(arenaX, arenaY), arena.$1, arena.$2, arenaPicked, locked: lockedLands.contains(arenaLand), named: named(arenaLand, arenaPicked));
@@ -1260,6 +1269,19 @@ class _MapPainter extends CustomPainter {
           c.drawLine(t + const Offset(0, 10), t + const Offset(0, 16), ink);
         }
     }
+  }
+
+  /// A relic part waiting here: a small gold diamond on the marker, so the quest's stops stand out
+  /// from the everyday pins.
+  void _relicMark(Canvas c, Offset at) {
+    final gem = Path()
+      ..moveTo(at.dx, at.dy - 6)
+      ..lineTo(at.dx + 5, at.dy)
+      ..lineTo(at.dx, at.dy + 6)
+      ..lineTo(at.dx - 5, at.dy)
+      ..close();
+    c.drawPath(gem, Paint()..color = const Color(0xFFFFC94A));
+    c.drawPath(gem, strokePaint(const Color(0xFF3A2614), 1.4));
   }
 
   void _pin(Canvas c, Offset at, String name, PlaceKind kind, bool done, bool ready, bool picked, {bool locked = false, bool named = true}) {
@@ -1633,6 +1655,7 @@ class _MapPainter extends CustomPainter {
       old.selected != selected ||
       old.beaten.length != beaten.length ||
       old.cleared.length != cleared.length ||
+      old.relicSpots.length != relicSpots.length ||
       old.wildPicked != wildPicked ||
       old.pinPicked != pinPicked ||
       old.delvePicked != delvePicked ||
