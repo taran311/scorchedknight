@@ -3707,9 +3707,10 @@ class GameEngine {
     } else {
       k.loadouts[item.heroClass ?? k.heroClass]!.put(item);
     }
-    // The old piece goes into the chest, unless it's full.
+    // The old piece goes into the chest, unless it's full. (A keepsake or a legendary goes in
+    // regardless: one tap to wear something new mustn't quietly sell a piece that rare.)
     var sold = 0;
-    if (old != null && k.stash.length < stashCap) {
+    if (old != null && (k.stash.length < stashCap || keptAnyway(old))) {
       k.stash.add(old);
     } else if (old != null) {
       sold = old.value;

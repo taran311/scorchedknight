@@ -301,3 +301,23 @@ void softOvalGlow(Canvas c, Rect r, Color colour, double sigma) {
   softGlow(c, Offset.zero, r.width / 2, colour, sigma);
   c.restore();
 }
+
+/// Set by the fight screen while it's in its lighter look (a phone, or a screen that's been
+/// dropping frames): glows on weapons, gems and wyrmscale draw as plain soft shapes, or not at all,
+/// instead of blurs.
+bool lightGlows = false;
+
+/// A blur on a small stroke or shape's edge, left off in the lighter look ([lightGlows]): on
+/// Android's renderer every blurred draw is a pass of its own, and a figure is drawn twice a frame
+/// (its rim light, then its body), so a rare foe's glowing eyes and seams alone were dozens of
+/// passes a frame.
+MaskFilter? edgeBlur(double sigma) => lightGlows ? null : MaskFilter.blur(BlurStyle.normal, sigma);
+
+/// An oval with a blurred edge, or in the lighter look the same soft oval as a gradient.
+void blurredOval(Canvas c, Rect r, Color colour, double sigma) {
+  if (lightGlows) {
+    softOvalGlow(c, r.inflate(sigma * .3), colour, sigma);
+  } else {
+    c.drawOval(r, Paint()..color = colour..maskFilter = MaskFilter.blur(BlurStyle.normal, sigma));
+  }
+}

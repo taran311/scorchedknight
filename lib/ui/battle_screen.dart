@@ -79,6 +79,12 @@ class _BattleScreenState extends State<BattleScreen> {
   /// a patrol once it's back).
   late bool _heroic;
 
+  /// You chose to patrol this land (from its trail, or by turning down the way on once): the
+  /// result's lit button is then the next fight, with the trail second, rather than nudging you
+  /// toward the risen boss or the next land after every kill. (Farming fangs is a fine thing to
+  /// be doing.) A level gained this fight can open something new, so that still gets its say.
+  late bool _patrolling;
+
   /// The crossbow's timing bar is up, waiting for you to loose the bolt.
   bool _aiming = false;
 
@@ -106,6 +112,7 @@ class _BattleScreenState extends State<BattleScreen> {
     _wild = widget.start == BattleStart.wild || c.state.wildFight;
     _dungeon = widget.start == BattleStart.dungeon || c.state.dungeonFight;
     _heroic = widget.start == BattleStart.heroic || c.state.heroicFight;
+    _patrolling = widget.start == BattleStart.explore && !_heroic && trailStep(c.state, c.state.continent) == TrailStep.patrol;
     c.addListener(_watch);
     // The stage subscribes during the first build; start once it is listening.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -786,7 +793,8 @@ class _BattleScreenState extends State<BattleScreen> {
     // The road's next land, open to you now and not yet set foot in (you've just reached its level,
     // say, patrolling an earlier land): that's the way on, ahead of more of this land,
     // which stays the second choice.
-    final ahead = o == Outcome.won && !waiting ? _roadAhead(c, land) : null;
+    final news = (c.lastKill?.levelUps ?? 0) > 0, nudge = !_patrolling || news;
+    final ahead = o == Outcome.won && !waiting && nudge ? _roadAhead(c, land) : null;
     if (ahead != null) {
       return [
         Expanded(
@@ -804,7 +812,10 @@ class _BattleScreenState extends State<BattleScreen> {
         const SizedBox(width: 8),
         Expanded(
           flex: 2,
-          child: StoneButton(title: 'Stay here', caption: 'Next fight', onPressed: _fightOn),
+          child: StoneButton(title: 'Stay here', caption: 'Next fight', onPressed: () {
+            _patrolling = true;
+            _fightOn();
+          }),
         ),
       ];
     }
@@ -823,7 +834,7 @@ class _BattleScreenState extends State<BattleScreen> {
         ];
       // Patrolling a land whose boss has risen again (you're a few levels on): it's the fight to
       // take, or patrol on.
-      case Outcome.won when !_heroic && !waiting && trailStep(c.state, land) == TrailStep.patrol && c.risenReady(land):
+      case Outcome.won when !_heroic && !waiting && nudge && trailStep(c.state, land) == TrailStep.patrol && c.risenReady(land):
         return [
           Expanded(
             flex: 3,
@@ -838,7 +849,10 @@ class _BattleScreenState extends State<BattleScreen> {
             ),
           ),
           const SizedBox(width: 8),
-          Expanded(flex: 2, child: StoneButton(title: 'Patrol on', caption: 'Next fight', onPressed: _fightOn)),
+          Expanded(flex: 2, child: StoneButton(title: 'Patrol on', caption: 'Next fight', onPressed: () {
+            _patrolling = true;
+            _fightOn();
+          })),
         ];
       case Outcome.won:
         // Badly hurt with nothing to drink: home to rest becomes the lit button, not onward.

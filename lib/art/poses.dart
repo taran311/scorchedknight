@@ -131,6 +131,24 @@ const crushClip = <Keyframe>[
   Keyframe(800, {}),
 ];
 
+/// Before a special attack: the weapon goes up overhead and is held there, gathering itself, for
+/// as long as the build-up lasts (the blow itself cuts in with [specialClip]).
+const readyClip = <Keyframe>[
+  Keyframe(320, {J.nS: 168, J.nE: 38, J.nW: 12, J.fS: 64, J.fE: 56, J.lean: -10, J.head: -8, J.nH: 8, J.nK: 14, J.fH: -8, J.fK: 10}, easeOut),
+  Keyframe(2400, {J.nS: 174, J.nE: 42, J.nW: 10, J.fS: 70, J.fE: 60, J.lean: -12, J.head: -10, J.nH: 10, J.nK: 18, J.fH: -8, J.fK: 12}),
+  Keyframe(2700, {}),
+];
+
+/// A special attack's blow: from the weapon held high (where [readyClip] left it), carried in on
+/// the dash and brought crashing down. Lands at [swingHitMs], like any other blow.
+const specialClip = <Keyframe>[
+  Keyframe(10, {J.nS: 174, J.nE: 42, J.nW: 10, J.fS: 70, J.fE: 60, J.lean: -12, J.head: -10, J.nH: 10, J.nK: 18, J.fH: -8, J.fK: 12}),
+  Keyframe(200, {J.nS: 178, J.nE: 46, J.nW: 8, J.fS: 72, J.fE: 62, J.lean: -12, J.head: -6, J.nH: 6, J.nK: 10, J.fH: -6, J.fK: 8, J.dx: 6}),
+  Keyframe(320, {J.nS: 62, J.nE: 0, J.nW: 40, J.fS: 40, J.fE: 30, J.lean: 26, J.head: 10, J.nH: 46, J.nK: 40, J.fH: -30, J.fK: 26, J.dx: 40}, easeIn),
+  Keyframe(460, {J.nS: 58, J.nE: 0, J.nW: 42, J.fS: 40, J.fE: 30, J.lean: 24, J.head: 8, J.nH: 46, J.nK: 42, J.fH: -30, J.fK: 28, J.dx: 40}),
+  Keyframe(860, {}),
+];
+
 const hitClip = <Keyframe>[
   Keyframe(80, {J.lean: -14, J.head: -12, J.dx: -22}, easeOut),
   Keyframe(460, {}, easeOut),

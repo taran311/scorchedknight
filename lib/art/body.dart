@@ -24,11 +24,6 @@ class DrawOptions {
 }
 
 /// Brightens toward white; used for hit flashes.
-/// Set by the fight screen while it's in its lighter look (a phone, or a screen that's been
-/// dropping frames): glows on weapons, gems and wyrmscale draw as plain soft shapes, or not at all,
-/// instead of blurs.
-bool lightGlows = false;
-
 /// Set while a fight's figures are recorded in runs (battle_stage): a ghost's see-through fade is
 /// then laid on its run once, not as a layer of its own inside the picture, drawn again in every
 /// pass of the backlight.
@@ -167,15 +162,13 @@ Skeleton drawHumanoid(Canvas c, Look look, Pose pose, double t, DrawOptions o, {
 /// is still very sooty, a thin wisp of smoke from the top of their head. Fades as [Look.soot] does.
 void _soot(Canvas c, Skeleton sk, Look look, double t, bool still) {
   final s = look.soot, b = sk.build;
-  final smudge = Paint()
-    ..color = Color.fromRGBO(34, 26, 22, .5 * s)
-    ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.5);
-  c.drawOval(Rect.fromCenter(center: sk.at(sk.chest, b.chest * .15, -b.spine * .2), width: b.chest * 1.1, height: b.spine * .32), smudge);
-  c.drawOval(Rect.fromCenter(center: sk.at(sk.pelvis, -b.hip * .2, b.spine * .35), width: b.chest * .9, height: b.spine * .22), smudge);
+  final smudge = Color.fromRGBO(34, 26, 22, .5 * s);
+  blurredOval(c, Rect.fromCenter(center: sk.at(sk.chest, b.chest * .15, -b.spine * .2), width: b.chest * 1.1, height: b.spine * .32), smudge, 3.5);
+  blurredOval(c, Rect.fromCenter(center: sk.at(sk.pelvis, -b.hip * .2, b.spine * .35), width: b.chest * .9, height: b.spine * .22), smudge, 3.5);
   final knee = sk.legNear.knee;
-  c.drawOval(Rect.fromCenter(center: knee + const Offset(2, -6), width: b.thigh.$1 * 1.8, height: b.thigh.$1 * 1.2), smudge);
+  blurredOval(c, Rect.fromCenter(center: knee + const Offset(2, -6), width: b.thigh.$1 * 1.8, height: b.thigh.$1 * 1.2), smudge, 3.5);
   final hand = sk.armNear.elbow;
-  c.drawOval(Rect.fromCenter(center: hand, width: b.upper.$1 * 1.8, height: b.upper.$1 * 1.4), smudge);
+  blurredOval(c, Rect.fromCenter(center: hand, width: b.upper.$1 * 1.8, height: b.upper.$1 * 1.4), smudge, 3.5);
   if (s > .5 && !still) {
     // A wisp of smoke, still rising after all this time.
     final top = sk.head - sk.up * -(b.head * 1.1);
@@ -183,7 +176,7 @@ void _soot(Canvas c, Skeleton sk, Look look, double t, bool still) {
     final wisp = Path()
       ..moveTo(top.dx, top.dy)
       ..cubicTo(top.dx + 6 + sway, top.dy - 10, top.dx - 6 + sway, top.dy - 20, top.dx + 3 + sway * 1.5, top.dy - 32);
-    c.drawPath(wisp, strokePaint(Color.fromRGBO(150, 140, 132, .45 * (s - .4)), 3.2)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2));
+    c.drawPath(wisp, strokePaint(Color.fromRGBO(150, 140, 132, .45 * (s - .4)), 3.2)..maskFilter = edgeBlur(2));
   }
 }
 
@@ -471,7 +464,7 @@ void _torso(Canvas c, Skeleton sk, Look look) {
           ..moveTo(back.dx, back.dy)
           ..quadraticBezierTo(dip.dx, dip.dy, front.dx, front.dy);
         if (ember != null) {
-          c.drawPath(ridge.shift(const Offset(0, 2.4)), strokePaint(ember.withValues(alpha: .5), 4)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2));
+          c.drawPath(ridge.shift(const Offset(0, 2.4)), strokePaint(ember.withValues(alpha: .5), 4)..maskFilter = edgeBlur(2));
           c.drawPath(ridge.shift(const Offset(0, 2.4)), strokePaint(ember.withValues(alpha: .95), 1.4));
         }
         c.drawPath(ridge.shift(const Offset(0, 1.2)), strokePaint(dark.withValues(alpha: .85), 2.2));
@@ -618,7 +611,7 @@ void _torso(Canvas c, Skeleton sk, Look look) {
   final embers = look.embers;
   if (embers != null) {
     // Cracks of fire through the hide, glowing from inside.
-    final glow = strokePaint(embers.withValues(alpha: .55), 4)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
+    final glow = strokePaint(embers.withValues(alpha: .55), 4)..maskFilter = edgeBlur(3);
     final core = strokePaint(Color.lerp(embers, const Color(0xFFFFF0B0), .5)!, 1.3);
     for (final pts in [
       [(.1, -.12), (.3, -.22), (.25, -.34), (.45, -.42)],
@@ -1517,7 +1510,7 @@ void _runes(Canvas c, Offset at, double angleDeg, Weapon shape, double t, bool s
     ..color = const Color(0xFF7FE0FF).withValues(alpha: .6 * pulse)
     ..strokeWidth = 4
     ..style = PaintingStyle.stroke
-    ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
+    ..maskFilter = edgeBlur(3);
   final line = Paint()
     ..color = const Color(0xFFE6FBFF).withValues(alpha: .95)
     ..strokeWidth = 1.3
@@ -2006,13 +1999,7 @@ void drawWeapon(Canvas c, Offset at, double angleDeg, Weapon kind, Look look, {d
     case Weapon.orb:
       final bob = still ? 0.0 : math.sin(t / 420) * 3;
       final centre = Offset(8, -24 + bob);
-      c.drawCircle(
-        centre,
-        16,
-        Paint()
-          ..color = gem.withValues(alpha: .35)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
-      );
+      blurredOval(c, Rect.fromCircle(center: centre, radius: 16), gem.withValues(alpha: .35), 8);
       c.drawCircle(centre, 10, Paint()..shader = ui.Gradient.radial(centre - const Offset(3, 3), 12, [const Color(0xFFFFFFFF), shade(gem, .2), shade(gem, -.45)], const [0, .35, 1]));
       c.drawCircle(centre, 10, strokePaint(outline, 1.4));
       c.drawArc(Rect.fromCircle(center: centre, radius: 6.5), 3.6, 1.2, false, strokePaint(const Color(0xAAFFFFFF), 1.6));
@@ -2682,7 +2669,7 @@ void _gem(Canvas c, Offset at, double r, Color col, double t, bool still) {
     r * 2.2 * pulse,
     Paint()
       ..color = col.withValues(alpha: lightGlows ? .2 : .4)
-      ..maskFilter = lightGlows ? null : MaskFilter.blur(BlurStyle.normal, r),
+      ..maskFilter = lightGlows ? null : edgeBlur(r),
   );
   c.drawCircle(at, r, Paint()..shader = ui.Gradient.radial(at - Offset(r * .3, r * .3), r * 1.2, [const Color(0xFFFFFFFF), shade(col, .15), shade(col, -.4)], const [0, .4, 1]));
   c.drawCircle(at, r, strokePaint(outline, 1));
@@ -2731,7 +2718,7 @@ void _kingsfall(Canvas c, double t, bool still) {
     ..strokeWidth = 7
     ..strokeJoin = StrokeJoin.round
     ..color = Color.fromRGBO(255, 110, 30, .45 * pulse)
-    ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4));
+    ..maskFilter = edgeBlur(4));
   c.drawPath(crack, Paint()
     ..style = PaintingStyle.stroke
     ..strokeWidth = 2.4

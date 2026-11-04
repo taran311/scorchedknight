@@ -150,7 +150,7 @@ void drawHound(Canvas c, HoundLook look, Offset at, double scale, double t, {dou
     Path()
       ..moveTo(-4, -70)
       ..quadraticBezierTo(4, -58, 0, -50),
-    strokePaint(coat[2].withValues(alpha: .35), 2.6)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
+    strokePaint(coat[2].withValues(alpha: .35), 2.6)..maskFilter = edgeBlur(2),
   );
   c.drawArc(Rect.fromCenter(center: const Offset(-32, -62), width: 26, height: 24), math.pi * .85, math.pi * .9, false, strokePaint(coat[2].withValues(alpha: .4), 1.6));
   c.drawArc(Rect.fromCenter(center: const Offset(20, -60), width: 20, height: 22), -math.pi * .1, math.pi * .7, false, strokePaint(coat[2].withValues(alpha: .3), 1.4));
@@ -159,7 +159,7 @@ void drawHound(Canvas c, HoundLook look, Offset at, double scale, double t, {dou
     Path()
       ..moveTo(-38, -72 - b)
       ..quadraticBezierTo(-10, -77 - b, 22, -82 - b),
-    strokePaint(coat[0].withValues(alpha: .55), 3)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5),
+    strokePaint(coat[0].withValues(alpha: .55), 3)..maskFilter = edgeBlur(1.5),
   );
   c.restore();
   c.drawPath(body, strokePaint(outline, 1.6));
@@ -233,7 +233,7 @@ void drawHound(Canvas c, HoundLook look, Offset at, double scale, double t, {dou
       ..close(),
     Paint()..color = look.belly.withValues(alpha: look.fire ? .35 : .75),
   );
-  c.drawLine(const Offset(2, -14), const Offset(26, -9), strokePaint(coat[0].withValues(alpha: .6), 2.2)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1));
+  c.drawLine(const Offset(2, -14), const Offset(26, -9), strokePaint(coat[0].withValues(alpha: .6), 2.2)..maskFilter = edgeBlur(1));
   c.restore();
   c.drawPath(head, strokePaint(outline, 1.4));
   // Ears.

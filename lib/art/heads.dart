@@ -124,11 +124,9 @@ void drawHead(Canvas c, Skeleton sk, Look look, double t, {bool still = false}) 
 /// Soot on the face (or helm): a smudge on the cheek, one on the brow and a sooty nose. The hero
 /// still grins through it.
 void _sootyFace(Canvas c, double r, double s) {
-  final smudge = Paint()
-    ..color = Color.fromRGBO(34, 26, 22, .55 * s)
-    ..maskFilter = MaskFilter.blur(BlurStyle.normal, r * .12);
-  _ellipse(c, Offset(r * .42, r * .3), r * .3, r * .16, smudge, -.3);
-  _ellipse(c, Offset(-r * .1, -r * .65), r * .38, r * .14, smudge, .2);
+  final smudge = Color.fromRGBO(34, 26, 22, .55 * s);
+  _blurredEllipse(c, Offset(r * .42, r * .3), r * .3, r * .16, smudge, r * .12, -.3);
+  _blurredEllipse(c, Offset(-r * .1, -r * .65), r * .38, r * .14, smudge, r * .12, .2);
   if (s > .3) _ellipse(c, Offset(r * 1.0, r * .02), r * .1, r * .09, Paint()..color = Color.fromRGBO(30, 22, 18, .6 * s));
 }
 
@@ -160,6 +158,24 @@ void _crown(Canvas c, double r) {
   c.drawCircle(Offset(-r * .03, (top + base) / 2 - r * .03), r * .035, Paint()..color = const Color(0xCCFFFFFF));
   for (final x in [left + r * .3, right - r * .3]) {
     c.drawCircle(Offset(x, (top + base) / 2), r * .05, Paint()..color = const Color(0xFF3A7AD2));
+  }
+}
+
+/// [_ellipse] with a blurred edge ([blurredOval]: a gradient in the lighter look).
+void _blurredEllipse(Canvas c, Offset centre, double rx, double ry, Color colour, double sigma, [double rot = 0]) {
+  c.save();
+  c.translate(centre.dx, centre.dy);
+  if (rot != 0) c.rotate(rot);
+  blurredOval(c, Rect.fromCenter(center: Offset.zero, width: rx * 2, height: ry * 2), colour, sigma);
+  c.restore();
+}
+
+/// A glow round an eye slit: a blurred bar, or in the lighter look a soft oval about it.
+void _slitGlow(Canvas c, Rect r, Color colour, double sigma) {
+  if (lightGlows) {
+    softOvalGlow(c, r.inflate(sigma), colour.withValues(alpha: colour.a * .8), sigma);
+  } else {
+    c.drawRect(r, Paint()..color = colour..maskFilter = edgeBlur(sigma));
   }
 }
 
@@ -364,12 +380,7 @@ void _helm(Canvas c, double r, Look look, double t, bool still) {
   final glow = look.eyeGlow;
   final slit = Rect.fromLTWH(r * .12, -r * .32, r * 1.06, r * .17);
   if (glow != null) {
-    c.drawRect(
-      slit.inflate(2),
-      Paint()
-        ..color = glow.withValues(alpha: .6)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
-    );
+    _slitGlow(c, slit.inflate(2), glow.withValues(alpha: .6), 4);
   }
   c.drawRect(slit, Paint()..color = glow ?? const Color(0xFF08090B));
   if (look.engrave >= 2) c.drawRect(slit.inflate(1.2), strokePaint(look.engraveCol ?? const Color(0xFFE8C060), 1.1));
@@ -478,7 +489,7 @@ void _greatHelm(Canvas c, double r, Look look, double t, bool still) {
   for (final (top, h2, from) in [(-.4, .13, .34), (-.19, .1, .44)]) {
     final s = Rect.fromLTRB(r * from, r * top, r * 1.3, r * (top + h2));
     if (glow != null) {
-      c.drawRect(s.inflate(2), Paint()..color = glow.withValues(alpha: .55)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4));
+      _slitGlow(c, s.inflate(2), glow.withValues(alpha: .55), 4);
     }
     c.drawRRect(RRect.fromRectAndRadius(s, Radius.circular(r * .04)), Paint()..color = glow ?? const Color(0xFF040405));
     c.drawLine(Offset(s.left + 1, s.bottom + .8), Offset(s.right, s.bottom + .8), strokePaint(edge.withValues(alpha: .9), 1.1));
@@ -585,16 +596,7 @@ void _goblinHead(Canvas c, double r, Look look) {
     strokePaint(shade(look.skin[2], -.2), 3),
   );
   final eye = Offset(r * .62, -r * .28);
-  _ellipse(
-    c,
-    eye,
-    r * .16,
-    r * .11,
-    Paint()
-      ..color = const Color(0x99FFD34A)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
-    .1,
-  );
+  _blurredEllipse(c, eye, r * .16, r * .11, const Color(0x99FFD34A), 3, .1);
   _ellipse(c, eye, r * .12, r * .075, Paint()..color = const Color(0xFFFFD34A), .1);
   c.drawCircle(Offset(r * .66, -r * .28), 1.4, Paint()..color = const Color(0xFF1A0E08));
   c.drawPath(
@@ -1320,9 +1322,7 @@ void _cyclopsHead(Canvas c, double r, Look look, double t, bool still) {
   c.save();
   c.clipPath(head);
   // Light on the dome, shadow under the jaw, and a rough stubble.
-  _ellipse(c, Offset(-r * .1, -r * .7), r * .55, r * .22, Paint()
-    ..color = shade(skin[0], .25).withValues(alpha: .55)
-    ..maskFilter = MaskFilter.blur(BlurStyle.normal, r * .15));
+  _blurredEllipse(c, Offset(-r * .1, -r * .7), r * .55, r * .22, shade(skin[0], .25).withValues(alpha: .55), r * .15);
   _ellipse(c, Offset(r * .4, r * 1.05), r * .9, r * .3, Paint()..color = shade(skin[2], -.2).withValues(alpha: .35));
   final stubble = Paint()..color = shade(skin[2], -.35).withValues(alpha: .35);
   final rng = math.Random(3);
@@ -1490,9 +1490,11 @@ void _demonHead(Canvas c, double r, Look look) {
     ..quadraticBezierTo(r * .75, r * .6, r * .35, r * .5)
     ..close();
   c.drawPath(grin, Paint()..color = (look.embers ?? const Color(0xFFFF7A2A)).withValues(alpha: .9));
-  c.drawPath(grin, Paint()
-    ..color = (look.embers ?? const Color(0xFFFF7A2A)).withValues(alpha: .5)
-    ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3));
+  if (!lightGlows) {
+    c.drawPath(grin, Paint()
+      ..color = (look.embers ?? const Color(0xFFFF7A2A)).withValues(alpha: .5)
+      ..maskFilter = edgeBlur(3));
+  }
   c.drawPath(Path()..moveTo(r * .35, r * .5)..quadraticBezierTo(r * .75, r * .72, r * 1.05, r * .45), strokePaint(const Color(0xFF1A0A08), 2.2));
   for (final x in const [.5, .9]) {
     c.drawPath(poly([Offset(r * x - 2.2, r * .52), Offset(r * x, r * .76), Offset(r * x + 2.2, r * .52)]), Paint()..color = const Color(0xFFF2EAD2));
@@ -1772,7 +1774,11 @@ void _wyrmHelm(Canvas c, double r, Look look, double t, bool still) {
     ..close();
   if (glow != null) {
     final pulse = still ? .8 : .65 + .35 * math.sin(t / 400);
-    c.drawPath(slit, Paint()..color = glow.withValues(alpha: .7 * pulse)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4));
+    if (lightGlows) {
+      _slitGlow(c, slit.getBounds().inflate(1), glow.withValues(alpha: .7 * pulse), 4);
+    } else {
+      c.drawPath(slit, Paint()..color = glow.withValues(alpha: .7 * pulse)..maskFilter = edgeBlur(4));
+    }
   }
   c.drawPath(slit, Paint()..color = glow ?? const Color(0xFF08090B));
   // The visor is a dragon's upper jaw: a row of teeth hanging over the slit.
@@ -2620,7 +2626,7 @@ void _orderHelm(Canvas c, double r, Look look, double t, bool still, String orde
         c.drawPath(poly([Offset(r * (x - .07), r * .02), Offset(r * x, r * .3), Offset(r * (x + .07), r * .02)]), strokePaint(outline, .8));
       }
       final pulse = still ? .85 : .7 + .3 * math.sin(t / 380);
-      c.drawLine(Offset(r * .5, -r * .335), Offset(r * 1.22, -r * .335), strokePaint(const Color(0xFFFF3040).withValues(alpha: .55 * pulse), 4)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5));
+      c.drawLine(Offset(r * .5, -r * .335), Offset(r * 1.22, -r * .335), strokePaint(const Color(0xFFFF3040).withValues(alpha: .55 * pulse), 4)..maskFilter = edgeBlur(2.5));
       c.drawLine(Offset(r * .5, -r * .335), Offset(r * 1.22, -r * .335), strokePaint(const Color(0xFFFF6070), 1.2));
     case 'deepforge':
       // The dwarves' iron beard: a braided guard of brass hanging from the jaw, and runes along

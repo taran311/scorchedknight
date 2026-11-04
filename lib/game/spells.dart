@@ -74,7 +74,7 @@ const spells = <Spell>[
   Spell('ashenhex', 'Ashen Hex', 'Choking ash in its lungs: its counters hit 40% softer for 4 turns', 26, 2, SpellKind.weaken, 0xFFA89C8C, hex: 4),
   Spell('phoenix', 'Phoenix Flame', 'Wings of fire fold round you: an attack that also mends 35% of your health', 30, 5, SpellKind.heal, 0xFFFFB04A, mend: .35),
   Spell('bonelegion', 'Bone Legion', 'Four skeletons in rusted mail rise and fight for 3 turns', 35, 5, SpellKind.summon, 0xFF9A7AD0, summons: 4, turns: 3),
-  Spell('cataclysm', 'Cataclysm', 'The sky splits and the ash comes down burning: 3.5x damage plus fire', 40, 5, SpellKind.dragon, 0xFFFF5A2A, mult: 3.5, element: Stat.burn),
+  Spell('cataclysm', 'Cataclysm', 'An elder wyrm darkens the sky and pours its fire over the foe: 3.5x damage plus fire', 40, 5, SpellKind.dragon, 0xFFFF5A2A, mult: 3.5, element: Stat.burn),
   // Won, not learned: the Hall of the Slain teaches its War Cry to the living who survive its second wave.
   Spell('warcry', 'War Cry', 'A roar from the old hall: your blows land 25% harder for 3 turns, and any war cry the foe has raised is drowned out', 1, 3, SpellKind.warcry, 0xFFCFE0F0, hex: 3, earned: 'the Hall of the Slain'),
 

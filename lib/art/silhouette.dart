@@ -91,8 +91,13 @@ void silhouettePicture(
 /// cost a whole extra layer four times over, every frame they showed, which is what dropped
 /// frames on a blow. [rim]: whether it catches the light at all (afterimages don't).
 class FigureRun {
-  const FigureRun(this.pic, {this.tint, this.alpha = 1, this.rim = true});
+  const FigureRun(this.pic, {this.tint, this.alpha = 1, this.rim = true, this.bounds});
   final ui.Picture pic;
+
+  /// Where it draws, if known: its tint or fade is then a layer only that big. (A layer the size
+  /// of the whole stage, every frame, for a tough foe's darker hue or a pack's shade, was a steady
+  /// cost on a phone all fight long.)
+  final Rect? bounds;
   final ColorFilter? tint;
   final double alpha;
   final bool rim;
@@ -115,7 +120,7 @@ void silhouetteRuns(
   void shapes() {
     for (final r in runs) {
       if (!r.rim || r.alpha <= 0) continue;
-      if (r.alpha < 1) c.saveLayer(bounds, Paint()..color = Color.fromRGBO(0, 0, 0, r.alpha));
+      if (r.alpha < 1) c.saveLayer(r.bounds ?? bounds, Paint()..color = Color.fromRGBO(0, 0, 0, r.alpha));
       c.drawPicture(r.pic);
       if (r.alpha < 1) c.restore();
     }
@@ -159,7 +164,7 @@ void silhouetteRuns(
   for (final r in runs) {
     if (r.alpha <= 0) continue;
     final layered = r.tint != null || r.alpha < 1;
-    if (layered) c.saveLayer(bounds, Paint()..color = Color.fromRGBO(0, 0, 0, r.alpha)..colorFilter = r.tint);
+    if (layered) c.saveLayer(r.bounds ?? bounds, Paint()..color = Color.fromRGBO(0, 0, 0, r.alpha)..colorFilter = r.tint);
     c.drawPicture(r.pic);
     if (layered) c.restore();
   }

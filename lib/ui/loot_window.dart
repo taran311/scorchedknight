@@ -9,12 +9,31 @@ import '../audio/audio.dart';
 import '../game/controller.dart';
 import '../game/classes.dart';
 import '../game/loot.dart';
-import '../game/vault.dart' show isKeepsake;
+import '../game/vault.dart' show isKeepsake, keptAnyway;
 import 'hero_view.dart';
 import 'item_icons.dart';
 import 'stat_icons.dart';
 import '../game/models.dart' show Loadout;
 import 'theme.dart';
+
+/// Before selling a legendary, a second thought: they do drop again, but so rarely that one tap
+/// on the wrong button shouldn't cost you one. Anything else sells straight away.
+Future<bool> sureToSell(BuildContext context, GearItem g) async {
+  if (g.rarity != Rarity.legendary) return true;
+  final yes = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      backgroundColor: Palette.stone2,
+      title: Text('Sell ${g.name}?', style: Txt.label(size: 18, color: rarityColour(g.rarity))),
+      content: Text('It\'s a legendary: another may drop one day, but they\'re very rare.', style: Txt.onStone(size: 14, color: Palette.cream)),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text('Keep it', style: Txt.label(size: 14))),
+        TextButton(onPressed: () => Navigator.of(context).pop(true), child: Text('Sell for ${g.value} gold', style: Txt.label(size: 14, color: const Color(0xFFE07A5A)))),
+      ],
+    ),
+  );
+  return yes == true;
+}
 
 /// Shows each waiting drop in turn until none are left (or the screen goes away).
 bool _resolving = false;
@@ -254,7 +273,7 @@ class _LootWindowState extends State<_LootWindow> {
                         child: StoneButton(
                           title: cant == null ? 'Equip' : 'Can\'t',
                           icon: cant == null ? _equipIcon(item.slot) : const Icon(Icons.block, size: 22, color: Color(0xFFFF8A70)),
-                          caption: cant ?? (better ? 'Upgrade!' : (old == null ? 'Fill the slot' : isKeepsake(old) ? '${old.name} to chest' : (controller.stashFull ? 'Old one sells' : 'Old to chest'))),
+                          caption: cant ?? (better ? 'Upgrade!' : (old == null ? 'Fill the slot' : keptAnyway(old) ? '${old.name} to chest' : (controller.stashFull ? 'Old one sells' : 'Old to chest'))),
                           tone: better ? ButtonTone.blood : ButtonTone.stone,
                           onPressed: cant != null ? null : () => Navigator.of(context).pop('equip'),
                         ),
@@ -277,7 +296,11 @@ class _LootWindowState extends State<_LootWindow> {
                           icon: const ItemIcon(Item.coins, size: 24),
                           caption: isKeepsake(item) ? 'One of a kind' : '+${item.value} gold',
                           tone: better ? ButtonTone.stone : ButtonTone.amber,
-                          onPressed: isKeepsake(item) ? null : () => Navigator.of(context).pop('sell'),
+                          onPressed: isKeepsake(item)
+                              ? null
+                              : () async {
+                                  if (await sureToSell(context, item) && context.mounted) Navigator.of(context).pop('sell');
+                                },
                         ),
                       ),
                     ],

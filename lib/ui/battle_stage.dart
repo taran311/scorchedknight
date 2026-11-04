@@ -58,27 +58,29 @@ class _Runs {
   ColorFilter? _tint;
   double _alpha = 1;
   bool _rim = true;
+  Rect? _bounds;
 
-  Canvas begin() => _open(null, 1, true);
+  Canvas begin() => _open(null, 1, true, null);
 
-  Canvas _open(ColorFilter? tint, double alpha, bool rim) {
+  Canvas _open(ColorFilter? tint, double alpha, bool rim, Rect? bounds) {
     _tint = tint;
     _alpha = alpha;
     _rim = rim;
+    _bounds = bounds;
     return Canvas(_rec = ui.PictureRecorder(), _figureBounds);
   }
 
   void _close() {
     final rec = _rec;
     if (rec == null) return;
-    runs.add(FigureRun(rec.endRecording(), tint: _tint, alpha: _alpha, rim: _rim));
+    runs.add(FigureRun(rec.endRecording(), tint: _tint, alpha: _alpha, rim: _rim, bounds: _bounds));
     _rec = null;
   }
 
-  Canvas next(Canvas current, {ColorFilter? tint, double alpha = 1, bool rim = true}) {
+  Canvas next(Canvas current, {ColorFilter? tint, double alpha = 1, bool rim = true, Rect? bounds}) {
     if (identical(tint, _tint) && alpha == _alpha && rim == _rim) return current;
     _close();
-    return _open(tint, alpha, rim);
+    return _open(tint, alpha, rim, bounds);
   }
 
   List<FigureRun> finish() {
@@ -164,7 +166,10 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   bool _reduceMotion = false;
 
   // animation state
-  final Map<String, double> fx = {'flash': 0, 'kflash': 0, 'alpha': 1, 'enter': 0, 'dying': 0, 'slash': 0, 'fire': 0, 'lunge': 0, 'wyrm': 0, 'bones': 0, 'ward': 0, 'pounce': 0, 'wave': 0, 'grasp': 0, 'charge': 0, 'spectral': 0, 'flee': 0, 'ko': 0, 'dash': 0, 'screen': 0, 'zoom': 0, 'swoop': 0, 'kback': 0, 'gloom': 0, 'reaper': 0, 'reap': 0, 'soul': 0, 'scar': 0, 'wolf': 0, 'deadrun': 0, 'legion': 0, 'demon': 0, 'wolves': 0, 'bats': 0, 'storm': 0, 'die': 0, 'blade': 0, 'ice': 0};
+  final Map<String, double> fx = {'flash': 0, 'kflash': 0, 'alpha': 1, 'enter': 0, 'dying': 0, 'slash': 0, 'fire': 0, 'lunge': 0, 'wyrm': 0, 'bones': 0, 'ward': 0, 'pounce': 0, 'wave': 0, 'grasp': 0, 'charge': 0, 'spectral': 0, 'flee': 0, 'ko': 0, 'dash': 0, 'screen': 0, 'zoom': 0, 'swoop': 0, 'kback': 0, 'gloom': 0, 'reaper': 0, 'reap': 0, 'soul': 0, 'scar': 0, 'wolf': 0, 'deadrun': 0, 'legion': 0, 'demon': 0, 'wolves': 0, 'bats': 0, 'storm': 0, 'die': 0, 'blade': 0, 'ice': 0, 'elder': 0};
+
+  /// The elder wyrm of Cataclysm is pouring out its fire (jaw dropped).
+  bool _elderBreath = false;
 
   /// How long the Reaper's visit takes, from the killing blow to the fallen hero.
   static const _reapMs = 3400.0;
@@ -221,6 +226,9 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   /// The legendary specials' show: the face the dice of fate land on, when the demon and the
   /// risen dead swing, and the shape of the last lightning bolt.
   int _dieFace = 6, _stormSeed = 0;
+
+  /// The colour the blade blazes in ([fx]'s 'blade'): gold for a lucky roll, else the special's own.
+  Color _bladeTint = const Color(0xFFFFE27A);
   double _demonAt = -1e9, _legionAt = -1e9;
 
   /// When the summoned dead last swung (they dash in and slash with the swing clip).
@@ -590,6 +598,99 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
 
   Offset get _launchPoint => const Offset(_knightX + 95, _groundY - 176);
 
+  static const _elderLead = 760.0;
+  // (Hanging right over your head: on a phone's narrow view there's no room beside you for
+  // something this size, and it's the dragon you summoned, so it's yours to stand under.)
+  static const _elderPerch = Offset(_knightX - 50, _groundY - 185), _elderScale = .75;
+  static Offset get _elderMouth {
+    final m = foeDragonMouth(foeDragons['elderWyrm']!, _elderScale);
+    return _elderPerch + Offset(-m.dx, m.dy);
+  }
+
+  /// Cataclysm's build-up: the rite's name over the field, and a great elder wyrm sweeping down
+  /// out of the sky to hang over your shoulder, its fire pouring out across the field and over the
+  /// foe until well after the rite lands ([hitAt] into the cast that follows); then it climbs away.
+  void _playElderLead(Spell spell, double d0, double hitAt) {
+    final colour = Color(spell.argb);
+    _at(d0, () {
+      _banner = ('${spell.name}!', colour, now);
+      fx['elder'] = .001;
+      _tween('elder', 1, 620, ease: easeOut);
+      Audio.play(Sfx.crit, power: .7);
+    });
+    final from = 560.0, until = _elderLead + hitAt + 140;
+    _at(d0 + from - 40, () => _elderBreath = true);
+    for (var ms = from; ms < until; ms += 34) {
+      _at(d0 + ms, () {
+        final mouth = _elderMouth, ang = math.atan2(_foeChest.dy - mouth.dy, _foeChest.dx - mouth.dx);
+        _spark('fire', mouth, 4, dir: ang, spread: .22, speed: 13, life: 560, radius: 13, lift: 0, gravity: 0);
+      });
+    }
+    _at(d0 + until, () => _elderBreath = false);
+    _at(d0 + until + 120, () => _tween('elder', 0, 650, ease: easeIn));
+  }
+
+  /// How long a special's build-up lasts before its blow (the dice need a little longer to fall).
+  static double _specialLead(Special sp) => sp.dice ? 1500 : 950;
+
+  /// A special's build-up, before the blow: its name over the field, the weapon raised and held,
+  /// blazing in the special's colour as its power gathers. For the Roll of Fate, the dice are
+  /// thrown out into the middle of the field and land: sixes, and the blade blazes gold; snake eyes,
+  /// and it doesn't.
+  void _playSpecialLead(Special sp, double d0, double lead, {required bool knight, required double hitAt}) {
+    final colour = Color(sp.argb);
+    final kind = switch (sp.argb) {
+      0xFF9BE27A => 'mend',
+      0xFFFF7A2A || 0xFFFFB060 => 'ember',
+      0xFF9ADFFF => 'rime',
+      0xFFC07AFF => 'curse',
+      _ => 'holy',
+    };
+    // (The blaze holds through the blow, and fades once it's landed.)
+    final off = lead + hitAt + 250;
+    _at(d0, () {
+      _banner = ('${sp.name}!', colour, now);
+      if (knight) {
+        _knightClip = readyClip;
+        _knightClipStart = now;
+      }
+    });
+    if (sp.dice) {
+      final lucky = sp.mult > 1;
+      _at(d0 + 120, () {
+        _dieFace = lucky ? 6 : 1;
+        fx['die'] = .001;
+        _tween('die', .999, lead - 120, ease: (p) => p);
+      });
+      _at(d0 + lead, () => fx['die'] = 0);
+      final settle = 120 + (lead - 120) * .55;
+      if (lucky) {
+        _at(d0 + settle, () {
+          _bladeTint = const Color(0xFFFFE27A);
+          _tween('blade', 1, 160);
+          _tween('blade', 0, 600, delay: off - settle);
+          _spark('holy', const Offset(_knightX + 30, _groundY - 250), 24, speed: 3, life: 900, radius: 4, gravity: -.02);
+          _spark('holy', const Offset((_knightX + _foeX) / 2, _groundY - 215), 18, speed: 3, life: 700, radius: 3.5, gravity: -.02);
+        });
+      } else {
+        _at(d0 + settle + 100, () {
+          _spark('curse', const Offset((_knightX + _foeX) / 2, _groundY - 215), 18, speed: 3, life: 700, radius: 3.5);
+          _mark('Unlucky', [colour, shade(colour, -.5)], const Offset((_knightX + _foeX) / 2, _groundY - 165));
+        });
+      }
+      return;
+    }
+    _at(d0 + 200, () {
+      _bladeTint = colour;
+      _tween('blade', 1, 420, ease: easeOut);
+      _tween('blade', 0, 600, delay: off - 200);
+    });
+    // Its power gathering: motes in its colour rising round the raised weapon, quicker as it builds.
+    for (final at in const [220.0, 420.0, 580.0, 700.0, 800.0]) {
+      _at(d0 + at * lead / 950, () => _spark(kind, const Offset(_knightX + 6, _groundY - 268), 7, speed: 2.4, life: 620, radius: 3.5, lift: 1.5, gravity: -.04));
+    }
+  }
+
   /// The extra show for a quest weapon's special attack: its name, a burst in its colour, and a
   /// volley of arrows or a falling star where the weapon calls for one.
   void _playSpecial(Special sp, HeroClass cls, double d0) {
@@ -601,10 +702,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       0xFFC07AFF => 'curse',
       _ => 'holy',
     };
-    _at(d0, () {
-      _banner = ('${sp.name}!', colour, now);
-      _spark(kind, const Offset(_knightX, _groundY - 120), 22, lift: 3, speed: 3, life: 900, radius: 4, gravity: -.03);
-    });
+    _at(d0, () => _spark(kind, const Offset(_knightX, _groundY - 120), 22, lift: 3, speed: 3, life: 900, radius: 4, gravity: -.03));
     final hit = switch (cls) {
       HeroClass.knight => swingHitMs,
       HeroClass.mage => castReleaseMs + 200,
@@ -662,28 +760,6 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       }
       _at(d0 + hit, () => _spark('fire', _foeChest, 30, speed: 6, life: 800, radius: 12, lift: 1, gravity: -.02));
       _at(d0 + hit + 500, () => _tween('wyrm', 0, 600, ease: easeIn));
-    }
-    if (sp.dice) {
-      // The dice of fate tumble over your head and land: sixes, and the blade blazes; snake eyes.
-      final lucky = sp.mult > 1;
-      _at(d0, () {
-        _dieFace = lucky ? 6 : 1;
-        fx['die'] = .001;
-        _tween('die', .999, 1300, ease: (p) => p);
-      });
-      _at(d0 + 1300, () => fx['die'] = 0);
-      if (lucky) {
-        _at(d0 + 700, () {
-          _tween('blade', 1, 160);
-          _tween('blade', 0, 700, delay: hit + 200);
-          _spark('holy', const Offset(_knightX + 40, _groundY - 170), 24, speed: 3, life: 900, radius: 4, gravity: -.02);
-        });
-      } else {
-        _at(d0 + 900, () {
-          _spark('curse', const Offset(_knightX, _groundY - 130), 18, speed: 3, life: 700, radius: 3.5);
-          _mark('Unlucky', [colour, shade(colour, -.5)], const Offset(_knightX, _groundY - 300));
-        });
-      }
     }
     if (sp.deadrun) {
       // A line of the dead rides out of the left of the field and through the foe.
@@ -791,11 +867,21 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   void _playSpell(SwingResult r, double d0) {
     final spell = r.damage.spell!, colour = Color(spell.argb);
     const hit = castReleaseMs + 200;
+    final elder = spell.id == 'cataclysm';
     _at(d0, () {
-      _banner = ('${spell.name}!', colour, now);
+      if (!elder) _banner = ('${spell.name}!', colour, now);
       _spark('curse', const Offset(_knightX + 20, _groundY - 170), 14, lift: 2.5, speed: 2.5, life: 700, radius: 3.5, gravity: -.03);
     });
     switch (spell.kind) {
+      case SpellKind.dragon when elder:
+        // (The wyrm came down in the build-up: see _playElderLead.) The fire engulfs the foe.
+        _at(d0 + hit - 30, () {
+          _tween('screen', .35, 40);
+          _tween('screen', 0, 320, delay: 40);
+          _punch(.9);
+          _burst(_foeChest, colour, 1.8);
+        });
+        _at(d0 + hit, () => _spark('fire', _foeChest, 34, speed: 7, life: 900, radius: 13, lift: 1, gravity: -.02));
       case SpellKind.summon:
         _at(d0 + castReleaseMs, () {
           c.showSummons(r.summons);
@@ -977,6 +1063,16 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     final end = [950.0, hitAt + 160 * nEffects + 60, if (dragonFire) hitAt + 580, if (hound) houndAt + 1060, if (r.summonHit > 0) bonesAt + swingHitMs + 420, if (r.counter != null) counterAt + 760, if (r.knockedOut || r.cheatedDeath) counterAt + strikeMs + _reapMs].reduce(math.max);
     // Mounted: the day's first strike opens with a charge, played before the blow.
     if (r.chargeHit > 0 && r.mount != null) _playCharge(r);
+    // A special attack is a show of its own, about as long again as the blow: a build-up first
+    // (or, for the Roll of Fate, the dice), then the blow.
+    // Cataclysm: an elder wyrm first comes down out of the sky behind you, and its fire is
+    // already pouring over the foe as your rite lands.
+    if (r.damage.spell?.id == 'cataclysm') _playElderLead(r.damage.spell!, _slot(_elderLead), hitAt);
+    final special = r.damage.special;
+    if (special != null) {
+      final lead = _specialLead(special);
+      _playSpecialLead(special, _slot(lead), lead, knight: mode == HeroClass.knight, hitAt: hitAt);
+    }
     final d0 = _slot(end);
     if (r.wolfEnded) _at(d0 + end - 250, () => _playWolf(false));
     if (r.shifted != null) {
@@ -1034,7 +1130,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         final bash = r.action == BattleAction.skill;
         _at(d0, () {
           // A quick slash, or for the stunning blow, an overhead crush.
-          _knightClip = bash ? crushClip : swingClip;
+          _knightClip = special != null ? specialClip : (bash ? crushClip : swingClip);
           _knightClipStart = now;
           // Run in to the foe on one smooth curve, arriving just before the blade comes down (the
           // clip raises the sword on the way), then glide back to your mark after the hold.
@@ -1939,7 +2035,12 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         _shake > 0 ||
         _freeze > 0 ||
         (_banner != null && t - _banner!.$3 < 2600);
-    if (_cadence.tick(real, fps: lively || !_lite ? 60 : 30)) _time.value = t;
+    // (Except when something is always drifting in plain sight: a rare foe's sparks, a foe's
+    // smoke. At 30 a second those visibly stepped, then smoothed out on every blow and stepped
+    // again after it, which read as the fight hitching. They stay at 60 unless this device has
+    // already shown it can't keep up.)
+    final drifting = _particles.any((p) => p.ambient);
+    if (_cadence.tick(real, fps: lively || !_lite || (drifting && !_struggling) ? 60 : 30)) _time.value = t;
   }
 
   final _cadence = Cadence();
@@ -2061,8 +2162,12 @@ class _ScenePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final depth = canvas.getSaveCount();
+    // (The lighter look's glows hold for the whole frame, effects and bolts as well as figures,
+    // and never leak into anything drawn outside the fight.)
+    lightGlows = s._lite;
     try {
       _paint(canvas, size);
+      lightGlows = false;
     } catch (e, st) {
       // Something in the frame failed: put the canvas back as it was and say what, rather than
       // leave half a picture (on Android, that left the Reaper on screen and the fighters gone).
@@ -2130,7 +2235,10 @@ class _ScenePainter extends CustomPainter {
       // The landscape as a picture of its pixels, made once per battleground and screen size, and
       // laid down each frame: replaying its hundreds of shapes every frame (on Android's renderer,
       // cutting each one into triangles again every frame) was a steady cost under every fight.
-      final px = math.min(2.6, size.width / visibleW * MediaQuery.devicePixelRatioOf(s.context));
+      // (Sized by the camera's usual width, not the eased-out one while you fall: otherwise the
+      // landscape was redrawn into a fresh image every few frames of that pull-back.)
+      final baseW = math.min(sceneSize.width, math.max(tall ? 620.0 + (flier ? 80 : 0) : 700.0, sceneSize.height * size.width / size.height));
+      final px = math.min(2.6, size.width / baseW * MediaQuery.devicePixelRatioOf(s.context));
       final img = _backdrop(s._scene, px);
       canvas.drawImageRect(img, Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble()), Offset.zero & sceneSize, Paint()..filterQuality = FilterQuality.low);
     }
@@ -2182,8 +2290,8 @@ class _ScenePainter extends CustomPainter {
     // not inside the picture; drawn straight to the screen (the Reaper's visit), it stays inline.
     ColorFilter? inline(ColorFilter? f) => runs == null ? f : null;
     double inlineAlpha(double a) => runs == null ? a : 1;
-    void runAs({ColorFilter? tint, double alpha = 1, bool rim = true}) {
-      if (runs != null) canvas = runs.next(canvas, tint: tint, alpha: alpha, rim: rim);
+    void runAs({ColorFilter? tint, double alpha = 1, bool rim = true, Rect? bounds}) {
+      if (runs != null) canvas = runs.next(canvas, tint: tint, alpha: alpha, rim: rim, bounds: bounds);
     }
 
     final arriving = s._arrival != null && t < s._arrival!;
@@ -2229,9 +2337,21 @@ class _ScenePainter extends CustomPainter {
     }
 
 
+    // Cataclysm's elder wyrm, hanging in the sky over your shoulder (behind you), breathing fire.
+    final elder = fx['elder']!;
+    if (elder > .01) {
+      final at = Offset.lerp(const Offset(_knightX - 460, _groundY - 560), _BattleStageState._elderPerch, elder)! + Offset(0, still ? 0 : math.sin(t / 300) * 6);
+      canvas.save();
+      canvas.translate(at.dx, 0);
+      canvas.scale(-1, 1);
+      canvas.translate(-at.dx, 0);
+      drawFoeDragon(canvas, foeDragons['elderWyrm']!, at, _BattleStageState._elderScale, t, alpha: elder.clamp(0.0, 1.0), still: still, breathing: s._elderBreath);
+      canvas.restore();
+    }
+
     // As the wolf (the Bloodmoon Pelt), you're all fur and claws until it passes.
     final blade = fx['blade']!;
-    final hero = s.fx['wolf']! > .5 && k.hp > 0 ? wolfformLook : (s._shooting ? _crossbowLook(k) : heroLook(k, glow: blade > .05 ? Color.lerp(const Color(0xFFFFE27A), const Color(0xFFFFFFFF), .3) : null));
+    final hero = s.fx['wolf']! > .5 && k.hp > 0 ? wolfformLook : (s._shooting ? _crossbowLook(k) : heroLook(k, glow: blade > .05 ? Color.lerp(s._bladeTint, const Color(0xFFFFFFFF), .3) : null));
     final kPose = s._sample(idlePose(hero.stance, t, still: still), s._knightClip, s._knightClipStart, () => s._knightClip = null);
     final riding = s._riding, charge = fx['charge']!;
     if (riding != null && charge > 0 && !riding.flying) {
@@ -2260,7 +2380,7 @@ class _ScenePainter extends CustomPainter {
         // Afterimages streaming behind the charge (just one on a phone: each is a whole extra knight
         // to draw, and three of them dropped frames mid-swing).
         // (All of them in one faint run, unlit: each used to be a layer of its own in every pass.)
-        runAs(alpha: .24 * math.min(dash, 1), rim: false);
+        runAs(alpha: .24 * math.min(dash, 1), rim: false, bounds: const Rect.fromLTRB(_knightX - 420, _groundY - 380, _knightX + _dashReach + 260, _groundY + 60));
         for (var i = s._lite ? 1 : 3; i >= 1; i--) {
           drawHumanoid(canvas, hero, kPose, t, DrawOptions(at: Offset(kx - i * 48 * math.min(dash, 1), _groundY), scale: _knightScale, alpha: runs == null ? .32 / i * math.min(dash, 1) : 1, shadow: false), still: true);
         }
@@ -2273,7 +2393,7 @@ class _ScenePainter extends CustomPainter {
         final red = math.max(fx['kflash']!, low);
         return red > .02 ? hurtFilter(red) : null;
       }();
-      runAs(tint: hurt);
+      runAs(tint: hurt, bounds: const Rect.fromLTRB(_knightX - 600, _groundY - 380, _knightX + _dashReach + 260, _groundY + 60));
       drawHumanoid(
         canvas,
         hero,
@@ -2355,9 +2475,11 @@ class _ScenePainter extends CustomPainter {
 
     final lift = s._foeLift;
     final fx0 = _foeX + fx['enter']! * 440 - fx['lunge']! * 90 + lift.dx, fy = _groundY + lift.dy;
+    // Room for the foe (and its pack) whatever it does: rears, swings, flies, falls.
+    final fh = s._foeHeight, foeArea = Rect.fromLTRB(fx0 - fh * 1.1 - 160, fy - fh * 1.5 - 80, fx0 + fh * 1.1 + 200, fy + 60);
     if (s._foe.aloft) {
       // Its shadow stays on the ground below it.
-      canvas.drawOval(Rect.fromCenter(center: Offset(fx0, _groundY + 3), width: s._foeHeight * .55, height: 12), Paint()..color = Color.fromRGBO(0, 0, 0, .3 * fx['alpha']!)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4));
+      blurredOval(canvas, Rect.fromCenter(center: Offset(fx0, _groundY + 3), width: s._foeHeight * .55, height: 12), Color.fromRGBO(0, 0, 0, .3 * fx['alpha']!), 4);
     }
     final aura = s._foe.aura;
     if (aura != null) {
@@ -2372,7 +2494,7 @@ class _ScenePainter extends CustomPainter {
       const shade = ColorFilter.matrix([.74, 0, 0, 0, 0, 0, .74, 0, 0, 0, 0, 0, .8, 0, 0, 0, 0, 0, 1, 0]);
       final packTint = fx['flash']! > .02 ? flashFilter(fx['flash']! * .6) : shade;
       final packAlpha = fx['alpha']! * (1 - fx['dying']! * .3);
-      runAs(tint: packTint, alpha: packAlpha * (!s._isBeast && s._foeLook.ghostly ? .74 : 1));
+      runAs(tint: packTint, alpha: packAlpha * (!s._isBeast && s._foeLook.ghostly ? .74 : 1), bounds: foeArea);
       final tint = inline(packTint), a = inlineAlpha(packAlpha);
       for (final (dx, dy, sc, ph) in const [(74.0, -12.0, .84, 2.9), (-38.0, -20.0, .78, .6)]) {
         final at = Offset(fx0 + dx, fy + dy);
@@ -2422,7 +2544,7 @@ class _ScenePainter extends CustomPainter {
     // Its flash when struck (or its darker hue, or your own shadow's), and its fade: on its run.
     final humanoidFoe = !(s._isBeast || s._isKraken || s._isHound || s._isDragon);
     final foeTint = fx['flash']! > .02 ? flashFilter(fx['flash']!) : (humanoidFoe && s._isYou ? _BattleStageState._shadowYou : dread);
-    runAs(tint: foeTint, alpha: fx['alpha']! * (humanoidFoe && s._foeLook.ghostly ? .74 : 1));
+    runAs(tint: foeTint, alpha: fx['alpha']! * (humanoidFoe && s._foeLook.ghostly ? .74 : 1), bounds: foeArea);
     final ownTint = inline(foeTint), ownAlpha = inlineAlpha(fx['alpha']!);
     canvas.save();
     canvas.translate(fx0, fy);
@@ -2548,7 +2670,7 @@ class _ScenePainter extends CustomPainter {
       // Hellgate: a rift opens before the foe and a demon climbs out to strike.
       final up = demon < .3 ? demon / .3 : (demon > .78 ? 1 - (demon - .78) / .22 : 1.0);
       final at = Offset(fx0 - 200, _groundY);
-      outer.drawOval(Rect.fromCenter(center: at + const Offset(0, 4), width: 170 * up, height: 26 * up), Paint()..color = const Color(0xFFFF5A1A).withValues(alpha: .8 * up)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8));
+      blurredOval(outer, Rect.fromCenter(center: at + const Offset(0, 4), width: 170 * up, height: 26 * up), const Color(0xFFFF5A1A).withValues(alpha: .8 * up), 8);
       outer.drawOval(Rect.fromCenter(center: at + const Offset(0, 4), width: 120 * up, height: 14 * up), Paint()..color = const Color(0xFFFFE08A).withValues(alpha: up));
       final look = foeLooks['pitdemon']!;
       final idle = idlePose(look.stance, t, still: still);
@@ -2568,7 +2690,6 @@ class _ScenePainter extends CustomPainter {
     }
 
     canvas = outer;
-    lightGlows = false;
     ghostFadeOutside = false;
     if (runs != null) {
       final figures = runs.finish();
@@ -2592,7 +2713,7 @@ class _ScenePainter extends CustomPainter {
         final p = Offset.lerp(top, end, i / 7)! + (i < 7 ? Offset((r.nextDouble() - .5) * 60, 0) : Offset.zero);
         path.lineTo(p.dx, p.dy);
       }
-      canvas.drawPath(path, strokePaint(const Color(0xFFB8D8FF).withValues(alpha: .6 * storm), 16)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10));
+      canvas.drawPath(path, strokePaint(const Color(0xFFB8D8FF).withValues(alpha: (lightGlows ? .28 : .6) * storm), lightGlows ? 22 : 16)..maskFilter = edgeBlur(10));
       canvas.drawPath(path, strokePaint(const Color(0xFFFFFFFF).withValues(alpha: storm), 4));
       softGlow(canvas, end, 60 * storm, const Color(0xFFCFE8FF).withValues(alpha: .5 * storm), 20);
     }
@@ -2626,7 +2747,9 @@ class _ScenePainter extends CustomPainter {
     if (die > 0) {
       final settled = die > .55, a = die > .85 ? 1 - (die - .85) / .15 : 1.0;
       final face = settled ? s._dieFace : 1 + ((t / 70).floor() % 6);
-      final centre = Offset(_knightX + 20, _groundY - 330 + (settled ? 0 : -math.sin(die / .55 * math.pi) * 40));
+      // Thrown from your hand out into the middle of the field, where it lands.
+      final throwP = (die / .55).clamp(0.0, 1.0), mid = const Offset((_knightX + _foeX) / 2, _groundY - 215);
+      final centre = Offset.lerp(const Offset(_knightX + 30, _groundY - 250), mid, easeOut(throwP))! + Offset(0, -math.sin(throwP * math.pi) * 110);
       _die(canvas, centre, 46, settled ? 0 : t / 90, face, a, s._dieFace == 6 ? const Color(0xFFF2C14E) : const Color(0xFFB06AE0), settled);
     }
 
@@ -2703,7 +2826,7 @@ class _ScenePainter extends CustomPainter {
           Rect.fromLTWH(x - w / 2, 0, w, _groundY),
           Paint()
             ..shader = ui.Gradient.linear(Offset(x, 0), Offset(x, _groundY), [beam.$1.withValues(alpha: 0), beam.$1.withValues(alpha: a)])
-            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10),
+            ..maskFilter = edgeBlur(10),
         );
         canvas.drawOval(Rect.fromCenter(center: Offset(x, _groundY), width: w * 2.4, height: 16), Paint()..color = beam.$1.withValues(alpha: a));
       }
@@ -2745,7 +2868,7 @@ class _ScenePainter extends CustomPainter {
             smear,
             Paint()
               ..shader = ui.Gradient.sweep(centre, [col.withValues(alpha: 0), col.withValues(alpha: .55 * fade), const Color(0xFFFFFFFF).withValues(alpha: .95 * fade)], [0, .75, 1], TileMode.clamp, tail, lead + .001)
-              ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
+              ..maskFilter = edgeBlur(2),
           );
           // The cutting edge, a hard white line at the front of the smear.
           canvas.drawArc(Rect.fromCircle(center: centre, radius: outer - 3), lead - .35, .35, false, strokePaint(const Color(0xFFFFFFFF).withValues(alpha: fade), crit ? 4 : 2.5)..strokeCap = StrokeCap.round);
@@ -2865,7 +2988,7 @@ class _ScenePainter extends CustomPainter {
       // size of the whole scene, every frame it showed, cost a phone dearly.)
       final fading = a < 1;
       if (fading) canvas.saveLayer(box.inflate(12).expandToInclude(Rect.fromLTWH(box.left, box.bottom, box.width, 20)), Paint()..color = Color.fromRGBO(0, 0, 0, a));
-      canvas.drawPath(shape.shift(const Offset(0, 3)), Paint()..color = const Color(0x66000000)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4));
+      canvas.drawPath(shape.shift(const Offset(0, 3)), Paint()..color = Color(lightGlows ? 0x40000000 : 0x66000000)..maskFilter = edgeBlur(4));
       canvas.drawPath(shape, Paint()..color = const Color(0xFFF4EAD0));
       canvas.drawPath(shape, strokePaint(const Color(0xFF3A2614), 2.2));
       tp.paint(canvas, box.topLeft + const Offset(13, 8));
@@ -3050,7 +3173,7 @@ class _ScenePainter extends CustomPainter {
     canvas.translate(centre.dx, centre.dy);
     canvas.rotate(spin);
     final box = RRect.fromRectAndRadius(Rect.fromCenter(center: Offset.zero, width: size, height: size), Radius.circular(size * .18));
-    if (settled) canvas.drawRRect(box.inflate(10), Paint()..color = glow.withValues(alpha: .55 * alpha)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12));
+    if (settled) blurredOval(canvas, box.outerRect.inflate(16), glow.withValues(alpha: .55 * alpha), 12);
     canvas.drawRRect(box, Paint()..color = const Color(0xFFF4EEE0).withValues(alpha: alpha));
     canvas.drawRRect(box, strokePaint((settled ? glow : const Color(0xFF3A2A1A)).withValues(alpha: alpha), 3));
     final q = size * .26;
@@ -3077,13 +3200,7 @@ class _ScenePainter extends CustomPainter {
       canvas.save();
       canvas.translate(head.dx, head.dy);
       if (p.colour.a > 0) {
-        canvas.drawCircle(
-          Offset.zero,
-          14,
-          Paint()
-            ..color = p.colour.withValues(alpha: .5)
-            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
-        );
+        blurredOval(canvas, Rect.fromCircle(center: Offset.zero, radius: 14), p.colour.withValues(alpha: .5), 6);
       }
       switch (p.kind) {
         case 'chakram':
@@ -3109,15 +3226,7 @@ class _ScenePainter extends CustomPainter {
       final d = head - tail, n = d / math.max(1, d.distance);
       final back = head - n * 34;
       if (p.colour.a > 0) {
-        canvas.drawLine(
-          back,
-          head,
-          Paint()
-            ..color = p.colour.withValues(alpha: .6)
-            ..strokeWidth = 7
-            ..strokeCap = StrokeCap.round
-            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
-        );
+        _glowLine(canvas, back, head, p.colour.withValues(alpha: .6), 7, 5);
       }
       canvas.drawLine(back, head, strokePaint(const Color(0xFF8A6440), 2.4));
       final side = Offset(-n.dy, n.dx);
@@ -3127,15 +3236,7 @@ class _ScenePainter extends CustomPainter {
       }
       return;
     }
-    canvas.drawLine(
-      tail,
-      head,
-      Paint()
-        ..color = p.colour.withValues(alpha: .55)
-        ..strokeWidth = 16
-        ..strokeCap = StrokeCap.round
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
-    );
+    _glowLine(canvas, tail, head, p.colour.withValues(alpha: .55), 16, 8);
     canvas.drawCircle(
       head,
       11,
@@ -3418,6 +3519,17 @@ double _outAndBack(double p) {
 
 /// A soft-edged glow on the ground: a radial gradient squashed into [r], in place of a blurred
 /// oval (a blur every frame is costly on a phone; this looks the same).
+/// A blurred streak (a bolt's or a spell's trail), or in the lighter look a wide faint stroke
+/// under a narrower one: near enough the same glow, without a blur pass for every shot in flight.
+void _glowLine(Canvas canvas, Offset a, Offset b, Color colour, double width, double sigma) {
+  if (lightGlows) {
+    canvas.drawLine(a, b, strokePaint(colour.withValues(alpha: colour.a * .3), width + sigma * 1.6)..strokeCap = StrokeCap.round);
+    canvas.drawLine(a, b, strokePaint(colour.withValues(alpha: colour.a * .6), width * .7)..strokeCap = StrokeCap.round);
+  } else {
+    canvas.drawLine(a, b, strokePaint(colour, width)..strokeCap = StrokeCap.round..maskFilter = MaskFilter.blur(BlurStyle.normal, sigma));
+  }
+}
+
 void _softOval(Canvas canvas, Rect r, Color colour) {
   canvas.save();
   canvas.translate(r.center.dx, r.center.dy);

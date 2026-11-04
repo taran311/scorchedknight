@@ -526,7 +526,8 @@ class _SlotSheetState extends State<_SlotSheet> {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          Expanded(child: StoneButton(title: 'Sell', caption: isKeepsake(picked) ? 'One of a kind' : '+${picked.value} gold', onPressed: isKeepsake(picked) ? null : () {
+                          Expanded(child: StoneButton(title: 'Sell', caption: isKeepsake(picked) ? 'One of a kind' : '+${picked.value} gold', onPressed: isKeepsake(picked) ? null : () async {
+                            if (!await sureToSell(context, picked)) return;
                             c.sellFromStash(picked.id);
                             Audio.play(Sfx.coins);
                           })),

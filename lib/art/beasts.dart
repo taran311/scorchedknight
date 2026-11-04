@@ -285,9 +285,9 @@ void drawBear(Canvas c, BearLook look, Offset at, double scale, double t, {doubl
     Path()
       ..moveTo(-60, -96 - b)
       ..quadraticBezierTo(0, -110 - b, 30, -130 - b),
-    strokePaint(fur[0].withValues(alpha: .45), 8)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+    strokePaint(fur[0].withValues(alpha: .45), 8)..maskFilter = edgeBlur(4),
   );
-  c.drawPath(Path()..moveTo(-70, -48)..quadraticBezierTo(0, -40, 66, -50), strokePaint(shade(fur[2], -.1).withValues(alpha: .4), 12)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4));
+  c.drawPath(Path()..moveTo(-70, -48)..quadraticBezierTo(0, -40, 66, -50), strokePaint(shade(fur[2], -.1).withValues(alpha: .4), 12)..maskFilter = edgeBlur(4));
   c.drawArc(Rect.fromCenter(center: const Offset(-48, -70), width: 46, height: 40), math.pi * .9, math.pi * .8, false, strokePaint(fur[2].withValues(alpha: .45), 1.8));
   c.drawArc(Rect.fromCenter(center: const Offset(46, -78), width: 36, height: 44), -math.pi * .1, math.pi * .8, false, strokePaint(fur[2].withValues(alpha: .35), 1.6));
   // Strokes of shaggy fur.
@@ -340,7 +340,7 @@ void drawBear(Canvas c, BearLook look, Offset at, double scale, double t, {doubl
       ..close(),
     Paint()..color = Color.lerp(fur[0], const Color(0xFFD8B890), .55)!,
   );
-  c.drawLine(const Offset(2, -22), const Offset(34, -18), strokePaint(fur[0].withValues(alpha: .5), 3)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5));
+  c.drawLine(const Offset(2, -22), const Offset(34, -18), strokePaint(fur[0].withValues(alpha: .5), 3)..maskFilter = edgeBlur(1.5));
   c.restore();
   c.drawPath(head, strokePaint(outline, 1.6));
   c.drawPath(Path()..moveTo(14, -16)..quadraticBezierTo(24, -20, 36, -12), strokePaint(fur[2], 3));
@@ -478,7 +478,7 @@ void drawDust(Canvas c, Offset at, double t, double strength) {
   final p = Paint()..color = Color.fromRGBO(200, 180, 140, .35 * strength);
   for (var i = 0; i < 6; i++) {
     final x = at.dx - i * 22, r = 10 + i * 3.0;
-    c.drawCircle(Offset(x, at.dy - 6 - math.sin(t / 90 + i) * 4), r, p..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6));
+    blurredOval(c, Rect.fromCircle(center: Offset(x, at.dy - 6 - math.sin(t / 90 + i) * 4), radius: r), p.color, 6);
   }
 }
 

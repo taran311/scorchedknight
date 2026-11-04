@@ -63,9 +63,16 @@ void drawDragon(Canvas c, String stage, double t, {bool breathing = false, bool 
 /// Height of a foe dragon standing on the ground, before scaling.
 const dragonHeight = 210.0;
 
+/// Where a foe dragon's mouth is, from where [drawFoeDragon] was asked to stand it, at [scale]
+/// (facing the hero; mirror the x for one facing the other way).
+Offset foeDragonMouth(DragonLook look, double scale) {
+  final s = scale * look.scale;
+  return Offset(-150 * s, -130 * s);
+}
+
 /// A dragon foe standing at [at] (its feet), facing left toward the hero. [hit] (0..1) rocks it
 /// back; [dying] rolls it over.
-void drawFoeDragon(Canvas c, DragonLook look, Offset at, double scale, double t, {double alpha = 1, double hit = 0, double dying = 0, ColorFilter? tint, bool still = false}) {
+void drawFoeDragon(Canvas c, DragonLook look, Offset at, double scale, double t, {double alpha = 1, double hit = 0, double dying = 0, ColorFilter? tint, bool still = false, bool breathing = false}) {
   final s = scale * look.scale;
   final painted = identical(look, foeDragons['emberKing']) ? Sprites.get('vharrax') : null;
   if (painted != null) {
@@ -97,7 +104,7 @@ void drawFoeDragon(Canvas c, DragonLook look, Offset at, double scale, double t,
     c.saveLayer(const Rect.fromLTRB(-700, -900, 700, 300), p);
   }
   c.drawOval(Rect.fromCenter(center: const Offset(-20, 46), width: 220, height: 22), Paint()..color = const Color(0x55000000));
-  paintDragon(c, look, flap: flap, fly: true, breathing: false, lineScale: s, flapScale: .55);
+  paintDragon(c, look, flap: flap, fly: true, breathing: breathing, lineScale: s, flapScale: .55);
   if (layered) c.restore();
   c.restore();
 }
@@ -253,7 +260,7 @@ void paintDragon(Canvas c, DragonLook look, {required double flap, required bool
       ..moveTo(-60, -26)
       ..cubicTo(-30, -46, 10, -50, 40, -40)
       ..cubicTo(56, -56, 64, -78, 82, -96),
-    strokePaint(col[0].withValues(alpha: .5), 3)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
+    strokePaint(col[0].withValues(alpha: .5), 3)..maskFilter = edgeBlur(2),
   );
   c.restore();
 
@@ -316,9 +323,7 @@ void paintDragon(Canvas c, DragonLook look, {required double flap, required bool
     strokePaint(col[2], 3),
   );
   c.drawOval(Rect.fromCenter(center: const Offset(55, -4), width: 5, height: 3), Paint()..color = col[2]);
-  c.drawOval(Rect.fromCenter(center: const Offset(20, -11), width: 13, height: 9), Paint()
-    ..color = look.eye.withValues(alpha: .6)
-    ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4));
+  blurredOval(c, Rect.fromCenter(center: const Offset(20, -11), width: 13, height: 9), look.eye.withValues(alpha: .6), 4);
   c.drawOval(Rect.fromCenter(center: const Offset(20, -11), width: 9, height: 5.5), Paint()..color = look.eye);
   c.drawOval(Rect.fromCenter(center: const Offset(21, -11), width: 2, height: 5), Paint()..color = const Color(0xFF140806));
   // Swept-back horns and a frill of small spines behind the jaw.

@@ -78,6 +78,10 @@ bool isKeepsake(GearItem g) =>
     _onceOnly.contains(g.name) ||
     (g.slot == GearSlot.trinket && (g.art == 'ashenseal' || continents.any((l) => l.prize == g.art)));
 
+/// Gear that goes in the chest even when it's full, rather than being sold to make room for
+/// something newly worn.
+bool keptAnyway(GearItem g) => isKeepsake(g) || g.rarity == Rarity.legendary;
+
 const _onceOnly = {
   // The Allfather's spear, from the Hall of the Slain.
   'Gungnir',
