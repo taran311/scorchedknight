@@ -265,6 +265,7 @@ class SwingResult {
 class GameEngine {
   GameEngine(this.state, {math.Random? random, DateTime Function()? clock}) : _rng = random ?? math.Random(), loot = LootTable(random), clock = clock ?? DateTime.now {
     loot.ng = state.ng;
+    sellSpareSetPieces();
   }
 
   /// Today, for seasonal events (swapped out in tests and the simulator).
@@ -4186,7 +4187,7 @@ class GameEngine {
       Metal.values.any((m) => whyNotSmelt(m) == null) ||
       armourRecipes.keys.any((id) => armourTierById(id).heroClass == state.knight.heroClass && whyNotCraft(id) == null) ||
       // A set piece you could forge and aren't wearing yet.
-      forgedSets.any((f) => setPieceSlots.any((slot) => whyNotForgePiece(f.id, slot) == null && !state.knight.gear.any((g) => g.gearSet == f.id && g.slot == slot)));
+      forgedSets.any((f) => setPieceSlots.any((slot) => whyNotForgePiece(f.id, slot) == null && !hasSetPiece(f.id, slot)));
 
   /// Gems you could have ground into bolts.
   bool get gemsWaiting => Gem.values.any((g) => whyNotFletch(g) == null) || Elemental.values.any((el) => whyNotBind(el) == null);
@@ -4246,6 +4247,7 @@ class GameEngine {
     if (f == null) return 'No such set';
     if (state.inBattle) return 'Not mid-fight';
     if (state.mat(blueprintKey(setId, slot)) == 0) return 'Find the blueprint first';
+    if (hasSetPiece(setId, slot) && !canReforge(setId, slot)) return 'Already forged';
     final have = state.mat(trophyKey(f.trophy));
     if (have < pieceTrophies) return 'Needs $pieceTrophies ${f.trophy.label.toLowerCase()} (you have $have)';
     if (state.mat(barKey(f.metal)) < pieceBars) return 'Needs $pieceBars ${f.metal.bar.toLowerCase()}s';
@@ -4253,8 +4255,78 @@ class GameEngine {
     return null;
   }
 
+  /// You already have the [slot] piece of set [setId]: worn, in the chest or in the spoils. Set
+  /// pieces can't be sold, so each is forged once (body armour you've changed out of is gone, and
+  /// can be forged again).
+  bool hasSetPiece(String setId, GearSlot slot) {
+    final k = state.knight;
+    if (slot == GearSlot.armour) {
+      final id = setArmourId(setId);
+      return k.loadouts.values.any((l) => l.armour == id) || [...k.stash, ...state.pendingLoot].any((g) => g.slot == GearSlot.armour && g.art == id);
+    }
+    return [for (final l in k.loadouts.values) ...[for (final s in GearSlot.values) l.inSlot(s)], k.trinket, k.ring, ...k.stash, ...state.pendingLoot]
+        .any((g) => g != null && g.gearSet == setId && g.slot == slot);
+  }
+
+  /// The [slot] piece of set [setId] you hold (not body armour, which is a suit you wear).
+  GearItem? heldSetPiece(String setId, GearSlot slot) {
+    if (slot == GearSlot.armour) return null;
+    final k = state.knight;
+    return [for (final l in k.loadouts.values) ...[for (final s in GearSlot.values) l.inSlot(s)], k.trinket, k.ring, ...k.stash, ...state.pendingLoot]
+        .firstWhere((g) => g != null && g.gearSet == setId && g.slot == slot, orElse: () => null);
+  }
+
+  /// Dunstan will rework the set piece you have, from a fresh blueprint's worth of trophies and
+  /// bars, all the way up to your level, once it's a few levels behind you (tempering only gets a
+  /// piece halfway).
+  bool canReforge(String setId, GearSlot slot) {
+    final g = heldSetPiece(setId, slot);
+    return g != null && state.knight.level - g.level >= temperMinGap;
+  }
+
+  /// Puts [better] wherever the piece with [id] is: worn, in the chest or in the spoils.
+  void _replaceItem(String id, GearItem better) {
+    final k = state.knight;
+    if (k.trinket?.id == id) k.trinket = better;
+    if (k.ring?.id == id) k.ring = better;
+    for (final l in k.loadouts.values) {
+      if (l.weapon?.id == id) l.weapon = better;
+      if (l.offhand?.id == id) l.offhand = better;
+      if (l.helm?.id == id) l.helm = better;
+      if (l.gloves?.id == id) l.gloves = better;
+      if (l.boots?.id == id) l.boots = better;
+      if (l.cape?.id == id) l.cape = better;
+    }
+    for (final list in [k.stash, state.pendingLoot]) {
+      final i = list.indexWhere((g) => g.id == id);
+      if (i >= 0) list[i] = better;
+    }
+  }
+
+  /// From before set pieces were forged once: spare copies of a piece (the worn one, or else the
+  /// best) are sold, so they don't sit in the chest for ever. The gold made (0: none).
+  int sellSpareSetPieces() {
+    final k = state.knight;
+    final worn = {for (final g in [for (final l in k.loadouts.values) ...[for (final s in GearSlot.values) l.inSlot(s)], k.trinket, k.ring]) if (g?.gearSet case final set?) '$set/${g!.slot.name}'};
+    final spares = <GearItem>[];
+    final held = [...k.stash, ...state.pendingLoot]..sort((a, b) => b.level.compareTo(a.level));
+    final kept = {...worn};
+    for (final g in held) {
+      if (g.slot == GearSlot.armour || forgedSetById(g.gearSet ?? '') == null) continue;
+      if (!kept.add('${g.gearSet}/${g.slot.name}')) spares.add(g);
+    }
+    if (spares.isEmpty) return 0;
+    final gold = spares.fold(0, (a, g) => a + g.value);
+    k.stash.removeWhere(spares.contains);
+    state.pendingLoot.removeWhere(spares.contains);
+    k.coins += gold;
+    _note('Set pieces are one of a kind now: your spare copies (${spares.map((g) => g.name).join(', ')}) sold for $gold gold.', EntryKind.gold);
+    return gold;
+  }
+
   /// Dunstan forges a set piece from its blueprint (kept for next time), trophies, bars and gold.
-  /// It goes into your spoils, at your level.
+  /// It goes into your spoils, at your level; or, if you have it already, he reforges that one up
+  /// to your level (see [canReforge]).
   GearItem? forgePiece(String setId, GearSlot slot) {
     if (whyNotForgePiece(setId, slot) != null) return null;
     final f = forgedSetById(setId)!, k = state.knight;
@@ -4262,6 +4334,13 @@ class GameEngine {
       ..addMat(trophyKey(f.trophy), -pieceTrophies)
       ..addMat(barKey(f.metal), -pieceBars);
     k.coins -= pieceFee(k.level);
+    if (heldSetPiece(setId, slot) case final old?) {
+      // One of a kind: the piece you have is reworked, not a second one made.
+      final better = tempered(old, k.level);
+      _replaceItem(old.id, better);
+      _note('$smithName melts down ${old.name} with the new ${f.trophy.label.toLowerCase()} and pours it again: level ${better.level}, your level.', EntryKind.gold);
+      return better;
+    }
     final item = loot.setPiece(setId, slot, k.heroClass, k.level);
     state.pendingLoot.add(item);
     _note('$smithName spreads out the blueprint, weighs the ${f.trophy.label.toLowerCase()} in his hand, and gets to work. By evening: ${item.name}.', EntryKind.gold);

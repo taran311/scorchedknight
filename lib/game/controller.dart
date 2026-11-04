@@ -786,6 +786,9 @@ class GameController extends ChangeNotifier {
   }
 
   String? whyNotForgePiece(String setId, GearSlot slot) => engine.whyNotForgePiece(setId, slot);
+  bool hasSetPiece(String setId, GearSlot slot) => engine.hasSetPiece(setId, slot);
+  GearItem? heldSetPiece(String setId, GearSlot slot) => engine.heldSetPiece(setId, slot);
+  bool canReforge(String setId, GearSlot slot) => engine.canReforge(setId, slot);
 
   GearItem? forgePiece(String setId, GearSlot slot) {
     final item = engine.forgePiece(setId, slot);

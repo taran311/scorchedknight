@@ -1352,6 +1352,25 @@ void main() {
     expect(s.mat(trophyKey(Trophy.fang)), 0);
     // The blueprint is kept.
     expect(s.mat(blueprintKey('nightblood', GearSlot.ring)), 1);
+    // Each piece is forged once, and can't be sold.
+    s..addMat(trophyKey(Trophy.fang), pieceTrophies)..addMat(barKey(Metal.iron), pieceBars);
+    expect(e.whyNotForgePiece('nightblood', GearSlot.ring), 'Already forged');
+    expect(isKeepsake(ring), isTrue);
+    // A few levels on, Dunstan reworks that one up to your level instead of making another.
+    s.knight.level = 20 + temperMinGap;
+    expect(e.canReforge('nightblood', GearSlot.ring), isTrue);
+    final again = e.forgePiece('nightblood', GearSlot.ring)!;
+    expect(again.id, ring.id);
+    expect(again.level, 20 + temperMinGap);
+    expect([...s.knight.stash, ...s.pendingLoot].where((g) => g.gearSet == 'nightblood' && g.slot == GearSlot.ring).single.level, 20 + temperMinGap);
+    s.knight.level = 20;
+    // Spare copies from before are sold when the game's loaded, the best kept.
+    final spare = e.loot.setPiece('nightblood', GearSlot.ring, HeroClass.knight, 5);
+    s.knight.stash.add(spare);
+    final gold = GameEngine(s).sellSpareSetPieces() + 0;
+    expect(gold, 0); // (already sold by the constructor)
+    expect(s.knight.stash.contains(spare), isFalse);
+    expect([...s.knight.stash, ...s.pendingLoot].where((g) => g.gearSet == 'nightblood' && g.slot == GearSlot.ring).length, 1);
     // Forged sets never turn up as random drops.
     final loot = LootTable(Random(1));
     for (var i = 0; i < 3000; i++) {

@@ -20,6 +20,7 @@ import 'package:scorchedknight/game/loot.dart';
 import 'package:scorchedknight/game/models.dart';
 import 'package:scorchedknight/game/rules.dart';
 import 'package:scorchedknight/game/spells.dart';
+import 'package:scorchedknight/game/vault.dart' show isKeepsake;
 
 /// What one playthrough saw and did.
 class Run {
@@ -138,8 +139,12 @@ void inTown(GameEngine e, Run run) {
   // Set pieces, from the blueprints the Ashen Order, the vampires and the werewolves left.
   for (final f in forgedSets) {
     for (final slot in setPieceSlots) {
-      if (!k.gear.any((g) => g.gearSet == f.id && g.slot == slot) && e.forgePiece(f.id, slot) != null) run.seen.add('forged ${f.id} piece');
+      if ((!e.hasSetPiece(f.id, slot) || e.canReforge(f.id, slot)) && e.forgePiece(f.id, slot) != null) run.seen.add('forged ${f.id} piece');
     }
+  }
+  // Set pieces are forged once, so Dunstan tempers them (and the other epics worn) to keep up.
+  for (final g in e.temperables) {
+    if (g.gearSet != null && forgedSetById(g.gearSet!) != null && e.whyNotTemper(g) == null && e.temper(g) != null) run.seen.add('tempered');
   }
   // Caches and shrines on the map, as soon as they're reachable.
   for (final p in places) {
@@ -169,6 +174,8 @@ void takeLoot(GameEngine e) {
     final better = g.slot == GearSlot.armour ? armourTierById(g.art).reduction > armourTierById(k.loadout.armour).reduction : old == null || g.score > old.score;
     if (usable && better) {
       e.equipLoot(g.id);
+    } else if (isKeepsake(g)) {
+      e.keepLoot(g.id);
     } else {
       e.sellLoot(g.id);
     }

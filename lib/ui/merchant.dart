@@ -559,9 +559,14 @@ class ForgeWares extends StatelessWidget {
                 x.ware(
                   MatIcon.blueprint(size: 28),
                   slot == GearSlot.armour ? armourTierById(setArmourId(f.id)).name : '${gearSetById(f.id)!.name} ${pieceNoun(slot)}',
-                  slot == GearSlot.armour ? '−${(armourTierById(setArmourId(f.id)).reduction * 100).round()}% damage taken' : 'Epic, at your level',
+                  switch (c.heldSetPiece(f.id, slot)) {
+                    final g? when c.canReforge(f.id, slot) => 'Yours, level ${g.level}: reforge to your level',
+                    final g? => 'Forged, level ${g.level}: yours to keep',
+                    _ when c.hasSetPiece(f.id, slot) => 'Forged: yours to keep',
+                    _ => slot == GearSlot.armour ? '−${(armourTierById(setArmourId(f.id)).reduction * 100).round()}% damage taken' : 'Epic, at your level',
+                  },
                   CostButton(
-                    label: 'Forge',
+                    label: c.canReforge(f.id, slot) ? 'Reforge' : (c.hasSetPiece(f.id, slot) ? 'Forged' : 'Forge'),
                     onTap: c.whyNotForgePiece(f.id, slot) == null
                         ? () {
                             if (c.forgePiece(f.id, slot) != null) {

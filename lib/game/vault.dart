@@ -3,6 +3,7 @@
 // gold and good gear, but six pieces are found nowhere else. Pure Dart: the rules only.
 
 import 'catalog.dart' show continents;
+import 'crafting.dart' show forgedSets;
 import 'loot.dart';
 
 /// The chance a fallen foe leaves a Cinder key: an even match, a tough one and a deadly one (see
@@ -70,11 +71,13 @@ class VaultFind {
 bool guardianSworn(List<String> found) => vaultPieces.every((p) => found.contains(p.name));
 
 /// A piece the world gives you only once: the vault's own six, a forged relic, a boss's trophy,
-/// and the one-per-hero weapons (the elemental arms, Thornbloom, Duskwing and Rimeforged). It
+/// a set piece Dunstan forged from a blueprint (each is forged once), and the one-per-hero weapons
+/// (the elemental arms, Thornbloom, Duskwing and Rimeforged). It
 /// can't be sold (and always fits in your chest), so a slip of the thumb never loses it for good.
 bool isKeepsake(GearItem g) =>
     g.gearSet == 'vault' ||
     g.gearSet == 'arena' ||
+    forgedSets.any((f) => f.id == g.gearSet) ||
     _onceOnly.contains(g.name) ||
     (g.slot == GearSlot.trinket && (g.art == 'ashenseal' || continents.any((l) => l.prize == g.art)));
 
