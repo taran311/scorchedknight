@@ -944,11 +944,14 @@ class _PinPainter extends CustomPainter {
   @override
   void paint(Canvas c, Size size) {
     final r = size.width / 2, centre = Offset(r, r);
+    // One outline, seal and point together: the point's sides meet the seal's rim, and the rim runs
+    // round the long way between them. (Drawn as a circle and a triangle, the triangle's top edge
+    // was stroked right across the bottom of the seal.)
+    final rr = r - 2, half = math.asin(12 / rr), base = Rect.fromCircle(center: centre, radius: rr);
     final pin = Path()
-      ..addOval(Rect.fromCircle(center: centre, radius: r - 2))
-      ..moveTo(r - 12, r + r * .72)
-      ..lineTo(r, size.height - 1)
-      ..lineTo(r + 12, r + r * .72)
+      ..moveTo(r, size.height - 1)
+      ..lineTo(centre.dx + rr * math.sin(half), centre.dy + rr * math.cos(half))
+      ..arcTo(base, math.pi / 2 - half, -(2 * math.pi - 2 * half), false)
       ..close();
     c.drawPath(pin.shift(const Offset(0, 3)), Paint()..color = const Color(0x99000000)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3));
     c.drawPath(pin, Paint()..color = fill);
