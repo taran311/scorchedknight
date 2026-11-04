@@ -25,7 +25,7 @@ class GameTask {
   final bool Function(GameState s) done;
   final TaskReward reward;
 
-  /// A region to clear (its boss, risen boss, places, dungeons and relic parts all done; see
+  /// A region to clear (its boss beaten, then beaten again risen; see
   /// GameEngine.landCleared), for the region tasks. Those are never offered as "next": you clear
   /// regions in your own order; they turn up to claim once done.
   final int? land;

@@ -620,38 +620,21 @@ void main() {
     expect(e.whyNotBrew(Brew.might), isNull);
   });
 
-  test('a region is cleared once its boss, places, dungeons and relic parts are all done', () {
+  test('a region is cleared once its boss is beaten, then beaten again risen (places and dungeons around it count on their own)', () {
     final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(1));
     final s = e.state;
-    // Pick a region with something of each kind, if there is one; else the first with a place.
-    var land = 0;
-    for (var c = 0; c < continents.length; c++) {
-      final p = e.landProgress(c);
-      if (p.placesAll > 0 && p.partsAll > 0) {
-        land = c;
-        break;
-      }
-    }
+    const land = 1;
     expect(e.landCleared(land), isFalse);
+    expect(e.landLeft(land), isNotEmpty);
     s.bossesDown.add(land);
-    expect(e.landCleared(land), e.landProgress(land).placesAll == 0 && e.landProgress(land).delvesAll == 0 && e.landProgress(land).partsAll == 0);
-    for (final p in places.where((p) => p.land == land)) {
-      s.explored.add(p.id);
-    }
-    for (final d in dungeons.where((d) => d.land == land)) {
-      s.dungeonsDone.add(d.id);
-    }
-    final parts = relicPartsOn(land);
-    if (parts.isNotEmpty) expect(e.landCleared(land), isFalse, reason: 'a relic part still to find');
-    for (final (r, i) in parts) {
-      s.relicParts[r] = (s.relicParts[r] ?? 0) | (1 << i);
-    }
-    // (Finding the risen boss's part counts as beating it; otherwise it's recorded.)
+    expect(e.landCleared(land), isFalse);
+    expect(e.landLeft(land).single, contains('risen'));
     s.risenDown.add(land);
-    expect(e.landCleared(land), isTrue);
+    expect(e.landCleared(land), isTrue, reason: 'unexplored places and dungeons around it don\'t hold it back');
+    expect(e.landLeft(land), isEmpty);
     expect(e.heroicCleared(land), isTrue);
     expect(GameState.fromJson(jsonDecode(jsonEncode(s.toJson())) as Map<String, dynamic>).risenDown, contains(land));
-    expect(e.landCleared(land == 0 ? 1 : 0), isFalse);
+    expect(e.landCleared(0), isFalse);
   });
 
   test('vault pieces grow with you: a level gained brings every one you own up to it', () {

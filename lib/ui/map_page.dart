@@ -576,7 +576,7 @@ class _ContinentPanel extends StatelessWidget {
                       children: [
                         if (c.engine.landCleared(index))
                           const Tooltip(
-                            message: 'Nothing new left to find here. Still good for gear, gold, XP and Cinder keys.',
+                            message: 'Its boss beaten, and beaten again risen. Places and dungeons around it tick off on their own. Still good for gear, gold and XP.',
                             child: InfoChip(icon: Icon(Icons.check_circle, size: 14, color: Palette.amber), text: 'Cleared', colour: Palette.amber, dense: true),
                           ),
                         if (p.boss) chip(Icons.local_fire_department, p.risen ? 1 : 0, 1, 'The boss beaten again, risen'),

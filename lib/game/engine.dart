@@ -467,26 +467,22 @@ class GameEngine {
   }
 
   /// What's still to do in land [c] before it counts as cleared (its flag turns green), by name:
-  /// its boss risen, then places, dungeons and relic parts.
+  /// its boss, then its boss risen.
   List<String> landLeft(int c) {
     final s = state;
     return [
       if (!s.bossesDown.contains(c)) continents[c].boss.name,
       if (s.bossesDown.contains(c) && !heroicCleared(c) && !s.risenDown.contains(c)) '${continents[c].boss.name}, risen${s.knight.level < risenLevel(c) ? ' (level ${risenLevel(c)})' : ''}',
-      for (final p in places)
-        if (p.land == c && !p.hidden && !s.explored.contains(p.id)) p.name,
-      for (final d in dungeons)
-        if (d.land == c && !s.dungeonsDone.contains(d.id)) d.name,
     ];
   }
 
   /// Region [c] is cleared: its boss down, every place and dungeon done, every relic part found.
   bool landCleared(int c) {
     final p = landProgress(c);
-    // (Relic parts aren't asked for on their own: each is held at a place, in a dungeon or by the
-    // risen boss, all counted already, and a part missed for want of its blueprint at the time
-    // mustn't keep a land from ever being finished.)
-    return p.boss && p.risen && p.places == p.placesAll && p.delves == p.delvesAll;
+    // Its boss beaten, then beaten again risen: what's inside the land itself, its trail and lair.
+    // (Places and dungeons sit out on the map around it, each with its own tick when done; asking
+    // for them too kept a land's flag gold for something drawn outside its patch.)
+    return p.boss && p.risen;
   }
 
   /// Region [c]'s boss has been beaten risen (saves from before this was kept show it by the relic

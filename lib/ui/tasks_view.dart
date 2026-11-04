@@ -173,7 +173,7 @@ class TaskList extends StatelessWidget {
           for (final t in gameTasks) _row(c, t),
           const SizedBox(height: 12),
           Text('Regions cleared · ${regionTasks.where((t) => s.tasksClaimed.contains(t.id)).length} / ${regionTasks.length}', style: Txt.label(size: 15, color: Palette.amber)),
-          Text('Everything new in a region done: its boss (and risen), its places, dungeons and relic parts', style: Txt.onStone(size: 12)),
+          Text('A region\'s boss beaten, then beaten again risen', style: Txt.onStone(size: 12)),
           const SizedBox(height: 6),
           for (final t in regionTasks) _row(c, t),
           const SizedBox(height: 12),
