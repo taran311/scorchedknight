@@ -333,6 +333,12 @@ class _InnPageState extends State<InnPage> with RouteAware {
                         if (s.innRepaired && c.engine.board.isNotEmpty) ...[
                           _BoardCard(controller: c),
                           const SizedBox(height: 10),
+                        ]
+                        // Every contract done: the board points somewhere to explore instead, so a
+                        // knight stuck on a boss always has another fight (or find) to go to.
+                        else if (c.engine.exploreStep() case final spot? when s.innRepaired) ...[
+                          _RoadCard(controller: c, step: spot, header: 'SOMEWHERE TO EXPLORE', onGo: () => _goRoad(spot)),
+                          const SizedBox(height: 10),
                         ],
                         // The next task: something to try, and a little for trying it.
                         if (c.nextTask != null) ...[
@@ -1888,10 +1894,13 @@ class _VaultCard extends StatelessWidget {
 /// The road on: the next land's boss, how far along its trail you are, and a button straight there
 /// (or, while the way's still shut, what opens it).
 class _RoadCard extends StatelessWidget {
-  const _RoadCard({required this.controller, required this.step, required this.onGo});
+  const _RoadCard({required this.controller, required this.step, required this.onGo, this.header});
   final GameController controller;
   final RoadStep step;
   final VoidCallback onGo;
+
+  /// Words over the title in place of the road's own (the board's "somewhere to explore").
+  final String? header;
 
   @override
   Widget build(BuildContext context) {
@@ -1923,7 +1932,7 @@ class _RoadCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(boss ? 'THE ROAD · ${road + 1} / $mainLands' : 'ON THE WAY · ${road + 1} / $mainLands', style: Txt.label(size: 11, color: Palette.parch2)),
+                Text(header ?? (boss ? 'THE ROAD · ${road + 1} / $mainLands' : 'ON THE WAY · ${road + 1} / $mainLands'), style: Txt.label(size: 11, color: Palette.parch2)),
                 Text(step.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.label(size: 14.5, color: Palette.cream, weight: FontWeight.w800)),
                 const SizedBox(height: 3),
                 if (step.why != null)

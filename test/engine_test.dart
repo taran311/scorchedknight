@@ -218,6 +218,27 @@ void main() {
     expect(back.vaultFound.length, vaultPieces.length);
   });
 
+  test('somewhere to explore: an open place or dungeon, unguarded first, never the road\'s own', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(2));
+    final s = e.state;
+    s.knight.level = 7;
+    s.innRepaired = true;
+    s.bossesDown.add(0);
+    final seen = <String>{};
+    for (var i = 0; i < 40; i++) {
+      final step = e.exploreStep();
+      if (step == null) break;
+      expect(step.id, isNot(e.roadStep()?.id));
+      expect(seen.add(step.id!), isTrue, reason: 'offered ${step.id} twice');
+      if (step.kind == RoadKind.place) {
+        s.explored.add(step.id!);
+      } else {
+        s.dungeonsDone.add(step.id!);
+      }
+    }
+    expect(seen, isNotEmpty);
+  });
+
   test('contracts: every guarded place is someone\'s trouble, on the board, and pays a bounty', () {
     for (final p in places.where((p) => p.foe != null && p.relic == null)) {
       expect(contractFor(p.id), isNotNull, reason: p.id);

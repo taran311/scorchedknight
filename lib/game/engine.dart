@@ -428,6 +428,34 @@ class GameEngine {
     return RoadStep(RoadKind.train, 'Grow stronger: reach level $need', 'Patrol ${continents[home].name}', home);
   }
 
+  /// Somewhere to explore, for the town's board once its contracts are all done: a place or
+  /// dungeon open to you now (not the one the road already points at). Places with no guard come
+  /// first (free finds, no risk), then guarded places, then dungeons, the gentlest lands first:
+  /// for a knight stuck on a boss, the surest way to more gold, gear and levels.
+  RoadStep? exploreStep() {
+    final skip = roadStep()?.id;
+    bool open(int land) => whyNotTravel(land) == null;
+    int rank(Place p) => p.kind == PlaceKind.guarded ? 1 : 0;
+    final spots = [
+      for (final p in places)
+        if (p.id != skip && open(p.land) && placeShown(p) && whyNotExplore(p.id) == null) p,
+    ]..sort((a, b) => rank(a) != rank(b) ? rank(a) - rank(b) : continents[a.land].minLevel - continents[b.land].minLevel);
+    if (spots.firstOrNull case final p?) {
+      final what = switch (p.kind) {
+        PlaceKind.guarded => 'Guarded by ${p.foe!.$4}',
+        PlaceKind.cache => 'Something hidden there',
+        PlaceKind.shrine => 'A shrine',
+      };
+      return RoadStep(RoadKind.place, 'Explore ${p.name}', '$what · ${continents[p.land].name}', p.land, id: p.id);
+    }
+    final delves = [
+      for (final d in dungeons)
+        if (d.id != skip && open(d.land) && !state.dungeonsDone.contains(d.id) && whyNotDungeon(d.id) == null) d,
+    ]..sort((a, b) => continents[a.land].minLevel - continents[b.land].minLevel);
+    if (delves.firstOrNull case final d?) return RoadStep(RoadKind.dungeon, 'Delve into ${d.name}', 'A dungeon · ${continents[d.land].name}', d.land, id: d.id);
+    return null;
+  }
+
   /// Region [c] is cleared: its boss down, every place and dungeon done, every relic part found.
   bool landCleared(int c) {
     final p = landProgress(c);
