@@ -1598,6 +1598,23 @@ void _briar(Canvas c, List<Offset> pts, double t, bool still, {double width = 2.
 }
 
 /// The glowing stretch of each weapon, in weapon-local space (start, end, width).
+/// Light off a blade from [a] to [b]: a leaf of [colour], [half] wide each side at its middle,
+/// tapering to nothing at both ends and soft at its edges.
+void _bladeGlow(Canvas c, Offset a, Offset b, double half, Color colour) {
+  if (colour.a < .01) return;
+  final d = b - a, len = d.distance;
+  if (len < 1) return;
+  final n = Offset(-d.dy, d.dx) / len, mid = (a + b) / 2;
+  // (A quadratic's middle sits half way to its control point: twice the width out.)
+  final leaf = Path()
+    ..moveTo(a.dx, a.dy)
+    ..quadraticBezierTo(mid.dx + n.dx * half * 2, mid.dy + n.dy * half * 2, b.dx, b.dy)
+    ..quadraticBezierTo(mid.dx - n.dx * half * 2, mid.dy - n.dy * half * 2, a.dx, a.dy)
+    ..close();
+  final clear = colour.withValues(alpha: 0);
+  c.drawPath(leaf, Paint()..shader = ui.Gradient.linear(mid - n * half, mid + n * half, [clear, colour, colour, clear], const [0, .4, .6, 1]));
+}
+
 (Offset, Offset, double)? _glowSpan(Weapon kind) => switch (kind) {
   Weapon.longsword => (const Offset(0, 14), const Offset(0, 112), 9),
   Weapon.greatsword => (const Offset(0, 14), const Offset(0, 144), 11),
@@ -1691,34 +1708,18 @@ void drawWeapon(Canvas c, Offset at, double angleDeg, Weapon kind, Look look, {d
   // back at the knight. Mirrored, the axe bit, the halberd's blade and the falchion's belly lead.
   if (const {Weapon.axe, Weapon.greataxe, Weapon.halberd, Weapon.tomahawk, Weapon.falchion, Weapon.cleaver, Weapon.glaive}.contains(kind)) c.scale(-1, 1);
   final span = _glowSpan(kind);
-  // (On a struggling screen, glows are drawn as plain soft strokes: a blur, replayed for every pass
-  // of the backlit figures, is the dearest thing a weapon draws.)
-  final soft = lightGlows ? null : const MaskFilter.blur(BlurStyle.normal, 10), softer = lightGlows ? null : const MaskFilter.blur(BlurStyle.normal, 7);
-  // A soft highlight in the weapon's rarity colour (green, blue, purple, orange), unless an element
-  // glows there instead. (Two blurred strokes on one blade, drawn again for every pass of the
-  // backlit figures, were a long weapon's whole frame budget mid-swing.)
-  if (rarity != null && span != null && glow == null) {
-    c.drawLine(
-      span.$1,
-      span.$2,
-      Paint()
-        ..color = rarity.withValues(alpha: lightGlows ? .22 : .45)
-        ..strokeWidth = span.$3 + 14
-        ..strokeCap = StrokeCap.round
-        ..maskFilter = soft,
-    );
-  }
-  if (glow != null && span != null) {
-    final pulse = still ? 1.0 : .8 + .2 * math.sin(t / 260);
-    c.drawLine(
-      span.$1,
-      span.$2,
-      Paint()
-        ..color = glow.withValues(alpha: (lightGlows ? .3 : .55) * pulse)
-        ..strokeWidth = span.$3 + 6
-        ..strokeCap = StrokeCap.round
-        ..maskFilter = softer,
-    );
+  // A glow on the blade: its rarity colour (green, blue, purple, orange), or its element in place
+  // of that. It breathes in from nothing and fades out again, rather than burning steadily, and
+  // it's shaped like light off the steel, fullest mid-blade and gone at the tip and the guard,
+  // not a tube round the whole blade. (A soft-edged gradient, not a blur: a blur, replayed for every
+  // pass of the backlit figures, was the dearest thing a weapon drew.)
+  if (span != null && (glow != null || rarity != null)) {
+    final col = glow ?? rarity!;
+    // Elements breathe quicker and brighter than rarity does. (Each weapon's own phase, so a
+    // pair doesn't pulse in step.)
+    final period = glow != null ? 1700.0 : 2600.0, peak = glow != null ? .7 : .5;
+    final breath = still ? .6 : .5 - .5 * math.cos(t / period * 2 * math.pi + kind.index);
+    _bladeGlow(c, span.$1, span.$2, span.$3 / 2 + (glow != null ? 9 : 8), col.withValues(alpha: peak * breath));
   }
   final wooden = const {Weapon.staff, Weapon.wand, Weapon.bow, Weapon.longbow}.contains(kind);
   final wood = wooden && tint != null ? rampOf(tint, .3, .55) : _woodRamp;

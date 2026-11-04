@@ -4177,6 +4177,20 @@ class GameEngine {
     ];
   }
 
+  /// Worn pieces $smithName could improve right now, honed or tempered (and you can pay for it):
+  /// the number on the forge's button.
+  int get upgradesReady => [
+    for (final g in state.knight.gear)
+      if (whyNotTemper(g) == null || (honeables.any((h) => h.id == g.id) && whyNotHone(g) == null)) g,
+  ].length;
+
+  /// A rite you know, left off a hotbar that still has room for it.
+  bool get riteSlotFree {
+    final k = state.knight;
+    final active = k.rites.where((r) => spellById(r) != null && riteKnown(k, spellById(r)!)).length;
+    return active < riteSlots && spells.any((sp) => riteKnown(k, sp) && !k.rites.contains(sp.id));
+  }
+
   String? whyNotHone(GearItem g) {
     if (state.inBattle) return 'Not mid-fight';
     if (g.hone >= honeMax) return 'As strong as it gets';

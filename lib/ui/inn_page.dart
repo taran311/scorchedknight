@@ -212,8 +212,9 @@ class _InnPageState extends State<InnPage> with RouteAware {
         // Wren out on an errand is news, not a job: a word on her home's button, not a card.
         else if (s.home >= 1 && s.errand != null && !c.errandBack)
           TownSpot.tent: '$retainerName back in ${c.errandLeft} ${c.errandLeft == 1 ? 'fight' : 'fights'}',
-        // Worn pieces fallen behind your level: Dunstan can bring them back up.
-        if (c.whyShut('forge') == null && c.temperables.isNotEmpty) TownSpot.forge: '${c.temperables.length} piece${c.temperables.length == 1 ? '' : 's'} to temper',
+        // Worn pieces Dunstan could make stronger right now (honed, or brought up to your level),
+        // and you've the gold for it.
+        if (c.whyShut('forge') == null && c.engine.upgradesReady > 0) TownSpot.forge: '${c.engine.upgradesReady} upgrade${c.engine.upgradesReady == 1 ? '' : 's'} ready',
       };
       final taps = <TownSpot, VoidCallback?>{
                             TownSpot.gate: s.inBattle ? _resume : (offered ? _talk : (s.wild != null ? _openWilds : _openMap)),

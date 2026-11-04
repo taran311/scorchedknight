@@ -740,6 +740,31 @@ class _BattleScreenState extends State<BattleScreen> {
         ),
       ];
     }
+    // The road's next land, open to you now and not yet set foot in (you've just reached its level,
+    // say, out on an earlier land's Heroic trail): that's the way on, ahead of more of this land,
+    // which stays the second choice.
+    final ahead = o == Outcome.won && !waiting ? _roadAhead(c, land) : null;
+    if (ahead != null) {
+      return [
+        Expanded(
+          flex: 3,
+          child: StoneButton(
+            title: isPhone(context) ? 'Onward' : 'Onward to ${continents[ahead].name}',
+            caption: isPhone(context) ? continents[ahead].name : 'The road goes on',
+            tone: ButtonTone.blood,
+            onPressed: () {
+              nextLand = ahead;
+              _close(BattleExit.onward);
+            },
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          flex: 2,
+          child: StoneButton(title: _heroic ? 'Stay Heroic' : 'Stay here', caption: 'Next fight', onPressed: _fightOn),
+        ),
+      ];
+    }
     switch (o) {
       // The lair has fallen (or you're patrolling a land whose lair has): onward is the Heroic
       // trail's elites, or home to rest up first.
@@ -1472,7 +1497,7 @@ class _Result extends StatelessWidget {
         title = 'Knocked out!';
         lines = [
           'Hob dragged you back to the inn.${(r?.goldLost ?? 0) > 0 ? ' −${r!.goldLost} gold.' : ''}',
-          if (c.wildHint(s.continent) case final a?) 'Tip: better gear waits in ${wildAreas[a].name}.',
+          _knockoutTip(c),
         ];
     }
     final colour = c.outcome == Outcome.knockedOut ? (onDark ? const Color(0xFFE88A70) : const Color(0xFF7A1D14)) : (onDark ? Palette.amber : Palette.goldText);
@@ -1487,6 +1512,30 @@ class _Result extends StatelessWidget {
     );
     return onDark ? body : Parchment(child: body);
   }
+}
+
+/// The first land on the road whose boss still stands, when it isn't [land], is open to you, and
+/// you haven't set foot on its trail yet.
+int? _roadAhead(GameController c, int land) {
+  final s = c.state;
+  for (var i = 0; i < mainLands; i++) {
+    if (s.bossesDown.contains(i)) continue;
+    return i != land && c.whyNotTravel(i) == null && s.wins[i] == 0 ? i : null;
+  }
+  return null;
+}
+
+/// After a knockout, one friendly nudge: the most useful thing you could do before trying again
+/// (only ever something you can do right now, and only one, so it reads as help, not a lecture).
+String _knockoutTip(GameController c) {
+  final s = c.state, k = s.knight, e = c.engine;
+  final points = unspentPoints(k), ups = e.upgradesReady, tent = 'your ${homes[s.home].name.toLowerCase()}';
+  if (points > 0) return 'Tip: you have $points training point${points == 1 ? '' : 's'} to spend in $tent.';
+  if (ups > 0) return 'Tip: $smithName can strengthen $ups piece${ups == 1 ? '' : 's'} of your gear right now.';
+  if (e.riteSlotFree) return 'Tip: there\'s room on your hotbar for another rite. Add one in $tent.';
+  if (k.potions == 0) return 'Tip: carry a potion or two. Mags sells them.';
+  if (c.wildHint(s.continent) case final a?) return 'Tip: better gear waits in ${wildAreas[a].name}.';
+  return 'Tip: try different rites in $tent. Some foes are weak to them.';
 }
 
 /// One thing won: an icon and a few words, in a chip. The big ones (a level, a new land, a
