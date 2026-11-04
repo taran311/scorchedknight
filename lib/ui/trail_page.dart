@@ -16,6 +16,7 @@ import '../game/catalog.dart';
 import '../game/classes.dart' show HeroClass;
 import '../game/controller.dart';
 import '../game/crafting.dart' show smithName;
+import '../game/loot.dart' show Rarity, RarityInfo;
 import '../game/dungeons.dart' show dungeonById;
 import '../game/models.dart' show GameState;
 import '../game/rules.dart';
@@ -25,6 +26,7 @@ import 'encounter_window.dart';
 import 'fill_column.dart';
 import 'gear_glance.dart';
 import 'hud.dart';
+import 'hero_view.dart' show GearIcon, rarityColour;
 import 'map_page.dart';
 import 'item_icons.dart';
 import 'stat_icons.dart' show InfoChip;
@@ -266,11 +268,21 @@ class _TrailPageState extends State<TrailPage> {
                         if (c.heroicOpen(land)) ...[
                           if (_risenCard(c, land)) ...[
                             _Heroic(controller: c, land: land, onGo: _goHeroic),
+                            if (betterWeaponFor(s.knight, continents[land].boss) != null) ...[
+                              const SizedBox(height: 6),
+                              _WeaponTip(controller: c, foe: continents[land].boss),
+                            ],
                             const SizedBox(height: 10),
                           ],
                           _Patrol(controller: c, land: land, onGo: _go),
-                        ] else
+                        ] else ...[
                           _NextStop(controller: c, land: land, onGo: _go),
+                          // A boss fight is a long one: worth the right weapon for it, if one's in your chest.
+                          if (trailStep(s, land) == TrailStep.lair && betterWeaponFor(s.knight, continents[land].boss) != null) ...[
+                            const SizedBox(height: 6),
+                            _WeaponTip(controller: c, foe: continents[land].boss),
+                          ],
+                        ],
                         const SizedBox(height: 10),
                         // A relic part kept somewhere in this land (a guardian's place or a dungeon's
                         // hoard), once you have its blueprint: what it is, and the way there.
@@ -327,6 +339,60 @@ class _Pill extends StatelessWidget {
       child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, color: colour, size: 18), const SizedBox(width: 6), Text(text, style: Txt.label(size: 15, color: Palette.cream))]),
     ),
   );
+}
+
+/// Before a boss: a weapon in your chest that suits it better than the one in your hand (its
+/// weakness, or what it shrugs off), and a tap to put it on.
+class _WeaponTip extends StatelessWidget {
+  const _WeaponTip({required this.controller, required this.foe});
+  final GameController controller;
+  final FoeType foe;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = controller, k = c.state.knight, tip = betterWeaponFor(k, foe);
+    if (tip == null) return const SizedBox.shrink();
+    final g = tip.item, col = rarityColour(g.rarity);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(8, 6, 6, 6),
+      decoration: BoxDecoration(color: const Color(0xFF1E1912), border: Border.all(color: col.withValues(alpha: .7)), borderRadius: BorderRadius.circular(6)),
+      child: Row(
+        children: [
+          GearIcon(item: g, size: 38, heroClass: k.heroClass, dye: k.dye),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(tip.why.toUpperCase(), style: Txt.label(size: 11, color: Palette.amber)),
+                Text.rich(
+                  TextSpan(children: [
+                    const TextSpan(text: 'Your '),
+                    TextSpan(text: g.name, style: TextStyle(color: col)),
+                    TextSpan(text: ' would hit ${foe.name} harder than your ${k.loadout.weapon?.name ?? 'bare hands'}.'),
+                  ]),
+                  style: Txt.onStone(size: 13),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 6),
+          StoneButton(
+            title: 'Wear it',
+            compact: true,
+            onPressed: c.state.inBattle
+                ? null
+                : () {
+                    c.equipFromStash(g.id);
+                    ScaffoldMessenger.of(context)
+                      ..hideCurrentSnackBar()
+                      ..showSnackBar(SnackBar(content: Text('You take up your ${g.name}.'), duration: const Duration(seconds: 2)));
+                  },
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 /// Where you're headed next, and what's known about it.
@@ -756,9 +822,10 @@ class _Lurking extends StatelessWidget {
       Companion.none => (Icons.emoji_events, 'The end of it all', 'the end of the Great Burning'),
     };
     final relic = relics[land];
-    Widget portrait(FoeType f, double size) => Tooltip(
+    Widget portrait(FoeType f, double size, {(Rarity, double)? seen}) => Tooltip(
       message: [
         f.name,
+        if (seen != null) '${seen.$1.label.toLowerCase()} sighting: about 1 fight in ${_oneIn(seen.$2)}',
         if (f.aloft) 'aloft: crossbow or rites',
         if (f.kind != FoeKind.none) '${f.kind.label.toLowerCase()}: weak to ${styleName(f.kind.weakTo!)}',
       ].join(' · '),
@@ -768,14 +835,27 @@ class _Lurking extends StatelessWidget {
         margin: const EdgeInsets.only(right: 6, bottom: 6),
         decoration: BoxDecoration(
           gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF8A8F96), Color(0xFF4E535A)]),
-          border: Border.all(color: Palette.stone0, width: 2),
+          border: Border.all(color: seen == null ? Palette.stone0 : Color(seen.$1.argb), width: seen == null ? 2 : 2.5),
           borderRadius: BorderRadius.circular(3),
+          boxShadow: [if (seen != null) BoxShadow(color: Color(seen.$1.argb).withValues(alpha: .45), blurRadius: 6)],
         ),
         child: Stack(
           children: [
             Positioned.fill(child: Padding(padding: const EdgeInsets.all(2), child: TypePortrait(type: f))),
-            if (f.aloft) const Positioned(right: 2, top: 2, child: Icon(Icons.flight, size: 15, color: Palette.cream, shadows: [Shadow(color: Colors.black, blurRadius: 3)])),
-            if (f.kind != FoeKind.none) Positioned(left: 2, top: 2, child: Icon(kindIcon(f.kind), size: 15, color: kindColour(f.kind), shadows: const [Shadow(color: Colors.black, blurRadius: 3)])),
+            // (No corner symbols: flying, its kind, a pack. They cluttered the faces; the tooltip says
+            // it, and the fight's foe card shows what it's weak to.)
+            // How often it turns up, on its face: one fight in so many.
+            if (seen != null)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 1),
+                  color: const Color(0xCC120E0A),
+                  child: Text('1/${_oneIn(seen.$2)}', textAlign: TextAlign.center, style: Txt.label(size: 11, color: Color(seen.$1.argb), weight: FontWeight.w800)),
+                ),
+              ),
           ],
         ),
       ),
@@ -787,6 +867,13 @@ class _Lurking extends StatelessWidget {
           Text('Lurking here', style: Txt.label(size: 15, color: Palette.amber)),
           const SizedBox(height: 6),
           Wrap(children: [for (final f in l.foes) portrait(f, 58)]),
+          // The rarer things that turn up here, bordered by how rare: packs, golems, elementals,
+          // the Hidden Ones and the land's named foes.
+          if (sightingsIn(land, cindervaleClear: s.bossesDown.contains(0)) case final rare when rare.isNotEmpty) ...[
+            Text('Rarer sightings', style: Txt.label(size: 12, color: Palette.parch2)),
+            const SizedBox(height: 4),
+            Wrap(children: [for (final (r, odds) in rare) portrait(r.type, 50, seen: (sightingRarity(odds), odds))]),
+          ],
           const Divider(color: Palette.stone3, height: 14),
           Row(
             children: [
@@ -826,6 +913,12 @@ class _Lurking extends StatelessWidget {
       ),
     );
   }
+}
+
+/// One fight in how many, from a chance a fight, in round numbers past twenty (1/25, not 1/27).
+int _oneIn(double odds) {
+  final n = math.max(2, (1 / odds).round());
+  return n <= 20 ? n : (n <= 60 ? (n / 5).round() * 5 : (n / 10).round() * 10);
 }
 
 /// Always on screen: back to the world, and the big button onward.

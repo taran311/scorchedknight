@@ -227,6 +227,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   /// risen dead swing, and the shape of the last lightning bolt.
   int _dieFace = 6, _stormSeed = 0;
 
+
   /// The colour the blade blazes in ([fx]'s 'blade'): gold for a lucky roll, else the special's own.
   Color _bladeTint = const Color(0xFFFFE27A);
   double _demonAt = -1e9, _legionAt = -1e9;

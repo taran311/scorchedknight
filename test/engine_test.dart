@@ -60,6 +60,20 @@ void main() {
     expect(shinesAt(30), isTrue);
   });
 
+  test('before a boss, a weapon in the chest that suits it better is pointed out', () {
+    final k = GameEngine.newGame(heroClass: HeroClass.knight).knight;
+    k.loadout.weapon = GearItem(id: 'venom', name: 'Venom blade', slot: GearSlot.weapon, art: 'longsword', rarity: Rarity.rare, level: 10, value: 5, heroClass: HeroClass.knight, stats: {Stat.damage: 30, Stat.poison: 14});
+    final fire = GearItem(id: 'fire', name: 'Fire blade', slot: GearSlot.weapon, art: 'longsword', rarity: Rarity.rare, level: 10, value: 5, heroClass: HeroClass.knight, stats: {Stat.damage: 30, Stat.burn: 14});
+    k.stash.add(fire);
+    final ent = foes.firstWhere((f) => f.ent && f.boss);
+    final tip = betterWeaponFor(k, ent);
+    expect(tip?.item.id, 'fire');
+    expect(tip?.why, 'Weak to fire');
+    // Against a foe that cares for neither, no tip: they hit it the same.
+    final plain = foes.firstWhere((f) => !f.ent && !f.demon && !f.venomous && f.element == null && !f.stone && !f.undead && f.boss);
+    expect(betterWeaponFor(k, plain), isNull);
+  });
+
   test('no foe is both weak to and resistant to the same thing', () {
     final rares = [for (final a in Aura.values) for (var i = 0; i < foes.length; i++) Rare(i, a).type];
     for (final f in [...foes, ...rares]) {
@@ -1827,11 +1841,11 @@ void main() {
     final s = e.state, k = s.knight..coins = 5000;
     expect(e.purchase('plate'), isFalse);
     expect(e.purchase('ammo:fire'), isFalse);
-    // Seven lumps of iron ore make three bars (one lump left over).
-    s.addMat(oreKey(Metal.iron), 7);
+    // Each lump of iron ore makes a bar.
+    s.addMat(oreKey(Metal.iron), 3);
     expect(e.smelt(Metal.iron), 3);
     expect(s.mat(barKey(Metal.iron)), 3);
-    expect(s.mat(oreKey(Metal.iron)), 1);
+    expect(s.mat(oreKey(Metal.iron)), 0);
     expect(e.whyNotCraft('plate'), isNotNull);
     s.addMat(barKey(Metal.iron), 3);
     expect(e.craftArmour('plate'), isTrue);
@@ -1844,6 +1858,7 @@ void main() {
     expect(e.fletch(Gem.ruby), isFalse);
     // Stock survives a save.
     s.addMat(gemKey(Gem.pearl), 2);
+    s.addMat(oreKey(Metal.iron), 1);
     final back = GameState.fromJson(jsonDecode(jsonEncode(s.toJson())) as Map<String, dynamic>);
     expect(back.mat(gemKey(Gem.pearl)), 2);
     expect(back.mat(oreKey(Metal.iron)), 1);

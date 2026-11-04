@@ -461,7 +461,7 @@ class ForgeWares extends StatelessWidget {
             x.ware(
               MatIcon.ore(m, size: 28),
               'Smelt ${m.ore.toLowerCase()}',
-              '$orePerBar ore make 1 bar',
+              orePerBar == 1 ? 'Each ore makes a bar' : '$orePerBar ore make 1 bar',
               CostButton(
                 label: c.engine.barsFrom(m) > 0 ? 'Smelt ${c.engine.barsFrom(m)} · ${c.engine.smeltCost(m)} gold' : 'Need $orePerBar',
                 onTap: c.whyNotSmelt(m) == null

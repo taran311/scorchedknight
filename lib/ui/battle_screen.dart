@@ -13,7 +13,7 @@ import '../game/controller.dart';
 import '../game/ammo.dart';
 import '../game/crafting.dart' show smithName, coresPerRune, Gem, GemInfo, Elemental, ElementalInfo, Metal, MetalInfo;
 import '../game/engine.dart';
-import '../game/loot.dart' show specialChanceAt, Stat, RarityInfo, GearSlotLabel;
+import '../game/loot.dart' show specialChanceAt, Stat, Rarity, RarityInfo, GearSlotLabel;
 import '../game/models.dart';
 import '../game/nemesis.dart' show nemesisTitle;
 import '../game/rules.dart';
@@ -917,7 +917,12 @@ class _FoeCard extends StatelessWidget {
           const FoeBadge(label: 'HEAVY ×$heavyBlow', colour: Color(0xFFFF5A4A), solid: true, tip: 'Winding up a heavy blow. Bash, freeze or hex it to stop it.'),
         if (c.engine.nemesisFight)
           FoeBadge(label: 'NEMESIS', colour: const Color(0xFFE0405A), solid: true, tip: '${nemesisTitle(c.state.nemesis!.rank)} · has beaten you ${c.state.nemesis!.wins}× · beat it for its hoard')
-        else if (aura != null) FoeBadge(label: foe.pack ? 'PACK' : (foe.named ? 'RARE BOSS' : 'RARE'), colour: colour, solid: true, tip: aura.label),
+        // How rare a find it is, in the same grades and colours as the trail's "Rarer sightings".
+        else if (aura != null)
+          if (c.shownRare case final rare?)
+            _gradeBadge(sightingRarityOf(rare, realm, cindervaleClear: c.state.bossesDown.contains(0)), foe.pack, aura)
+          else
+            FoeBadge(label: foe.pack ? 'PACK' : 'RARE', colour: colour, solid: true, tip: aura.label),
         if (foe.boss && aura == null) const FoeBadge(label: 'BOSS', colour: Palette.amber, solid: true),
         // A foe well above you: say so (the stage shows it too, bigger and darker).
         if (foeMenace(c.state) case final m when m > 0)
@@ -990,6 +995,10 @@ class _FoeCard extends StatelessWidget {
       _ => const Icon(Icons.circle, size: 10, color: Palette.parch2),
     },
   );
+
+  /// A rare foe's badge: how rare a sighting it is, in loot's grades and colours.
+  static Widget _gradeBadge(Rarity grade, bool pack, Aura aura) =>
+      FoeBadge(label: '${grade.label.toUpperCase()}${pack ? ' PACK' : ''}', colour: Color(grade.argb), solid: true, tip: '${aura.label} · ${grade.label.toLowerCase()} sighting');
 
   /// What a rare foe's aura does for its loot, in a word or two.
   static Widget _perkBadge(Aura a) {

@@ -2,6 +2,8 @@
 // become armour. Gems, rarer, from any foe, are ground into bundles of special bolts by Old Wick. The merchant sells
 // only the basics now; the good armour and bolts are earned. Pure Dart.
 
+import 'dart:math' as math;
+
 import 'ammo.dart';
 import 'catalog.dart';
 import 'classes.dart';
@@ -58,9 +60,12 @@ String gemKey(Gem g) => 'gem:${g.name}';
 /// Golems, by land: which metal walks there, and the chance one turns up when you set out. None in
 /// Cindervale: a fresh hero's sword would barely scratch one.
 const golemLands = <int, List<(Metal, double)>>{
-  1: [(Metal.iron, .08)],
-  2: [(Metal.iron, .05)],
-  3: [(Metal.gold, .06), (Metal.iron, .04)],
+  // (Iron was scarce: armour wants six bars, twelve lumps, and at a golem in a dozen fights for two
+  // to four lumps it took the best part of a hundred fights. Golems are a little commoner now, and
+  // carry more.)
+  1: [(Metal.iron, .10)],
+  2: [(Metal.iron, .07)],
+  3: [(Metal.gold, .06), (Metal.iron, .05)],
   4: [(Metal.gold, .09)],
   5: [(Metal.obsidian, .08)],
   6: [(Metal.obsidian, .06)],
@@ -80,10 +85,12 @@ final golemTypes = <String, (String, double)>{for (final m in Metal.values) m.go
 Metal? golemMetal(String? look) => Metal.values.where((m) => m.golemLook == look).firstOrNull;
 
 /// Ore a golem leaves: a few lumps (more from a tougher one).
-const golemOreMin = 2, golemOreMax = 4;
+const golemOreMin = 4, golemOreMax = 6;
 
 /// Ore to a bar, and the smith's fee per bar at [level].
-const orePerBar = 2;
+// (It was two: with a set's five pieces wanting ten bars, and plate armour six, the ore took far
+// longer to find than anything else it went with.)
+const orePerBar = 1;
 int smeltFee(int level) => 4 + level;
 
 /// Tempering a favourite weapon up to your level: worth it once it's this many levels behind, and
@@ -338,7 +345,23 @@ int pieceFee(int level) => 60 + 6 * level;
 
 /// The chance a win leaves its trophy, and a blueprint (more from a named or rare foe; bosses and
 /// Sir Malric always leave one you haven't got).
-const trophyChance = .4, trophiesFromBoss = 3, blueprintChance = .05, blueprintChanceRare = .25;
+const trophyChance = .4, trophiesFromBoss = 3, blueprintChance = .08, blueprintChanceRare = .25;
+
+/// A plain kill's chance of a blueprint, in a land where [share] of the fights are against its set's
+/// makers: [blueprintChance] where all of them are, more where they're few (and a little more again
+/// than the share alone would give, since there the rare foes who carry blueprints are few too).
+double blueprintsEach(double share) => share <= 0 ? blueprintChance : math.min(.45, blueprintChance * math.pow(share, -1.3));
+
+/// Kills of a set's makers without one of its blueprints, at most, before one turns up: luck
+/// alone left some sets waiting a hundred fights and more for their last blueprint.
+const blueprintPity = 10;
+
+/// How many of its trophy a plain kill leaves on average, in a land where [share] of the foes
+/// carry it: [trophyChance] where they all do, more where they're few (Ravenmoor's vampires and the
+/// Weald's werewolves are half their lands' foes and only come out at night; the Ashen Knights and
+/// the dragons are one or two in six), so a set takes about as many fights wherever it's from.
+/// Never more than two a kill.
+double trophiesEach(double share) => share <= 0 ? trophyChance : (trophyChance / share).clamp(trophyChance, 2.0);
 
 // ------------------------------------------------------------------ elementals and their cores
 
@@ -398,7 +421,8 @@ const elementalLands = <int, List<(Elemental, double)>>{
 };
 
 /// Cores an elemental leaves (one or two), and how many Old Wick binds into a rune.
-const coresMin = 1, coresMax = 2, coresPerRune = 3;
+// (One or two a time made a rune take some fifty fights; two or three, about twenty-five.)
+const coresMin = 2, coresMax = 3, coresPerRune = 3;
 
 // ------------------------------------------------------------------ where materials come from
 

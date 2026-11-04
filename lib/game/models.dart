@@ -76,6 +76,7 @@ class Loadout {
   String armour;
   GearItem? weapon, offhand, helm, gloves, boots, cape;
 
+
   /// A rune on this kit's armour (it stays when the armour is upgraded).
   EnchantRoll? armourEnchant;
 
@@ -128,7 +129,7 @@ class Loadout {
 
   factory Loadout.fromJson(Map<String, dynamic> j, HeroClass c) => Loadout(
     armour: armourTierById(j['armour'] as String? ?? tiersFor(c).first.id).id,
-    weapon: _item(j['weapon']) ?? starterWeapon(c),
+    weapon: _item(j['weapon']) ?? _item(j['dropped']) ?? starterWeapon(c),
     offhand: _item(j['offhand']),
     helm: _item(j['helm']),
     gloves: _item(j['gloves']),
@@ -335,7 +336,11 @@ class Knight {
       dragonXp: (j['dragonXp'] as num?)?.toInt(),
       ammo: _ammo(j['ammo']),
       ammoLoaded: _ammoLoaded(j['ammoLoaded'], j['ammo']),
-      stash: [for (final g in (j['stash'] as List?) ?? const []) _item(g)].whereType<GearItem>().toList(),
+      // (A test build carried a backup weapon on your back: it goes back in the chest.)
+      stash: [
+        for (final g in (j['stash'] as List?) ?? const []) _item(g),
+        for (final l in raw.values) if (l is Map) _item(l['backup']),
+      ].whereType<GearItem>().toList(),
       preparedSpell: j['spell'] as String? ?? 'arcanebolt',
       rites: (j['rites'] as List?)?.whereType<String>().toList() ?? [j['spell'] as String? ?? 'arcanebolt'],
       training: {for (final e in ((j['training'] as Map?) ?? const {}).entries) e.key as String: (e.value as num).toInt()},
@@ -922,7 +927,7 @@ class GameState {
     for (var i = 0; i < reagents.length && i < rs.length; i++) {
       reagents[i] = (rs[i] as num).toInt();
     }
-    return GameState(
+    final out = GameState(
       reagents: reagents,
       warded: ((j['warded'] as List?) ?? []).map((e) => (e as num).toInt()).toSet(),
       // Heroes from before Hob's job find the inn already patched up.
@@ -1054,6 +1059,7 @@ class GameState {
       did: {...((j['did'] as List?) ?? const []).whereType<String>()},
       tasksClaimed: {...((j['tasks'] as List?) ?? const []).whereType<String>()},
     );
+    return out;
   }
 }
 

@@ -7,6 +7,7 @@ import 'brews.dart';
 import 'arena.dart' show arenaBoutOf;
 import 'hall.dart' show roarHit, einherjarOf;
 import 'catalog.dart';
+import 'crafting.dart' show golemLands, elementalLands, MetalInfo, ElementalInfo, Metal, Elemental;
 import 'classes.dart';
 import 'knight_classes.dart' show classOf;
 import 'loot.dart';
@@ -622,3 +623,100 @@ String attackName(Knight k) => suitArtFor(k)?.attack ?? 'Attack';
 
 /// What a crossbow bolt deals, as a share of an attack.
 double crossbowShare(Knight k) => crossbows[k.crossbow.clamp(0, crossbows.length - 1)].$2;
+
+/// How hard [w] lands on [f] in a swing, roughly: its edge and what its fire, venom, frost and holy
+/// light do to this foe (the rest of your kit is the same whichever weapon you hold, so it's left
+/// out). Worked out the way [swingDamage] works them out.
+double weaponPunchOn(GearItem w, FoeType f) {
+  final s = HeroStats();
+  w.stats.forEach(s.add);
+  final rune = w.enchant;
+  if (rune != null) s.add(rune.info.stat, rune.value);
+  double el(String st, num v) => f.element == null ? v.toDouble() : (f.element == st ? 0 : (elementWeakness(f.element!) == st ? v * 2.0 : v.toDouble()));
+  var base = (s.damage + twoHandBonus(w)).toDouble();
+  if (f.stone) base *= bluntWeapons.contains(w.art) ? 1.5 : .6;
+  final unholy = f.undead || f.demon || f.element == 'poison';
+  return base +
+      el('burn', f.demon || f.look == 'emberKing' ? s.burn / 2 : (f.ent ? s.burn * 2 : s.burn)) +
+      el('poison', f.venomous ? 0 : (f.ent ? s.poison / 2 : s.poison)) +
+      el('frost', s.frost) +
+      el('smite', unholy ? s.smite * (f.spirit ? 2 : 1) : 0);
+}
+
+/// A weapon in your chest that would do clearly better against [f] than the one in your hand (and
+/// works with your off-hand, if you carry one), with a few words on why; null if none would.
+({GearItem item, String why})? betterWeaponFor(Knight k, FoeType f) {
+  final held = k.loadout.weapon, offhand = k.loadout.offhand;
+  final now = held == null ? 0.0 : weaponPunchOn(held, f);
+  ({GearItem item, String why})? best;
+  var bestPunch = now;
+  for (final g in k.stash) {
+    if (g.slot != GearSlot.weapon || (g.heroClass != null && g.heroClass != k.heroClass)) continue;
+    if (offhand != null && offhandWorksWith(held, offhand) && !offhandWorksWith(g, offhand)) continue;
+    final p = weaponPunchOn(g, f);
+    // (Only a real difference: a fifth harder, and a few points a swing at least.)
+    if (p < now * 1.2 || p - now < 6 || p <= bestPunch) continue;
+    bestPunch = p;
+    best = (item: g, why: _whyBetter(g, held, f));
+  }
+  return best;
+}
+
+String _whyBetter(GearItem g, GearItem? held, FoeType f) {
+  int st(GearItem? w, Stat s) => (w?.stats[s] ?? 0) + (w?.enchant?.info.stat == s ? w!.enchant!.value : 0);
+  const word = {'burn': 'fire', 'frost': 'frost', 'poison': 'poison', 'smite': 'holy light'};
+  final unholy = f.undead || f.demon || f.element == 'poison';
+  if (f.stone && bluntWeapons.contains(g.art) && !bluntWeapons.contains(held?.art)) return 'It\'s stone: a blunt weapon crushes it';
+  final weak = f.element == null ? null : elementWeakness(f.element!);
+  if (weak != null && st(g, Stat.values.byName(weak)) > st(held, Stat.values.byName(weak))) return 'Weak to ${word[weak]}';
+  if (f.ent && st(g, Stat.burn) > st(held, Stat.burn)) return 'Weak to fire';
+  if (unholy && st(g, Stat.smite) > st(held, Stat.smite)) return 'Weak to holy light';
+  if (f.element != null && st(held, Stat.values.byName(f.element!)) > 0) return 'Shrugs off ${word[f.element!]}';
+  if ((f.venomous || f.ent) && st(held, Stat.poison) > 0) return f.venomous ? 'Shrugs off poison' : 'Half your poison is lost on it';
+  if ((f.demon || f.look == 'emberKing') && st(held, Stat.burn) > 0) return 'Half your fire is lost on it';
+  return 'Hits it harder';
+}
+
+
+/// How rare a sighting is, by its chance a fight, in loot's grades: uncommon about one fight in
+/// twenty or more often, rare to one in fifty, epic to one in a hundred and fifty, legendary
+/// rarer still.
+Rarity sightingRarity(double odds) => odds >= .05 ? Rarity.uncommon : (odds >= .02 ? Rarity.rare : (odds >= 1 / 150 ? Rarity.epic : Rarity.legendary));
+
+/// The rarer things that can turn up in land [c] when you set out, with the chance of each a fight
+/// (as the road rolls them): its golems, elementals, the Hidden Ones (and their Prior), its packs
+/// and its named foes. Commonest first.
+List<(Rare, double)> sightingsIn(int c, {required bool cindervaleClear}) {
+  final l = continents[c], at = foeIndexes(c).first, out = <(Rare, double)>[];
+  for (final (m, odds) in golemLands[c] ?? const <(Metal, double)>[]) {
+    out.add((Rare(at, m.aura, look: m.golemLook), odds));
+  }
+  for (final (el, odds) in elementalLands[c] ?? const <(Elemental, double)>[]) {
+    out.add((Rare(at, el.aura, look: el.look), odds));
+  }
+  final hidden = hiddenChance(c, cindervaleClear: cindervaleClear);
+  if (hidden > 0) {
+    out.add((Rare(at, Aura.cursed, look: 'hiddenAcolyte'), hidden * (1 - hiddenPriorShare)));
+    out.add((Rare(at, Aura.cursed, look: hiddenPrior, name: 'The Veiled Prior'), hidden * hiddenPriorShare));
+  }
+  for (final (look, name) in l.packs) {
+    final i = lookIndex(look, c);
+    out.add((Rare(i, wildAura(foeAt(i)), name: name, pack: true), packChance(c) / l.packs.length));
+  }
+  for (final n in l.named) {
+    out.add((Rare(lookIndex(n.base, c), n.aura, name: n.name, look: n.look), rareChance * namedRareShare / l.named.length));
+  }
+  return out..sort((a, b) => b.$2.compareTo(a.$2));
+}
+
+/// How rare the rare foe in front of you is to meet, graded like [sightingsIn] (any of the Hidden
+/// Ones counts as one sighting). A rare that isn't on that list (a foe turned rare by an aura, a
+/// nemesis, Sir Malric) is plain [Rarity.rare].
+Rarity sightingRarityOf(Rare rare, int c, {required bool cindervaleClear}) {
+  final hiddenLook = hiddenRanks.containsKey(rare.look) && rare.look != hiddenPrior;
+  for (final (r, odds) in sightingsIn(c, cindervaleClear: cindervaleClear)) {
+    final same = hiddenLook ? r.look == 'hiddenAcolyte' : (r.look == rare.look && r.name == rare.name && r.pack == rare.pack && (r.look != null || r.name != null || r.pack));
+    if (same) return sightingRarity(odds);
+  }
+  return Rarity.rare;
+}

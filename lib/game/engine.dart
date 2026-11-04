@@ -243,6 +243,7 @@ class SwingResult {
   /// The foe's blow this turn was a heavy one it wound up; and it's winding up another.
   bool heavy = false, windup = false;
 
+
   /// The Guardian's Oath caught the heavy blow.
   bool oath = false;
 
@@ -561,6 +562,15 @@ class GameEngine {
     state.warded.add(c);
     _note('Old Wick mutters over the reagents and hands you the ${continents[c].ward}: ${continents[c].hazard!.toLowerCase()} can\'t touch you in ${continents[c].name} now.', EntryKind.gold);
     return true;
+  }
+
+  /// The share of the fights in land [c] that are against a foe carrying [t]: by day its day foes
+  /// come out, by night (some [nightFights] of the time, as people play) mostly its night foes.
+  double _trophyShare(int c, Trophy t) {
+    final all = continents[c].foes, day = [for (final f in all) if (!f.night) f], night = [for (final f in all) if (f.night) f];
+    double of(List<FoeType> fs) => fs.isEmpty ? 0 : fs.where((f) => trophyLooks[f.look] == t).length / fs.length;
+    if (night.isEmpty) return of(all);
+    return (1 - nightFights) * of(day) + nightFights * (nightShare * of(night) + (1 - nightShare) * of(day));
   }
 
   /// Whether the current continent's boss will face you now.
@@ -3159,14 +3169,24 @@ class GameEngine {
     String? blueprint;
     if (trophy != null) {
       final malric = rare?.look == malricLook;
-      trophies = f.boss || malric ? trophiesFromBoss : (_rng.nextDouble() < trophyChance ? (f.pack ? 2 : 1) : 0);
+      // (Where few of a land's foes carry it, each one carries more: see trophiesEach.)
+      final share = _trophyShare(c, trophy), each = trophiesEach(share);
+      final n = each > 1 ? 1 + (_rng.nextDouble() < each - 1 ? 1 : 0) : (_rng.nextDouble() < each ? 1 : 0);
+      trophies = f.boss || malric ? trophiesFromBoss : n * (f.pack ? 2 : 1);
       if (trophies > 0) state.addMat(trophyKey(trophy), trophies);
       final set = forgedSetFor(trophy);
       final missing = [for (final slot in setPieceSlots) if (state.mat(blueprintKey(set.id, slot)) == 0) slot];
-      if (missing.isNotEmpty && (f.boss || malric || _rng.nextDouble() < (rare != null ? blueprintChanceRare : blueprintChance))) {
+      // (Kills since the last one are counted, so a long dry run ends in one: see blueprintPity.)
+      final dry = 'dry:${set.id}';
+      if (missing.isNotEmpty && (f.boss || malric || state.mat(dry) + 1 >= blueprintPity || _rng.nextDouble() < (rare != null ? blueprintChanceRare : blueprintsEach(share)))) {
         final slot = missing[_rng.nextInt(missing.length)];
         state.addMat(blueprintKey(set.id, slot), 1);
+        state.mats.remove(dry);
         blueprint = blueprintName(set, slot);
+      } else if (missing.isNotEmpty) {
+        state.addMat(dry, 1);
+      } else {
+        state.mats.remove(dry);
       }
     }
     // A shapeshifter that died wearing a trophy-bearer's shape now and then leaves that too.
@@ -3333,8 +3353,10 @@ class GameEngine {
 
   /// Rarity odds (common to legendary) for a rare foe's drop: mostly rare and epic, now and then legendary.
   /// (Legendaries were turning up about once a land; they're meant to be the find of a lifetime.)
+  // (A pack's legendary odds were a sixth of a plain foe's, though it's three of them: now a
+  // little better than one.)
   static List<int> rareOdds(Rare rare) => rare.pack
-      ? const [600, 800, 500, 99, 1]
+      ? const [600, 800, 500, 92, 8]
       : rare.name != null || rare.aura == Aura.ancient
       ? const [0, 0, 115, 82, 3]
       : rare.aura == Aura.cursed
@@ -4180,7 +4202,7 @@ class GameEngine {
     return null;
   }
 
-  /// Smelts all of [metal]'s ore into bars (two lumps a bar). Returns the bars made.
+  /// Smelts all of [metal]'s ore into bars ([orePerBar] lumps a bar). Returns the bars made.
   int smelt(Metal metal) {
     if (whyNotSmelt(metal) != null) return 0;
     final bars = barsFrom(metal), cost = smeltCost(metal);

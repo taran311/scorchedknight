@@ -1278,7 +1278,9 @@ const generalCut = .08, generalChance = .12;
 const doggedStep = .05, doggedMax = .2;
 
 /// Packs turn up more often the further you go.
-double packChance(int continent) => .05 + .025 * continent;
+// (By the land's tier, not its place in the list: the side lands come after the main road in the
+// list, so by index the Frostmarch, a tier-4 land, had a pack in half its fights.)
+double packChance(int continent) => .05 + .025 * landTier(continent);
 
 /// The aura a pack (or a beast turned rare) wears.
 Aura wildAura(FoeType f) => f.undead ? Aura.cursed : (f.venomous ? Aura.venom : (f.ork ? Aura.blazing : Aura.ancient));
@@ -1307,6 +1309,10 @@ const dayLength = 6;
 
 /// In a land with night foes, the share of foes after dark who are night foes.
 const nightShare = .7;
+
+/// About how many of a land's fights come after dark, as people play (a day is [dayLength] wins,
+/// and the night lasts till you sleep): for evening out what each land's night foes leave.
+const nightFights = .4;
 
 enum ChestTier { wooden, iron, gilded, ancient }
 
