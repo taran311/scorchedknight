@@ -1166,6 +1166,23 @@ void main() {
     expect(e.risenReady(0), isFalse);
   });
 
+  test('a relic part you can go and get is offered on the board, ahead of contracts', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(5));
+    final s = e.state;
+    s.innRepaired = true;
+    s.knight.level = 14;
+    expect(e.relicStep(), isNull, reason: 'no blueprint yet');
+    s.bossesDown.addAll({0, 1, 2});
+    final step = e.relicStep();
+    expect(step, isNotNull);
+    expect(relicPartsAt(step!.id!), isNotEmpty);
+    s.relicParts.clear();
+    for (final (r, i) in relicPartsAt(step.id!)) {
+      s.relicParts[r] = (s.relicParts[r] ?? 0) | (1 << i);
+    }
+    expect(e.relicStep()?.id, isNot(step.id));
+  });
+
   test('the road is one line: each land opens behind the one before it', () {
     final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(2));
     final s = e.state..knight.level = 40;

@@ -434,6 +434,24 @@ class GameEngine {
     return RoadStep(RoadKind.train, 'Grow stronger: reach level $need', 'Patrol ${continents[home].name}', home);
   }
 
+  /// A relic part you're after, waiting at a place or in a dungeon you can go to now (the
+  /// gentlest land first): for the town's board, ahead of its contracts. A relic's part is worth
+  /// more than a bounty, and its keepers never carry a contract, so it never showed there.
+  RoadStep? relicStep() {
+    final skip = roadStep()?.id;
+    final spots = <(int, RoadStep)>[
+      for (final p in places)
+        for (final (r, i) in relicPartsAt(p.id))
+          if (p.id != skip && relicPartWanted(r, i) && whyNotTravel(p.land) == null && placeShown(p) && whyNotExplore(p.id) == null)
+            (continents[p.land].minLevel, RoadStep(RoadKind.place, 'Explore ${p.name}', '${relics[r]!.parts[i].name}, for ${relics[r]!.name} · ${continents[p.land].name}', p.land, id: p.id)),
+      for (final d in dungeons)
+        for (final (r, i) in relicPartsAt(d.id))
+          if (d.id != skip && relicPartWanted(r, i) && whyNotTravel(d.land) == null && whyNotDungeon(d.id) == null)
+            (continents[d.land].minLevel, RoadStep(RoadKind.dungeon, 'Delve into ${d.name}', '${relics[r]!.parts[i].name}, for ${relics[r]!.name} · ${continents[d.land].name}', d.land, id: d.id)),
+    ]..sort((a, b) => a.$1 - b.$1);
+    return spots.firstOrNull?.$2;
+  }
+
   /// Somewhere to explore, for the town's board once its contracts are all done: a place or
   /// dungeon open to you now (not the one the road already points at). Places with no guard come
   /// first (free finds, no risk), then guarded places, then dungeons, the gentlest lands first:

@@ -346,6 +346,11 @@ class _InnPageState extends State<InnPage> with RouteAware {
                         // The notice board: the village's troubles, a contract each. (Like the road, not
                         // until Hob's job is done: a new knight has one thing to do first.)
                         if (s.inBattle) ...[]
+                        // A relic part you can go and get now comes before the contracts.
+                        else if (c.engine.relicStep() case final spot? when s.innRepaired) ...[
+                          _RoadCard(controller: c, step: spot, header: 'RELIC PART', icon: Icons.extension, onGo: () => _goRoad(spot)),
+                          const SizedBox(height: 10),
+                        ]
                         else if (s.innRepaired && c.engine.board.isNotEmpty) ...[
                           _BoardCard(controller: c),
                           const SizedBox(height: 10),
@@ -1911,7 +1916,10 @@ class _VaultCard extends StatelessWidget {
 /// The road on: the next land's boss, how far along its trail you are, and a button straight there
 /// (or, while the way's still shut, what opens it).
 class _RoadCard extends StatelessWidget {
-  const _RoadCard({required this.controller, required this.step, required this.onGo, this.header});
+  const _RoadCard({required this.controller, required this.step, required this.onGo, this.header, this.icon});
+
+  /// An icon in place of the step's own (a relic part's).
+  final IconData? icon;
   final GameController controller;
   final RoadStep step;
   final VoidCallback onGo;
@@ -1923,7 +1931,7 @@ class _RoadCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = controller.state, l = continents[step.land], at = trailAt(s, step.land), col = Color(l.argb), boss = step.kind == RoadKind.boss;
     final road = [for (var i = 0; i < mainLands; i++) i].where((i) => !s.bossesDown.contains(i)).firstOrNull ?? mainLands - 1;
-    final art = switch (step.kind) {
+    final art = icon != null ? Icon(icon, color: Palette.amber, size: 30) : switch (step.kind) {
       RoadKind.boss || RoadKind.heroic || RoadKind.side => SizedBox.expand(child: TypePortrait(type: l.boss)),
       RoadKind.place => const Icon(Icons.place, color: Palette.amber, size: 30),
       RoadKind.dungeon => const Icon(Icons.stairs, color: Palette.amber, size: 30),
