@@ -39,6 +39,22 @@ class GameStorage {
     }
   }
 
+  /// Which save the game was last played in ('main', or 'hardcore'), so it opens there again.
+  static const _slotKey = 'scorchedknight.activeSlot';
+  static Future<String> activeSlot() async {
+    try {
+      return (await SharedPreferences.getInstance()).getString(_slotKey) ?? 'main';
+    } catch (_) {
+      return 'main';
+    }
+  }
+
+  static Future<void> setActiveSlot(String slot) async {
+    try {
+      await (await SharedPreferences.getInstance()).setString(_slotKey, slot);
+    } catch (_) {}
+  }
+
   Future<void> clear() async {
     try {
       final prefs = await SharedPreferences.getInstance();
