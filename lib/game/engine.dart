@@ -1921,7 +1921,7 @@ class GameEngine {
       ..foe = foe
       ..rare = rare
       ..foeLevel = level
-      ..foeMax = (spawnHp(foe, level, rare) * ngFoeHp(state.ng) * (rare == null && foe == bossIndex(mainLands - 1) ? kingStrength : 1) * (rare == null ? doggedFor(foe) : 1)).round()
+      ..foeMax = (spawnHp(foe, level, rare) * ngFoeHp(state.ng, realmAt(rare?.base ?? foe), encounterType(foe, rare).boss) * (rare == null && foe == bossIndex(mainLands - 1) ? kingStrength : 1) * (rare == null ? doggedFor(foe) : 1)).round()
       ..turn = 0
       ..fleeTries = 0
       ..skillWait = 0
@@ -2995,6 +2995,11 @@ class GameEngine {
     final k = state.knight;
     r.knockedOut = true;
     state.knockouts++;
+    // Hardcore: one life. The run is over (the save is laid to rest once the stage has shown it).
+    if (state.hardcore) {
+      state.fallen = true;
+      _note('$foeName strikes you down, and this time there is no getting up. Your hardcore road ends here, at level ${k.level}.', EntryKind.damage);
+    }
     final lost = math.min(k.coins ~/ 10, 20 + 10 * k.level);
     k.coins -= lost;
     r.goldLost = lost;
@@ -4737,11 +4742,27 @@ class GameEngine {
     return got;
   }
 
+  // ---------------- Hardcore ----------------
+
+  /// Hardcore is open: New Game+ has been beaten (on your main hero's save).
+  bool get hardcoreOpen => hardcoreOpenFor(state);
+  bool hardcoreOpenFor(GameState s) => s.hcUnlocked || (s.won && s.ng >= 1);
+
+  /// A hardcore hero's line for the main save's card: who, how far, and how it ended.
+  static Map<String, dynamic> hardcoreSummary(GameState s) => {
+    'name': s.settings.name,
+    'level': s.knight.level,
+    'lands': s.bossesDown.where((c) => c < mainLands).length,
+    if (s.fallen) 'fell': true,
+    if (s.won) 'won': true,
+  };
+
   // ---------------- New Game+ ----------------
 
   /// Why you can't start the road again yet (null: you can).
   String? whyNotNewGamePlus() {
     final s = state;
+    if (s.hardcore) return 'A hardcore road ends at the Ember King';
     if (!s.won) return 'Defeat the Ember King first';
     // (Each says what to do about it: "Not mid-fight" on the card, with a fight left paused from
     // days ago, read as New Game+ simply not working.)
@@ -4794,6 +4815,10 @@ class GameEngine {
     fresh
       ..settings = old.settings
       ..ng = old.ng + 1
+      // (Hardcore opens once New Game+ is beaten, and stays open whatever road you're on.)
+      ..hcUnlocked = old.hcUnlocked || (old.won && old.ng >= 1)
+      ..hcRun = old.hcRun
+      ..hcBest = old.hcBest
       ..keys = old.keys
       ..vaultDry = old.vaultDry
       ..seasonSeen = old.seasonSeen

@@ -1139,6 +1139,38 @@ void main() {
     expect(k.dye, 'obsidian');
   });
 
+  test('Hardcore: opens once New Game+ is beaten, and the first knockout ends the road', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(5));
+    final s = e.state;
+    expect(e.hardcoreOpen, isFalse);
+    s.bossesDown.addAll({for (var c = 0; c < mainLands; c++) c});
+    expect(e.hardcoreOpen, isFalse, reason: 'the first time through opens New Game+, not Hardcore');
+    s.ng = 1;
+    expect(e.hardcoreOpen, isTrue);
+    // Going round New Game+ again keeps it open.
+    expect(e.newGamePlus(), isTrue);
+    expect(e.state.hcUnlocked, isTrue);
+    expect(e.hardcoreOpen, isTrue);
+    // A hardcore road: one life.
+    final h = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight)..hardcore = true, random: Random(6));
+    expect(h.whyNotNewGamePlus(), isNotNull);
+    h.travel(0);
+    h.explore();
+    h.state.foeLevel = 40;
+    for (var i = 0; i < 60 && h.state.inBattle; i++) {
+      h.state.knight.hp = 1;
+      if (h.takeTurn(BattleAction.attack).knockedOut) break;
+    }
+    expect(h.state.fallen, isTrue);
+    final run = GameEngine.hardcoreSummary(h.state);
+    expect(run['fell'], isTrue);
+    expect(run['level'], 1);
+    // It all survives a save and a load.
+    final back = GameState.fromJson(h.state.toJson());
+    expect(back.hardcore, isTrue);
+    expect(back.fallen, isTrue);
+  });
+
   test('New Game+: start again at level 1 with your keys and vault pieces, foes tougher', () {
     final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(4));
     final s = e.state, k = s.knight;

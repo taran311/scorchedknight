@@ -76,7 +76,8 @@ class HeroCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 HeroName(s, style: Txt.label(size: 15, color: Palette.cream, weight: FontWeight.w800)),
-                if (classOf(k) case final cls?) Padding(padding: const EdgeInsets.only(top: 2), child: Align(alignment: Alignment.centerLeft, child: ClassTag(knight: k, cls: cls))),
+                // Your class, and which road you're on (New Game+ or Hardcore), side by side.
+                if (classOf(k) != null || ModeTag.shows(s)) Padding(padding: const EdgeInsets.only(top: 2), child: Align(alignment: Alignment.centerLeft, child: Wrap(spacing: 4, runSpacing: 2, children: [if (classOf(k) case final cls?) ClassTag(knight: k, cls: cls), if (ModeTag.shows(s)) ModeTag(state: s)]))),
                 const SizedBox(height: 3),
                 Tooltip(message: 'Health', child: Bar(value: hp, max: mh, height: 14, colours: const [Color(0xFFE0604A), Color(0xFF8E2117)], label: 'HP ${fmt(hp)} / ${fmt(mh)}')),
                 if (!compact) ...[
@@ -388,6 +389,35 @@ class ClassTag extends StatelessWidget {
   }
 }
 
+/// Which road the hero is on, for the hero card: New Game+ in gold, Hardcore in red (the first
+/// time through carries no tag). So opening the game, you know which save you're in.
+class ModeTag extends StatelessWidget {
+  const ModeTag({super.key, required this.state});
+  final GameState state;
+
+  static bool shows(GameState s) => s.hardcore || s.ng > 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final hc = state.hardcore, col = hc ? const Color(0xFFE0503A) : const Color(0xFFF2C14E);
+    return Tooltip(
+      message: hc ? 'Hardcore: one life, in a save of its own' : 'New Game+: tougher foes, legendaries twice as likely',
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(4, 1, 5, 1),
+        decoration: BoxDecoration(color: col.withValues(alpha: .16), borderRadius: BorderRadius.circular(3), border: Border.all(color: col.withValues(alpha: .8))),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(hc ? Icons.local_fire_department_rounded : Icons.auto_awesome, size: 11, color: col),
+            const SizedBox(width: 2),
+            Text(hc ? 'HARDCORE' : 'NEW GAME+', style: Txt.label(size: 10.5, color: Color.lerp(col, const Color(0xFFFFFFFF), .25)!, weight: FontWeight.w800)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class HeroStrip extends StatelessWidget {
   const HeroStrip({super.key, required this.controller});
   final GameController controller;
@@ -460,7 +490,7 @@ class HeroStrip extends StatelessWidget {
             ),
           ),
           // Fighting as a class: which, and your rank in it.
-          if (classOf(k) case final cls?) Padding(padding: const EdgeInsets.only(top: 5), child: Align(alignment: Alignment.centerLeft, child: ClassTag(knight: k, cls: cls))),
+          if (classOf(k) != null || ModeTag.shows(s)) Padding(padding: const EdgeInsets.only(top: 5), child: Align(alignment: Alignment.centerLeft, child: Wrap(spacing: 4, runSpacing: 2, children: [if (classOf(k) case final cls?) ClassTag(knight: k, cls: cls), if (ModeTag.shows(s)) ModeTag(state: s)]))),
           // What you're carrying into the next few fights: brews, cards, songs.
           if (HeroBuffs.of(s).isNotEmpty) Padding(padding: const EdgeInsets.only(top: 5), child: HeroBuffs(state: s)),
         ],

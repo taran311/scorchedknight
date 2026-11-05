@@ -332,9 +332,10 @@ class _InnPageState extends State<InnPage> with RouteAware {
                           _ResumeBanner(controller: c, onTap: _resume),
                           const SizedBox(height: 10),
                         ],
-                        // The Ember King is down: go round again, harder.
-                        if (s.won) ...[
-                          _NewGamePlusCard(controller: c),
+                        // The roads (the first, New Game+, Hardcore): up top when there's one to start
+                        // or you're on a hardcore road; otherwise down by the log, always in sight.
+                        if (s.won || s.hardcore) ...[
+                          _RoadsCard(controller: c),
                           const SizedBox(height: 10),
                         ],
                         // Hob's job first: the story's quest outranks the side task below it.
@@ -410,6 +411,10 @@ class _InnPageState extends State<InnPage> with RouteAware {
                         ],
                         if (c.nextLoot != null) ...[
                           _Banner(icon: Icons.inventory_2, text: c.nextLoot!.name, button: 'Open', onTap: () => resolvePendingLoot(context, c)),
+                          const SizedBox(height: 10),
+                        ],
+                        if (!s.won && !s.hardcore && !s.inBattle && s.innRepaired) ...[
+                          _RoadsCard(controller: c),
                           const SizedBox(height: 10),
                         ],
                         const SizedBox(height: 12),
@@ -1633,80 +1638,161 @@ class _CloudSection extends StatelessWidget {
 
 /// The Ember Vault in Hob's cellar: your Cinder keys, the six pieces only it holds (the ones you've
 /// found shown, the rest still locked), and the door.
-/// New Game+: after the Ember King, start again at level 1 with the vault's pieces and your keys,
-/// against tougher foes, for better loot and another star by your name.
-class _NewGamePlusCard extends StatelessWidget {
-  const _NewGamePlusCard({required this.controller});
+/// The three roads, on the square from the very first day: the first time through, New Game+
+/// (open once the Ember King falls) and Hardcore (open once New Game+ is beaten): one life, in a
+/// save of its own. Locked ones say what opens them, so there's always a next road in sight.
+class _RoadsCard extends StatelessWidget {
+  const _RoadsCard({required this.controller});
   final GameController controller;
 
-  static const _gold = Color(0xFFF2C14E);
-
-  Widget _chip(IconData icon, String text, {Color colour = _gold}) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-    decoration: BoxDecoration(color: Colors.black38, borderRadius: BorderRadius.circular(12), border: Border.all(color: colour.withValues(alpha: .5))),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: colour),
-        const SizedBox(width: 3),
-        Text(text, style: Txt.onStone(size: 12, color: Palette.cream)),
-      ],
-    ),
-  );
+  static const _gold = Color(0xFFF2C14E), _blood = Color(0xFFE0503A), _dim = Color(0xFF8A8070);
 
   @override
   Widget build(BuildContext context) {
-    final c = controller, s = c.state, next = s.ng + 1, why = c.whyNotNewGamePlus;
-    final stars = next <= 3 ? '★' * next : '★$next';
+    final c = controller, s = c.state;
+    if (s.hardcore) return _hardcoreRoad(context);
+    final ngOpen = s.won && c.whyNotNewGamePlus == null, onNg = s.ng > 0;
+    final run = s.hcRun, best = s.hcBest;
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.fromLTRB(8, 7, 8, 8),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: _gold.withValues(alpha: .75), width: 1.5),
-        gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF3A3016), Color(0xFF1A1408)]),
-        boxShadow: [BoxShadow(color: _gold.withValues(alpha: .18), blurRadius: 12)],
+        border: Border.all(color: _gold.withValues(alpha: ngOpen ? .8 : .35), width: ngOpen ? 1.6 : 1.2),
+        gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF2E2614), Color(0xFF17120A)]),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              const Icon(Icons.auto_awesome, color: _gold, size: 26),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('NEW GAME+ $stars', style: Txt.label(size: 15, color: _gold, weight: FontWeight.w800)),
-                    Text(why ?? 'The ash returns, thicker', style: Txt.onStone(size: 12.5, color: why != null ? const Color(0xFFE8B070) : Palette.parch2)),
-                  ],
+          Text('THE ROADS', style: Txt.label(size: 12.5, color: _gold, weight: FontWeight.w800)),
+          const SizedBox(height: 6),
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: _tile(Icons.flag_rounded, 'The road', s.won || onNg ? 'Done' : 'You\'re here', _gold, done: s.won || onNg, here: !onNg && !s.won)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: _tile(
+                    Icons.auto_awesome,
+                    'New Game+',
+                    ngOpen ? 'Tougher foes, legendaries ×2' : (onNg ? (s.won ? 'Done' : 'You\'re here') : 'Beat the Ember King'),
+                    _gold,
+                    locked: !ngOpen && !onNg,
+                    here: onNg && !s.won,
+                    done: onNg && s.won,
+                    action: ngOpen ? ('Begin', () => _beginNg(context)) : null,
+                  ),
                 ),
-              ),
-              SizedBox(
-                width: 96,
-                child: StoneButton(title: 'Begin', compact: true, tone: ButtonTone.blood, onPressed: why == null ? () => _begin(context) : null),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            alignment: WrapAlignment.center,
-            children: [
-              _chip(Icons.restart_alt_rounded, 'Level 1', colour: const Color(0xFFE07A5A)),
-              _chip(Icons.vpn_key_rounded, 'Keys kept'),
-              _chip(Icons.shield_rounded, 'Vault set kept'),
-              _chip(Icons.trending_up_rounded, 'Tougher foes', colour: const Color(0xFFE07A5A)),
-              _chip(Icons.diamond_rounded, 'Legendaries ×${1 + math.min(next, 4)}'),
-            ],
+                const SizedBox(width: 6),
+                Expanded(
+                  child: _tile(
+                    Icons.local_fire_department_rounded,
+                    'Hardcore',
+                    c.hardcoreOpen
+                        ? (run != null ? '${run['name']} · Lv ${run['level']}' : (best != null ? 'Best: ${best['won'] == true ? 'beat the King' : 'Lv ${best['level']}'}' : 'One life. Own save'))
+                        : 'Beat New Game+',
+                    _blood,
+                    locked: !c.hardcoreOpen,
+                    action: c.hardcoreOpen && !s.inBattle ? (run != null ? 'Continue' : 'Begin', () => _beginHc(context, run != null)) : null,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Future<void> _begin(BuildContext context) async {
+  Widget _tile(IconData icon, String title, String line, Color colour, {bool locked = false, bool here = false, bool done = false, (String, VoidCallback)? action}) {
+    final col = locked ? _dim : colour;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(6, 6, 6, 6),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: locked ? .35 : .22),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: col.withValues(alpha: here ? .9 : (locked ? .3 : .55)), width: here ? 1.6 : 1),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(locked ? Icons.lock_rounded : (done ? Icons.check_circle_rounded : icon), size: 16, color: col),
+              const SizedBox(width: 4),
+              Flexible(child: FittedBox(fit: BoxFit.scaleDown, child: Text(title, style: Txt.label(size: 13, color: col, weight: FontWeight.w800)))),
+            ],
+          ),
+          const SizedBox(height: 3),
+          Text(line, textAlign: TextAlign.center, maxLines: 2, style: Txt.onStone(size: 11.5, color: locked ? _dim : Palette.parch2)),
+          if (action != null) ...[
+            const SizedBox(height: 5),
+            SizedBox(height: 30, child: StoneButton(title: action.$1, compact: true, tone: colour == _blood ? ButtonTone.blood : ButtonTone.amber, onPressed: action.$2)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// On a hardcore road: say so, and the way back to your main hero.
+  Widget _hardcoreRoad(BuildContext context) {
+    final c = controller, s = c.state;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: _blood.withValues(alpha: .8), width: 1.6),
+        gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF3A1610), Color(0xFF1A0B08)]),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.local_fire_department_rounded, color: _blood, size: 26),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('HARDCORE · ONE LIFE', style: Txt.label(size: 14, color: _blood, weight: FontWeight.w800)),
+                Text(s.won ? 'The Ember King is dead. Walk away a legend.' : 'A knockout ends this road for good.', style: Txt.onStone(size: 12.5, color: Palette.parch2)),
+              ],
+            ),
+          ),
+          SizedBox(
+            width: 104,
+            child: StoneButton(title: 'Main hero', compact: true, onPressed: s.inBattle ? null : () => c.leaveHardcore()),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _beginHc(BuildContext context, bool resume) async {
+    final c = controller;
+    if (!resume) {
+      final sure = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: Palette.stone2,
+          title: Text('A hardcore road?', style: Txt.label(size: 18, color: _blood)),
+          content: Text(
+            'A new hero, from level 1, with one life. The first knockout ends the road for good, and that hero is gone. '
+            'It\'s a save of its own: your main hero stays exactly as they are, and you can go back to them any time between fights.',
+            style: Txt.onStone(size: 14, color: Palette.cream),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text('Not yet', style: Txt.label(size: 14))),
+            TextButton(onPressed: () => Navigator.of(context).pop(true), child: Text('Begin', style: Txt.label(size: 14, color: _blood))),
+          ],
+        ),
+      );
+      if (sure != true) return;
+    }
+    Audio.play(Sfx.quest);
+    await c.enterHardcore();
+  }
+
+  Future<void> _beginNg(BuildContext context) async {
     final c = controller;
     final sure = await showDialog<bool>(
       context: context,
@@ -1714,7 +1800,7 @@ class _NewGamePlusCard extends StatelessWidget {
         backgroundColor: Palette.stone2,
         title: Text('Start the road again?', style: Txt.label(size: 18, color: _gold)),
         content: Text(
-          'You start again at level 1 in Cindervale. Your Cinder keys and the vault\'s pieces come with you (back to level 1, growing as you do). Gold, other gear, companions and the map start over.',
+          'You start again at level 1 in Cindervale, against tougher foes, with legendaries twice as likely. Your Cinder keys and the vault\'s pieces come with you (back to level 1, growing as you do). Gold, other gear, companions and the map start over.',
           style: Txt.onStone(size: 14, color: Palette.cream),
         ),
         actions: [

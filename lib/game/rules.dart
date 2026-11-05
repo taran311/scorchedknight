@@ -287,8 +287,16 @@ int foeMenace(GameState s) {
 
 /// New Game+ [ng]: foes have this much more HP, and hit this much harder (levelling off after
 /// three times round).
-double ngFoeHp(int ng) => 1 + .3 * math.min(ng, 3);
-double ngFoeHit(int ng) => 1 + .2 * math.min(ng, 3);
+/// (One step, not a climb: it used to stack three times over, and a third time round was more
+/// grind than game. Round again after that, it's the same New Game+.)
+/// It comes in land by land: Cindervale's foes are barely tougher (you start again at level 1
+/// with next to nothing), and the full weight lands from the Grimtusk Badlands on. Bosses get
+/// less of it than the foes on their trails: they're tuned close to the edge already, and at full
+/// weight the first ones stood in the road like walls.
+const ngHp = 1.4, ngHit = 1.25, ngBossShare = .5;
+double _ngRamp(int? land) => land == null ? 1 : (.15 + .85 * landTier(land) / 3).clamp(0.0, 1.0);
+double ngFoeHp(int ng, [int? land, bool boss = false]) => ng > 0 ? 1 + (ngHp - 1) * _ngRamp(land) * (boss ? ngBossShare : 1) : 1;
+double ngFoeHit(int ng, [int? land, bool boss = false]) => ng > 0 ? 1 + (ngHit - 1) * _ngRamp(land) * (boss ? ngBossShare : 1) : 1;
 
 /// A foe's HP, fixed when the fight starts.
 int spawnHp(int foeIndex, int level, [Rare? rare]) {
@@ -575,7 +583,7 @@ int counterDamage(GameState s) {
   // (see doggedFor): a hero who can't win yet still gets there, rather than losing for ever.
   final c = realmAt(s.foe);
   final dogged = s.rare == null && foeIn(s).boss && !s.bossesDown.contains(c) && !s.wildFight && !s.dungeonFight ? 1 - math.min(doggedHitMax, doggedHitStep * (s.bossLosses[c] ?? 0)) : 1.0;
-  return math.max(1, (foeAttack(s.foe, s.rare, s.foeLevel) * (1 - damageReduction(k)) * weakened * bones * bark * hide * scale * dogged * manaShield(s) * outmatched(s.foeLevel, k.level) * ngFoeHit(s.ng)).round());
+  return math.max(1, (foeAttack(s.foe, s.rare, s.foeLevel) * (1 - damageReduction(k)) * weakened * bones * bark * hide * scale * dogged * manaShield(s) * outmatched(s.foeLevel, k.level) * ngFoeHit(s.ng, realmAt(s.rare?.base ?? s.foe), foeIn(s).boss)).round());
 }
 
 /// The Bloodmoon Pelt: when a blow leaves you under [wolfAt] of your HP, the wolf comes out (once a

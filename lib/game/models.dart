@@ -494,6 +494,11 @@ class GameState {
     this.knockouts = 0,
     this.flees = 0,
     this.ng = 0,
+    this.hardcore = false,
+    this.fallen = false,
+    this.hcUnlocked = false,
+    this.hcRun,
+    this.hcBest,
     this.errand,
     this.errandAt = 0,
     Set<String>? did,
@@ -771,6 +776,15 @@ class GameState {
   /// through). Each one makes the foes tougher and legendaries likelier.
   int ng;
 
+  /// Hardcore: this road has one life (its own save, apart from your main hero's). [fallen]: the
+  /// hero's been knocked out, and the run is over.
+  bool hardcore, fallen;
+
+  /// (Your main hero's save.) Hardcore is open (New Game+ beaten); the hardcore hero you have on
+  /// the go, as you last left them (name, level, lands); and the best run that ever fell or won.
+  bool hcUnlocked;
+  Map<String, dynamic>? hcRun, hcBest;
+
   /// Wren's errand under way (null: she's home), and how many foes you'd felled when she set out.
   String? errand;
   int errandAt;
@@ -914,6 +928,11 @@ class GameState {
     'kos': knockouts,
     'flees': flees,
     if (ng > 0) 'ng': ng,
+    if (hardcore) 'hc': true,
+    if (fallen) 'fallen': true,
+    if (hcUnlocked) 'hcOpen': true,
+    if (hcRun != null) 'hcRun': hcRun,
+    if (hcBest != null) 'hcBest': hcBest,
     if (errand != null) 'errand': errand,
     if (errand != null) 'errandAt': errandAt,
     if (did.isNotEmpty) 'did': did.toList(),
@@ -1063,6 +1082,11 @@ class GameState {
       knockouts: n('kos'),
       flees: n('flees'),
       ng: n('ng'),
+      hardcore: j['hc'] == true,
+      fallen: j['fallen'] == true,
+      hcUnlocked: j['hcOpen'] == true,
+      hcRun: (j['hcRun'] as Map?)?.cast<String, dynamic>(),
+      hcBest: (j['hcBest'] as Map?)?.cast<String, dynamic>(),
       errand: j['errand'] as String?,
       errandAt: n('errandAt'),
       did: {...((j['did'] as List?) ?? const []).whereType<String>()},

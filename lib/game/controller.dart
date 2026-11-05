@@ -56,11 +56,19 @@ class KillEvent extends StageEvent {
 enum Outcome { won, fled, knockedOut }
 
 class GameController extends ChangeNotifier {
-  GameController({GameStorage? storage, this.cloud}) : storage = storage ?? GameStorage() {
+  GameController({GameStorage? storage, GameStorage? hardcoreStorage, this.cloud}) : storage = storage ?? GameStorage(), _hcStorage = hardcoreStorage ?? GameStorage(slot: 'hardcore'), _hcPrefs = storage == null {
+    _mainStorage = this.storage;
     cloud?.addListener(_cloudChanged);
   }
 
-  final GameStorage storage;
+  /// Where the hero being played is kept: your main hero's save, or (on a hardcore road) its own.
+  GameStorage storage;
+  late final GameStorage _mainStorage;
+  final GameStorage _hcStorage;
+
+  /// Whether the last-played save is remembered on the device (not for a game kept in memory, as
+  /// the tests and previews keep theirs).
+  final bool _hcPrefs;
 
   /// Cloud saves, if this build has them (null in tests and until Firebase is set up).
   final SaveCloud? cloud;
@@ -107,6 +115,14 @@ class GameController extends ChangeNotifier {
   Future<void> load() async {
     final saved = await storage.load();
     if (saved != null) engine = GameEngine(saved);
+    // Last played on a hardcore road: open there again (it says so on the hero card).
+    if (_hcPrefs && await GameStorage.activeSlot() == 'hardcore') {
+      final run = await _hcStorage.load();
+      if (run != null && run.hardcore) {
+        storage = _hcStorage;
+        engine = GameEngine(run);
+      }
+    }
     _syncShown();
     loaded = true;
     notifyListeners();
@@ -167,7 +183,8 @@ class GameController extends ChangeNotifier {
   /// Saves go up at most every 20 seconds while you play (and straight away when the app is put
   /// away: see [flushCloud]).
   void _schedulePush() {
-    if (cloud?.signedIn != true) return;
+    // (A hardcore hero is kept on this device only: the cloud holds your main hero.)
+    if (cloud?.signedIn != true || state.hardcore) return;
     _dirty = true;
     _pushTimer ??= Timer(const Duration(seconds: 20), () => unawaited(flushCloud()));
   }
@@ -177,7 +194,7 @@ class GameController extends ChangeNotifier {
     _pushTimer?.cancel();
     _pushTimer = null;
     final cl = cloud;
-    if (!_dirty || cl == null || !cl.signedIn) return;
+    if (!_dirty || cl == null || !cl.signedIn || state.hardcore) return;
     _dirty = false;
     if (!await cl.push(jsonEncode(state.toJson()), storage.savedAt, cloudSummary(state))) _dirty = true;
   }
@@ -188,7 +205,7 @@ class GameController extends ChangeNotifier {
   /// and the cloud's is newer, the player is asked ([cloudChoice]).
   Future<void> syncWithCloud() async {
     final cl = cloud;
-    if (cl == null || !cl.signedIn) return;
+    if (cl == null || !cl.signedIn || state.hardcore) return;
     final copy = await cl.fetch();
     if (copy == null) {
       // Nothing up there yet: this device's hero goes up.
@@ -639,6 +656,83 @@ class GameController extends ChangeNotifier {
     _koHp = null;
     _emit(ResetEvent());
     notifyListeners();
+    // A hardcore hero who fell: the run is laid to rest, and you're back with your main hero.
+    if (state.hardcore && state.fallen) unawaited(_endHardcore());
+  }
+
+  // ---- hardcore ----
+
+  /// Hardcore is open (New Game+ beaten), and whether you're on a hardcore road now.
+  bool get hardcoreOpen => engine.hardcoreOpen;
+  bool get inHardcore => state.hardcore;
+
+  /// Onto a hardcore road: your main hero is saved as they are, and the hardcore hero you have on
+  /// the go is picked up (or a new one begins: same name, class chosen afresh, one life).
+  Future<void> enterHardcore() async {
+    if (busy || state.inBattle || state.hardcore || !hardcoreOpen) return;
+    final saved = await _hcStorage.load();
+    // (One that fell with the app closed before it could be laid to rest: counted now.)
+    if (saved != null && saved.fallen) _recordRun(state, GameEngine.hardcoreSummary(saved));
+    final GameState run;
+    if (saved != null && saved.hardcore && !saved.fallen) {
+      run = saved;
+    } else {
+      run = GameEngine.newGame()
+        ..hardcore = true
+        ..settings = state.settings.copy();
+      run.settings.tourSeen = true;
+    }
+    // The main save knows a hardcore hero is on the go, even if the app's closed mid-road.
+    state.hcRun = GameEngine.hardcoreSummary(run);
+    await _mainStorage.save(state);
+    await flushCloud();
+    storage = _hcStorage;
+    _switchTo(run);
+    await storage.save(state);
+    if (_hcPrefs) await GameStorage.setActiveSlot('hardcore');
+  }
+
+  /// Back to your main hero (the hardcore hero waits in its own save, as you left them).
+  Future<void> leaveHardcore() async {
+    if (busy || state.inBattle || !state.hardcore) return;
+    await _hcStorage.save(state);
+    await _backToMain(GameEngine.hardcoreSummary(state), ended: state.won);
+  }
+
+  /// The hardcore hero fell (or won and walked away): their save is cleared, the main save keeps
+  /// the best run there's been, and you're back with your main hero.
+  Future<void> _endHardcore() async {
+    final summary = GameEngine.hardcoreSummary(state);
+    await _hcStorage.clear();
+    await _backToMain(summary, ended: true);
+  }
+
+  Future<void> _backToMain(Map<String, dynamic> run, {required bool ended}) async {
+    final main = await _mainStorage.load() ?? GameEngine.newGame();
+    if (ended || run['won'] == true) _recordRun(main, run);
+    main.hcRun = run['fell'] == true ? null : run;
+    if (run['fell'] == true) {
+      main.journal.add(JournalEntry('Your hardcore hero, ${run['name']}, fell at level ${run['level']}. ${run['lands'] == 0 ? 'Cindervale claims another.' : 'They had beaten ${run['lands']} of the road\'s bosses.'}', EntryKind.damage));
+    }
+    storage = _mainStorage;
+    _switchTo(main);
+    await storage.save(state);
+    if (_hcPrefs) await GameStorage.setActiveSlot('main');
+  }
+
+  /// Keeps [run] as the main save's best hardcore run, if it went further than the last best.
+  static void _recordRun(GameState main, Map<String, dynamic> run) {
+    int score(Map<String, dynamic>? r) => r == null ? -1 : (r['won'] == true ? 100000 : 0) + ((r['lands'] as num?)?.toInt() ?? 0) * 100 + ((r['level'] as num?)?.toInt() ?? 0);
+    if (score(run) > score(main.hcBest)) main.hcBest = run;
+  }
+
+  void _switchTo(GameState s) {
+    engine = GameEngine(s);
+    _emit(ResetEvent());
+    busy = false;
+    outcome = null;
+    _syncShown();
+    notifyListeners();
   }
 
   // ---- the Inn ----
@@ -941,9 +1035,14 @@ class GameController extends ChangeNotifier {
   /// Starts over with a new hero (same name; the class is chosen again).
   Future<void> newAdventure() async {
     if (busy) return;
-    final name = state.settings.name;
+    final name = state.settings.name, old = state;
     engine = GameEngine(GameEngine.newGame());
     state.settings.name = name;
+    // (What you've opened and the best hardcore run stay yours, whoever you start again as.)
+    state
+      ..hcUnlocked = old.hcUnlocked || engine.hardcoreOpenFor(old)
+      ..hcRun = old.hcRun
+      ..hcBest = old.hcBest;
     _emit(ResetEvent());
     busy = false;
     outcome = null;
