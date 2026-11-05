@@ -4739,8 +4739,11 @@ class GameEngine {
   String? whyNotNewGamePlus() {
     final s = state;
     if (!s.won) return 'Defeat the Ember King first';
-    if (s.inBattle) return 'Not mid-fight';
-    if (s.wild != null || s.dungeon != null) return 'Come back to town first';
+    // (Each says what to do about it: "Not mid-fight" on the card, with a fight left paused from
+    // days ago, read as New Game+ simply not working.)
+    if (s.inBattle) return 'Finish or flee your fight first (${foeIn(s).name})';
+    if (s.wild != null) return 'Leave the wilds first';
+    if (s.dungeon != null) return 'Leave the dungeon first';
     return null;
   }
 
