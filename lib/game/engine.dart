@@ -945,8 +945,7 @@ class GameEngine {
       got.add('+$gold gold');
     }
     if (p.potions > 0) {
-      _givePotions(p.potions);
-      got.add('${p.potions} health potion${p.potions == 1 ? '' : 's'}');
+      got.add(_givePotions(p.potions));
     }
     for (final e in p.ore.entries) {
       final m = Metal.values.byName(e.key);
@@ -1474,12 +1473,33 @@ class GameEngine {
   }
 
   /// Drinks a potion between fights.
-  /// Potions into your belt, up to [potionBelt]; the rest are left where they lie.
-  void _givePotions([int n = 1]) {
+  /// Potions into your belt, up to [potionBelt]. Nothing found goes to waste: what won't fit, you
+  /// drink on the spot if you're hurt (out of a fight), and the rest are worth half the shop's price
+  /// in gold (a pedlar's always glad of them). Returns how it went, for a reward's list of finds.
+  String _givePotions([int n = 1]) {
     final k = state.knight, room = math.max(0, potionBelt - k.potions), got = math.min(n, room);
     k.potions += got;
-    if (got < n) _note('Your potion belt is full ($potionBelt): you leave ${n - got == 1 ? 'one' : '${n - got}'} behind.');
+    var spare = n - got, drunk = 0;
+    final before = k.hp;
+    while (spare > 0 && !state.inBattle && k.hp < maxHp(k)) {
+      k.hp = math.min(maxHp(k), k.hp + potionHeal(k));
+      spare--;
+      drunk++;
+    }
+    final gold = spare * spareGold;
+    k.coins += gold;
+    final what = '$n health potion${n == 1 ? '' : 's'}';
+    if (got == n) return what;
+    final parts = [if (drunk > 0) 'drink ${drunk == 1 ? 'one' : drunk} on the spot (+${k.hp - before} HP)', if (gold > 0) 'sell ${spare == 1 ? 'the spare' : 'the $spare spares'} for $gold gold'];
+    _note('Your potion belt is full ($potionBelt), so you ${parts.join(' and ')}.', EntryKind.gold);
+    return '$what (${[if (got > 0) '$got to your belt', if (drunk > 0) '$drunk drunk', if (gold > 0) '+$gold gold'].join(', ')})';
   }
+
+  /// (For the tests.)
+  String givePotionsForTest(int n) => _givePotions(n);
+
+  /// What a potion that won't fit in your belt fetches: half the shop's price.
+  int get spareGold => priceOf('potion') ~/ 2;
 
   int drinkPotion() {
     final k = state.knight;
@@ -4593,10 +4613,10 @@ class GameEngine {
   /// forge's button. Tempering, and honing epic or legendary gear (pieces worth keeping). Rare gear
   /// can still be honed at the forge, but isn't pressed on you: it's usually replaced within a few
   /// levels, and the button counting every piece made the gold feel always spoken for.
-  int get upgradesReady => [
-    for (final g in state.knight.gear)
-      if (whyNotTemper(g) == null || (g.rarity.index >= Rarity.epic.index && honeables.any((h) => h.id == g.id) && whyNotHone(g) == null)) g,
-  ].length;
+  int get upgradesReady => state.knight.gear.where(upgradeReady).length;
+
+  /// Whether [g] is one of the pieces the forge's button counts (the forge marks them "Ready").
+  bool upgradeReady(GearItem g) => whyNotTemper(g) == null || (g.rarity.index >= Rarity.epic.index && honeables.any((h) => h.id == g.id) && whyNotHone(g) == null);
 
   /// A rite you know, left off a hotbar that still has room for it.
   bool get riteSlotFree {
@@ -4741,8 +4761,7 @@ class GameEngine {
       got.add('+$xp XP');
     }
     if (r.potions > 0) {
-      _givePotions(r.potions);
-      got.add('+${r.potions} potion${r.potions == 1 ? '' : 's'}');
+      got.add('+${_givePotions(r.potions)}');
     }
     if (r.scrolls > 0) {
       k.scrolls += r.scrolls;

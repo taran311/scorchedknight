@@ -502,10 +502,12 @@ class ForgeWares extends StatelessWidget {
         // Tempering: a favourite weapon reworked up to your level, so a farmed prize stays useful.
         x.heading('Bring up to your level'),
         for (final w in c.temperables)
-          x.ware(
+          Spotlit(
+            on: c.engine.upgradeReady(w),
+            child: x.ware(
             GearIcon(item: w, size: 30, heroClass: k.heroClass, dye: k.dye),
             w.name,
-            'Lv ${w.level} → ${k.level}',
+            'Lv ${w.level} → ${k.level}${c.engine.upgradeReady(w) ? ' · Ready' : ''}',
             CostButton(
               label: '${c.temperCost(w)} gold',
               onTap: c.whyNotTemper(w) == null
@@ -515,16 +517,19 @@ class ForgeWares extends StatelessWidget {
                   : null,
             ),
           ),
+          ),
         if (c.temperables.isEmpty) Text('Epic and legendary gear, back up to your level', style: Txt.onStone(size: 12.5)),
         // Honing: a little more out of a piece you love, for more gold each time.
         x.heading('Strengthen · +${(honeStep * 100).round()}% to every stat a step, up to +$honeMax'),
-        for (final g in c.honeables)
+        // The pieces the forge's button counts (epic or finer, and you can pay) first, lit and
+        // marked Ready, so "1 upgrade ready" points at something; rare ones after.
+        for (final g in [...c.honeables.where(c.engine.upgradeReady), ...c.honeables.where((g) => !c.engine.upgradeReady(g))])
           Spotlit(
-            on: focus == 'hone:${g.id}',
+            on: focus == 'hone:${g.id}' || c.engine.upgradeReady(g),
             child: x.ware(
               GearIcon(item: g, size: 30, heroClass: k.heroClass, dye: k.dye),
               g.name,
-              g.hone == 0 ? 'Not strengthened yet' : 'Strengthened +${g.hone}',
+              '${g.hone == 0 ? 'Not strengthened yet' : 'Strengthened +${g.hone}'}${c.engine.upgradeReady(g) ? ' · Ready' : ''}',
               CostButton(
                 label: '+${g.hone + 1} · ${honeCost(g, k.level)} gold',
                 onTap: c.whyNotHone(g) == null

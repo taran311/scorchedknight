@@ -2701,4 +2701,21 @@ void main() {
       expect(back.dungeonsDone, {'ossuary'});
     });
   });
+
+  test('potions past a full belt: drunk if you\'re hurt, the rest sold for gold', () {
+    final e = GameEngine(GameEngine.newGame(), random: Random(1), clock: () => DateTime(2026, 6, 1));
+    final k = e.state.knight;
+    k.potions = potionBelt - 1;
+    k.hp = maxHp(k);
+    final coins = k.coins;
+    final said = e.givePotionsForTest(3);
+    expect(k.potions, potionBelt);
+    expect(k.coins, coins + 2 * e.spareGold);
+    expect(said, contains('+${2 * e.spareGold} gold'));
+    k.hp = 1;
+    final hp = k.hp, coins2 = k.coins;
+    e.givePotionsForTest(1);
+    expect(k.hp, greaterThan(hp));
+    expect(k.coins, coins2);
+  });
 }
