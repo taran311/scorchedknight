@@ -168,6 +168,9 @@ class SwingResult {
   /// Reaper's Bane saved you from this blow: the Reaper came and his scythe went through you.
   bool cheatedDeath = false;
 
+  /// Hardcore's Death's Door held you up on 1 HP this turn.
+  bool deathsDoor = false;
+
   /// The Bloodmoon Pelt: the wolf came out this turn, or went back in.
   bool wolfed = false, wolfEnded = false;
 
@@ -1924,6 +1927,7 @@ class GameEngine {
       ..foeMax = (spawnHp(foe, level, rare) * ngFoeHp(state.ng, realmAt(rare?.base ?? foe), encounterType(foe, rare).boss) * (rare == null && foe == bossIndex(mainLands - 1) ? kingStrength : 1) * (rare == null ? doggedFor(foe) : 1)).round()
       ..turn = 0
       ..fleeTries = 0
+      ..doorUsed = false
       ..skillWait = 0
       ..petWait = 0
       ..mana = startingMana(k)
@@ -2974,6 +2978,16 @@ class GameEngine {
           k.hp = math.max(1, (maxHp(k) * reaperbaneHp).round());
           r.cheatedDeath = true;
           _note('The Reaper comes for you, and his scythe passes straight through. Reaper\'s Bane burns in your chest: you stand back up on ${k.hp} HP.', EntryKind.good);
+        } else if (state.hardcore && !state.doorUsed) {
+          // Hardcore's Death's Door: one life, but not one blow. Once a fight the killing blow leaves
+          // you on 1 HP, with a turn to drink or run (and running is easier: they think you're done).
+          state
+            ..doorUsed = true
+            ..fleeTries += deathsDoorFlee;
+          k.hp = 1;
+          r.cheatedDeath = true;
+          r.deathsDoor = true;
+          _note('Death\'s Door: the blow should have ended you, and somehow it didn\'t. 1 HP. Drink, or run (${(fleeChance(k, foeIn(state), state.fleeTries) * 100).round()}%): the next one won\'t miss.', EntryKind.damage);
         } else {
           _knockOut(r, foeName);
         }

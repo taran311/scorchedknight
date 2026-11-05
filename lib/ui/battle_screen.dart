@@ -1574,7 +1574,7 @@ class _Result extends StatelessWidget {
             if (k.trophy != null) _Spoil(const Icon(Icons.emoji_events, size: 17, color: Palette.cream), k.trophy!, Palette.cream, tip: 'For $smithName\'s forge'),
             if (k.blueprint != null) _Spoil(const Icon(Icons.description, size: 17, color: Color(0xFF8AB8F0)), k.blueprint!, const Color(0xFF8AB8F0), big: true, tip: 'A blueprint. Take it to $smithName'),
           ]);
-          if (k.won) lines = ['The Great Burning is over. Your eyebrows can start growing back.', 'New Game+ is open: start the road again, harder, from the card in the square whenever you like.'];
+          if (k.won) lines = ['The Great Burning is over. Your eyebrows can start growing back.', 'New Game+ is open: start the road again, harder, from the roads in Your Tent (tap the label under your name) whenever you like.'];
         }
       case Outcome.fled when r?.packLoss != null:
         title = 'You got away!';

@@ -12,7 +12,7 @@ import '../game/catalog.dart';
 import '../art/looks.dart';
 import 'hud.dart' show LookPortrait, TypePortrait;
 
-enum FrameKind { knight, ember, bog, thorn, tusk, sand, raven, forge, tide, sky, blossom, frost, laurel }
+enum FrameKind { knight, ascendant, hardcore, ember, bog, thorn, tusk, sand, raven, forge, tide, sky, blossom, frost, laurel }
 
 /// The frame for a foe met in continent [land] (by its place in the list).
 FrameKind frameForLand(int land) => const [
@@ -39,7 +39,9 @@ FrameKind frameForLand(int land) => const [
 
 /// Light, mid and dark of each frame's metal (or bone, or ice).
 const _metal = {
-  FrameKind.knight: [Color(0xFFFFE9A8), Color(0xFFDCA23E), Color(0xFF6E3E0C)],
+  FrameKind.knight: [Color(0xFFF6D9A0), Color(0xFFB8803A), Color(0xFF4E2A0C)],
+  FrameKind.ascendant: [Color(0xFFFFFBE6), Color(0xFFF2C14E), Color(0xFF8A5A10)],
+  FrameKind.hardcore: [Color(0xFF8A7E78), Color(0xFF3A3230), Color(0xFF0E0A0A)],
   FrameKind.ember: [Color(0xFFFFD08A), Color(0xFFD2652A), Color(0xFF5A1606)],
   FrameKind.bog: [Color(0xFFC8DCA8), Color(0xFF6E8E5A), Color(0xFF223018)],
   FrameKind.thorn: [Color(0xFFD8E49A), Color(0xFF6E8A34), Color(0xFF26340E)],
@@ -57,6 +59,8 @@ const _metal = {
 /// The jewel set at its foot.
 const _gem = {
   FrameKind.knight: Color(0xFFE0302A),
+  FrameKind.ascendant: Color(0xFF6AB0FF),
+  FrameKind.hardcore: Color(0xFFFF3A1A),
   FrameKind.ember: Color(0xFFFF8A2A),
   FrameKind.bog: Color(0xFF9AE05A),
   FrameKind.thorn: Color(0xFFC03A5A),
@@ -148,12 +152,36 @@ class _FramePainter extends CustomPainter {
   // ---- each frame: what goes behind the face and ring, and what crosses over the ring --------------
 
   ({void Function(Canvas) back, void Function(Canvas)? front}) get _style => switch (kind) {
-    // A golden dragon coiled the whole way round, its head at the top, its tail tufted in flame.
+    // The road: a knight's crossed swords behind a scorched bronze ring, an ember burning at its crown.
     FrameKind.knight => (
-      back: (c) => _serpent(c, _knightCoil, over: false),
+      back: (c) {
+        _swords(c);
+        _crownFlames(c, red: false);
+      },
+      front: (c) => _jewel(c, const Offset(0, _ring + 1)),
+    ),
+    // New Game+: the swords in bright gold before a sunburst, a laurel up each side and a star above.
+    FrameKind.ascendant => (
+      back: (c) {
+        _rays(c);
+        _swords(c);
+        _wreath(c, perSide: 6, len: 11, w: 3.2, splay: .6);
+      },
       front: (c) {
-        _serpent(c, _knightCoil, over: true);
-        _dragonHead(c, _knightCoil, eye: const Color(0xFFFF3A2A));
+        _star(c, const Offset(0, -_ring - 7), 9);
+        _jewel(c, const Offset(0, _ring + 1));
+      },
+    ),
+    // Hardcore: blackened iron, spiked, red fire behind it and a skull at the crown. One life.
+    FrameKind.hardcore => (
+      back: (c) {
+        _crownFlames(c, red: true);
+        _spikes(c);
+        _swords(c);
+      },
+      front: (c) {
+        _skull(c, const Offset(0, -_ring - 3));
+        _jewel(c, const Offset(0, _ring + 1));
       },
     ),
     // Flames licking up all the way round, tallest at the top.
@@ -292,7 +320,6 @@ class _FramePainter extends CustomPainter {
 
   /// Where a coil starts (its head), how far round it runs, how many times it crosses the ring,
   /// how thick it is at the neck, and whether it has a crest of fins along its back.
-  static const _knightCoil = (start: -1.15, sweep: 5.3, waves: 4, thick: 10.5, fins: true, tail: true);
   static const _wyrmCoil = (start: -1.99, sweep: -5.3, waves: 4, thick: 10.0, fins: true, tail: true);
   static const _eelCoil = (start: -1.9, sweep: 5.6, waves: 5, thick: 6.5, fins: false, tail: false);
   static const _cobraCoil = (start: -1.57, sweep: 5.9, waves: 4, thick: 6.5, fins: false, tail: false);
@@ -743,6 +770,137 @@ class _FramePainter extends CustomPainter {
     canvas.drawCircle(at, r * .32, Paint()..color = const Color(0xFFFFE08A));
   }
 
+  /// Two swords crossed behind the ring: pommels at the foot, points up past the shoulders.
+  void _swords(Canvas canvas) {
+    for (final side in [-1.0, 1.0]) {
+      final pommel = Offset(-side * 40, 42), tip = Offset(side * 43, -44);
+      final d = (tip - pommel) / (tip - pommel).distance, n = Offset(-d.dy, d.dx);
+      final guard = pommel + d * 10;
+      // The blade, with a ridge down it.
+      final blade = Path()
+        ..moveTo((guard + n * 3).dx, (guard + n * 3).dy)
+        ..lineTo((tip - d * 7 + n * 3).dx, (tip - d * 7 + n * 3).dy)
+        ..lineTo(tip.dx, tip.dy)
+        ..lineTo((tip - d * 7 - n * 3).dx, (tip - d * 7 - n * 3).dy)
+        ..lineTo((guard - n * 3).dx, (guard - n * 3).dy)
+        ..close();
+      canvas.drawPath(blade, Paint()..shader = LinearGradient(colors: kind == FrameKind.hardcore ? const [Color(0xFF9A928E), Color(0xFF4A4240), Color(0xFF8A2A1A)] : const [Color(0xFFF4F6F8), Color(0xFFA8B0B8), Color(0xFF5A6068)]).createShader(blade.getBounds()));
+      canvas.drawPath(blade, _edge);
+      canvas.drawLine(guard + d * 2, tip - d * 6, Paint()
+        ..strokeWidth = .7
+        ..color = Colors.white.withValues(alpha: .55));
+      // Grip, crossguard and pommel, in the frame's metal.
+      _solid(canvas, Path()
+        ..moveTo((pommel + n * 1.8).dx, (pommel + n * 1.8).dy)
+        ..lineTo((guard + n * 1.8).dx, (guard + n * 1.8).dy)
+        ..lineTo((guard - n * 1.8).dx, (guard - n * 1.8).dy)
+        ..lineTo((pommel - n * 1.8).dx, (pommel - n * 1.8).dy)
+        ..close());
+      _solid(canvas, Path()
+        ..moveTo((guard + n * 8 - d * 1.6).dx, (guard + n * 8 - d * 1.6).dy)
+        ..lineTo((guard + n * 8 + d * 1.6).dx, (guard + n * 8 + d * 1.6).dy)
+        ..lineTo((guard - n * 8 + d * 1.6).dx, (guard - n * 8 + d * 1.6).dy)
+        ..lineTo((guard - n * 8 - d * 1.6).dx, (guard - n * 8 - d * 1.6).dy)
+        ..close());
+      _solid(canvas, Path()..addOval(Rect.fromCircle(center: pommel - d * 1.5, radius: 3.2)));
+    }
+  }
+
+  /// Flames at the crown of the ring: an ember (amber), or a blaze (red, for hardcore).
+  void _crownFlames(Canvas canvas, {required bool red}) {
+    canvas.save();
+    final flame = red ? const [Color(0xFFFFB07A), Color(0xFFE0301A), Color(0xFF4A0804)] : const [Color(0xFFFFE6A0), Color(0xFFF08A2A), Color(0xFF6A2206)];
+    void one(double deg, double len, double w) {
+      final a = deg * math.pi / 180 - math.pi / 2;
+      canvas.save();
+      final at = _polar(a, _ring + 1);
+      canvas.translate(at.dx, at.dy);
+      canvas.rotate(a + math.pi / 2);
+      final outer = Path()
+        ..moveTo(-w, 2)
+        ..cubicTo(-w * 1.1, -len * .45, -w * .1, -len * .55, w * .25, -len)
+        ..cubicTo(w * .2, -len * .65, w * 1.2, -len * .45, w, 2)
+        ..close();
+      canvas.drawPath(outer, Paint()..shader = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: flame).createShader(outer.getBounds()));
+      canvas.drawPath(outer, Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = .8
+        ..color = flame[2]);
+      canvas.restore();
+    }
+
+    if (red) {
+      // A blaze all round the top half, tallest at the crown.
+      for (var i = -5; i <= 5; i++) {
+        one(i * 17.0, 16 - i.abs() * 1.6 + (i.isEven ? 2 : 0), 4.4);
+      }
+    } else {
+      one(-40, 7, 3);
+      one(40, 7, 3);
+      one(-20, 11, 3.8);
+      one(20, 11, 3.8);
+      one(0, 17, 5);
+    }
+    canvas.restore();
+  }
+
+  /// A five-pointed star.
+  void _star(Canvas canvas, Offset at, double r) {
+    final p = Path();
+    for (var i = 0; i < 10; i++) {
+      final a = i * math.pi / 5 - math.pi / 2, rr = i.isEven ? r : r * .45;
+      final q = at + Offset(math.cos(a), math.sin(a)) * rr;
+      i == 0 ? p.moveTo(q.dx, q.dy) : p.lineTo(q.dx, q.dy);
+    }
+    p.close();
+    _solid(canvas, p);
+    canvas.drawCircle(at, r * .22, Paint()..color = Colors.white.withValues(alpha: .8));
+  }
+
+  /// Iron spikes all the way round, longest at the sides.
+  void _spikes(Canvas canvas) {
+    for (var i = 0; i < 14; i++) {
+      final a = i * math.pi / 7 + math.pi / 14;
+      if (math.sin(a) < -.75) continue; // (the crown's the skull's)
+      final d = Offset(math.cos(a), math.sin(a)), n = Offset(-d.dy, d.dx);
+      final len = 9 + 5 * math.cos(a).abs(), base = d * (_ring + 1);
+      _solid(canvas, Path()
+        ..moveTo((base + n * 3.2).dx, (base + n * 3.2).dy)
+        ..lineTo((d * (_ring + len)).dx, (d * (_ring + len)).dy)
+        ..lineTo((base - n * 3.2).dx, (base - n * 3.2).dy)
+        ..close());
+      // A hot edge, as if the iron's still glowing.
+      canvas.drawLine(base + n * 2.2, d * (_ring + len - 1), Paint()
+        ..strokeWidth = .9
+        ..color = const Color(0xFFFF5A2A).withValues(alpha: .7));
+    }
+  }
+
+  /// A skull, its sockets lit red.
+  void _skull(Canvas canvas, Offset at) {
+    const bone = [Color(0xFFFBF3E0), Color(0xFFD8C8A8), Color(0xFF6E5E44)];
+    final head = Path()
+      ..addOval(Rect.fromCenter(center: at + const Offset(0, -2), width: 17, height: 15))
+      ..addRRect(RRect.fromRectAndRadius(Rect.fromCenter(center: at + const Offset(0, 6), width: 10, height: 6), const Radius.circular(2)));
+    canvas.drawPath(head, Paint()..shader = const RadialGradient(center: Alignment(-.3, -.4), colors: bone).createShader(head.getBounds().inflate(2)));
+    canvas.drawPath(head, _edge);
+    for (final x in [-3.6, 3.6]) {
+      final eye = Rect.fromCenter(center: at + Offset(x, -1), width: 4.6, height: 4.2);
+      canvas.drawOval(eye, Paint()..color = const Color(0xFF1A0604));
+      canvas.drawCircle(eye.center, 1.3, Paint()..color = const Color(0xFFFF3A1A));
+    }
+    canvas.drawPath(Path()
+      ..moveTo(at.dx, at.dy + 1.5)
+      ..lineTo(at.dx - 1.3, at.dy + 3.6)
+      ..lineTo(at.dx + 1.3, at.dy + 3.6)
+      ..close(), Paint()..color = const Color(0xFF1A0604));
+    for (final x in [-2.6, 0.0, 2.6]) {
+      canvas.drawLine(at + Offset(x, 4.4), at + Offset(x, 8.6), Paint()
+        ..strokeWidth = .7
+        ..color = bone[2]);
+    }
+  }
+
   void _shards(Canvas canvas) {
     for (var i = 0; i < 16; i++) {
       final a = i * math.pi / 8 + .1;
@@ -788,7 +946,7 @@ class FramesPreview extends StatelessWidget {
       ? Scaffold(
           backgroundColor: const Color(0xFF1A1510),
           body: Wrap(children: [
-            for (final k in [FrameKind.knight, FrameKind.frost, FrameKind.sand, FrameKind.tide])
+            for (final k in [FrameKind.knight, FrameKind.ascendant, FrameKind.hardcore, FrameKind.frost])
               Padding(padding: const EdgeInsets.all(8), child: OrnateFrame(kind: k, size: 380, child: Container(color: const Color(0xFF5A5E66)))),
           ]),
         )

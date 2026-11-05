@@ -640,6 +640,9 @@ double fleeChance(Knight k, FoeType foe, [int tries = 0]) =>
 /// How much better your odds of fleeing get after each failed try in a fight.
 const fleeStep = .15;
 
+/// Hardcore's Death's Door: as many failed tries' worth of better odds to run when it holds you up.
+const deathsDoorFlee = 2;
+
 /// Mana you start each fight with.
 int startingMana(Knight k) => 1 + (k.loadout.cape?.special == 'manawell' ? 1 : 0) + (trained(k, Trait.arcana) >= arcanaManaAt ? 1 : 0) + (brewOn(k, Brew.wisp) ? wispMana : 0);
 

@@ -66,7 +66,7 @@ class HeroCard extends StatelessWidget {
           Stack(
             clipBehavior: Clip.none,
             children: [
-              HeroPortrait(look: heroLook(k), size: compact ? 62 : 84, signature: portraitSignature(k), framed: true),
+              HeroPortrait(look: heroLook(k), size: compact ? 62 : 84, signature: portraitSignature(k), framed: true, frame: heroFrame(s)),
               Positioned(right: -6, bottom: -6, child: _LevelBadge(level: k.level, size: 28)),
             ],
           ),
@@ -163,9 +163,16 @@ class Bar extends StatelessWidget {
   }
 }
 
+/// Your portrait's frame: the road's scorched bronze and crossed swords, New Game+'s gold sunburst,
+/// or Hardcore's spiked black iron with a skull at its crown.
+FrameKind heroFrame(GameState s) => s.hardcore ? FrameKind.hardcore : (s.ng > 0 ? FrameKind.ascendant : FrameKind.knight);
+
 /// A head-and-shoulders portrait of any figure, in a round frame lit like the fire behind them.
 class HeroPortrait extends StatelessWidget {
-  const HeroPortrait({super.key, required this.look, this.size = 64, this.signature, this.framed = false});
+  const HeroPortrait({super.key, required this.look, this.size = 64, this.signature, this.framed = false, this.frame = FrameKind.knight});
+
+  /// Which of your frames (the road's, New Game+'s or Hardcore's): see [heroFrame].
+  final FrameKind frame;
   final Look look;
   final double size;
 
@@ -178,7 +185,7 @@ class HeroPortrait extends StatelessWidget {
   @override
   Widget build(BuildContext context) => framed
       ? OrnateFrame(
-          kind: FrameKind.knight,
+          kind: frame,
           size: size,
           child: DecoratedBox(
             decoration: const BoxDecoration(gradient: RadialGradient(center: Alignment(.3, -.2), colors: [Color(0xFF8A4A22), Color(0xFF2A160C)])),
@@ -443,7 +450,7 @@ class HeroStrip extends StatelessWidget {
           Stack(
             clipBehavior: Clip.none,
             children: [
-              HeroPortrait(look: heroLook(k), size: 64, signature: portraitSignature(k), framed: true),
+              HeroPortrait(look: heroLook(k), size: 64, signature: portraitSignature(k), framed: true, frame: heroFrame(s)),
               Positioned(
                 left: -2,
                 bottom: -2,

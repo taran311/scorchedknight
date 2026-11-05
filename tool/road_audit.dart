@@ -57,9 +57,14 @@ class Audit {
 /// (weakness, bash, any rite, companion, bolt); 'melee' only the two attacks (and potions).
 var policy = 'smart';
 
+/// The odds a hardcore player wants before taking a boss on.
+var hcOdds = .9;
+
 BattleAction choose(GameEngine e) {
   final k = e.state.knight, f = encounterType(e.state.foe, e.state.rare);
   if (k.hp < maxHp(k) * .35 && e.whyNot(BattleAction.potion) == null) return BattleAction.potion;
+  // Hardcore: Death's Door has held once this fight and there's nothing to drink: run.
+  if (e.state.hardcore && e.state.doorUsed && k.hp < maxHp(k) * .35 && e.whyNot(BattleAction.flee) == null) return BattleAction.flee;
   if (policy == 'melee') return e.whyNot(BattleAction.skill) == null ? BattleAction.skill : BattleAction.attack;
   if (policy == 'smart') return smart(e);
   bool rite() {
@@ -347,8 +352,8 @@ double? winOdds(GameEngine e, RoadStep st, int n) {
       s.wins[st.land] = winsForBoss;
       if (!t.challengeBoss()) return null;
     }
-    final a = Audit('trial', 0);
-    if (!fight(t, Random(i), a)) won++;
+    final a = Audit('trial', 0), fled = s.flees;
+    if (!fight(t, Random(i), a) && s.flees == fled) won++;
   }
   onFight = hook;
   return won / n;
@@ -364,6 +369,7 @@ Audit play(int seed, String player, {int maxFights = 2500}) {
   final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(seed), clock: () => DateTime(2026, 6, 1));
   final rng = Random(seed * 7 + 1), s = e.state, k = s.knight;
   e.takeHobsJob();
+  if (player.startsWith('hc')) s.hardcore = true;
   String? showing;
   var shownFrom = 0, shownKos = 0, shownLevel = 0, shownSub = '', loops = 0, streak = 0, worst = 0;
   final tried = <String>{};
@@ -372,7 +378,7 @@ Audit play(int seed, String player, {int maxFights = 2500}) {
     if (title != null) a.steps.add((title: title, sub: shownSub, level: shownLevel, from: shownFrom, fights: a.fights - shownFrom, kos: a.knockouts - shownKos, streak: worst));
   }
 
-  while (!s.won && a.fights < maxFights && loops++ < maxFights * 3) {
+  while (!s.won && !s.fallen && a.fights < maxFights && loops++ < maxFights * 3) {
     inTown(e, careless: player == 'careless', wards: player != 'noward', forge: player != 'noforge' && player != 'hinted', armour: player != 'noarmour');
     if (s.inBattle) {
       fight(e, rng, a);
@@ -436,6 +442,14 @@ Audit play(int seed, String player, {int maxFights = 2500}) {
       fight(e, rng, a);
       continue;
     }
+    // A hardcore player doesn't take a boss on till the odds are good: grow on its land's foes first.
+    if (player == 'hc' && (winOdds(e, pick, 12) ?? 1) < hcOdds && k.level < 60) {
+      e.travel(e.whyNotTravel(pick.land) == null ? pick.land : s.continent);
+      if (!s.day && continents[s.continent].boss.night == false) e.rest();
+      e.explore();
+      if (s.inBattle) fight(e, rng, a);
+      continue;
+    }
     final kos = a.knockouts, fought = a.fights;
     take(e, pick, rng, a);
     // Knockouts one after another while the card stays the same: a wall the card keeps sending you at.
@@ -454,7 +468,8 @@ Audit play(int seed, String player, {int maxFights = 2500}) {
   a.won = s.won;
   a.coins = k.coins;
   a.level = k.level;
-  if (!s.won) a.flag('never beat Vharrax: stuck on "$showing" ($shownSub) at level ${k.level} after ${a.fights} fights');
+  if (s.fallen) a.flag('fell at level ${k.level} on "$showing"');
+  if (!s.won && !s.fallen) a.flag('never beat Vharrax: stuck on "$showing" ($shownSub) at level ${k.level} after ${a.fights} fights');
   // Steps that hung on, or kept knocking you out.
   for (final st in a.steps) {
     if (st.fights > 120) a.flag('"${st.title}" stayed up ${st.fights} fights (from level ${st.level})');

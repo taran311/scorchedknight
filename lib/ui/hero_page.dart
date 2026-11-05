@@ -33,6 +33,7 @@ import 'merchant.dart';
 import 'task_routes.dart';
 import 'tasks_view.dart';
 import 'stat_icons.dart';
+import 'roads_card.dart';
 import 'theme.dart';
 import 'map_page.dart' show WhereLine;
 
@@ -273,6 +274,8 @@ class _PaperDoll extends StatelessWidget {
                   children: [
                     Text(s.settings.name, style: Txt.label(size: 20, color: Palette.cream, weight: FontWeight.w800)),
                     Text(classOf(k) == null ? 'Level ${k.level} knight' : 'Level ${k.level} ${classOf(k)!.name} · Rank ${classRank(k, classOf(k)!.id)}', style: Txt.label(size: 13, color: classOf(k) == null ? Palette.amber : Color(classOf(k)!.argb))),
+                    // Which road you're on (the first, New Game+ or Hardcore): tap for all three.
+                    RoadLabel(controller: c),
                     if (fill) Expanded(child: figure) else SizedBox(height: phone ? 200 : 300, child: figure),
                     // The armour you wear, under your feet.
                     Tooltip(
@@ -988,6 +991,8 @@ class _Journey extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        RoadsCard(controller: controller),
+        const SizedBox(height: 10),
         TaskList(controller: controller, onGo: onGo),
         const SizedBox(height: 10),
         Stone(
