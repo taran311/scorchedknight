@@ -3,7 +3,7 @@
 
 import 'loot.dart';
 
-enum SpellKind { blast, summon, dragon, nova, ward, chain, drain, slow, weaken, expose, heal, charge, reflect, sleep, warcry, fester }
+enum SpellKind { blast, summon, dragon, nova, ward, chain, drain, slow, weaken, expose, heal, charge, reflect, sleep, warcry, fester, bloodedge }
 
 class Spell {
   const Spell(this.id, this.name, this.desc, this.level, this.cost, this.kind, this.argb, {this.mult = 1, this.element, this.summons = 0, this.turns = 0, this.wards = 0, this.drain = .5, this.hex = 0, this.mend = 0, this.order, this.rank = 0, this.selfHurt = 0, this.earned});
@@ -51,6 +51,10 @@ class Spell {
   bool get passive => false;
 }
 
+/// Blood Edge: how much your next blade blow adds, in whole swings (the old Blood Pact's 2.6x, saved
+/// for the blow you choose).
+const bloodEdgeBonus = 2.6;
+
 /// Fester: how many turns of the foe's affliction it brings on at once.
 const festerTurns = 4;
 
@@ -90,7 +94,8 @@ const spells = <Spell>[
   Spell('dragonroar', 'Dragon\'s Roar', 'A roar that shakes its nerve: 1.3x, and your hits deal 25% more for 4 turns', 1, 3, SpellKind.expose, 0xFFFF5A2A, mult: 1.3, hex: 4, order: 'drakesworn', rank: 7),
   // The Blood Knight (Nightblood): drain and sustain.
   Spell('crimsonthirst', 'Crimson Thirst', 'Your blade drinks: 1.6x damage, and you heal a third of it', 1, 3, SpellKind.drain, 0xFFC8303A, mult: 1.6, drain: .35, order: 'nightblood', rank: 1),
-  Spell('bloodpact', 'Blood Pact', 'Pay 15% of your health for a terrible blow: 2.6x damage', 1, 3, SpellKind.blast, 0xFF8A1020, mult: 2.6, selfHurt: .15, order: 'nightblood', rank: 4),
+  // (Its id is still the old Blood Pact's, so hotbars saved with it keep it.)
+  Spell('bloodpact', 'Blood Edge', 'Bleed 15% of your health onto your blade: your next attack or Mighty Blow can\'t miss and lands +${bloodEdgeBonus}x harder', 1, 3, SpellKind.bloodedge, 0xFFC8303A, selfHurt: .15, order: 'nightblood', rank: 4),
   Spell('nightveil', 'Night Veil', 'Shadows wrap you: half its blows miss for 3 turns', 1, 3, SpellKind.slow, 0xFF6A4A8A, hex: 3, order: 'nightblood', rank: 7),
   // The Forge Knight (Deepforge): guard and stun.
   Spell('anvilward', 'Anvil Ward', 'Runes of iron ring round you: the next 2 blows are stopped dead', 1, 3, SpellKind.ward, 0xFFE8C060, wards: 2, order: 'deepforge', rank: 1),

@@ -498,7 +498,13 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     emit(st.poisoned, 7, 'venom', () => onMe(.1, .8), const Offset(0, -.7), 1100, 3.2, -.004);
     emit(st.roar, 6, 'ember', () => onMe(0, .5), const Offset(0, -1.4), 800, 3, -.01);
     emit(st.cowed, 3, 'smoke', () => onMe(.7, 1), const Offset(0, .5), 900, 5, .01);
+    // A blade charged with Blood Edge drips, all the while it waits for its blow.
+    emit(c.state.bloodEdge && !c.busy, 7, 'blood', () => Offset.lerp(_edgeHilt, _edgePoint, _rng.nextDouble())!, const Offset(0, .3), 900, 3.4, .2);
   }
+
+  /// Where the Blood Knight's blade lies at rest (held low behind, point down): for Blood Edge's
+  /// blood to run down it.
+  static const _edgeHilt = Offset(_knightX + 10, _groundY - 150), _edgePoint = Offset(_knightX - 85, _groundY - 60);
 
   void _mark(String text, List<Color> colours, Offset at, {IconData? icon}) => _marks.add(_Mark(text, colours, at, now, icon: icon));
 
@@ -1055,6 +1061,8 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         if (r.drained > 0) _at(d0 + hit + 500, () => _heal(r.drained, const Offset(_knightX + 10, _groundY - 270)));
       case SpellKind.blast:
         _at(d0 + hit, () => _spark(spell.element == Stat.burn ? 'fire' : 'bolt', _foeChest, 18, speed: 5.5, life: 500, radius: 4));
+      case SpellKind.bloodedge:
+        break; // (Played on its own: see _playBloodEdge.)
       case SpellKind.fester:
         // Whatever is eating at the foe erupts: it flashes hard in that colour, the fire, venom or
         // blood bursts up out of it, and the whole eruption lands as one big number in its colour.
@@ -1296,7 +1304,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
 
   void _playSwing(SwingResult r) {
     if (tracing) traceMark('${r.action.name}${r.counter != null ? ' +counter' : ''}');
-    if (const {BattleAction.potion, BattleAction.pet, BattleAction.flee}.contains(r.action)) {
+    if (const {BattleAction.potion, BattleAction.pet, BattleAction.flee}.contains(r.action) || r.edgeCharged) {
       _playOther(r);
       return;
     }
@@ -1374,6 +1382,17 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     final sp = r.damage.special;
     if (sp != null) _playSpecial(sp, mode, d0);
     if (r.damage.spell != null) _playSpell(r, d0);
+    if (r.edgeSpent) {
+      // The blood-charged blow: the blade blazes red as it comes, and the blow lands in a spray.
+      const blood = Color(0xFFC8303A);
+      _at(d0, () => _banner = ('Blood Edge!', blood, now));
+      _at(d0 + hitAt - 110, () => _trail2 = (now, blood, false, true, 'arc'));
+      _at(d0 + hitAt, () {
+        _burst(_foeChest, blood, 1.5);
+        _spark('blood', _foeChest, 26, speed: 6, life: 800, radius: 4.5, gravity: .2);
+        _punch(.7);
+      });
+    }
     if (r.offhandHit > 0) {
       // Dual wielding: the off-hand weapon follows the main blow with a second stroke of its own
       // (its own swing and smear, so you see two strikes), a clear beat after the first.
@@ -2097,7 +2116,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       _at(d0 + 1250, () => c.swingFinished(r));
       return;
     }
-    final act = r.action == BattleAction.pet ? 900.0 : 500.0;
+    final act = r.action == BattleAction.pet ? 900.0 : (r.edgeCharged ? 1700.0 : 500.0);
     final tail = (r.counter != null ? 900 : 0) + (r.knockedOut || r.cheatedDeath ? _reapMs - 600 : 0);
     final d0 = _slot(act + tail + 400);
     switch (r.action) {
@@ -2117,6 +2136,8 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         });
       case BattleAction.pet:
         _playCommand(r, d0);
+      case BattleAction.cast when r.edgeCharged:
+        _playBloodEdge(r, d0);
       case BattleAction.attack || BattleAction.skill || BattleAction.cast || BattleAction.shoot:
         break;
     }
@@ -2124,6 +2145,39 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     if (r.regrown > 0) _at(d0 + act + tail + 120, () => _heal(r.regrown, const Offset(_knightX + 10, _groundY - 250)));
     if (r.counter != null) _playCounter(r, d0 + act);
     _at(d0 + act + tail + 300, () => c.swingFinished(r));
+  }
+
+  /// Blood Edge: the knight raises the blade and draws it across a palm; blood runs down the steel,
+  /// which drinks it and lights up red (and stays lit, dripping, till the blow that spends it).
+  void _playBloodEdge(SwingResult r, double d0) {
+    const blood = Color(0xFFC8303A);
+    _at(d0, () {
+      _banner = ('Blood Edge!', blood, now);
+      _knightClip = castClip;
+      _knightClipStart = now;
+    });
+    // The cut: a red flash on you, the price over your head.
+    _at(d0 + 260, () {
+      _tween('kflash', 1, 60);
+      _tween('kflash', 0, 380, delay: 60);
+      Audio.play(Sfx.hit, power: .6);
+      final hurt = r.selfHurt;
+      if (hurt > 0) _mark('-$hurt', _red, const Offset(_knightX - 10, _groundY - 250));
+    });
+    // Blood running down the blade, in drops, from the hilt to the point.
+    for (var i = 0; i < 10; i++) {
+      _at(d0 + 820 + i * 50.0, () {
+        final at = Offset.lerp(_edgeHilt, _edgePoint, i / 9)!;
+        _spark('blood', at, 3, dir: math.pi / 2, spread: .6, speed: 1, life: 800, radius: 4, gravity: .25);
+      });
+    }
+    // And the steel drinks it: a pulse of red light along it.
+    _at(d0 + 1340, () {
+      final mid = Offset.lerp(_edgeHilt, _edgePoint, .5)!;
+      _burst(mid, blood, .9);
+      _spark('blood', mid, 12, speed: 2.2, life: 600, radius: 3, gravity: .15);
+      _mark('Next blow can\'t miss', [blood, shade(blood, -.5)], const Offset(_knightX + 20, _groundY - 300));
+    });
   }
 
   /// The companion's command: a hound's pounce, a fairy's charm, a dragon's torrent of fire.
@@ -2841,7 +2895,7 @@ class _ScenePainter extends CustomPainter {
 
     // As the wolf (the Bloodmoon Pelt), you're all fur and claws until it passes.
     final blade = fx['blade']!;
-    final hero = s.fx['wolf']! > .5 && k.hp > 0 ? wolfformLook : (s._shooting ? _crossbowLook(k) : heroLook(k, glow: blade > .05 ? Color.lerp(s._bladeTint, const Color(0xFFFFFFFF), .3) : null));
+    final hero = s.fx['wolf']! > .5 && k.hp > 0 ? wolfformLook : (s._shooting ? _crossbowLook(k) : heroLook(k, glow: blade > .05 ? Color.lerp(s._bladeTint, const Color(0xFFFFFFFF), .3) : (c.state.bloodEdge ? const Color(0xFFE0303A) : null)));
     // A class suit stands its own way (breathing on top). (The crossbow's clip sets the arms.)
     final moves = s._classMoves;
     final kPose = s._sample(moves == null ? idlePose(hero.stance, t, still: still) : inClassStance(idlePose(hero.stance, t, still: still), moves.stance), s._knightClip, s._knightClipStart, () => s._knightClip = null);

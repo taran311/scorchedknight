@@ -505,6 +505,15 @@ int foeAttack(int foeIndex, Rare? rare, int level) {
 /// (Tried lower, 35% and 30%: it reined in the dodging suits, but every other player too, and the
 /// road's knockouts went up by half. The suits are tuned on their own instead, in loot's _setPower.)
 const dodgeCap = .4, parryCap = .4;
+
+/// The most of the foe's blows that dodging and parrying between them can turn aside. Each is
+/// capped on its own, but a build maxing both turned away 64% of everything (a full Nightblood suit
+/// with a crit blade: it felt like nothing ever landed). Ordinary knights sit well under this.
+const avoidCap = .55;
+
+/// The Blood Knight's bash (Blood Rend) heals this share of the blow. (An eighth, it made the Blood
+/// Knight with a big two-handed legendary all but unkillable: see tool/sweep.dart.)
+const bloodRendHeal = .1;
 double dodgeChance(Knight k, [FoeType? foe]) => math.min(k.heroClass == HeroClass.ranger ? .5 : dodgeCap, (k.heroClass == HeroClass.ranger ? .25 : .15) + heroStats(k).dodge / 100 + (foe?.look == 'cyclops' ? cyclopsDodge : 0));
 
 /// How the foe's blow went.
@@ -663,7 +672,7 @@ class SuitArt {
 
 const suitArts = <String, SuitArt>{
   'ashen': SuitArt('Cinder Slam', 'Ashen Cut', 'IGNITE', 0xFFFF6A2A, 'Sets it ablaze'),
-  'nightblood': SuitArt('Blood Rend', 'Crimson Cut', 'DRINK', 0xFFE0405A, 'Heals you an eighth of the blow'),
+  'nightblood': SuitArt('Blood Rend', 'Crimson Cut', 'DRINK', 0xFFE0405A, 'Heals you a tenth of the blow'),
   'moonfang': SuitArt('Savage Maul', 'Moonfang Rake', 'BLEED', 0xFFC8C4BC, 'Opens a bleeding wound'),
   'silverleaf': SuitArt('Moonlit Feint', 'Silver Cut', 'WEAKEN', 0xFFE8E0B0, 'It hits softer for 2 turns'),
   'deepforge': SuitArt('Anvil Strike', 'Runed Cut', 'STUN', 0xFFE8C060, 'Always stuns, bosses too'),

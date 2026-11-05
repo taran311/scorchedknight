@@ -22,6 +22,7 @@ import 'tarot.dart';
 import 'vault.dart';
 import 'wilds.dart';
 import 'dungeons.dart';
+import 'knight_classes.dart' show classOf;
 
 sealed class StageEvent {}
 
@@ -131,6 +132,7 @@ class GameController extends ChangeNotifier {
   }
 
   void _syncShown() {
+    _lastClass = classOf(state.knight)?.id;
     shownFoe = state.foe;
     shownRare = state.rare;
     shownForm = state.form;
@@ -256,6 +258,10 @@ class GameController extends ChangeNotifier {
     // A whole faction suit worn once counts for its task, even after you take a piece off.
     final suit = suitWorn(state.knight);
     if (suit != null) engine.mark('suit:$suit');
+    // The whole suit of a class just went on: you're that knight now.
+    final cls = classOf(state.knight)?.id;
+    if (loaded && cls != null && cls != _lastClass) classAwakened.value = cls;
+    _lastClass = cls;
     // Gear changed out of a fight (a piece swapped, armour reforged): never more HP than the new
     // most.
     final k = state.knight;
@@ -580,6 +586,13 @@ class GameController extends ChangeNotifier {
   /// used to rebuild the whole battle screen (log, cards, move tiles) on the very frame it
   /// landed, and on a phone that dropped the impact frame, which read as a hitch in the swing.
   final hpShown = ValueNotifier<int>(0);
+
+  /// You've just become a class (the last piece of its suit put on): its id, for the app to play
+  /// the moment; back to null once it's been shown.
+  final classAwakened = ValueNotifier<String?>(null);
+
+  /// The class you were last seen as (to notice when it changes).
+  String? _lastClass;
 
   /// Called by the stage when the foe's blow lands (or misses).
   void revealCounter() {

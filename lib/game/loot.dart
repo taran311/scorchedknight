@@ -129,7 +129,7 @@ class GearSet {
 // four times in five: see tool/builds.dart. Scores alone count capped stats in full.)
 const _setPower = <String, double>{
   'ashen': 1.3,
-  'nightblood': 0.85,
+  'nightblood': 0.7,
   'moonfang': 1.25,
   'silverleaf': 0.6,
   'deepforge': 1.0,
@@ -139,7 +139,7 @@ const _setPower = <String, double>{
   'changeling': 0.9,
   'skyborn': 1.4,
   'bushido': 0.9,
-  'drakesworn': 0.95,
+  'drakesworn': 1.02,
   'arena': 1.15,
 };
 
@@ -147,7 +147,7 @@ const _setPower = <String, double>{
 const dragonhideFire = .85;
 
 /// The full Nightblood set's Bloodthirst: under half health, what your blows heal you, this much over.
-const bloodthirstBoost = 1.3;
+const bloodthirstBoost = 1.15;
 
 /// The Champion's set: how much harder the blow after a dodge, parry or block lands.
 const showmanBoost = 1.3;
@@ -1092,6 +1092,20 @@ double randomEpicWeapon(HeroClass c, int level) {
 /// above (they're farmed for), legendaries well above (and they carry a special), relics above that.
 const farmedEdge = 1.05, legendEdge = 1.2, relicEdge = 1.35;
 
+/// Each named legendary weapon's own power (see _Legend.edge), set by the balance sweep so each,
+/// found from level 15, leaves the rest of the road at about 4 to 7 knockouts and 75-85% first-try
+/// odds at the bosses (found gear: about 13, and 58%). Those that heal as they hit, or crit for a
+/// living, came out far ahead at the same budget; the two-handers with no guard far behind (they
+/// give up the shield). Unlisted: 1. (A var, so the sweep can try others: EDGES=...)
+var legendWeaponEdge = <String, double>{
+  'The Bat-King\'s Flail': .5,
+  'Oathkeeper': .5,
+  'Grimtooth': .6,
+  'Gambler\'s Edge': .65,
+  'Moonfang': .75,
+  'Legion\'s Due': .9,
+};
+
 /// The typical amount of a stat at a level (before rarity and luck).
 double statRoll(Stat s, int level) => _base(s, level);
 
@@ -1176,6 +1190,12 @@ class _Legend {
   const _Legend(this.name, this.slot, this.art, this.heroClass, this.stats, this.lore, {this.special});
   final String name, art, lore;
 
+  /// A weapon's own power, on top of [legendEdge]: every legendary gets the same budget of stats,
+  /// but a stat's price isn't what it's worth in a fight (healing as you hit keeps you on your feet
+  /// through anything; holy fire only bites the undead), so each is set by the balance sweep
+  /// (tool/sweep.dart) to come out about as strong as the others.
+  double get edge => legendWeaponEdge[name] ?? 1;
+
   /// A weapon's own special attack (otherwise one is picked for it by name).
   final String? special;
   final GearSlot slot;
@@ -1195,12 +1215,12 @@ const _legends = <_Legend>[
   _Legend('Bloodstone Signet', _rg, 'ring', null, {Stat.lifesteal: 2.2, Stat.damage: 1.0}, 'Its stone darkens a little after every fight.'),
   // The knight's legendary weapons: each has its own special attack.
   _Legend('Oathkeeper', _w, 'longsword', HeroClass.knight, {Stat.damage: 1.6, Stat.lifesteal: 1.5, Stat.guard: 1.0}, 'It has never broken a promise, nor a shield.', special: 'cleave'),
-  _Legend('Dawnbreaker', _w, 'mace', HeroClass.knight, {Stat.damage: 1.3, Stat.smite: 2.5, Stat.burn: 1.0}, 'The dead flinch at its shadow. Raise it high, and the sky answers.', special: 'stormcall'),
+  _Legend('Dawnbreaker', _w, 'mace', HeroClass.knight, {Stat.damage: 1.8, Stat.smite: 1.2, Stat.burn: .5}, 'The dead flinch at its shadow. Raise it high, and the sky answers.', special: 'stormcall'),
   _Legend('Grimtooth', _w, 'axe', HeroClass.knight, {Stat.damage: 1.9, Stat.crit: 1.4}, 'Notched from a hundred quarrels. Something below the earth likes the sound it makes.', special: 'hellgate'),
   _Legend('Gambler\'s Edge', _w, 'rapier', HeroClass.knight, {Stat.damage: 1.5, Stat.crit: 1.8}, 'Won in a game of bones from a man who swore he never lost. The dice came with it.', special: 'fatesroll'),
-  _Legend('Gravewarden', _w, 'halberd', HeroClass.knight, {Stat.damage: 1.7, Stat.smite: 1.6}, 'Carried by the last captain of the barrow guard. His men still answer when it calls.', special: 'deadcharge'),
+  _Legend('Gravewarden', _w, 'halberd', HeroClass.knight, {Stat.damage: 1.8, Stat.smite: .7, Stat.guard: 1.0}, 'Carried by the last captain of the barrow guard. His men still answer when it calls.', special: 'deadcharge'),
   _Legend('Legion\'s Due', _w, 'greatsword', HeroClass.knight, {Stat.damage: 1.8, Stat.guard: 1.0}, 'Forged on a battlefield from the swords of the fallen, who never quite left it.', special: 'legion'),
-  _Legend('Wyrmcaller', _w, 'spear', HeroClass.knight, {Stat.damage: 1.5, Stat.burn: 1.6}, 'Its head is a dragon\'s tooth. Hold it up, and somewhere in the ash, something big turns its head.', special: 'wyrmcall'),
+  _Legend('Wyrmcaller', _w, 'spear', HeroClass.knight, {Stat.damage: 1.8, Stat.burn: .7, Stat.guard: 1.0}, 'Its head is a dragon\'s tooth. Hold it up, and somewhere in the ash, something big turns its head.', special: 'wyrmcall'),
   _Legend('Moonfang', _w, 'scimitar', HeroClass.knight, {Stat.damage: 1.6, Stat.dodge: 1.2, Stat.crit: 1.0}, 'Silver, curved like a new moon. Wolves no one can see run beside whoever holds it.', special: 'moonpack'),
   _Legend('The Bat-King\'s Flail', _w, 'flail', HeroClass.knight, {Stat.damage: 1.6, Stat.leech: 1.0}, 'Taken from the Bat Tower. Swing it, and the dark itself takes wing.', special: 'nightswarm'),
   _Legend("The Warden's Bulwark", _o, 'tower', HeroClass.knight, {Stat.guard: 2.2, Stat.thorns: 2.0, Stat.vigour: 1.0}, 'Carried by the last keeper of the Cindervale gate.'),
@@ -2058,6 +2078,25 @@ class LootTable {
 
   /// Rolls one drop. [odds] overrides the rarity weights (common to legendary); [element] makes
   /// a rare foe's aura show up as the drop's first affix.
+  /// (The balance tools: legendary [name] at [level], as it would drop. Null if there's no such.)
+  GearItem? legendNamed(String name, HeroClass heroClass, int level) {
+    final l = _legends.where((l) => l.name == name).firstOrNull;
+    if (l == null) return null;
+    return GearItem(
+      id: _id(),
+      name: l.name,
+      slot: l.slot,
+      art: l.art,
+      rarity: Rarity.legendary,
+      level: level,
+      heroClass: l.heroClass,
+      lore: l.lore,
+      special: l.slot == _w ? (l.special ?? legendSpecial(l.name, l.heroClass ?? heroClass)) : null,
+      value: _value(level, Rarity.legendary, l.slot),
+      stats: l.slot == _w ? _tuned(l.stats, level, l.heroClass ?? heroClass, legendEdge * l.edge) : {for (final e in l.stats.entries) e.key: _roll(e.key, level, e.value, _r)},
+    );
+  }
+
   GearItem roll(HeroClass heroClass, int level, {bool boss = false, List<int>? odds, Stat? element, GearItem? wielding, GearSlot? only, bool east = false}) {
     var rarity = _rarity(boss, odds);
     // Legendaries belong to the middle and end of the road: none drop before [legendFrom], and
@@ -2084,7 +2123,7 @@ class LootTable {
         special: l.slot == _w ? (l.special ?? legendSpecial(l.name, l.heroClass ?? heroClass)) : null,
         value: _value(level, rarity, l.slot),
         // Named legendary weapons are tuned like every other signature weapon; the rest roll as written.
-        stats: l.slot == _w ? _tuned(l.stats, level, l.heroClass ?? heroClass, legendEdge) : {for (final e in l.stats.entries) e.key: _roll(e.key, level, e.value, _r)},
+        stats: l.slot == _w ? _tuned(l.stats, level, l.heroClass ?? heroClass, legendEdge * l.edge) : {for (final e in l.stats.entries) e.key: _roll(e.key, level, e.value, _r)},
       );
     }
     final slot = only ?? _slot();

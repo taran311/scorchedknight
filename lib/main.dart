@@ -18,6 +18,7 @@ import 'ui/effects_preview.dart';
 import 'ui/armoury.dart';
 import 'ui/bestiary.dart';
 import 'ui/frames.dart';
+import 'ui/class_awakening.dart';
 import 'ui/tarot_card.dart';
 import 'ui/lands_preview.dart';
 import 'ui/class_picker.dart';
@@ -163,7 +164,13 @@ class _ScorchedKnightAppState extends State<ScorchedKnightApp> {
       // out of what each page sees, so no page pads for it twice.
       return ColoredBox(
         color: Palette.ground,
-        child: SafeArea(top: false, left: false, right: false, child: app),
+        child: SafeArea(
+          top: false,
+          left: false,
+          right: false,
+          // Over every screen: the moment you become a class (see ClassAwakening).
+          child: Stack(children: [Positioned.fill(child: app), ClassAwakening(controller: _game)]),
+        ),
       );
     },
     debugShowCheckedModeBanner: false,

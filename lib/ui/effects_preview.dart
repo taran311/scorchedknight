@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import '../game/classes.dart' show HeroClass;
 import '../game/controller.dart';
 import '../game/engine.dart';
+import '../game/crafting.dart' show setPieceSlots;
 import '../game/loot.dart' show Stat, GearItem, GearSlot;
 import '../game/models.dart';
 import '../game/rules.dart';
@@ -43,6 +44,7 @@ final _shows = <_Show>[
   (id: 'fester', title: 'Fester: the fire erupts (venom: &only=festerv, bleed: festerb)', wound: {Stat.burn: 30}, lay: null),
   (id: 'festerv', title: 'Fester on venom', wound: {Stat.poison: 30}, lay: null),
   (id: 'festerb', title: 'Fester on a bleed', wound: {Stat.bleed: 30}, lay: null),
+  (id: 'edge', title: 'Blood Edge: charge the blade, then the blow', wound: {}, lay: null),
   (id: 'dual', title: 'Two blades: katana and wakizashi', wound: {}, lay: null),
   (id: 'you', title: 'You: poisoned · war cry', wound: {}, lay: (s) => s
     ..heroPoison = 3
@@ -88,6 +90,21 @@ class _EffectsPreviewState extends State<EffectsPreview> {
     w.stats.removeWhere((st, _) => st == Stat.burn || st == Stat.poison || st == Stat.bleed || st == Stat.frost || st == Stat.smite);
     w.stats.addAll(sh.wound);
     w.enchant = null;
+    if (sh.id == 'edge') {
+      // A Blood Knight, whole suit, top rank.
+      for (final slot in setPieceSlots) {
+        final g = c.engine.loot.setPiece('nightblood', slot, k.heroClass, k.level);
+        switch (slot) {
+          case GearSlot.armour:
+            k.loadout.armour = g.art;
+          case GearSlot.ring:
+            k.ring = g;
+          default:
+            k.loadout.put(g);
+        }
+      }
+      k.classWins['nightblood'] = 150;
+    }
     if (sh.id == 'dual') {
       // A katana in the hand and a wakizashi in the other: the off-hand's second stroke.
       final j = w.toJson();
@@ -137,6 +154,13 @@ class _EffectsPreviewState extends State<EffectsPreview> {
       _rest[c] = 0;
       s.knight.hp = maxHp(s.knight);
       s.foeLevel = 1;
+      // Blood Edge's cell: charge the blade, then swing it, by turns.
+      if (sh.id == 'edge' && !s.bloodEdge) {
+        s.mana = 5;
+        s.knight.rites = ['bloodpact'];
+        c.castRite('bloodpact');
+        continue;
+      }
       // Fester's cells: a blow to lay the affliction, then Fester to burst it, by turns.
       if (sh.id.startsWith('fester') && c.engine.foeAffliction != null && !(_festered[c] ?? false)) {
         _festered[c] = true;

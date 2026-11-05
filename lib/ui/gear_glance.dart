@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 // Your gear at a glance, mid-fight: tap your card and a sheet slides up with everything you're
 // wearing and what it all adds up to. Tap outside (or drag it down) and you're back in the fight.
 
@@ -62,6 +64,36 @@ class _GearGlance extends StatelessWidget {
                 InfoChip(icon: const Icon(Icons.shield, size: 15, color: Palette.cream), text: '${armour.name}: ${(damageReduction(k) * 100).round()}% less damage', colour: Palette.cream, dense: true),
                 for (final (s, v) in totals) StatChip(stat: s, value: v, dense: true),
               ],
+            ),
+            // What those add up to in a fight, with your knight's own base and the caps: the gear's
+            // sums alone ("+100% crit", "+30% dodge") said nothing of either.
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Builder(builder: (context) {
+                final crit = critChance(k), dodge = dodgeChance(k), parry = parryChance(k), block = blockChance(k);
+                final avoid = math.min(avoidCap, dodge + (1 - dodge) * parry);
+                String pc(double x) => '${(x * 100).round()}%';
+                Widget odds(String name, double v, bool capped) => InfoChip(
+                  icon: Icon(capped ? Icons.vertical_align_top_rounded : Icons.casino_outlined, size: 14, color: capped ? Palette.amber : Palette.parch2),
+                  text: '$name ${pc(v)}${capped ? ' (max)' : ''}',
+                  colour: capped ? Palette.amber : Palette.cream,
+                  dense: true,
+                );
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text('IN A FIGHT', style: Txt.label(size: 12, color: Palette.amber)),
+                    const SizedBox(height: 5),
+                    Wrap(spacing: 5, runSpacing: 5, children: [
+                      odds('Crit', crit, crit >= .45),
+                      odds('Dodge', dodge, dodge >= dodgeCap),
+                      odds('Parry', parry, parry >= parryCap),
+                      odds('Block', block, false),
+                      odds('Blows you avoid', avoid, avoid >= avoidCap),
+                    ]),
+                  ],
+                );
+              }),
             ),
             for (final (set, n) in activeSets(k.setGear))
               Padding(padding: const EdgeInsets.only(top: 6), child: SetChips(set: set, dense: true, worn: n)),

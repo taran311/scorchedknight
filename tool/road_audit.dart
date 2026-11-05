@@ -27,6 +27,7 @@ import 'package:scorchedknight/game/classes.dart';
 import 'package:scorchedknight/game/crafting.dart';
 import 'package:scorchedknight/game/dungeons.dart';
 import 'package:scorchedknight/game/engine.dart';
+import 'package:scorchedknight/game/knight_classes.dart';
 import 'package:scorchedknight/game/loot.dart';
 import 'package:scorchedknight/game/models.dart';
 import 'package:scorchedknight/game/rules.dart';
@@ -112,7 +113,10 @@ BattleAction smart(GameEngine e) {
   for (final id in k.rites) {
     final sp = spellById(id);
     if (sp == null || e.whyNotRite(id) != null) continue;
-    final dmg = styleEdgeOn(f, AttackStyle.rite) * sp.mult * arcanaBoost(k) / might + (sp.element == null ? 0 : .3) + (sp.kind == SpellKind.fester ? e.festerBurst / max(1, fullSwing(k)) : 0);
+    // (Blood Edge is worth the blow it charges, as Blood Pact's own blow was.)
+    final dmg = sp.kind == SpellKind.bloodedge
+        ? blade * bloodEdgeBonus
+        : styleEdgeOn(f, AttackStyle.rite) * sp.mult * arcanaBoost(k) / might + (sp.element == null ? 0 : .3) + (sp.kind == SpellKind.fester ? e.festerBurst / max(1, fullSwing(k)) : 0);
     if (sp.kind == SpellKind.fester) festerSeen.add(e.festerBurst / max(1, fullSwing(k)));
     if (sp.mult > 0 && dmg > score) {
       best = BattleAction.cast;
@@ -125,7 +129,50 @@ BattleAction smart(GameEngine e) {
 
 /// Between fights: rest, rites, training, and (unless careless) the shops and the forge. (Places
 /// are left for the cards to send you to.)
+// ---- forced builds, for the balance sweep: BUILD=nightblood|deepforge|drakesworn (the class's
+// whole suit from a few levels after its land opens, kept at level) and WEAPON=<a legendary's
+// name> (from level 15, when legendaries start to drop, kept at level).
+var buildSuit = Platform.environment['BUILD'];
+var buildWeapon = Platform.environment['WEAPON'];
+const suitFrom = {'nightblood': 18, 'deepforge': 30, 'drakesworn': 35, 'ashen': 12, 'moonfang': 24, 'silverleaf': 34, 'faceless': 37, 'sunscale': 32, 'tidecaller': 26, 'changeling': 40};
+const classRitesOf = {'drakesworn': ['wyrmflame', 'dragonroar', 'scaleward'], 'nightblood': ['crimsonthirst', 'bloodpact', 'nightveil'], 'deepforge': ['moltenhammer', 'earthshaker', 'anvilward']};
+var _suitAt = -99, _weaponAt = -99;
+bool suitOn(Knight k) => buildSuit != null && k.level >= suitFrom[buildSuit]!;
+bool weaponOn(Knight k) => buildWeapon != null && k.level >= 15;
+
+void applyBuild(GameEngine e) {
+  final k = e.state.knight;
+  if (suitOn(k) && (k.level - _suitAt >= 3 || suitWorn(k) != buildSuit)) {
+    _suitAt = k.level;
+    for (final slot in setPieceSlots) {
+      final g = e.loot.setPiece(buildSuit!, slot, k.heroClass, k.level);
+      switch (slot) {
+        case GearSlot.armour:
+          k.loadout.armour = g.art;
+        case GearSlot.ring:
+          k.ring = g;
+        default:
+          k.loadout.put(g);
+      }
+    }
+  }
+  if (weaponOn(k) && (k.level - _weaponAt >= 3 || k.loadout.weapon?.name != buildWeapon)) {
+    _weaponAt = k.level;
+    k.loadout.weapon = e.loot.legendNamed(buildWeapon!, k.heroClass, k.level) ?? (throw 'No legendary named $buildWeapon');
+  }
+}
+
+/// Slots the forced build holds: the loot never replaces them.
+bool buildHolds(Knight k, GearSlot slot) => (slot == GearSlot.weapon && weaponOn(k)) || (suitOn(k) && setPieceSlots.contains(slot));
+
 void inTown(GameEngine e, {required bool careless, bool wards = true, bool forge = true, bool armour = true}) {
+  applyBuild(e);
+  _inTown(e, careless: careless, wards: wards, forge: forge, armour: armour);
+  // (The shops and the forge may have put other armour on: the build's suit goes back on.)
+  applyBuild(e);
+}
+
+void _inTown(GameEngine e, {required bool careless, bool wards = true, bool forge = true, bool armour = true}) {
   final s = e.state, k = s.knight;
   final known = spellsKnown(k.level).map((x) => x.id).toSet();
   // (A test build: FESTERBUILD=poison|burn|bleed puts that on the blade, a third of a swing.)
@@ -139,7 +186,11 @@ void inTown(GameEngine e, {required bool careless, bool wards = true, bool forge
   // (Fester only for a knight whose blade lays a real affliction: a quarter of a swing a turn.)
   final h = heroStats(k), festers = useFester && (h.burn + h.poison + h.bleed) >= fullSwing(k) * .25;
   final pref = ['chainlightning', if (festers) 'fester' else 'dragonfire', 'lifedrain', 'frostnova', 'spectralcharge', 'bloodbolt', 'arcanebolt'];
-  k.rites = [for (final id in pref) if (known.contains(id)) id].take(riteSlots).toList();
+  final cls = classRitesOf[classOf(k)?.id] ?? const <String>[];
+  k.rites = [
+    for (final id in cls) if (spellById(id) case final sp? when riteKnown(k, sp)) id,
+    for (final id in pref) if (known.contains(id)) id,
+  ].take(riteSlots).toList();
   const plan = [Trait.might, Trait.arcana, Trait.aim, Trait.vigour];
   var i = 0;
   while (unspentPoints(k) > 0) {
@@ -204,7 +255,7 @@ void takeLoot(GameEngine e) {
   final s = e.state, k = s.knight;
   for (final g in List.of(s.pendingLoot)) {
     final old = e.equippedFor(g);
-    final usable = (g.heroClass == null || g.heroClass == k.heroClass) && e.whyNotWear(g) == null;
+    final usable = (g.heroClass == null || g.heroClass == k.heroClass) && e.whyNotWear(g) == null && !buildHolds(k, g.slot);
     final better = g.slot == GearSlot.armour ? armourTierById(g.art).reduction > armourTierById(k.loadout.armour).reduction : old == null || gearWorth(k, g, old) > gearWorth(k, old, old);
     if (usable && better) {
       e.equipLoot(g.id);
@@ -387,6 +438,7 @@ final odds = <String, (int, double, int)>{};
 
 Audit play(int seed, String player, {int maxFights = 2500}) {
   final a = Audit(player, seed);
+  _suitAt = _weaponAt = -99;
   final was = policy;
   if (player == 'careless') policy = 'full';
   final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(seed), clock: () => DateTime(2026, 6, 1));

@@ -497,6 +497,7 @@ class GameState {
     this.hardcore = false,
     this.fallen = false,
     this.doorUsed = false,
+    this.bloodEdge = false,
     this.hcUnlocked = false,
     this.hcRun,
     this.hcBest,
@@ -784,6 +785,10 @@ class GameState {
   /// Hardcore: Death's Door has held you up this fight already (once a fight).
   bool doorUsed;
 
+  /// Blood Edge: your blade's coated in your own blood, and your next attack or bash is charged (it
+  /// stays charged from one fight to the next till you swing it: the price is never wasted).
+  bool bloodEdge;
+
   /// (Your main hero's save.) Hardcore is open (New Game+ beaten); the hardcore hero you have on
   /// the go, as you last left them (name, level, lands); and the best run that ever fell or won.
   bool hcUnlocked;
@@ -935,6 +940,7 @@ class GameState {
     if (hardcore) 'hc': true,
     if (fallen) 'fallen': true,
     if (doorUsed) 'door': true,
+    if (bloodEdge) 'edge': true,
     if (hcUnlocked) 'hcOpen': true,
     if (hcRun != null) 'hcRun': hcRun,
     if (hcBest != null) 'hcBest': hcBest,
@@ -1090,6 +1096,7 @@ class GameState {
       hardcore: j['hc'] == true,
       fallen: j['fallen'] == true,
       doorUsed: j['door'] == true,
+      bloodEdge: j['edge'] == true,
       hcUnlocked: j['hcOpen'] == true,
       hcRun: (j['hcRun'] as Map?)?.cast<String, dynamic>(),
       hcBest: (j['hcBest'] as Map?)?.cast<String, dynamic>(),

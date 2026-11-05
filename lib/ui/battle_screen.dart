@@ -482,6 +482,8 @@ class _BattleScreenState extends State<BattleScreen> {
     // the foe's weak to it, red when it shrugs it off.
     Color edgeColour(double e) => e > 1 ? good : (e < 1 ? bad : Palette.amber);
     final swing = fullSwing(k);
+    // A blade charged with Blood Edge: the next attack or bash adds [bloodEdgeBonus] whole swings.
+    double edgeX(double own) => s.bloodEdge ? 1 + bloodEdgeBonus / own : 1;
     final bash = skillName(k) == 'Shield Bash';
     // A whole questline suit: the attack and the bash are the order's own.
     final art = suitArtFor(k);
@@ -548,6 +550,7 @@ class _BattleScreenState extends State<BattleScreen> {
         SpellKind.summon => '+${sp.summons} ${sp.summons == 1 ? 'ally' : 'allies'}',
         SpellKind.heal => 'Heal ${(sp.mend * 100).round()}%',
         SpellKind.fester => '~${(swing * mult * arcana).round() + c.engine.festerBurst}',
+        SpellKind.bloodedge => '+${(swing * bloodEdgeBonus * mightBoost(k)).round()}',
         _ => '~${(swing * mult * arcana).round()}',
       };
       final lines = <(String, String, Color)>[
@@ -564,6 +567,11 @@ class _BattleScreenState extends State<BattleScreen> {
           SpellKind.sleep => [('💤', 'Sleeps through ${sp.hex} blows', plain), ('👑', 'Bosses wake after 1', soft)],
           SpellKind.ward => [('✨', 'Blocks the next ${sp.wards} hits', plain)],
           SpellKind.reflect => [('🪞', 'Next ${sp.wards} hits: half to you, all back', plain)],
+          SpellKind.bloodedge => [
+              ('🩸', 'Costs ${(sp.selfHurt * 100).round()}% of your health (${(maxHp(k) * sp.selfHurt).round()} HP)', bad),
+              ('🗡️', 'Next attack or Mighty Blow: +~${(swing * bloodEdgeBonus * mightBoost(k)).round()}, and it can\'t miss', good),
+              ('⏳', 'No blow this turn: save it for the moment that counts', soft),
+            ],
           SpellKind.fester => c.engine.festerBurst > 0
               ? [('🦠', 'Its ${switch (c.engine.foeAffliction) {'burn' => 'fire', 'venom' => 'venom', _ => 'bleeding'}} erupts: +${c.engine.festerBurst}', good), ('⏳', '$festerTurns turns of it at once', soft)]
               : [('⚠️', 'Nothing on it yet, so just the blow: lay fire, venom or a wound with your blade first', bad)],
@@ -595,16 +603,17 @@ class _BattleScreenState extends State<BattleScreen> {
           art == null ? const ItemIcon(Item.swords, size: 40) : Icon(Icons.auto_awesome, size: 38, color: Color(art.argb)),
           art == null ? 'Attack' : art.attack,
           _SlotInfo(art?.attack ?? 'Attack', art == null ? const Color(0xFFFF9A7A) : Color(art.argb), [
-            ('⚔️', '~${(swing * bladeEdge * mightBoost(k)).round()} damage', plain),
+            ('⚔️', '~${(swing * bladeEdge * mightBoost(k) * edgeX(1)).round()} damage', plain),
+            if (s.bloodEdge) ('🩸', 'Blood Edge: +${bloodEdgeBonus}x, and it can\'t miss', good),
             if (aloft) ('🦅', 'Out of reach ${pct(aloftMelee)}', bad),
             if (triangle(kind, AttackStyle.blade) != 1) edgeLine(triangle(kind, AttackStyle.blade), 'blades'),
             // (This attack's chance; it climbs each time it doesn't fire, so it comes round about
             // one attack in four.)
             if (special != null) ('⚡', '${special.name}: ${(specialChanceAt(s.specialCharge) * 100).round()}% now, rising · ~1 in ${specialEvery.round()} attacks', soft),
           ]),
-          badge: '~${(swing * bladeEdge * mightBoost(k)).round()}',
-          badgeColour: edgeColour(bladeEdge),
-          glow: bladeEdge > 1,
+          badge: '~${(swing * bladeEdge * mightBoost(k) * edgeX(1)).round()}',
+          badgeColour: s.bloodEdge ? const Color(0xFFFF6A6A) : edgeColour(bladeEdge),
+          glow: bladeEdge > 1 || s.bloodEdge,
           tint: const Color(0xFF5A1A14),
         ),
         slot(
@@ -612,14 +621,15 @@ class _BattleScreenState extends State<BattleScreen> {
           art != null ? Icon(Icons.flare, size: 40, color: Color(art.argb)) : (bash ? const ItemIcon(Item.shield, size: 38) : const Icon(Icons.gavel, size: 38, color: Color(0xFFFFD98A))),
           art?.skill ?? (bash ? 'Bash' : 'Mighty Blow'),
           _SlotInfo(art?.skill ?? (bash ? 'Shield Bash' : 'Mighty Blow'), art == null ? const Color(0xFFFFD98A) : Color(art.argb), [
-            ('⚔️', '~${(swing * bashMult * bladeEdge * mightBoost(k)).round()} damage', plain),
+            ('⚔️', '~${(swing * bashMult * bladeEdge * mightBoost(k) * edgeX(bashMult)).round()} damage', plain),
+            if (s.bloodEdge) ('🩸', 'Blood Edge: +${bloodEdgeBonus}x on top', good),
             ('😵', suitWorn(k) == 'deepforge' ? 'Stuns it, bosses too' : 'Stuns it (bosses 50%)', good),
             if (art != null) ('✨', art.desc, good),
             if (bladeEdge != 1) edgeLine(bladeEdge, 'blades'),
             ('⏳', s.skillWait > 0 ? 'Ready in ${turns(s.skillWait)}' : 'Cooldown ${turns(skillCooldown)}', soft),
           ]),
-          badge: '~${(swing * bashMult * bladeEdge * mightBoost(k)).round()}',
-          badgeColour: edgeColour(bladeEdge),
+          badge: '~${(swing * bashMult * bladeEdge * mightBoost(k) * edgeX(bashMult)).round()}',
+          badgeColour: s.bloodEdge ? const Color(0xFFFF6A6A) : edgeColour(bladeEdge),
           wait: s.skillWait,
           glow: s.skillWait == 0,
           tint: const Color(0xFF5A4318),

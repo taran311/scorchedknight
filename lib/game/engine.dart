@@ -171,6 +171,9 @@ class SwingResult {
   /// Hardcore's Death's Door held you up on 1 HP this turn.
   bool deathsDoor = false;
 
+  /// Blood Edge: charged this turn, or spent on this blow.
+  bool edgeCharged = false, edgeSpent = false;
+
   /// Fester: what the foe's affliction ('burn', 'venom', 'bleed') erupted for.
   int festered = 0;
   String? festerKind;
@@ -2101,6 +2104,7 @@ class GameEngine {
   String? whyNotRite(String id) {
     final k = state.knight, sp = spellById(id);
     if (sp == null || !riteKnown(k, sp)) return sp?.order != null ? 'Wear the whole ${knightClassById(sp!.order)!.name}\'s suit' : 'Prepare a rite first';
+    if (sp.kind == SpellKind.bloodedge && state.bloodEdge) return 'Your blade is already charged';
     final cost = spellCost(k, sp);
     return state.mana >= cost ? null : 'Needs $cost mana';
   }
@@ -2203,6 +2207,10 @@ class GameEngine {
       state.mana = math.min(maxMana, state.mana + 1);
     }
     if (cast?.kind == SpellKind.expose) state.foeExposed = cast!.hex + 1; // takes hold at once
+    // Blood Edge: no blow this turn, only the blood on the blade. The next attack or bash spends it.
+    final charging = cast?.kind == SpellKind.bloodedge;
+    final edged = melee && state.bloodEdge;
+    if (edged) state.bloodEdge = false;
     // A foe that's aloft is hard to reach with a blade and easy pickings for a crossbow.
     final reach = foe.aloft ? (melee ? aloftMelee : (shooting ? aloftShot : 1.0)) : 1.0;
     // The combat triangle: the right way of fighting this kind of foe hits harder.
@@ -2237,13 +2245,14 @@ class GameEngine {
     if (draconic) _note('Draconic blood: you breathe fire with the blow!', EntryKind.damage);
     final ironBolt = shooting && classOf(k)?.id == 'deepforge' ? 1.25 : 1.0;
     final mult = (draconic ? 1.5 : 1.0) * ironBolt * reach * edge * train * song * wolf * updraft * bushido * showman * roared * (adapted ? adaptBoost : 1) * (bash ? bashMult : (shooting ? crossbowShare(k) * aim : (casting && cape == 'starweave' ? 1.3 : 1.0)));
-    final d = striking
-        ? swingDamage(state, _rng.nextDouble(), special: fire, ammo: shot, spell: cast, hitRoll: _rng.nextDouble(), mult: mult, sureCrit: (state.turn == 1 && activeSets(k.setGear).any((e) => e.$1.firstCrit && e.$2 >= e.$1.full)) || (bash && suitWorn(k) == 'bushido'))
-        : const SwingDamage();
+    // (A charged blade adds [bloodEdgeBonus] whole swings to the blow, on top of a bash's own.)
+    final d = striking && !charging
+        ? swingDamage(state, _rng.nextDouble(), special: fire, ammo: shot, spell: cast, hitRoll: _rng.nextDouble(), mult: edged ? mult * (1 + bloodEdgeBonus / (bash ? bashMult : 1)) : mult, sureCrit: (state.turn == 1 && activeSets(k.setGear).any((e) => e.$1.firstCrit && e.$2 >= e.$1.full)) || (bash && suitWorn(k) == 'bushido'))
+        : SwingDamage(spell: charging ? cast : null);
     // Attacks and shots can miss now and then. Specials, rites and the bash always land.
-    final miss = (action == BattleAction.attack || (shooting && aim <= 1)) && fire?.sure != true && _rng.nextDouble() < missChance;
+    final miss = !edged && (action == BattleAction.attack || (shooting && aim <= 1)) && fire?.sure != true && _rng.nextDouble() < missChance;
     // Elves are quick: some attacks and bolts just miss (rites, skills and specials never do).
-    final dodged = !miss && foe.evasive && (action == BattleAction.attack || shooting) && fire?.sure != true && _rng.nextDouble() < evasiveMiss;
+    final dodged = !miss && !edged && foe.evasive && (action == BattleAction.attack || shooting) && fire?.sure != true && _rng.nextDouble() < evasiveMiss;
     final r = SwingResult(action, d, miss || dodged || !striking, k.heroClass, aim: shooting ? aim : 1, edge: reach * edge * _quirk(foe, melee, shooting, casting, cast));
     if (bash) state.skillWait = skillCooldown + 1;
 
@@ -2294,7 +2303,20 @@ class GameEngine {
         _note('You try to flee, but $foeName cuts you off! (Next try: ${(fleeChance(k, foe, state.fleeTries) * 100).round()}%)');
       case BattleAction.pet:
         _command(r);
+      case BattleAction.cast when charging:
+        // Blood Edge: the price, and the blade drinks it.
+        final before = k.hp;
+        k.hp = math.max(1, k.hp - (maxHp(k) * cast!.selfHurt).round());
+        r
+          ..selfHurt = before - k.hp
+          ..edgeCharged = true;
+        state.bloodEdge = true;
+        _note('You draw your blade across your palm and let it drink: −${r.selfHurt} HP. Your next blow can\'t miss.', EntryKind.gold);
       case BattleAction.attack || BattleAction.skill || BattleAction.cast || BattleAction.shoot:
+        if (edged) {
+          r.edgeSpent = true;
+          _note('Your blood-soaked blade comes down with everything in it!', EntryKind.damage);
+        }
         _strike(r, fire, cast, foeName);
         if (bash) _suitArt(r, foe, foeName);
     }
@@ -2310,7 +2332,7 @@ class GameEngine {
       _note('An opening! You get a second blow in for ${r.opening}.', EntryKind.damage);
     }
 
-    if (striking) {
+    if (striking && !charging) {
       // Dual wielding: the off-hand weapon strikes after every blade attack, even if the main blow
       // missed.
       final o = melee ? (offhandStrike(state) * reach).round() : 0;
@@ -2465,7 +2487,7 @@ class GameEngine {
         }
       case 'nightblood':
         final before = k.hp;
-        k.hp = math.min(maxHp(k), k.hp + (r.dealt / 8).round());
+        k.hp = math.min(maxHp(k), k.hp + (r.dealt * bloodRendHeal).round());
         r.artHeal = k.hp - before;
         if (r.artHeal > 0) _note('You drink deep: +${r.artHeal} HP.', EntryKind.good);
       case 'moonfang':
@@ -2696,7 +2718,7 @@ class GameEngine {
           _note('A shimmering mirror rises before you.');
         case SpellKind.fester:
           _fester(r, foeName);
-        case SpellKind.blast || SpellKind.dragon || SpellKind.chain || SpellKind.charge:
+        case SpellKind.blast || SpellKind.dragon || SpellKind.chain || SpellKind.charge || SpellKind.bloodedge:
           break;
       }
     }
@@ -2938,7 +2960,7 @@ class GameEngine {
         ..counter = 0
         ..guard = Guard.dodge;
       _note('$foeName strikes, and finds only a drift of silver leaves where you were.');
-    } else if (roll < dodge + (1 - dodge) * parry) {
+    } else if (roll < math.min(avoidCap, dodge + (1 - dodge) * parry)) {
       // Parry: deflect the blow and strike back.
       _primed = true;
       final hit = riposte(k);
@@ -3079,6 +3101,12 @@ class GameEngine {
     k.coins -= lost;
     r.goldLost = lost;
     k.hp = maxHp(k);
+    // Out of potions: Hob won't send you back out with none. (Broke and dry at a boss you can't
+    // out-grow, each try went worse than the last: a spiral, not a fight.)
+    if (k.potions == 0 && !state.hardcore) {
+      k.potions = 1;
+      _note('Hob presses a potion into your hand on the way out. "On the house. Don\'t make a habit of it."', EntryKind.good);
+    }
     final wild = state.wildFight;
     // Struggling on a land's trail: the town starts suggesting the wilds for better gear.
     final dungeon = state.dungeonFight;

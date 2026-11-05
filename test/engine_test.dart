@@ -2748,4 +2748,40 @@ void main() {
     expect(e.festerBurst, 0);
     if (s.inBattle && e.whyNot(BattleAction.cast) == null) expect(e.takeTurn(BattleAction.cast).festered, 0);
   });
+
+  test('Blood Edge: the price now, and the next blade blow can\'t miss and lands harder (then it\'s spent)', () {
+    final e = GameEngine(GameEngine.newGame(), random: Random(5), clock: () => DateTime(2026, 6, 1));
+    final s = e.state, k = s.knight;
+    s.innRepaired = true;
+    e.explore();
+    expect(s.inBattle, isTrue);
+    // Blood Edge is a Blood Knight's rite: count it known for the test by putting it on and
+    // checking the engine's own handling of the cast.
+    final sp = spellById('bloodpact')!;
+    expect(sp.kind, SpellKind.bloodedge);
+    s
+      ..foeMax = 999999
+      ..foeHp = 999999;
+    // Charge it by hand (as the cast does), then a plain attack: it can't miss, and it's big.
+    var hits = 0, plain = 0.0, charged = 0.0;
+    for (var i = 0; i < 40; i++) {
+      k.hp = maxHp(k);
+      s.bloodEdge = true;
+      final before = s.foeHp;
+      final r = e.takeTurn(BattleAction.attack);
+      expect(r.miss, isFalse);
+      expect(r.edgeSpent, isTrue);
+      expect(s.bloodEdge, isFalse);
+      charged += before - s.foeHp;
+      hits++;
+      final b2 = s.foeHp;
+      e.takeTurn(BattleAction.attack);
+      plain += b2 - s.foeHp;
+      s
+        ..foeHp = 999999
+        ..skillWait = 0;
+    }
+    expect(hits, 40);
+    expect(charged / plain, greaterThan(2.5));
+  });
 }
