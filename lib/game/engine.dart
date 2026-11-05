@@ -4742,8 +4742,9 @@ class GameEngine {
     // (Each says what to do about it: "Not mid-fight" on the card, with a fight left paused from
     // days ago, read as New Game+ simply not working.)
     if (s.inBattle) return 'Finish or flee your fight first (${foeIn(s).name})';
-    if (s.wild != null) return 'Leave the wilds first';
-    if (s.dungeon != null) return 'Leave the dungeon first';
+    // (A dungeon run or a trip into the wilds left open used to block it too, with nothing in town
+    // to say one was open. Starting over closes them anyway: the vault's pieces in your pack still
+    // come along.)
     return null;
   }
 

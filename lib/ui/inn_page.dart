@@ -44,6 +44,7 @@ import 'item_icons.dart';
 import 'journal_panel.dart';
 import 'loot_window.dart';
 import 'arena_page.dart';
+import 'dungeon_page.dart';
 import 'hall_page.dart';
 import 'map_page.dart';
 import 'merchant.dart';
@@ -184,6 +185,10 @@ class _InnPageState extends State<InnPage> with RouteAware {
     await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => MapPage(controller: c)));
   }
 
+  Future<void> _openDungeon() async {
+    await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => DungeonPage(controller: c)));
+  }
+
   Future<void> _openWilds() async {
     await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => WildsPage(controller: c, fromTown: true)));
   }
@@ -209,7 +214,9 @@ class _InnPageState extends State<InnPage> with RouteAware {
       final s = c.state, k = s.knight, hurt = k.hp < maxHp(k);
       final job = c.onHobsJob, ready = c.innReady, offered = c.jobOffered, phone = isPhone(context);
       final labels = {
-                            TownSpot.gate: s.inBattle ? 'Back to the fight' : (s.wild != null ? 'The Wilds' : 'Set out'),
+                            // (A dungeon run left open, from its Map button or a trip home mid-run: the
+                            // way back to it, so it's never forgotten down there.)
+                            TownSpot.gate: s.inBattle ? 'Back to the fight' : (s.wild != null ? 'The Wilds' : (s.dungeon != null ? 'Back to the dungeon' : 'Set out')),
                             TownSpot.stall: s.raid == 'stall' ? 'Mags\' Stall · Raided!' : 'Mags\' Stall',
                             TownSpot.inn: (hurt || !s.day) && c.whyNotRest == null && !job && !offered ? (hurt ? 'Soot & Kettle · Rest' : 'Soot & Kettle · Sleep') : 'Soot & Kettle',
                             TownSpot.tent: unspentPoints(k) > 0 ? 'Your ${homes[s.home].name} · +${unspentPoints(k)}' : 'Your ${homes[s.home].name}',
@@ -240,7 +247,7 @@ class _InnPageState extends State<InnPage> with RouteAware {
         if (c.whyShut('forge') == null && c.engine.upgradesReady > 0) TownSpot.forge: '${c.engine.upgradesReady} upgrade${c.engine.upgradesReady == 1 ? '' : 's'} ready',
       };
       final taps = <TownSpot, VoidCallback?>{
-                            TownSpot.gate: s.inBattle ? _resume : (offered ? _talk : (s.wild != null ? _openWilds : _openMap)),
+                            TownSpot.gate: s.inBattle ? _resume : (offered ? _talk : (s.wild != null ? _openWilds : (s.dungeon != null ? _openDungeon : _openMap))),
                             // (Raided: the stall's button gives chase, as its note says, not Mags' usual chat.)
                             TownSpot.stall: s.inBattle ? () => _shut('Finish your fight first') : (s.raid == 'stall' ? _chase : () => showMerchantWindow(context, c)),
                             TownSpot.inn: () => visitInn(context, c, onHunt: _hunt),

@@ -1156,8 +1156,12 @@ void main() {
       ..bossesDown.addAll({for (var c = 0; c < mainLands; c++) c})
       ..unlocked = mainLands - 1
       ..foesFelled = 300;
+    // A dungeon run left open (its Map button, or home mid-run) doesn't hold it up: it used to,
+    // with nothing in town to say a run was open.
+    s.dungeon = dungeons.first.id;
     expect(e.whyNotNewGamePlus(), isNull);
     expect(e.newGamePlus(), isTrue);
+    expect(e.state.dungeon, isNull);
     final n = e.state, h = n.knight;
     expect(n.ng, 1);
     expect(n.won, isFalse);
