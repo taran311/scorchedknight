@@ -202,7 +202,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   bool _reduceMotion = false;
 
   // animation state
-  final Map<String, double> fx = {'flash': 0, 'kflash': 0, 'alpha': 1, 'enter': 0, 'dying': 0, 'slash': 0, 'fire': 0, 'lunge': 0, 'wyrm': 0, 'bones': 0, 'ward': 0, 'pounce': 0, 'wave': 0, 'grasp': 0, 'charge': 0, 'spectral': 0, 'flee': 0, 'ko': 0, 'dash': 0, 'screen': 0, 'zoom': 0, 'swoop': 0, 'kback': 0, 'gloom': 0, 'reaper': 0, 'reap': 0, 'soul': 0, 'scar': 0, 'wolf': 0, 'deadrun': 0, 'legion': 0, 'demon': 0, 'wolves': 0, 'bats': 0, 'storm': 0, 'die': 0, 'blade': 0, 'ice': 0, 'elder': 0, 'vanish': 0};
+  final Map<String, double> fx = {'flash': 0, 'kflash': 0, 'alpha': 1, 'enter': 0, 'dying': 0, 'slash': 0, 'fire': 0, 'lunge': 0, 'wyrm': 0, 'bones': 0, 'ward': 0, 'pounce': 0, 'wave': 0, 'grasp': 0, 'charge': 0, 'spectral': 0, 'flee': 0, 'ko': 0, 'dash': 0, 'screen': 0, 'zoom': 0, 'swoop': 0, 'kback': 0, 'gloom': 0, 'reaper': 0, 'reap': 0, 'soul': 0, 'scar': 0, 'wolf': 0, 'deadrun': 0, 'legion': 0, 'demon': 0, 'wolves': 0, 'bats': 0, 'storm': 0, 'die': 0, 'blade': 0, 'ice': 0, 'elder': 0, 'vanish': 0, 'sflash': 0};
 
   /// The elder wyrm of Cataclysm is pouring out its fire (jaw dropped).
   bool _elderBreath = false;
@@ -344,7 +344,8 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    // (The effects preview always shows them whole: it's there to look at them.)
+    _reduceMotion = !Uri.base.queryParameters.containsKey('effects') && (MediaQuery.maybeDisableAnimationsOf(context) ?? false);
     _lite = _struggling || MediaQuery.sizeOf(context).width < 600;
   }
 
@@ -411,7 +412,23 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   /// What's on the foe and on you, as the stage shows it: taken from the game between turns, not
   /// mid-swing, so a fire doesn't start burning before the blow that lit it has landed.
   var _st = const _Status();
+
+  /// The colour the foe flashes as an affliction takes hold or bites ([fx]'s 'sflash').
+  Color _sflashCol = const Color(0xFFFF8A2A);
+
+  /// The foe washes over in [col] for a moment: an affliction taking hold ([k] 1), or biting.
+  void _statusFlash(Color col, [double k = 1]) {
+    _sflashCol = col;
+    _tween('sflash', k, 70);
+    _tween('sflash', 0, 650, delay: 90);
+  }
+
+  static const _fireCol = Color(0xFFFF7A1A), _venomCol = Color(0xFF6FE03A), _bloodCol = Color(0xFFE0202A), _iceCol = Color(0xFF9FE4FF);
   bool _stSeeded = false;
+
+  /// Till when a foe that slept or stood frozen through its turn is still shown so (the
+  /// condition itself is spent by then).
+  double _iceUntil = 0, _sleepUntil = 0;
 
   /// Keeps [_st] up with the game while nothing's playing, with a little flourish as a condition
   /// takes hold (the words only for those the blow itself doesn't already announce).
@@ -464,8 +481,9 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     }
 
     emit(st.burn, 16, 'fire', () => onFoe(.05, .7), const Offset(0, -1.7), 650, 6, -.02);
-    emit(st.venom, 5 + 2.0 * math.min(st.stacks, 5), 'venom', () => onFoe(.1, .8), const Offset(0, -.7), 1100, 3.2, -.004);
-    emit(st.bleed, 5, 'blood', () => onFoe(.35, .7), const Offset(0, .4), 900, 2.6, .12);
+    emit(st.venom, 9 + 3.0 * math.min(st.stacks, 5), 'venom', () => onFoe(.1, .85), const Offset(0, -.8), 1200, 4.2, -.004);
+    emit(st.venom, 2 + .6 * math.min(st.stacks, 5), 'miasma', () => onFoe(.2, .7), const Offset(0, -.4), 1500, 9, -.002);
+    emit(st.bleed, 9, 'blood', () => onFoe(.3, .75), const Offset(0, .4), 900, 3.2, .14);
     emit(st.frozen, 6, 'rime', () => onFoe(.1, 1), const Offset(0, -.3), 1000, 2.6, .003);
     emit(st.weak, 4, 'curse', () => onFoe(.6, 1), const Offset(0, .7), 900, 2.8, .01);
     final me = _knightFeet;
@@ -1254,11 +1272,11 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     final houndAt = hitAt + 250, bonesAt = hitAt + (hound ? 800 : 120);
     // Then what the blow left in the wound takes hold (it catches fire, venom gets in), and
     // after everyone's blows, it eats at the foe: one beat each, before the foe answers.
-    final afflictAt = hitAt + 160 * nEffects + 140;
+    final afflictAt = hitAt + 160 * nEffects + 140, afflictLong = _afflictMs(r);
     final ticks = r.burned + r.venomed + r.bled > 0;
-    final tickAt = [if (r.afflicted != null) afflictAt + 460 else hitAt + 160 * nEffects + 140, if (hound) houndAt + 640, if (r.summonHit > 0) bonesAt + swingHitMs + 180].reduce(math.max);
-    final counterAt = [hitAt + 160 * nEffects + 440, if (r.afflicted != null) afflictAt + 520, if (ticks) tickAt + 420, if (dragonFire) hitAt + 760.0, if (hound) houndAt + 820, if (r.summonHit > 0) bonesAt + swingHitMs + 300].reduce(math.max);
-    final end = [950.0, hitAt + 160 * nEffects + 60, if (r.afflicted != null) afflictAt + 560, if (ticks) tickAt + 480, if (dragonFire) hitAt + 580, if (hound) houndAt + 1060, if (r.summonHit > 0) bonesAt + swingHitMs + 420, if (r.counter != null) counterAt + 760, if (r.knockedOut || r.cheatedDeath) counterAt + strikeMs + _reapMs].reduce(math.max);
+    final tickAt = [if (r.afflicted != null) afflictAt + afflictLong + 80 else hitAt + 160 * nEffects + 140, if (hound) houndAt + 640, if (r.summonHit > 0) bonesAt + swingHitMs + 180].reduce(math.max);
+    final counterAt = [hitAt + 160 * nEffects + 440, if (r.afflicted != null) afflictAt + afflictLong + 140, if (ticks) tickAt + 420, if (dragonFire) hitAt + 760.0, if (hound) houndAt + 820, if (r.summonHit > 0) bonesAt + swingHitMs + 300].reduce(math.max);
+    final end = [950.0, hitAt + 160 * nEffects + 60, if (r.afflicted != null) afflictAt + afflictLong + 180, if (ticks) tickAt + 480, if (dragonFire) hitAt + 580, if (hound) houndAt + 1060, if (r.summonHit > 0) bonesAt + swingHitMs + 420, if (r.counter != null) counterAt + 760, if (r.knockedOut || r.cheatedDeath) counterAt + strikeMs + _reapMs].reduce(math.max);
     // Mounted: the day's first strike opens with a charge, played before the blow.
     if (r.chargeHit > 0 && r.mount != null) _playCharge(r);
     // A special attack is a show of its own, about as long again as the blow: a build-up first
@@ -1731,11 +1749,19 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
             c.revealCounter();
             return;
           case Guard.frozen:
-            _spark('rime', _foeChest, 14, speed: 2.5, life: 700, radius: 3.5);
-            _mark('Frozen!', _frost, _foeChest + const Offset(-20, -70));
+            // Frozen solid for its turn: the ice shell closes over it, and it stays a moment.
+            _iceUntil = now + 1500;
+            _statusFlash(_iceCol, 1);
+            _burst(_foeChest, _iceCol, 1.3);
+            _spark('rime', _foeChest, 30, speed: 4, life: 900, radius: 4);
+            _mark('Frozen!', _frost, _foeChest + const Offset(-20, -70), icon: Icons.ac_unit_rounded);
             c.revealCounter();
             return;
           case Guard.asleep:
+            // Asleep through its turn: it sags, the Zs drift up off it a while.
+            _sleepUntil = now + 1500;
+            _statusFlash(const Color(0xFFB8A0E8), .6);
+            _spark('curse', _foeChest + const Offset(0, -60), 14, dir: -math.pi / 2, spread: 1.6, speed: 1.2, life: 1200, radius: 3.5, gravity: -.01);
             _mark('Zzz…', const [Color(0xFFB8A0E8), Color(0xFF4A3A7A)], _foeChest + const Offset(10, -90));
             c.revealCounter();
             return;
@@ -1891,30 +1917,62 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     }
 
     final h = _foeHeight, feet = chest + Offset(0, h * .55);
+    final col = switch (kind) {
+      'burn' => _fireCol,
+      'venom' => _venomCol,
+      _ => _bloodCol,
+    };
+    // The foe flashes the colour, hard when it first takes hold, and a ring bursts off it.
+    _statusFlash(col, r.afflictNew ? 1 : .55);
+    if (r.afflictNew || kind == 'venom') _burst(chest, col, r.afflictNew ? 1.3 : .7 + .1 * math.min(n, 4));
+    // Then a moment to see it take: a second and a half the first time it takes hold, most of a
+    // second when it's renewed, before its first bite and the foe's answer.
+    final long = _afflictMs(r), rnd = math.Random(r.afflictStacks * 7 + kind.length);
+    double side() => (rnd.nextDouble() - .5) * h * .4;
     switch (kind) {
       case 'burn':
-        if (r.afflictNew) {
-          // It goes up: flames from its feet to its head.
-          spark('fire', feet, 16, dir: -math.pi / 2, spread: .9, speed: 4.5, life: 700, radius: 8, gravity: -.05);
-          spark('fire', chest, 10, dir: -math.pi / 2, spread: 2.2, speed: 3, life: 600, radius: 6, gravity: -.04);
-          _mark('Burning', _orange, chest + const Offset(-10, -110), icon: Icons.local_fire_department_rounded);
-          Audio.play(Sfx.castFire);
-        } else {
-          spark('fire', chest, 7, dir: -math.pi / 2, spread: 1.4, speed: 2.6, life: 500, radius: 6, gravity: -.04);
+        _mark(r.afflictNew ? 'Burning' : 'Burning', _orange, chest + const Offset(-10, -110), icon: Icons.local_fire_department_rounded);
+        if (r.afflictNew) Audio.play(Sfx.castFire);
+        // It goes up: tongues of fire climbing it from its feet to its head and down again.
+        for (var i = 0, n = (long / 120).floor(); i < n; i++) {
+          final up = math.sin(i / n * math.pi);
+          _at(i * 120.0, () {
+            final at = feet + Offset(side(), -h * (.05 + .8 * up));
+            spark('fire', at, r.afflictNew ? 9 : 6, dir: -math.pi / 2, spread: 1, speed: 4.5, life: 650, radius: r.afflictNew ? 10 : 8, gravity: -.06);
+            if (i.isEven) spark('ember', at, 3, speed: 4, life: 800, radius: 2.6, gravity: -.03);
+          });
         }
+        _at(long * .5, () => _statusFlash(_fireCol, .7));
       case 'venom':
-        // A splash of venom, bigger the more there is in it.
-        spark('venom', chest, 8 + 3 * math.min(n, 5), speed: 2.6 + .3 * math.min(n, 5), life: 700, radius: 3.5, gravity: .02);
+        // Venom splashes in, then bubbles up out of it all over, more the more there is.
         _mark(r.afflictNew ? 'Poisoned' : 'Poison ×$n', _green, chest + const Offset(10, -110), icon: Icons.science_rounded);
+        spark('venom', chest, 16 + 4 * math.min(n, 5), speed: 3.5 + .4 * math.min(n, 5), life: 800, radius: 4.5, gravity: .05);
+        for (var i = 1, m = (long / 150).floor(); i < m; i++) {
+          _at(i * 150.0, () {
+            spark('venom', chest + Offset(side(), side() * 1.4), 4 + math.min(n, 4), dir: -math.pi / 2, spread: 1.4, speed: 2, life: 900, radius: 4, gravity: -.02);
+            if (i % 3 == 0) spark('miasma', chest + Offset(side(), 0), 2, speed: 1, life: 1100, radius: 10, gravity: -.01);
+          });
+        }
+        _at(long * .5, () {
+          _statusFlash(_venomCol, .7);
+          _burst(chest, _venomCol, .6 + .1 * math.min(n, 4));
+        });
       case 'bleed':
-        if (r.afflictNew) {
-          if (!_reduceMotion) _spill(chest, .8);
-          _mark('Bleeding', _red, chest + const Offset(0, -110), icon: Icons.water_drop_rounded);
-        } else if (!_reduceMotion) {
-          _spill(chest, .35);
+        // A wound opens and spurts, again and again, and drips.
+        _mark('Bleeding', _red, chest + const Offset(0, -110), icon: Icons.water_drop_rounded);
+        for (var i = 0, m = r.afflictNew ? 4 : 2; i < m; i++) {
+          _at(i * long / m, () {
+            if (_reduceMotion) return;
+            _spill(chest + Offset(side() * .5, side() * .5), i == 0 ? 1.1 : .6);
+            spark('blood', chest, 10, dir: -.5 + rnd.nextDouble() * .3, spread: 1.2, speed: 6, life: 600, radius: 3.5, gravity: .3);
+            if (i > 0) _statusFlash(_bloodCol, .55);
+          });
         }
     }
   }
+
+  /// How long the stage dwells on an affliction taking hold (see _playAfflict): ms.
+  static double _afflictMs(SwingResult r) => r.afflicted == null ? 0 : (r.afflictNew ? 1500 : 900);
 
   void _playLingering(SwingResult r, double at) {
     final total = r.burned + r.venomed + r.bled;
@@ -1932,13 +1990,22 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
           'venom' => Icons.science_rounded,
           _ => Icons.water_drop_rounded,
         });
+        // Each bite flashes the foe its colour too, so you see what's eating it as it does.
         switch (kind) {
           case 'fire':
-            _spark('fire', _foeChest + const Offset(0, -20), 6, dir: -math.pi / 2, spread: 1, speed: 2, life: 500, radius: 6, gravity: -.02);
+            _statusFlash(_fireCol, .6);
+            if (!_reduceMotion) {
+              _spark('fire', _foeChest + Offset(0, _foeHeight * .3), 14, dir: -math.pi / 2, spread: 1.2, speed: 4, life: 650, radius: 9, gravity: -.05);
+            }
           case 'venom':
-            _spark('venom', _foeChest, 8, speed: 1.6, life: 600, radius: 3, gravity: -.01);
+            _statusFlash(_venomCol, .55);
+            if (!_reduceMotion) {
+              _spark('venom', _foeChest, 14, speed: 2.4, life: 700, radius: 4, gravity: -.01);
+              _burst(_foeChest, _venomCol, .55);
+            }
           default:
-            _spill(_foeChest + const Offset(-10, 0), .6);
+            _statusFlash(_bloodCol, .5);
+            if (!_reduceMotion) _spill(_foeChest + const Offset(-10, 0), .9);
         }
         c.revealDamage(n);
       });
@@ -2427,6 +2494,23 @@ class _ScenePainter extends CustomPainter {
     final h = s._foeHeight, w = h * .5;
     final flicker = still ? .5 : .5 + .5 * math.sin(t / 90) * math.sin(t / 37);
     if (st.burn) {
+      // Tongues of fire licking up it: a ring at its feet and a few up its body, each flickering
+      // to its own beat (flat shapes, two each: no blurs).
+      final outer = Paint()..color = const Color(0xFFFF5A12).withValues(alpha: .62), inner = Paint()..color = const Color(0xFFFFD27A).withValues(alpha: .7);
+      for (var i = 0; i < 7; i++) {
+        final up = i < 4 ? 0.0 : h * (.28 + .16 * (i - 4));
+        final bx = x + (i < 4 ? (i - 1.5) * w * .32 : (i.isEven ? -1 : 1) * w * .26), by = y - up - 2;
+        final beat = still ? .5 : .5 + .5 * math.sin(t / (70 + i * 9) + i * 1.9);
+        final ht = (i < 4 ? h * .3 : h * .2) * (.6 + .55 * beat), fw = (i < 4 ? w * .17 : w * .12) * (.85 + .3 * beat);
+        final sway = still ? 0.0 : math.sin(t / 110 + i) * fw * .5;
+        Path tongue(double k) => Path()
+          ..moveTo(bx - fw * k, by)
+          ..quadraticBezierTo(bx - fw * k * 1.05, by - ht * k * .55, bx + sway * k, by - ht * k)
+          ..quadraticBezierTo(bx + fw * k * 1.05, by - ht * k * .55, bx + fw * k, by)
+          ..close();
+        canvas.drawPath(tongue(1), outer);
+        canvas.drawPath(tongue(.55), inner);
+      }
       canvas.drawOval(Rect.fromCenter(center: Offset(x, y - 4), width: w * 1.5, height: 26), Paint()..color = Color.fromRGBO(255, 120, 30, .18 + .12 * flicker));
       canvas.drawOval(Rect.fromCenter(center: Offset(x, y - 4), width: w * .9, height: 14), Paint()..color = Color.fromRGBO(255, 200, 90, .16 + .1 * flicker));
     }
@@ -2436,7 +2520,7 @@ class _ScenePainter extends CustomPainter {
         canvas.drawArc(ring, spin + i * 2.094, 1.2, false, strokePaint(const Color(0xFF8AD4F0).withValues(alpha: .55), 2.4)..strokeCap = StrokeCap.round);
       }
     }
-    if (st.frozen) {
+    if (st.frozen || t < s._iceUntil) {
       // A shell of ice over the body, a glint running up it, and crystals at its feet.
       final body = Rect.fromCenter(center: Offset(x, y - h * .48), width: w * 1.25, height: h * 1.0);
       final shell = RRect.fromRectAndRadius(body, Radius.circular(w * .35));
@@ -2460,13 +2544,13 @@ class _ScenePainter extends CustomPainter {
         canvas.drawLine(at + d * (14 + 4 * pulse), at + d * (30 + 4 * pulse), p);
       }
     }
-    if (st.asleep) {
+    if (st.asleep || t < s._sleepUntil) {
       // Zs drifting up off its head, each growing and fading as it goes.
       final head = Offset(x + w * .3, y - h * 1.02);
       // (Drawn as strokes, not text: a fading letter needs a layer each, every frame.)
       for (var i = 0; i < 3; i++) {
         final ph = still ? i / 3 : (t / 1500 + i / 3) % 1;
-        final a = math.sin(ph * math.pi), r = 5 + ph * 6;
+        final a = math.sin(ph * math.pi), r = 7 + ph * 9;
         final c = Offset(head.dx + ph * 34 + math.sin(ph * 6) * 6, head.dy - ph * 70);
         final zig = Path()
           ..moveTo(c.dx - r, c.dy - r)
@@ -2867,7 +2951,21 @@ class _ScenePainter extends CustomPainter {
               : const [.94, 0, 0, 0, 10, 0, .78, 0, 0, 0, 0, 0, .78, 0, 0, 0, 0, 0, 1, 0]);
     // Its flash when struck (or its darker hue, or your own shadow's), and its fade: on its run.
     final humanoidFoe = !(s._isBeast || s._isKraken || s._isHound || s._isDragon);
-    final foeTint = fx['flash']! > .02 ? flashFilter(fx['flash']!) : (humanoidFoe && s._isYou ? _BattleStageState._shadowYou : dread);
+    // What's on it shows on the figure itself: frozen, it's washed ice-blue; burning, it glows
+    // and flickers orange; poisoned, a sickly green. As one takes hold or bites, it flashes the
+    // colour hard for a moment.
+    final st = s._st, sf = fx['sflash']!;
+    final flick = still ? .5 : .5 + .5 * math.sin(t / 70) * math.sin(t / 23);
+    final iced = st.frozen || t < s._iceUntil;
+    final Color? heldCol = iced ? _BattleStageState._iceCol : (st.burn ? _BattleStageState._fireCol : (st.venom ? _BattleStageState._venomCol : (st.bleed ? _BattleStageState._bloodCol : null)));
+    final double held = iced ? .5 : (st.burn ? .2 + .12 * flick : (st.venom ? .26 + .06 * flick : (st.bleed ? .16 : 0)));
+    final foeTint = fx['flash']! > .02
+        ? flashFilter(fx['flash']!)
+        : sf > .02
+        ? tintToward(s._sflashCol, .75 * sf + held * (1 - sf))
+        : heldCol != null && fx['dying']! < .05
+        ? tintToward(heldCol, held)
+        : (humanoidFoe && s._isYou ? _BattleStageState._shadowYou : dread);
     runAs(tint: foeTint, alpha: fx['alpha']! * (humanoidFoe && s._foeLook.ghostly ? .74 : 1), bounds: foeArea);
     final ownTint = inline(foeTint), ownAlpha = inlineAlpha(fx['alpha']!);
     canvas.save();

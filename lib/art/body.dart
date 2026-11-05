@@ -34,6 +34,13 @@ ColorFilter flashFilter(double k) {
   return ColorFilter.matrix([m, 0, 0, 0, add, 0, m, 0, 0, add, 0, 0, m, 0, add, 0, 0, 0, 1, 0]);
 }
 
+/// Washes a figure toward [c] by [k] (0 none, 1 nearly flat colour), keeping some of its shading:
+/// a foe burning, poisoned, bleeding or frozen.
+ColorFilter tintToward(Color c, double k) {
+  final keep = 1 - .7 * k, r = c.r * 255 * .7 * k, g = c.g * 255 * .7 * k, b = c.b * 255 * .7 * k;
+  return ColorFilter.matrix([keep, 0, 0, 0, r, 0, keep, 0, 0, g, 0, 0, keep, 0, b, 0, 0, 0, 1, 0]);
+}
+
 /// Pushes toward red; used when the knight takes damage.
 ColorFilter hurtFilter(double k) {
   return ColorFilter.matrix([1 + k * .6, 0, 0, 0, k * 60, 0, 1 - k * .35, 0, 0, 0, 0, 0, 1 - k * .45, 0, 0, 0, 0, 0, 1, 0]);
