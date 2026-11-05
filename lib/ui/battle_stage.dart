@@ -246,6 +246,9 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   final List<_Mark> _drops = [];
   final List<_Projectile> _shots = [];
   List<Keyframe>? _knightClip, _foeClip;
+
+  /// Dual wielding: when the off hand's strike began (the move holds while it plays), or null.
+  double? _offAt;
   double _knightClipStart = 0, _foeClipStart = 0;
   double _queueFree = 0;
   late final List<_Particle> _motes;
@@ -720,9 +723,10 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         _banner = null;
         _arrival = null;
         _beam = null;
-        _trail = null;
+        _trail = _trail2 = null;
         _bursts.clear();
         _knightClip = _foeClip = null;
+        _offAt = null;
         _queueFree = 0;
         fx.updateAll((k, v) => k == 'alpha' ? 1 : 0);
     }
@@ -1051,6 +1055,44 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         if (r.drained > 0) _at(d0 + hit + 500, () => _heal(r.drained, const Offset(_knightX + 10, _groundY - 270)));
       case SpellKind.blast:
         _at(d0 + hit, () => _spark(spell.element == Stat.burn ? 'fire' : 'bolt', _foeChest, 18, speed: 5.5, life: 500, radius: 4));
+      case SpellKind.fester:
+        // Whatever is eating at the foe erupts: it flashes hard in that colour, the fire, venom or
+        // blood bursts up out of it, and the whole eruption lands as one big number in its colour.
+        final kind = r.festerKind;
+        if (kind == null) break;
+        final col = switch (kind) {
+          'burn' => _fireCol,
+          'venom' => _venomCol,
+          _ => _bloodCol,
+        };
+        final mark = switch (kind) {
+          'burn' => _orange,
+          'venom' => _green,
+          _ => _red,
+        };
+        _at(d0 + hit + 140, () {
+          _statusFlash(col, 1);
+          _burst(_foeChest, col, 1.4);
+          _punch(.5);
+          final up = _foeChest + Offset(0, _foeHeight * .2);
+          switch (kind) {
+            case 'burn':
+              _spark('fire', up, 28, dir: -math.pi / 2, spread: 1.6, speed: 6, life: 800, radius: 11, gravity: -.06);
+            case 'venom':
+              _spark('venom', up, 26, dir: -math.pi / 2, spread: 2, speed: 5, life: 900, radius: 5, gravity: .05);
+              _spark('miasma', up, 10, dir: -math.pi / 2, spread: 1.4, speed: 1.6, life: 1100, radius: 14, gravity: -.02);
+            default:
+              _spark('blood', up, 24, dir: -math.pi / 2, spread: 2.2, speed: 6, life: 700, radius: 4.5, gravity: .25);
+          }
+          if (r.festered > 0) {
+            _mark('${r.festered}', mark, _foeChest + const Offset(-120, -30), icon: switch (kind) {
+              'burn' => Icons.local_fire_department_rounded,
+              'venom' => Icons.science_rounded,
+              _ => Icons.water_drop_rounded,
+            });
+            c.revealDamage(r.festered);
+          }
+        });
       case SpellKind.warcry:
         // A roar: a ring of breath and grit bursting out from you, and the words over your head.
         _at(d0 + castReleaseMs, () {
@@ -1117,6 +1159,9 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   /// (see [ClassMove.stroke]).
   (double, Color, bool, bool, String)? _trail;
 
+  /// The off-hand blade's stroke, alongside the main one's (it starts before that one has faded).
+  (double, Color, bool, bool, String)? _trail2;
+
   /// How the knight is crossing to the foe for this blow (a class's own way, or a plain run).
   DashStyle _dashStyle = DashStyle.run;
 
@@ -1148,10 +1193,11 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   Offset get _knightFeet => Offset(_knightX + fx['dash']! * _dashReach, _groundY);
 
   /// Crosses to the foe a class's own way for [move], to [reach], and back once its hold is done.
-  void _classDash(ClassMove move, double reach) {
+  void _classDash(ClassMove move, double reach, {double hold = 0}) {
     _dashStyle = move.dash;
-    // Home again once the blow's hold is over (the clip's last pose but one).
-    final back = move.clip[move.clip.length - 2].ms - 20;
+    // Home again once the blow's hold is over (the clip's last pose but one), and the off hand's
+    // strike if there is one.
+    final back = move.clip[move.clip.length - 2].ms - 20 + hold;
     void dust(double delay, double size) => _at(delay, () => _spark('smoke', _knightFeet + const Offset(-10, -4), (6 * size).round(), dir: -math.pi / 2, spread: 2.6, speed: 2.5 * size, life: 520, radius: 7 * size, gravity: .02));
     switch (move.dash) {
       case DashStyle.blink:
@@ -1273,14 +1319,17 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     // Everyone takes their turn at it in order: your blow, then the hound's bite, then the
     // summoned dead. The foe answers once the last of them has landed.
     final hound = r.pet != null && r.pet!.$1 != Pet.fairy;
-    final houndAt = hitAt + 250, bonesAt = hitAt + (hound ? 800 : 120);
+    // Two blades: everything after the blow waits for the off hand's strike too.
+    // (And for the walk home it adds, so the foe doesn't answer your back.)
+    final struck = hitAt + (mode == HeroClass.knight && r.offhandHit > 0 ? offAt + 110 : 0);
+    final houndAt = struck + 250, bonesAt = struck + (hound ? 800 : 120);
     // Then what the blow left in the wound takes hold (it catches fire, venom gets in), and
     // after everyone's blows, it eats at the foe: one beat each, before the foe answers.
-    final afflictAt = hitAt + 160 * nEffects + 140, afflictLong = _afflictMs(r);
+    final afflictAt = struck + 160 * nEffects + 140, afflictLong = _afflictMs(r);
     final ticks = r.burned + r.venomed + r.bled > 0;
-    final tickAt = [if (r.afflicted != null) afflictAt + afflictLong + 80 else hitAt + 160 * nEffects + 140, if (hound) houndAt + 640, if (r.summonHit > 0) bonesAt + swingHitMs + 180].reduce(math.max);
-    final counterAt = [hitAt + 160 * nEffects + 440, if (r.afflicted != null) afflictAt + afflictLong + 140, if (ticks) tickAt + 420, if (dragonFire) hitAt + 760.0, if (hound) houndAt + 820, if (r.summonHit > 0) bonesAt + swingHitMs + 300].reduce(math.max);
-    final end = [950.0, hitAt + 160 * nEffects + 60, if (r.afflicted != null) afflictAt + afflictLong + 180, if (ticks) tickAt + 480, if (dragonFire) hitAt + 580, if (hound) houndAt + 1060, if (r.summonHit > 0) bonesAt + swingHitMs + 420, if (r.counter != null) counterAt + 760, if (r.knockedOut || r.cheatedDeath) counterAt + strikeMs + _reapMs].reduce(math.max);
+    final tickAt = [if (r.festered > 0) hitAt + 760, if (r.afflicted != null) afflictAt + afflictLong + 80 else struck + 160 * nEffects + 140, if (hound) houndAt + 640, if (r.summonHit > 0) bonesAt + swingHitMs + 180].reduce(math.max);
+    final counterAt = [struck + 160 * nEffects + 440, if (r.festered > 0) hitAt + 1000, if (r.afflicted != null) afflictAt + afflictLong + 140, if (ticks) tickAt + 420, if (dragonFire) hitAt + 760.0, if (hound) houndAt + 820, if (r.summonHit > 0) bonesAt + swingHitMs + 300].reduce(math.max);
+    final end = [950.0, struck + 160 * nEffects + 60, if (r.festered > 0) hitAt + 1100, if (r.afflicted != null) afflictAt + afflictLong + 180, if (ticks) tickAt + 480, if (dragonFire) hitAt + 580, if (hound) houndAt + 1060, if (r.summonHit > 0) bonesAt + swingHitMs + 420, if (r.counter != null) counterAt + 760, if (r.knockedOut || r.cheatedDeath) counterAt + strikeMs + _reapMs].reduce(math.max);
     // Mounted: the day's first strike opens with a charge, played before the blow.
     if (r.chargeHit > 0 && r.mount != null) _playCharge(r);
     // A special attack is a show of its own, about as long again as the blow: a build-up first
@@ -1326,9 +1375,20 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     if (sp != null) _playSpecial(sp, mode, d0);
     if (r.damage.spell != null) _playSpell(r, d0);
     if (r.offhandHit > 0) {
-      // Dual wielding: the off-hand weapon follows the main blow.
-      _at(d0 + hitAt + 170, () {
+      // Dual wielding: the off-hand weapon follows the main blow with a second stroke of its own
+      // (its own swing and smear, so you see two strikes), a clear beat after the first.
+      final off = mode == HeroClass.knight ? offAt : 170.0;
+      if (mode == HeroClass.knight) {
+        // A clear second beat: the off hand winds up and cuts after the first blow has landed.
+        _at(d0 + hitAt + 60, () => _offAt = now);
+        _at(d0 + hitAt + off - 110, () {
+          _trail2 = (now, const Color(0xFFD8E0EA), false, false, 'back');
+          Audio.play(Sfx.swing, power: .9);
+        });
+      }
+      _at(d0 + hitAt + off, () {
         _spark('spark', _foeChest + const Offset(-34, 18), 8, dir: 0, spread: 2, speed: 4, life: 320, radius: 3.5);
+        if (mode == HeroClass.knight) _punch(.35);
         _mark('${r.offhandHit}', const [Color(0xFFE8E2D0), Color(0xFF5A5448)], _foeChest + const Offset(-20, 44));
         c.revealDamage(r.offhandHit);
       });
@@ -1364,9 +1424,10 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
           if (move == null) {
             _dashStyle = DashStyle.run;
             _tween('dash', reach, swingHitMs - 60, ease: easeInOut);
-            _tween('dash', 0, 380, delay: swingHitMs + 100, ease: easeInOut);
+            // (Two blades: you stay in for the second stroke before you step back.)
+            _tween('dash', 0, 380, delay: swingHitMs + 100 + (r.offhandHit > 0 ? offhandHold : 0), ease: easeInOut);
           } else {
-            _classDash(move, reach);
+            _classDash(move, reach, hold: r.offhandHit > 0 ? offhandHold : 0);
           }
         });
         if (bash) {
@@ -2392,11 +2453,25 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   Pose _sample(Pose base, List<Keyframe>? clip, double start, void Function() clear, {String track = 'k'}) {
     var pose = base;
     if (clip != null) {
-      final p = sampleClip(base, clip, now - start);
+      var ms = now - start;
+      double? off;
+      // Two blades: the move holds where it was as the off hand's strike begins, the off arm cuts
+      // over it, and then the move goes on where it left off.
+      if (track == 'k' && _offAt != null && _offAt! >= start && ms >= _offAt! - start) {
+        final w = now - _offAt!;
+        if (w < offhandMs) {
+          off = w;
+          ms = _offAt! - start;
+        } else {
+          ms -= offhandMs;
+        }
+      }
+      final p = sampleClip(base, clip, ms);
       if (p == null) {
         clear();
+        if (track == 'k') _offAt = null;
       } else {
-        pose = p;
+        pose = off == null ? p : (sampleClip(p, offhandClip, off) ?? p);
       }
     }
     // A new move (or the end of one) never snaps: blend from wherever the figure was over 140 ms.
@@ -3274,15 +3349,26 @@ class _ScenePainter extends CustomPainter {
 
     // The blade's stroke: a bright crescent smear that sweeps through the foe and fades, wider and
     // whiter on a crit, a broad shockwave on a bash.
-    final trail = s._trail;
+    for (final second in const [false, true]) {
+    final trail = second ? s._trail2 : s._trail;
     if (trail != null) {
       final (start, col, bash, crit, kind) = trail;
       final age = (t - start) / (bash ? 420 : classStrokeMs(kind));
       if (age > 1) {
-        s._trail = null;
+        if (second) {
+          s._trail2 = null;
+        } else {
+          s._trail = null;
+        }
       } else if (age >= 0) {
         final centre = s._foeChest + const Offset(-110, 10);
-        if (kind != 'arc') {
+        // The off-hand's stroke: the same smear, mirrored, rising from below.
+        final back = kind == 'back';
+        if (back) {
+          canvas.save();
+          canvas.translate(28, -26);
+        }
+        if (kind != 'arc' && !back) {
           drawClassStroke(canvas, kind, age, s._foeChest, col, crit);
         } else if (bash) {
           final r = 30 + 120 * Curves.easeOut.transform(age), a = (1 - age);
@@ -3313,7 +3399,9 @@ class _ScenePainter extends CustomPainter {
             canvas.drawLine(centre + Offset(math.cos(ang), math.sin(ang)) * r0, centre + Offset(math.cos(ang + .3), math.sin(ang + .3)) * (r0 - 4), strokePaint(col.withValues(alpha: .5 * fade), 1.4));
           }
         }
+        if (back) canvas.restore();
       }
+    }
     }
 
     _statusLooks(canvas, t, fx0, fy, still);
@@ -3988,6 +4076,12 @@ Pose inClassStance(Pose idle, Map<J, double> stance) {
 }
 
 /// How long a class's stroke lingers, in milliseconds.
+/// Dual wielding: when the off hand's blade lands, after the main blow's.
+const offAt = 60 + offhandHitMs;
+
+/// Dual wielding: how much later the move (and the walk home) goes on, for the off hand's strike.
+const offhandHold = offhandMs;
+
 double classStrokeMs(String kind) => switch (kind) {
   'cross' => 440,
   'anvil' => 460,

@@ -114,6 +114,18 @@ const swingClip = <Keyframe>[
   Keyframe(780, {}),
 ];
 
+/// Dual wielding: after the main blow lands, the move holds in its follow-through while the off
+/// arm alone winds up over the head and cuts down (laid over whatever move it is, a class's own
+/// included), then lets go back to the move. Its blade lands [offhandHitMs] in; it all takes
+/// [offhandMs], and the move carries on that much later.
+const offhandClip = <Keyframe>[
+  Keyframe(120, {J.fS: 140, J.fE: 40}),
+  Keyframe(offhandHitMs, {J.fS: 24, J.fE: 0}, easeIn),
+  Keyframe(270, {J.fS: 22, J.fE: 4}),
+  Keyframe(offhandMs, {}),
+];
+const offhandHitMs = 210.0, offhandMs = 330.0;
+
 /// How long any blow takes to land, yours or a foe's, so the two sides fight at the same pace.
 const strikeMs = 320.0;
 const swingHitMs = strikeMs;

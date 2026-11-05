@@ -171,6 +171,10 @@ class SwingResult {
   /// Hardcore's Death's Door held you up on 1 HP this turn.
   bool deathsDoor = false;
 
+  /// Fester: what the foe's affliction ('burn', 'venom', 'bleed') erupted for.
+  int festered = 0;
+  String? festerKind;
+
   /// The Bloodmoon Pelt: the wolf came out this turn, or went back in.
   bool wolfed = false, wolfEnded = false;
 
@@ -2553,6 +2557,41 @@ class GameEngine {
     if (sp.expose > 0) state.foeExposed = math.max(state.foeExposed, sp.expose + 1);
   }
 
+  /// What Fester would bring on now: [festerTurns] turns of the foe's affliction as it stands (0 if
+  /// nothing's eating at it).
+  int get festerBurst {
+    final k = state.knight, foe = foeIn(state);
+    final tick = switch (foeAffliction) {
+      'burn' => state.foeBurn,
+      'venom' => (state.foeVenom * venomTick(k.level) * (foe.ent ? .5 : 1)).round() + state.foeToxin,
+      'bleed' => state.foeBleed,
+      _ => 0,
+    };
+    return tick * festerTurns;
+  }
+
+  /// Fester: the foe's affliction erupts, [festerTurns] turns of it at once (venom as it stands now),
+  /// and fire or a bleed is kept going as long again. Nothing in it: nothing happens but the blow.
+  void _fester(SwingResult r, String foeName) {
+    final kind = foeAffliction;
+    if (kind == null) {
+      _note('There\'s nothing in $foeName to fester.');
+      return;
+    }
+    final hit = math.min(math.max(0, state.foeHp - 1), festerBurst);
+    state.foeHp -= hit;
+    if (kind == 'burn') state.foeBurnTurns = math.max(state.foeBurnTurns, burnTurns);
+    if (kind == 'bleed') state.foeBleedTurns = math.max(state.foeBleedTurns, bleedTurns);
+    r
+      ..festered = hit
+      ..festerKind = kind;
+    _note(switch (kind) {
+      'burn' => 'The fire in $foeName roars up: $hit!',
+      'venom' => 'The venom in $foeName boils over: $hit!',
+      _ => 'Every wound in $foeName tears open: $hit!',
+    }, EntryKind.damage);
+  }
+
   /// Fire and venom eat at the foe every turn while they last (ents shrug off half the venom).
   void _burnAndVenom(SwingResult r, FoeType foe, String foeName) {
     if (!state.inBattle || state.foeHp <= 0) return;
@@ -2655,6 +2694,8 @@ class GameEngine {
         case SpellKind.reflect:
           state.mirror = cast.wards;
           _note('A shimmering mirror rises before you.');
+        case SpellKind.fester:
+          _fester(r, foeName);
         case SpellKind.blast || SpellKind.dragon || SpellKind.chain || SpellKind.charge:
           break;
       }

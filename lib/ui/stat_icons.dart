@@ -277,4 +277,5 @@ IconData riteIcon(Spell sp) => switch (sp.kind) {
   SpellKind.reflect => Icons.flip,
   SpellKind.sleep => Icons.bedtime,
   SpellKind.warcry => Icons.campaign,
+  SpellKind.fester => Icons.coronavirus_rounded,
 };

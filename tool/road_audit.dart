@@ -18,6 +18,7 @@
 // Run: dart --packages=.dart_tool/package_config.json run tool/road_audit.dart [runs] [player]
 
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:scorchedknight/game/brews.dart';
@@ -56,6 +57,10 @@ class Audit {
 /// 'smart' reads the foe's card and picks the hardest-landing move; 'full' the old fixed order
 /// (weakness, bash, any rite, companion, bolt); 'melee' only the two attacks (and potions).
 var policy = 'smart';
+
+/// Whether the audit's knight takes Fester onto the hotbar (and what it was worth when it could).
+var useFester = Platform.environment['FESTER'] == '1';
+final festerSeen = <double>[];
 
 /// The odds a hardcore player wants before taking a boss on.
 var hcOdds = .9;
@@ -107,7 +112,8 @@ BattleAction smart(GameEngine e) {
   for (final id in k.rites) {
     final sp = spellById(id);
     if (sp == null || e.whyNotRite(id) != null) continue;
-    final dmg = styleEdgeOn(f, AttackStyle.rite) * sp.mult * arcanaBoost(k) / might + (sp.element == null ? 0 : .3);
+    final dmg = styleEdgeOn(f, AttackStyle.rite) * sp.mult * arcanaBoost(k) / might + (sp.element == null ? 0 : .3) + (sp.kind == SpellKind.fester ? e.festerBurst / max(1, fullSwing(k)) : 0);
+    if (sp.kind == SpellKind.fester) festerSeen.add(e.festerBurst / max(1, fullSwing(k)));
     if (sp.mult > 0 && dmg > score) {
       best = BattleAction.cast;
       score = dmg;
@@ -122,7 +128,17 @@ BattleAction smart(GameEngine e) {
 void inTown(GameEngine e, {required bool careless, bool wards = true, bool forge = true, bool armour = true}) {
   final s = e.state, k = s.knight;
   final known = spellsKnown(k.level).map((x) => x.id).toSet();
-  const pref = ['chainlightning', 'dragonfire', 'lifedrain', 'frostnova', 'spectralcharge', 'bloodbolt', 'arcanebolt'];
+  // (A test build: FESTERBUILD=poison|burn|bleed puts that on the blade, a third of a swing.)
+  final fb = Platform.environment['FESTERBUILD'];
+  if (fb != null && k.loadout.weapon != null) {
+    final w = k.loadout.weapon!, st = Stat.values.byName(fb);
+    w.stats.removeWhere((x, _) => x == Stat.poison || x == Stat.burn || x == Stat.bleed);
+    w.stats[st] = 0;
+    w.stats[st] = (fullSwing(k) * .33).round();
+  }
+  // (Fester only for a knight whose blade lays a real affliction: a quarter of a swing a turn.)
+  final h = heroStats(k), festers = useFester && (h.burn + h.poison + h.bleed) >= fullSwing(k) * .25;
+  final pref = ['chainlightning', if (festers) 'fester' else 'dragonfire', 'lifedrain', 'frostnova', 'spectralcharge', 'bloodbolt', 'arcanebolt'];
   k.rites = [for (final id in pref) if (known.contains(id)) id].take(riteSlots).toList();
   const plan = [Trait.might, Trait.arcana, Trait.aim, Trait.vigour];
   var i = 0;
@@ -207,6 +223,8 @@ void takeLoot(GameEngine e) {
 /// Called after every fight: (engine, foe type, turns, share of max HP lost, knocked out).
 void Function(GameEngine e, FoeType f, int turns, double lost, bool ko)? onFight;
 
+var _dumped = 0;
+
 bool fight(GameEngine e, Random rng, Audit a) {
   final s = e.state;
   final f0 = s.inBattle ? encounterType(s.foe, s.rare) : null, hp0 = s.knight.hp / maxHp(s.knight);
@@ -221,6 +239,11 @@ bool fight(GameEngine e, Random rng, Audit a) {
   if (f0 != null) onFight?.call(e, f0, turns, hp0 - s.knight.hp / maxHp(s.knight), ko);
   a.fights++;
   if (ko) a.knockouts++;
+  if (ko && Platform.environment['DEBUGKO'] == '1' && (f0?.name.startsWith('Vharrax') ?? false) && _dumped++ < 1) {
+    for (final j in s.journal.reversed.take(40).toList().reversed) {
+      print('    | ${j.text}');
+    }
+  }
   if (s.encounter != null) e.resolveEncounter(rng.nextInt(2));
   takeLoot(e);
   return ko;
@@ -522,6 +545,10 @@ void main(List<String> args) {
       final (n, sum, lv) = e.value;
       print('  ${(sum / n * 100).round().toString().padLeft(3)}%  L${(lv / n).toStringAsFixed(0).padLeft(2)}  ${e.key}');
     }
+  }
+  if (festerSeen.isNotEmpty) {
+    final worth = festerSeen.where((x) => x > 0).toList()..sort();
+    print('== Fester: ready ${festerSeen.length}× · something to burst ${worth.length}× · burst in swings: median ${worth.isEmpty ? 0 : worth[worth.length ~/ 2].toStringAsFixed(2)}, top 10% ${worth.isEmpty ? 0 : worth[worth.length * 9 ~/ 10].toStringAsFixed(2)} ==');
   }
   print('== Problems, all games (how many games each turned up in) ==');
   final keys = tally.keys.toList()..sort((a, b) => tally[b]! - tally[a]!);

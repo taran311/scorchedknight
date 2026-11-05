@@ -11,7 +11,7 @@ import 'package:flutter/material.dart';
 import '../game/classes.dart' show HeroClass;
 import '../game/controller.dart';
 import '../game/engine.dart';
-import '../game/loot.dart' show Stat;
+import '../game/loot.dart' show Stat, GearItem, GearSlot;
 import '../game/models.dart';
 import '../game/rules.dart';
 import '../services/storage.dart';
@@ -40,6 +40,10 @@ final _shows = <_Show>[
     ..foeSlowed = 3
     ..foeWeakened = 3
     ..foeExposed = 3),
+  (id: 'fester', title: 'Fester: the fire erupts (venom: &only=festerv, bleed: festerb)', wound: {Stat.burn: 30}, lay: null),
+  (id: 'festerv', title: 'Fester on venom', wound: {Stat.poison: 30}, lay: null),
+  (id: 'festerb', title: 'Fester on a bleed', wound: {Stat.bleed: 30}, lay: null),
+  (id: 'dual', title: 'Two blades: katana and wakizashi', wound: {}, lay: null),
   (id: 'you', title: 'You: poisoned · war cry', wound: {}, lay: (s) => s
     ..heroPoison = 3
     ..heroRoar = 3),
@@ -84,6 +88,12 @@ class _EffectsPreviewState extends State<EffectsPreview> {
     w.stats.removeWhere((st, _) => st == Stat.burn || st == Stat.poison || st == Stat.bleed || st == Stat.frost || st == Stat.smite);
     w.stats.addAll(sh.wound);
     w.enchant = null;
+    if (sh.id == 'dual') {
+      // A katana in the hand and a wakizashi in the other: the off-hand's second stroke.
+      final j = w.toJson();
+      k.loadout.weapon = GearItem.fromJson({...j, 'art': 'katana', 'name': 'Katana'});
+      k.loadout.offhand = GearItem.fromJson({...j, 'id': '${j['id']}-off', 'art': 'wakizashi', 'name': 'Wakizashi', 'slot': GearSlot.offhand.name});
+    }
     c.state.innRepaired = true;
     c.loaded = true;
     return c;
@@ -127,9 +137,20 @@ class _EffectsPreviewState extends State<EffectsPreview> {
       _rest[c] = 0;
       s.knight.hp = maxHp(s.knight);
       s.foeLevel = 1;
+      // Fester's cells: a blow to lay the affliction, then Fester to burst it, by turns.
+      if (sh.id.startsWith('fester') && c.engine.foeAffliction != null && !(_festered[c] ?? false)) {
+        _festered[c] = true;
+        s.mana = 5;
+        s.knight.rites = ['fester'];
+        c.castRite('fester');
+        continue;
+      }
+      _festered[c] = false;
       c.act(BattleAction.attack);
     }
   }
+
+  final _festered = <GameController, bool>{};
 
   @override
   void dispose() {

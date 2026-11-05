@@ -1459,7 +1459,7 @@ class PetStage {
 /// A fairy's charms, cast in turn: sleep, sap its strength, slow it, poison it, drink its life.
 enum FairyCharm {
   slumber('Slumber dust', 'the foe sleeps through its next blow', 0xFFB8A0E8),
-  enfeeble('Wilting charm', 'its blows land 40% softer for 2 turns', 0xFFB8A0D8),
+  enfeeble('Wilting charm', 'the foe\'s blows land 40% softer for 2 turns', 0xFFB8A0D8),
   slow('Tangleroot', 'half its blows miss for 2 turns', 0xFF6ABF9A),
   venom('Thornsting', 'poison damage', 0xFF8BE05A),
   leech('Lifebloom', 'drains the foe and heals you', 0xFFE07AA0);

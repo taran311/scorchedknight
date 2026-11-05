@@ -271,6 +271,9 @@ class _BattleScreenState extends State<BattleScreen> {
         final from = _journalFrom == null ? 0 : s.journal.indexOf(_journalFrom!) + 1;
         final lines = upTo > from ? s.journal.sublist(from, upTo) : const <JournalEntry>[];
         final over = c.outcome != null;
+        // The moves first: building them works out the held move's card, which is drawn above them
+        // in the tree (built the other way round, the card showed the move held before this one).
+        final moveRows = over || _aiming ? null : _actionRows();
         if (!c.busy && _queued != null) {
           final go = _queued!;
           _queued = null;
@@ -352,6 +355,27 @@ class _BattleScreenState extends State<BattleScreen> {
                                     Stack(
                                     children: [
                                       BattleStage(controller: c, aspectRatio: aspect, fill: fill),
+                                      // A win on a phone: the spoils up in the open sky over the fight,
+                                      // clear of you on the left, rather than squeezed into the deck.
+                                      if (_Result.spoilsOnStage(c, fill))
+                                        Positioned.fill(
+                                          child: Padding(
+                                            padding: const EdgeInsets.fromLTRB(70, 40, 10, 12),
+                                            child: Align(
+                                              alignment: const Alignment(.4, -.35),
+                                              child: TweenAnimationBuilder<double>(
+                                                tween: Tween(begin: 0, end: 1),
+                                                duration: const Duration(milliseconds: 420),
+                                                curve: Curves.easeOut,
+                                                builder: (context, t, child) => Opacity(opacity: t, child: Transform.translate(offset: Offset(0, 14 * (1 - t)), child: child)),
+                                                child: ConstrainedBox(
+                                                  constraints: const BoxConstraints(maxWidth: 420),
+                                                  child: SingleChildScrollView(child: _Result(controller: c, onDark: true, part: _ResultPart.spoils)),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
                                       if (phone)
                                         Positioned(left: 6, top: 6, child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 260), child: StatusBadges(state: s, boons: false, bolts: false))),
                                       // You top-left, the foe top-right, like facing cards.
@@ -396,7 +420,7 @@ class _BattleScreenState extends State<BattleScreen> {
                                         ? null
                                         : _aiming
                                         ? [Expanded(child: _AimBar(controller: c, speed: c.state.settings.fastFights ? 1.6 : 1, zone: bullseyeFor(c.state.knight), onLoose: _loose, onCancel: () => setState(() => _aiming = false)))]
-                                        : _actionRows().first,
+                                        : moveRows!.first,
                                     result: over ? _resultButtons() : null,
                                     progress: over ? _trailProgress() : null,
                                   ),
@@ -523,22 +547,26 @@ class _BattleScreenState extends State<BattleScreen> {
         SpellKind.reflect => 'Mirror ${sp.wards}',
         SpellKind.summon => '+${sp.summons} ${sp.summons == 1 ? 'ally' : 'allies'}',
         SpellKind.heal => 'Heal ${(sp.mend * 100).round()}%',
+        SpellKind.fester => '~${(swing * mult * arcana).round() + c.engine.festerBurst}',
         _ => '~${(swing * mult * arcana).round()}',
       };
       final lines = <(String, String, Color)>[
         if (hits) ('⚔️', '~${(swing * mult * arcana).round()} damage', plain),
         ...switch (sp.kind) {
-          SpellKind.nova => [('❄️', 'Freezes it: no counter', good)],
+          SpellKind.nova => [('❄️', 'Freezes the foe: no counter', good)],
           SpellKind.dragon => [('🔥', 'Plus fire damage', plain)],
           SpellKind.chain => [('⚡', 'Leaps three times', plain)],
           SpellKind.drain => [('🩸', 'Heals you ${(sp.drain * 100).round()}% of it', good)],
           SpellKind.heal => [('❤️', 'Heals you ${(sp.mend * 100).round()}% HP', good)],
-          SpellKind.slow => [('🐌', 'Half its hits miss · ${turns(sp.hex)}', plain)],
-          SpellKind.weaken => [('📉', 'It hits 40% softer · ${turns(sp.hex)}', plain)],
+          SpellKind.slow => [('🐌', 'Half the foe\'s hits miss · ${turns(sp.hex)}', plain)],
+          SpellKind.weaken => [('📉', 'Foe hits 40% softer · ${turns(sp.hex)}', plain)],
           SpellKind.expose => [('💥', 'You hit 25% harder · ${turns(sp.hex)}', plain)],
           SpellKind.sleep => [('💤', 'Sleeps through ${sp.hex} blows', plain), ('👑', 'Bosses wake after 1', soft)],
           SpellKind.ward => [('✨', 'Blocks the next ${sp.wards} hits', plain)],
           SpellKind.reflect => [('🪞', 'Next ${sp.wards} hits: half to you, all back', plain)],
+          SpellKind.fester => c.engine.festerBurst > 0
+              ? [('🦠', 'Its ${switch (c.engine.foeAffliction) {'burn' => 'fire', 'venom' => 'venom', _ => 'bleeding'}} erupts: +${c.engine.festerBurst}', good), ('⏳', '$festerTurns turns of it at once', soft)]
+              : [('⚠️', 'Nothing on it yet, so just the blow: lay fire, venom or a wound with your blade first', bad)],
           SpellKind.summon => [('💀', '${sp.summons} skeleton${sp.summons == 1 ? '' : 's'} · ${turns(sp.turns)}', plain), ('⚔️', '~${summonHit(k)} damage each a turn', plain)],
           _ => const <(String, String, Color)>[],
         },
@@ -1375,7 +1403,9 @@ class _CommandDeck extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (result != null) ...[
-            if (fill)
+            if (_Result.spoilsOnStage(c, fill))
+              _Result(controller: c, onDark: true, part: _ResultPart.title)
+            else if (fill)
               ConstrainedBox(
                 constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .45),
                 child: SingleChildScrollView(child: RepaintBoundary(child: _Result(controller: c, onDark: true))),
@@ -1506,13 +1536,23 @@ void _showLog(BuildContext context, List<JournalEntry> lines, Color Function(Ent
   ),
 );
 
+enum _ResultPart { all, title, spoils }
+
 /// How the fight ended.
 class _Result extends StatelessWidget {
-  const _Result({required this.controller, this.onDark = false});
+  const _Result({required this.controller, this.onDark = false, this.part = _ResultPart.all});
   final GameController controller;
 
   /// Drawn on the dark command deck instead of parchment.
   final bool onDark;
+
+  /// All of it, or (on a phone, after a win) just the title for the deck, or just the spoils for
+  /// the stage.
+  final _ResultPart part;
+
+  /// On a phone, a win's spoils go up on the stage (in the open sky over the fight) rather than
+  /// crammed into the deck under it.
+  static bool spoilsOnStage(GameController c, bool fill) => fill && c.outcome == Outcome.won && c.lastKill != null;
 
   static const _green = Color(0xFF9BE27A), _gold = Color(0xFFF2C14E);
 
@@ -1522,17 +1562,19 @@ class _Result extends StatelessWidget {
     // A win is a row of spoils, each an icon and a few words; everything else is a line or two.
     final spoils = <_Spoil>[];
     var lines = <String>[];
+    var newRites = const <Spell>[];
     final String title;
     switch (c.outcome!) {
       case Outcome.won:
         title = k?.won == true ? 'The Ember King is no more!' : (k?.boss == true ? 'Boss defeated!' : (k?.foe?.boss == true ? 'Risen boss defeated!' : 'Victory!'));
         if (k != null) {
           final chest = k.chest;
+          newRites = k.levelUps == 0 ? const [] : spells.where((sp) => sp.order == null && sp.earned == null && sp.level > s.knight.level - k.levelUps && sp.level <= s.knight.level).toList();
           spoils.addAll([
             if (k.levelUps > 0) _Spoil(const Icon(Icons.arrow_upward, size: 18, color: _green), 'Level ${s.knight.level}!', _green, big: true),
             // Any rite the new level brings, by name, in its own colour.
-            if (k.levelUps > 0)
-              for (final sp in spells.where((sp) => sp.order == null && sp.earned == null && sp.level > s.knight.level - k.levelUps && sp.level <= s.knight.level))
+            if (k.levelUps > 0 && part != _ResultPart.spoils)
+              for (final sp in newRites)
                 _Spoil(Icon(riteIcon(sp), size: 18, color: Color(sp.argb)), 'New rite: ${sp.name}', Color(sp.argb), big: true, tip: s.knight.rites.contains(sp.id) ? 'On your hotbar' : 'Swap it onto your hotbar in your ${homes[s.home].name.toLowerCase()}'),
             if (c.engine.rankUp case final up?) _Spoil(const Icon(Icons.military_tech, size: 18, color: Color(0xFFFFB04A)), up, const Color(0xFFFFB04A), big: true),
             _Spoil(const Icon(Icons.auto_awesome, size: 17, color: Color(0xFFB8D8FF)), '+${fmt(k.xp)} XP', const Color(0xFFB8D8FF)),
@@ -1597,6 +1639,54 @@ class _Result extends StatelessWidget {
         ];
     }
     final colour = c.outcome == Outcome.knockedOut ? (onDark ? const Color(0xFFE88A70) : const Color(0xFF7A1D14)) : (onDark ? Palette.amber : Palette.goldText);
+    if (part == _ResultPart.title) return Text(title, style: Txt.label(size: 20, color: colour, weight: FontWeight.w800));
+    if (part == _ResultPart.spoils) {
+      // Up on the stage: the spoils as chips, and each new rite with what it does.
+      return Container(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+        decoration: BoxDecoration(
+          color: const Color(0xE6140F0A),
+          border: Border.all(color: Palette.amberLo, width: 1.5),
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 14)],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('SPOILS', style: Txt.label(size: 12, color: Palette.amber, weight: FontWeight.w800).copyWith(letterSpacing: 1)),
+            const SizedBox(height: 8),
+            Wrap(spacing: 6, runSpacing: 6, children: spoils),
+            for (final sp in newRites) ...[
+              const SizedBox(height: 10),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(color: Color(sp.argb).withValues(alpha: .18), border: Border.all(color: Color(sp.argb)), borderRadius: BorderRadius.circular(6)),
+                    child: Icon(riteIcon(sp), size: 20, color: Color(sp.argb)),
+                  ),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('New rite: ${sp.name}', style: Txt.label(size: 14.5, color: Color(sp.argb), weight: FontWeight.w800)),
+                        Text(sp.desc, style: Txt.onStone(size: 13, color: Palette.cream)),
+                        Text('${sp.cost} mana · ${s.knight.rites.contains(sp.id) ? 'on your hotbar' : 'add it to your hotbar in your ${homes[s.home].name.toLowerCase()}'}', style: Txt.onStone(size: 12, color: Palette.parch2)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            for (final l in lines) Padding(padding: const EdgeInsets.only(top: 6), child: Text(l, style: Txt.onStone(size: 13.5, color: Palette.cream))),
+          ],
+        ),
+      );
+    }
     final body = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

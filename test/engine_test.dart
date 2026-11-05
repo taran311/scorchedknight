@@ -2718,4 +2718,34 @@ void main() {
     expect(k.hp, greaterThan(hp));
     expect(k.coins, coins2);
   });
+
+  test('Fester bursts the foe\'s affliction (turns of it at once), and does nothing more without one', () {
+    final e = GameEngine(GameEngine.newGame(), random: Random(3), clock: () => DateTime(2026, 6, 1));
+    final s = e.state, k = s.knight;
+    while (k.level < 12) {
+      e.grantXp(xpToNext(k));
+    }
+    s.innRepaired = true;
+    e.explore();
+    expect(s.inBattle, isTrue);
+    k.rites = ['fester'];
+    k.preparedSpell = 'fester';
+    s
+      ..foeMax = 99999
+      ..foeHp = 99999
+      ..mana = 5
+      ..foeBurn = 10
+      ..foeBurnTurns = 1;
+    expect(e.festerBurst, 10 * festerTurns);
+    final r = e.takeTurn(BattleAction.cast);
+    expect(r.festered, 10 * festerTurns);
+    expect(r.festerKind, 'burn');
+    // Nothing on it: no burst.
+    s
+      ..foeBurnTurns = 0
+      ..foeBurn = 0
+      ..mana = 5;
+    expect(e.festerBurst, 0);
+    if (s.inBattle && e.whyNot(BattleAction.cast) == null) expect(e.takeTurn(BattleAction.cast).festered, 0);
+  });
 }

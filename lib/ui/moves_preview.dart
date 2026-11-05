@@ -12,6 +12,7 @@ import '../art/body.dart';
 import '../art/class_moves.dart';
 import '../art/looks.dart';
 import '../art/poses.dart';
+import '../art/rig.dart' show Pose;
 import '../game/crafting.dart' show setPieceSlots;
 import '../game/classes.dart' show HeroClass, setArmourId;
 import '../game/engine.dart';
@@ -49,6 +50,25 @@ class _MovesPreviewState extends State<MovesPreview> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     final q = Uri.base.queryParameters;
+    if (q.containsKey('dual')) {
+      // ?moves&dual: the off hand's strike laid over each move (the plain knight's and each class's
+      // attack and bash), frozen at moments around it.
+      final times = (q['ms'] ?? '330,440,500,590,650,760,1000').split(',').map(double.parse).toList();
+      final rows = [for (final id in [null, ...classMoves.keys]) for (final skill in [false, true]) (id, skill)];
+      return Scaffold(
+        backgroundColor: const Color(0xFF15100C),
+        body: ListView(children: [
+          for (final (id, skill) in rows)
+            SizedBox(
+              height: 130,
+              child: Row(children: [
+                SizedBox(width: 60, child: Text('${id ?? 'knight'}\n${skill ? 'bash' : 'attack'}', style: Txt.label(size: 10, color: Palette.cream))),
+                for (final ms in times) Expanded(child: CustomPaint(painter: _DualPainter(ms, id, skill), size: Size.infinite)),
+              ]),
+            ),
+        ]),
+      );
+    }
     final ids = (q['cls'] ?? classMoves.keys.join(',')).split(',').where(classMoves.containsKey).toList();
     final skill = q['move'] == 'skill', play = q.containsKey('play');
     final times = play ? const [0.0] : (q['ms'] ?? '0,150,220,270,320,420,620').split(',').map(double.parse).toList();
@@ -138,4 +158,54 @@ class _MovePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_MovePainter old) => true;
+}
+
+
+class _DualPainter extends CustomPainter {
+  _DualPainter(this.ms, this.id, this.skill);
+  final double ms;
+  final String? id;
+  final bool skill;
+  static final _ks = <String, Knight>{};
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final k = _ks.putIfAbsent(id ?? '', () {
+      final k = id == null ? GameEngine.newGame(heroClass: HeroClass.knight).knight : _knightIn(id!);
+      final w = k.loadout.weapon!, j = w.toJson();
+      k.loadout.weapon = GearItem.fromJson({...j, 'art': 'katana', 'name': 'Katana'});
+      k.loadout.offhand = GearItem.fromJson({...j, 'id': 'off', 'art': 'wakizashi', 'name': 'Wakizashi', 'slot': GearSlot.offhand.name, 'rarity': 'common', 'sp': null, 'set': null});
+      return k;
+    });
+    final look = heroLook(k), moves = id == null ? null : classMoves[id];
+    final clip = moves == null ? (skill ? crushClip : swingClip) : (skill ? moves.skill.clip : moves.attack.clip);
+    var idle = idlePose(look.stance, 0, still: true);
+    if (moves != null) idle = inClassStance(idle, moves.stance);
+    // As the stage plays it: the move holds as the off hand's strike begins, and goes on after.
+    const offStart = swingHitMs + 60;
+    final Pose pose;
+    if (ms < offStart) {
+      pose = sampleClip(idle, clip, ms) ?? idle;
+    } else if (ms < offStart + offhandMs) {
+      final held = sampleClip(idle, clip, offStart) ?? idle;
+      pose = sampleClip(held, offhandClip, ms - offStart) ?? held;
+    } else {
+      pose = sampleClip(idle, clip, ms - offhandMs) ?? idle;
+    }
+    canvas.save();
+    canvas.clipRect(Offset.zero & size);
+    canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFF2A221C));
+    final s = size.height / 330;
+    canvas.translate(size.width / 2 - (_knightX + _reach + 40) * s, -(_groundY - 300) * s);
+    canvas.scale(s);
+    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromCenter(center: const Offset(_foeX + 20, _groundY - 120), width: 90, height: 240), const Radius.circular(30)), Paint()..color = const Color(0xFF4A3A30));
+    drawHumanoid(canvas, look, pose, 0, DrawOptions(at: const Offset(_knightX + _reach, _groundY), scale: _scale), still: true);
+    canvas.restore();
+    final hit = ms == offStart + offhandHitMs;
+    final tp = TextPainter(text: TextSpan(text: '${ms.round()}', style: TextStyle(fontSize: 10, color: hit ? const Color(0xFFFF7070) : const Color(0xFFB0A090))), textDirection: TextDirection.ltr)..layout();
+    tp.paint(canvas, const Offset(2, 2));
+  }
+
+  @override
+  bool shouldRepaint(_DualPainter old) => old.ms != ms || old.id != id || old.skill != skill;
 }

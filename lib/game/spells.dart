@@ -3,7 +3,7 @@
 
 import 'loot.dart';
 
-enum SpellKind { blast, summon, dragon, nova, ward, chain, drain, slow, weaken, expose, heal, charge, reflect, sleep, warcry }
+enum SpellKind { blast, summon, dragon, nova, ward, chain, drain, slow, weaken, expose, heal, charge, reflect, sleep, warcry, fester }
 
 class Spell {
   const Spell(this.id, this.name, this.desc, this.level, this.cost, this.kind, this.argb, {this.mult = 1, this.element, this.summons = 0, this.turns = 0, this.wards = 0, this.drain = .5, this.hex = 0, this.mend = 0, this.order, this.rank = 0, this.selfHurt = 0, this.earned});
@@ -51,6 +51,9 @@ class Spell {
   bool get passive => false;
 }
 
+/// Fester: how many turns of the foe's affliction it brings on at once.
+const festerTurns = 4;
+
 const spells = <Spell>[
   Spell('arcanebolt', 'Arcane Bolt', 'A crackling bolt: 2x damage', 1, 2, SpellKind.blast, 0xFF9ADFFF, mult: 2),
   Spell('sloth', 'Hex of Sloth', 'The foe moves as if through tar: half its counters miss for 3 turns', 2, 3, SpellKind.slow, 0xFF6ABF9A, hex: 3),
@@ -62,6 +65,7 @@ const spells = <Spell>[
   Spell('sunder', 'Sunder Armour', 'A cracking blow (1.4x), and the foe\'s defences give: your hits deal 25% more for 4 turns', 8, 3, SpellKind.expose, 0xFFE0A050, mult: 1.4, hex: 4),
   Spell('dragonfire', 'Summon Dragonfire', 'Call a dragon from the sky to breathe a fireball: 2.5x damage plus fire', 9, 4, SpellKind.dragon, 0xFFFF7A2A, mult: 2.5, element: Stat.burn),
   Spell('slumber', 'Slumber', 'Lull the foe to sleep: it sleeps through its next 2 blows (bosses shake it off after 1, and a foe lulled again in the same fight sleeps through just 1)', 10, 3, SpellKind.sleep, 0xFFB8A0E8, hex: 2),
+  Spell('fester', 'Fester', 'A heavy blow (2x), and whatever is eating at the foe erupts: $festerTurns turns of its fire, venom or bleeding at once (fire and bleeding are kept going)', 12, 3, SpellKind.fester, 0xFFB4D25A, mult: 2),
   Spell('spectralcharge', 'Spectral Charge', 'A ghostly warhorse thunders out of the mist and tramples the foe: 2.3x damage', 11, 3, SpellKind.charge, 0xFF9ADFFF, mult: 2.3),
   Spell('chainlightning', 'Chain Lightning', 'Lightning leaps three times: 2.5x damage', 12, 4, SpellKind.chain, 0xFFE8F4FF, mult: 2.5),
   Spell('mirrorward', 'Mirror Ward', 'A shimmering mirror for the next 2 blows: you take half, and the foe takes the other half back', 13, 4, SpellKind.reflect, 0xFFCFE8F8, wards: 2),
