@@ -22,6 +22,7 @@ import '../build_info.dart';
 import '../game/loot.dart';
 import '../game/errands.dart' show retainerName;
 import '../game/vault.dart';
+import '../game/wilds.dart' show wildAreas;
 import '../game/catalog.dart';
 import '../game/events.dart';
 import '../game/controller.dart';
@@ -160,7 +161,14 @@ class _InnPageState extends State<InnPage> with RouteAware {
   }
 
   /// Whether a place in the square is still shut (see GameEngine.whyShut).
+  /// Out in the wilds with the run still open: the town waits till you're back (only the way back
+  /// to the wilds, and your own tent, the kit on your back, stay open).
+  bool get _away => c.state.wild != null;
+  static const _awayWhy = 'You\'re out in the Wilds. The town waits till you head home';
+
   bool _shutSpot(TownSpot spot) => switch (spot) {
+    TownSpot.stall || TownSpot.inn when _away => true,
+    TownSpot.forge || TownSpot.enchanter when _away => true,
     TownSpot.forge => c.whyShut('forge') != null,
     TownSpot.enchanter => c.whyShut('tower') != null,
     _ => false,
@@ -224,7 +232,7 @@ class _InnPageState extends State<InnPage> with RouteAware {
                             TownSpot.enchanter: '$mageName\'s Tower',
                           };
       // A word under a place's name, on a phone: what's waiting there.
-      final notes = <TownSpot, String>{
+      final notes = _away ? <TownSpot, String>{} : <TownSpot, String>{
         if (s.raid == 'stall') TownSpot.stall: 'Raided! Go and help',
         if ((hurt || !s.day) && c.whyNotRest == null && !job && !offered) TownSpot.inn: hurt ? 'Rest and heal' : 'Sleep till morning',
         if (unspentPoints(k) > 0)
@@ -246,7 +254,16 @@ class _InnPageState extends State<InnPage> with RouteAware {
           TownSpot.enchanter: 'A rune to bind',
         if (c.whyShut('forge') == null && c.engine.upgradesReady > 0) TownSpot.forge: '${c.engine.upgradesReady} upgrade${c.engine.upgradesReady == 1 ? '' : 's'} ready',
       };
-      final taps = <TownSpot, VoidCallback?>{
+      final taps = _away && !s.inBattle
+          ? <TownSpot, VoidCallback?>{
+              TownSpot.gate: _openWilds,
+              TownSpot.stall: () => _shut(_awayWhy),
+              TownSpot.inn: () => _shut(_awayWhy),
+              TownSpot.tent: _openKit,
+              TownSpot.forge: () => _shut(_awayWhy),
+              TownSpot.enchanter: () => _shut(_awayWhy),
+            }
+          : <TownSpot, VoidCallback?>{
                             TownSpot.gate: s.inBattle ? _resume : (offered ? _talk : (s.wild != null ? _openWilds : (s.dungeon != null ? _openDungeon : _openMap))),
                             // (Raided: the stall's button gives chase, as its note says, not Mags' usual chat.)
                             TownSpot.stall: s.inBattle ? () => _shut('Finish your fight first') : (s.raid == 'stall' ? _chase : () => showMerchantWindow(context, c)),
@@ -333,11 +350,16 @@ class _InnPageState extends State<InnPage> with RouteAware {
                           const SizedBox(height: 10),
                         ],
                         // Hob's job first: the story's quest outranks the side task below it.
-                        if (offered) ...[
+                        // Out in the wilds: one card, the way back to them; the town's own cards wait.
+                        if (_away && !s.inBattle) ...[
+                          _Banner(icon: Icons.forest_rounded, text: 'Out in ${wildAreas[s.wild!].name}. The town waits till you head home.', button: 'Back', onTap: _openWilds),
+                          const SizedBox(height: 10),
+                        ],
+                        if (offered && !_away) ...[
                           _TalkBanner(onTap: _talk),
                           const SizedBox(height: 10),
                         ],
-                        if (job) ...[
+                        if (job && !_away) ...[
                           _QuestCard(
                             compact: phone,
                             timber: s.timber,
@@ -353,13 +375,13 @@ class _InnPageState extends State<InnPage> with RouteAware {
                         // job is done: on a new game, the job is the way on, offered or taken.)
                         // (Not mid-fight: the fight is the way on, and the cards' suggestions skip
                         // whatever can't be started mid-fight, so they read oddly.)
-                        if (c.engine.roadStep() case final step? when !s.inBattle && (s.innRepaired || step.land != 0)) ...[
+                        if (c.engine.roadStep() case final step? when !s.inBattle && !_away && (s.innRepaired || step.land != 0)) ...[
                           _RoadCard(controller: c, step: step, onGo: () => _goRoad(step)),
                           const SizedBox(height: 10),
                         ],
                         // The notice board: the village's troubles, a contract each. (Like the road, not
                         // until Hob's job is done: a new knight has one thing to do first.)
-                        if (s.inBattle) ...[]
+                        if (s.inBattle || _away) ...[]
                         // A relic part you can go and get now comes before the contracts.
                         else if (c.engine.relicStep() case final spot? when s.innRepaired) ...[
                           _RoadCard(controller: c, step: spot, header: 'RELIC PART', icon: Icons.extension, onGo: () => _goRoad(spot)),
@@ -378,23 +400,23 @@ class _InnPageState extends State<InnPage> with RouteAware {
                           const SizedBox(height: 10),
                         ],
                         // The next task: something to try, and a little for trying it.
-                        if (c.nextTask != null) ...[
+                        if (c.nextTask != null && !_away) ...[
                           TaskCard(controller: c, onGo: (t) => goToTask(context, c, t)),
                           const SizedBox(height: 10),
                         ],
                         // Wren, your housekeeper (from the cottage): a card when there's something to do
                         // (she's back, or idle and waiting to be sent); out on an errand, a phone just
                         // notes it on the home button, so the square isn't a stack of cards.
-                        if (s.home >= 1 && (!phone || s.errand == null || c.errandBack)) ...[
+                        if (s.home >= 1 && !_away && (!phone || s.errand == null || c.errandBack)) ...[
                           WrenCard(controller: c, onOpen: () => openTent(context, c, tab: 'home')),
                           const SizedBox(height: 10),
                         ],
                         // Hob's cellar: while you've a Cinder key to use in it.
-                        if (s.keys > 0) ...[
+                        if (s.keys > 0 && !_away) ...[
                           _VaultCard(controller: c, compact: phone),
                           const SizedBox(height: 10),
                         ],
-                        if (s.raid != null && !s.inBattle) ...[
+                        if (s.raid != null && !s.inBattle && !_away) ...[
                           _Banner(
                             icon: Icons.warning_amber_rounded,
                             text: s.raid == 'inn' ? 'Bandits robbed the Soot & Kettle!' : 'Bandits raided Mags\' stall!',
