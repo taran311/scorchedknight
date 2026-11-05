@@ -968,13 +968,19 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       _at(d0 + hit, () => _spark('fire', _foeChest, 24, speed: 6, life: 700, radius: 10, lift: 1, gravity: -.02));
       _at(d0 + hit + 300, () {
         final hurt = c.lastSwing?.selfHurt ?? 0;
-        if (hurt > 0) _mark('-$hurt', _red, const Offset(_knightX - 10, _groundY - 250));
+        if (hurt > 0) {
+          _mark('-$hurt', _red, const Offset(_knightX - 10, _groundY - 250));
+          c.revealHurt(hurt);
+        }
       });
     }
     if (sp.dice && sp.mult <= 1) {
       _at(d0 + hit + 300, () {
         final hurt = c.lastSwing?.selfHurt ?? 0;
-        if (hurt > 0) _mark('-$hurt', _red, const Offset(_knightX - 10, _groundY - 250));
+        if (hurt > 0) {
+          _mark('-$hurt', _red, const Offset(_knightX - 10, _groundY - 250));
+          c.revealHurt(hurt);
+        }
       });
     }
     if (sp.legion) {
@@ -2162,7 +2168,10 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       _tween('kflash', 0, 380, delay: 60);
       Audio.play(Sfx.hit, power: .6);
       final hurt = r.selfHurt;
-      if (hurt > 0) _mark('-$hurt', _red, const Offset(_knightX - 10, _groundY - 250));
+      if (hurt > 0) {
+        _mark('-$hurt', _red, const Offset(_knightX - 10, _groundY - 250));
+        c.revealHurt(hurt);
+      }
     });
     // Blood running down the blade, in drops, from the hilt to the point.
     for (var i = 0; i < 10; i++) {

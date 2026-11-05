@@ -617,6 +617,15 @@ class GameController extends ChangeNotifier {
     hpShown.value++;
   }
 
+  /// Called by the stage as you pay HP yourself (Blood Edge's cut, a dice rite's price): the bar
+  /// drops then, with the number, not later with the foe's blow (when it looked like the foe did it).
+  void revealHurt(int amount) {
+    final held = _heldHeroHp;
+    if (held == null || amount <= 0) return;
+    _heldHeroHp = (held - amount).clamp(1, maxHp(state.knight));
+    hpShown.value++;
+  }
+
   /// Called by the stage as the kill plays: the HP the win gives back shows on the bar now.
   void revealHeroHp() {
     _heldHeroHp = null;
