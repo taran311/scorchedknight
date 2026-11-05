@@ -2677,19 +2677,23 @@ class GameEngine {
     _note('$how $foeName for $hit${d.crit ? ' (critical!)' : ''}${extras.isEmpty ? '' : ', including ${extras.join(', ')}'}.', EntryKind.damage);
     // What the weapon leaves in the wound: fire that keeps burning, venom that builds, a bleed.
     // (Only one of the three ever comes off a blow: swingDamage pools them into the strongest.)
-    if (d.ignite > 0) {
+    // And only off the blade: the venom, fire or edge is on your weapon, so a rite or a crossbow
+    // bolt (special bolts aside) leaves the wound as it was. Venom keeps biting all the while, but
+    // only grows with each blow of the blade; a wound only stays open while the blade keeps at it.
+    final blade = r.action == BattleAction.attack || r.action == BattleAction.skill;
+    if (d.ignite > 0 && blade) {
       if (state.foeBurnTurns == 0) _note('$foeName catches fire.', EntryKind.damage);
       _afflict(r, 'burn');
       state
         ..foeBurn = math.max(state.foeBurnTurns > 0 ? state.foeBurn : 0, d.ignite)
         ..foeBurnTurns = burnTurns;
     }
-    if (d.envenom > 0) {
+    if (d.envenom > 0 && blade) {
       _afflict(r, 'venom');
       state.foeToxin += math.max(1, (d.envenom * toxinGrowth).round());
       if (state.foeToxin == math.max(1, (d.envenom * toxinGrowth).round())) _note('Venom gets into $foeName.', EntryKind.damage);
     }
-    if (d.bleed > 0) {
+    if (d.bleed > 0 && blade) {
       if (state.foeBleedTurns == 0) _note('$foeName starts to bleed.', EntryKind.damage);
       _afflict(r, 'bleed');
       state

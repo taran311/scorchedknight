@@ -426,6 +426,9 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   static const _fireCol = Color(0xFFFF7A1A), _venomCol = Color(0xFF6FE03A), _bloodCol = Color(0xFFE0202A), _iceCol = Color(0xFF9FE4FF);
   bool _stSeeded = false;
 
+  /// The venom's last bite this fight (0: none yet), so a bigger one gets its arrow.
+  int _lastVenom = 0;
+
   /// Till when a foe that slept or stood frozen through its turn is still shown so (the
   /// condition itself is spent by then).
   double _iceUntil = 0, _sleepUntil = 0;
@@ -440,6 +443,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     if (!c.state.inBattle || fx['enter']! > .05) {
       _st = const _Status();
       _stSeeded = false;
+      _lastVenom = 0;
       return;
     }
     if (c.busy) return;
@@ -1312,6 +1316,8 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       });
     }
     if (r.afflicted != null) _at(d0 + afflictAt, () => _playAfflict(r));
+    // (Venom laid on fresh, after fire or a wound took its place: its count starts again.)
+    if (r.afflicted == 'venom' && r.afflictNew) _lastVenom = 0;
     _playLingering(r, d0 + tickAt);
     if (r.froze) _at(d0 + end - 520, () => _mark('Frozen!', const [Color(0xFF9ADFFF), Color(0xFF2A5A8A)], _foeChest + const Offset(0, -90)));
     if (r.regrown > 0) _at(d0 + end - 300, () => _heal(r.regrown, const Offset(_knightX + 10, _groundY - 250)));
@@ -1945,7 +1951,9 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         _at(long * .5, () => _statusFlash(_fireCol, .7));
       case 'venom':
         // Venom splashes in, then bubbles up out of it all over, more the more there is.
-        _mark(r.afflictNew ? 'Poisoned' : 'Poison ×$n', _green, chest + const Offset(10, -110), icon: Icons.science_rounded);
+        // (Only the first time: after that the bite's own number climbing, with its arrow, says it's
+        // building. A "Poison ×7" every turn on top of that was clutter.)
+        if (r.afflictNew) _mark('Poisoned', _green, chest + const Offset(10, -110), icon: Icons.science_rounded);
         spark('venom', chest, 16 + 4 * math.min(n, 5), speed: 3.5 + .4 * math.min(n, 5), life: 800, radius: 4.5, gravity: .05);
         for (var i = 1, m = (long / 150).floor(); i < m; i++) {
           _at(i * 150.0, () {
@@ -1980,12 +1988,15 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     // Each its own number in its own colour (venom green, fire orange, wounds red), a beat apart
     // and stacked, so you can see what your poison is doing even with a fire burning too.
     final ticks = [if (r.burned > 0) (r.burned, _orange, 'fire'), if (r.venomed > 0) (r.venomed, _green, 'venom'), if (r.bled > 0) (r.bled, _red, 'bleed')];
+    // Venom bites harder each turn it's laid on again: an arrow by the number when it's gone up.
+    final venomUp = r.venomed > 0 && _lastVenom > 0 && r.venomed > _lastVenom;
+    if (r.venomed > 0) _lastVenom = r.venomed;
     for (final (i, (n, col, kind)) in ticks.indexed) {
       _at(at + i * 180, () {
         // (With its element's mark on it, so a fire tick never reads as a plain hit.)
         // (Out to its left, in the open between you, where the blow's own column of labels isn't:
         // up among them, a tick got pushed up under the foe's card and was never seen.)
-        _mark('$n', col, _foeChest + Offset(-120, 20 + i * 44), icon: switch (kind) {
+        _mark(kind == 'venom' && venomUp ? '$n ↑' : '$n', col, _foeChest + Offset(-120, 20 + i * 44), icon: switch (kind) {
           'fire' => Icons.local_fire_department_rounded,
           'venom' => Icons.science_rounded,
           _ => Icons.water_drop_rounded,

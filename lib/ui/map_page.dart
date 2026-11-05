@@ -911,7 +911,11 @@ class _WildPanel extends StatelessWidget {
 const _done = Color(0xFF9BE27A);
 
 class _MapPainter extends CustomPainter {
-  _MapPainter({required this.open, required this.selected, required this.beaten, this.cleared = const {}, required this.wildsOpen, this.wildPicked, this.trip, this.pins = const [], this.pinPicked, this.delves = const [], this.delvePicked, this.lockedLands = const {}, this.levelGates = const {}, this.relicSpots = const {}, this.nameLand, this.allNames = true, this.arena = (false, 0), this.arenaPicked = false, this.hall = (false, 0), this.hallPicked = false});
+  _MapPainter({required this.open, required this.selected, required this.beaten, this.cleared = const {}, required this.wildsOpen, this.wildPicked, this.trip, this.pins = const [], this.pinPicked, this.delves = const [], this.delvePicked, this.lockedLands = const {}, this.levelGates = const {}, this.relicSpots = const {}, this.nameLand, this.allNames = true, this.arena = (false, 0), this.arenaPicked = false, this.hall = (false, 0), this.hallPicked = false, this.hideRoadTo});
+
+  /// The road into this land is left off: it's being walked onto the map right now
+  /// (showRoadOpens), and drawn there twice the two lines didn't match.
+  final int? hideRoadTo;
 
   /// The Hall of the Slain: whether it's open, and waves won.
   final (bool, int) hall;
@@ -1010,7 +1014,9 @@ class _MapPainter extends CustomPainter {
     }
 
     // The roads, dashed: from the Inn to Cindervale, and on between the lands, branching (the
-    // tracks to the side lands narrower). Roads not open yet are faint.
+    // tracks to the side lands narrower). Only the roads you've opened are drawn: each one is
+    // walked onto the map as it opens (showRoadOpens), rather than inked over a faint line that
+    // was there all along.
     void dashed(Path path, double width, double gap, double alpha) {
       for (final metric in path.computeMetrics()) {
         for (double d = 0; d < metric.length; d += gap) {
@@ -1028,8 +1034,9 @@ class _MapPainter extends CustomPainter {
 
     dashed(bend(_innSpot, _spots[0]), 3.2, 22, 1);
     for (final (from, to) in roads) {
-      final side = isSideLand(to), lit = beaten.contains(from);
-      dashed(bend(_spots[from], _spots[to]), side ? 2 : 3.2, side ? 14 : 22, lit ? (side ? .8 : 1) : .3);
+      final side = isSideLand(to);
+      if (!beaten.contains(from) || to == hideRoadTo) continue;
+      dashed(bend(_spots[from], _spots[to]), side ? 2 : 3.2, side ? 14 : 22, side ? .8 : 1);
     }
     for (var i = 0; i < continents.length; i++) {
       final at = _spots[i], land = continents[i], open = this.open[i], size = _blobSize(i);
@@ -1837,6 +1844,7 @@ class _RoadOpensState extends State<_RoadOpens> with SingleTickerProviderStateMi
                                                   levelGates: {for (var i = 0; i < continents.length; i++) if (c.whyNotTravel(i)?.startsWith('Reach level') ?? false) i: continents[i].minLevel},
                                       nameLand: widget.to,
                                       allNames: false,
+                                      hideRoadTo: widget.to,
                                     ),
                                   ),
                                 ),
@@ -1908,8 +1916,9 @@ class _RoadPainter extends CustomPainter {
     canvas.save();
     canvas.scale(size.width / 1000);
     // A gentle bend, not a ruler line.
+    // (The same bend the map's own roads take, so the road walked is the road left behind.)
     final mid = (a + b) / 2, d = b - a;
-    final bend = mid + Offset(-d.dy, d.dx) * .18;
+    final bend = mid + Offset(d.dy, -d.dx) * .18;
     final path = Path()
       ..moveTo(a.dx, a.dy)
       ..quadraticBezierTo(bend.dx, bend.dy, b.dx, b.dy);
