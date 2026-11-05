@@ -352,7 +352,12 @@ class _InnPageState extends State<InnPage> with RouteAware {
                         // Hob's job first: the story's quest outranks the side task below it.
                         // Out in the wilds: one card, the way back to them; the town's own cards wait.
                         if (_away && !s.inBattle) ...[
-                          _Banner(icon: Icons.forest_rounded, text: 'Out in ${wildAreas[s.wild!].name}. The town waits till you head home.', button: 'Back', onTap: _openWilds),
+                          _RoadCard(
+                            controller: c,
+                            header: 'THE WILDS · THE TOWN WAITS',
+                            step: RoadStep(RoadKind.wild, 'Back into ${wildAreas[s.wild!].name.replaceFirst('The ', 'the ')}', 'Step ${math.max(1, s.wildDepth)}', wildAreas[s.wild!].lands.first, id: '${s.wild}'),
+                            onGo: _openWilds,
+                          ),
                           const SizedBox(height: 10),
                         ],
                         if (offered && !_away) ...[
