@@ -26,7 +26,7 @@ enum FoeKind { none, armoured, caster, ranged }
 enum AttackStyle { blade, rite, bolt }
 
 /// Damage for the right answer on the triangle, and for the wrong one.
-const weakness = 1.25, resistance = .8;
+const weakness = 1.5, resistance = .8;
 
 /// How hard [style] lands on a foe of [kind].
 double triangle(FoeKind kind, AttackStyle? style) => switch ((kind, style)) {
@@ -404,6 +404,7 @@ String? landTrophyName(int land) => switch (land) {
   13 => 'coral',
   14 => 'skin',
   15 => 'feather',
+  16 => 'lacquer',
   // The Hollowdeep's bats leave fangs, like Ravenmoor's vampires: the same Nightblood set.
   17 => 'fang',
   // The Frostmarch's wolves, yetis and fur-clad reavers leave pelts, like the Weald's werewolves.
@@ -454,7 +455,7 @@ const continents = <Continent>[
     name: 'The Gloomfen',
     blurb: 'A drowned marsh where the ash fell into the water and the dead got up to complain about it.',
     minLevel: 6,
-    foeHit: 1.1,
+    foeHit: 1.0,
     argb: 0xFF7A9A8A,
     foes: [
       FoeType('Bog Shambler', 'zombie', undead: true),
@@ -559,7 +560,7 @@ const continents = <Continent>[
       FoeType('Tomb Priest', 'tombPriest', undead: true, hp: .9, strike: Strike.magic),
       FoeType('Tomb Guardian', 'mummyGuard', undead: true, hp: 1.2, armoured: true),
     ],
-    boss: FoeType('Nephrakhet, the Ash Pharaoh', 'pharaoh', boss: true, hp: 1.5, hit: 1.45, undead: true, strike: Strike.magic),
+    boss: FoeType('Nephrakhet, the Ash Pharaoh', 'pharaoh', boss: true, hp: 1.35, hit: 1.25, undead: true, strike: Strike.magic),
     companion: Companion.none,
     companionText: 'Nephrakhet crumbles to dust and linen. Behind his throne, the treasury of a dynasty glitters in the torchlight.',
     prize: 'ankh',
@@ -588,7 +589,7 @@ const continents = <Continent>[
       FoeType('Ashen Knight', 'ashenKnight', armoured: true),
       FoeType('Gargoyle Sentinel', 'gargoylematriarch', stone: true, hp: 1.1, aloft: true),
     ],
-    boss: FoeType('Scorchmaw, Hound of Vharrax', 'demonhound', boss: true, hp: 1.4, hit: 1.3, hound: true, strike: Strike.fire),
+    boss: FoeType('Scorchmaw, Hound of Vharrax', 'demonhound', boss: true, hp: 1.3, hit: 1.25, hound: true, strike: Strike.fire),
     companion: Companion.dragon,
     companionText: 'Behind Scorchmaw\'s den, in a nest of cooled glass: a dragon egg, still warm. It isn\'t on his side either.',
     prize: 'collar',
@@ -649,7 +650,7 @@ const continents = <Continent>[
       FoeType('Blood Bride', 'bloodBride', undead: true, hp: .9, strike: Strike.magic, night: true),
       FoeType('Vampire Knight', 'vampireKnight', undead: true, hp: 1.15, armoured: true, night: true),
     ],
-    boss: FoeType('Countess Morwenna', 'countess', boss: true, hp: 1.25, hit: 1.2, undead: true, strike: Strike.magic, night: true),
+    boss: FoeType('Countess Morwenna', 'countess', boss: true, hp: 1.2, hit: 1.1, undead: true, strike: Strike.magic, night: true),
     companion: Companion.none,
     companionText: 'The Countess comes apart into a hundred bats, and they scatter over the moor. In the castle\'s cellar, the thralls\' chains hang open. They walk home in the dawn light.',
     prize: 'heartsblood',
@@ -677,7 +678,7 @@ const continents = <Continent>[
       FoeType('Moonstalker', 'werewolfStalker', hp: .95, night: true),
       FoeType('Silverback', 'werewolfBrute', hp: 1.25, night: true),
     ],
-    boss: FoeType('The Alpha of the Weald', 'werewolfAlpha', boss: true, hp: 1.45, hit: 1.45, night: true),
+    boss: FoeType('The Alpha of the Weald', 'werewolfAlpha', boss: true, hp: 1.35, hit: 1.3, night: true),
     companion: Companion.none,
     companionText: 'The Alpha falls, and the moon goes back behind the clouds. In the morning, the woodsmen are just woodsmen again, and very sorry about everything.',
     prize: 'bloodmoonpelt',
@@ -786,7 +787,7 @@ const continents = <Continent>[
       FoeType('Saurian Champion', 'lizardChampion', hp: 1.2, armoured: true, regrows: true),
       FoeType('Marsh Drake', 'mossDragon', dragon: true, aloft: true, strike: Strike.fire),
     ],
-    boss: FoeType('King Ssarrak the Sun-Eater', 'lizardKing', boss: true, hp: 1.3, hit: 1.15, armoured: true, regrows: true),
+    boss: FoeType('King Ssarrak the Sun-Eater', 'lizardKing', boss: true, hp: 1.2, hit: 1.1, armoured: true, regrows: true),
     companion: Companion.none,
     companionText: 'King Ssarrak sinks to his knees and hisses, almost laughing. "The sun has chosen a new champion. Very well." The temple drums go quiet.',
     prize: 'sunfang',
@@ -948,7 +949,7 @@ const continents = <Continent>[
       FoeType('Frost Giant', 'frostGiant', hp: 1.2, armoured: true),
       FoeType('Ice Wraith', 'iceWraith', hp: .85, spirit: true, aloft: true, strike: Strike.magic, element: 'frost'),
     ],
-    boss: FoeType('Jarl Hrimgar the Ice-Crowned', 'frostJarl', boss: true, hp: 1.45, hit: 1.4, armoured: true),
+    boss: FoeType('Jarl Hrimgar the Ice-Crowned', 'frostJarl', boss: true, hp: 1.35, hit: 1.25, armoured: true),
     companion: Companion.none,
     companionText: 'Jarl Hrimgar falls to one knee, and the ice crown cracks clean in two. Somewhere under the glacier, the frozen city groans. By morning there is water running in its streets for the first time in a hundred years.',
     prize: 'rimeheart',
@@ -1076,7 +1077,7 @@ int lookIndex(String look, [int? continent]) {
 }
 
 /// Against a foe that's aloft: your blade deals this much, your crossbow this much.
-const aloftMelee = .7, aloftShot = 1.25;
+const aloftMelee = .7, aloftShot = 1.4;
 
 /// The knight's crossbow, upgraded at Mags's stall: (name, share of an attack a bolt deals, price).
 const crossbows = <(String, double, int)>[
@@ -1258,6 +1259,9 @@ double hiddenChance(int continent, {required bool cindervaleClear}) => continent
 /// Of those meetings: the share that are a whole coven, and the share that are the Prior himself.
 const hiddenCovenShare = .25, hiddenPriorShare = .12;
 
+/// The Prior's share of the Hidden Ones' sightings: none until the Gloomfen's boss is down.
+double priorShare(bool gloomfenClear) => gloomfenClear ? hiddenPriorShare : 0;
+
 /// The chance the Prior leaves his mask behind (once you have it, he leaves gold).
 const hiddenMaskChance = .4;
 
@@ -1272,10 +1276,13 @@ const rareChance = .08, namedRareShare = .35;
 /// takes [generalCut] off his strength (his HP); while any still stand, one comes for you on
 /// [generalChance] of the Throne's fights.
 List<String> get emberGenerals => [for (final n in continents[mainLands - 1].named) n.name];
-const generalCut = .08, generalChance = .12;
+const generalCut = .05, generalChance = .12;
 
 /// A boss you keep falling to: what each knockout it deals you takes off it, and the most.
 const doggedStep = .05, doggedMax = .2;
+
+/// And its blows, a little each loss too (bosses that beat you again and again were walls).
+const doggedHitStep = .04, doggedHitMax = .2;
 
 /// Packs turn up more often the further you go.
 // (By the land's tier, not its place in the list: the side lands come after the main road in the
@@ -1592,7 +1599,7 @@ const places = <Place>[
   Place('rocnest', 'The Great Nest', 15, 798, 26, PlaceKind.guarded, 'A nest the size of a cottage on the highest peak, woven from whole trees, and something huge and feathered sitting on it.', 'The mother griffin takes wing and is gone. In the nest: feathers by the armful, gold the aeriekin left as offerings, and eggshell like porcelain.', foe: ('griffin', null, Aura.ancient, 'The Mother Griffin'), purses: 3, trophies: 4, gems: 1),
   // The second wave: something to go and look at in every corner of the map.
   Place('orkscouts', 'The Ork Scout Camp', 0, 205, 590, PlaceKind.guarded, 'A ring of spears by the shore and a cooking fire nobody bothered to hide. Orks, this far from the Badlands, scouting.', 'Snagga the Scout won\'t be reporting back. His camp is full of things the orks stole on the way here.', foe: ('pillager', 'ork', Aura.blazing, 'Snagga the Scout'), purses: 2, potions: 1),
-  Place('barrow', 'The Champion\'s Barrow', 1, 440, 535, PlaceKind.guarded, 'A grassy mound with a door in it, and on the door, a tourney shield. Someone in there is still waiting for his next match.', 'Sir Rattlesby bows from the waist as he falls apart. Among his bones: a century of tourney purses.', foe: ('skeleton', 'skeletonChampion', Aura.ancient, 'Sir Rattlesby the Undying'), purses: 2, trophies: 2),
+  Place('barrow', 'The Champion\'s Barrow', 1, 440, 535, PlaceKind.guarded, 'A grassy mound with a door in it, and on the door, a tourney shield. Someone in there is still waiting for his next match.', 'Sir Rattlesby bows from the waist as he falls apart. Among his bones: a century of tourney purses.', foe: ('skeleton', 'skeletonChampion', Aura.ancient, 'Sir Rattlesby the Undying'), purses: 2),
   Place('warcamp', 'The Ork War Camp', 3, 585, 345, PlaceKind.guarded, 'Drums, smoke and a stockade of sharpened logs. Every ork in the Badlands seems to be sharpening something, and the biggest one is sharpening two things.', 'Gorehowl goes down roaring. His tent holds the camp\'s whole war chest, and the iron they meant to make into axes.', foe: ('orkWarlord', null, Aura.blazing, 'Gorehowl the Many-Scarred'), purses: 3, ore: {'iron': 4}),
   Place('queensleep', 'The Queen\'s Sarcophagus', 4, 705, 300, PlaceKind.guarded, 'A painted coffin standing upright in the sand, lid ajar. The paint shows a queen asleep. The coffin is empty.', 'Merit-Ash crumbles back to dust, still wearing her jewels. You take them. She won\'t mind now.', foe: ('mummyGuard', null, Aura.cursed, 'Merit-Ash, the Sleepless Queen'), purses: 3, gems: 1),
   Place('glassfurnace', 'The Glass Furnace', 5, 655, 575, PlaceKind.guarded, 'A crater of molten glass that never cools, and in the middle of it, the fire has stood up. It has noticed you.', 'The Furnace Heart gutters out into a lump of black glass. Around the crater: obsidian, cooled and glittering.', foe: ('pitdemon', 'elementalEmber', Aura.blazing, 'The Furnace Heart'), purses: 3, ore: {'obsidian': 4}),

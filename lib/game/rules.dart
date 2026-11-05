@@ -134,8 +134,9 @@ int spellCost(Knight k, Spell spell) {
 int twoHandBonus(GearItem? w) {
   if (w == null) return 0;
   final kind = offhandKindFor(w.art), staff = w.heroClass == HeroClass.mage;
-  // Staves get less: a mage's spells already multiply the swing.
-  final share = kind == null ? (staff ? .25 : .6) : (kind == OffhandKind.quiver ? .4 : 0.0);
+  // Staves get less: a mage's spells already multiply the swing. (A knight's two-hander was +60%, a
+  // whole rarity ahead of a one-hander and shield; +45% keeps it the harder hitter, not the only one.)
+  final share = kind == null ? (staff ? .25 : .45) : (kind == OffhandKind.quiver ? .4 : 0.0);
   return ((w.stats[Stat.damage] ?? 0) * share).round();
 }
 
@@ -248,7 +249,30 @@ int foeLevelFor(int continent, int heroLevel) => math.max(heroLevel, continents[
 /// Turns a hero of the foe's level, in the gear such a hero usually has, needs to fell a common foe
 /// with plain attacks (skills and companions make it fewer), and how many times longer a boss
 /// takes.
-const turnsPerFoe = 5.8, bossTurns = 3.0;
+const turnsPerFoe = 5.8, bossTurns = 4.0;
+
+/// Each land further on, its boss stands a little longer: a hero's gear outgrows the formula late
+/// (a class suit, a relic, honing), and the last bosses went down in a handful of blows.
+const bossTurnsPerTier = .05;
+
+/// A land's boss grows with you only this many levels past the land's own (see GameEngine._begin).
+const bossLevelSpan = 4;
+
+/// A foe carries one lasting affliction at a time (see GameEngine.foeAffliction). Only the balance
+/// tools turn it off, to compare against the old rule (every kind at once).
+var oneAffliction = true;
+
+/// The level land [continent]'s own boss fights a hero of [heroLevel] at.
+int bossLevelFor(int continent, int heroLevel) => math.min(foeLevelFor(continent, heroLevel), continents[continent].minLevel + bossLevelSpan);
+
+/// Ordinary foes (not bosses, not rares): a little tougher and harder-hitting than the formula
+/// alone, so a plain fight lasts a few real turns and costs a real share of your HP, and picking
+/// the right way to fight it (see [triangle]) is worth a turn or two.
+const commonHp = 1.35, commonHit = 1.15;
+
+/// How much of [commonHp] / [commonHit] a foe of [level] gets: none for a new hero's first few
+/// levels (they're still learning the buttons), all of it from level 12.
+double commonLift(double full, int level) => 1 + (full - 1) * ((level - 4) / 8).clamp(0.0, 1.0);
 
 /// The foe in front of you now: its kind, and any shape a shapeshifter has taken.
 FoeType foeIn(GameState s) => formed(encounterType(s.foe, s.rare), s.form);
@@ -273,7 +297,7 @@ int spawnHp(int foeIndex, int level, [Rare? rare]) {
   // (A boss risen again: a step tougher than the first time, not a named rare's whole lift on top
   // of a boss's, which made it all but unbeatable when it rose.)
   final variant = rare == null ? 1.0 : (f.boss ? risenHp : (rare.name != null && !rare.pack ? namedRareHp : rareHp));
-  return ((8 + 2 * level) * turnsPerFoe * (f.boss ? bossTurns : 1) * f.hp * variant * toughness(landTier(realmAt(i)), level) * (f.boss || ownTuning(rare) ? 1 : continents[realmAt(i)].foeHp)).round();
+  return ((8 + 2 * level) * turnsPerFoe * (f.boss ? bossTurns + bossTurnsPerTier * landTier(realmAt(i)) : 1) * f.hp * variant * toughness(landTier(realmAt(i)), level) * (f.boss || ownTuning(rare) ? 1 : continents[realmAt(i)].foeHp) * (rare == null && !f.boss ? commonLift(commonHp, level) : 1)).round();
 }
 
 /// Later continents are tougher, and foes keep pace with the gear a hero of [level] usually
@@ -394,14 +418,33 @@ SwingDamage swingDamage(GameState state, double roll, {Special? special, AmmoTyp
   final burn = (sp?.element == Stat.burn ? extra : 0) + ammoAdds(Stat.burn) + (pet?.burn ?? 0);
   // An elemental shrugs off its own element and takes double from its opposite.
   int el(Stat st, int v) => foe.element == null ? v : (foe.element == st.name ? 0 : (elementWeakness(foe.element!) == st.name ? v * 2 : v));
+  // What the blow leaves in the wound: fire that keeps burning, venom that builds, or a bleed. A
+  // foe carries only one at a time (see GameEngine.foeAffliction), so a weapon with more than one
+  // of them pours them all into its strongest on this foe: nothing's lost, and each blow lays on
+  // one clear thing. (A fire elemental shrugs off fire, so a burning blade's fire goes into its
+  // venom or its edge instead, if it has any.)
+  var ignite = el(Stat.burn, foe.demon || foe.look == 'emberKing' ? s.burn ~/ 2 : (foe.ent ? s.burn * 2 : s.burn));
+  var envenom = el(Stat.poison, foe.venomous ? 0 : (foe.ent ? poison ~/ 2 : poison) + (sp?.element == Stat.poison ? extra : 0));
+  var bleed = bloodless ? 0 : s.bleed * (crit ? 2 : 1);
+  final pooled = ignite + envenom + bleed;
+  if (oneAffliction && pooled > 0) {
+    if (ignite >= envenom && ignite >= bleed) {
+      (ignite, envenom, bleed) = (pooled, 0, 0);
+    } else if (envenom >= bleed) {
+      (ignite, envenom, bleed) = (0, pooled, 0);
+    } else {
+      (ignite, envenom, bleed) = (0, 0, pooled);
+    }
+  }
   return SwingDamage(
     base: base,
     // Ents shrug off half the poison; spiders all of it.
     poison: el(Stat.poison, foe.venomous ? 0 : (foe.ent ? ammoAdds(Stat.poison) ~/ 2 : ammoAdds(Stat.poison))),
     // The weapon's own venom, fire and edge go in to work over the turns that follow.
-    envenom: el(Stat.poison, foe.venomous ? 0 : (foe.ent ? poison ~/ 2 : poison)),
-    ignite: el(Stat.burn, foe.demon || foe.look == 'emberKing' ? s.burn ~/ 2 : (foe.ent ? s.burn * 2 : s.burn)),
-    bleed: bloodless ? 0 : s.bleed * (crit ? 2 : 1),
+    // (A special's own venom goes in with it: Bramblelash's "plus poison" used to add nothing.)
+    envenom: envenom,
+    ignite: ignite,
+    bleed: bleed,
     // Ents burn twice as hard; demons (and the Ember King himself) only half as hard.
     burn: el(Stat.burn, foe.demon || foe.look == 'emberKing' ? burn ~/ 2 : (foe.ent ? burn * 2 : burn)),
     frost: el(Stat.frost, s.frost + (sp?.element == Stat.frost ? extra : 0) + ammoAdds(Stat.frost)),
@@ -411,7 +454,8 @@ SwingDamage swingDamage(GameState state, double roll, {Special? special, AmmoTyp
     smite: el(Stat.smite, ((foe.undead || foe.demon || foe.element == 'poison' ? s.smite : 0) + (sp?.element == Stat.smite ? extra : 0) + ammoAdds(Stat.smite)) * (foe.spirit ? 2 : 1)),
     chip: chip,
     // Bloodleech heals a share of the hit (capped), on top of flat lifesteal.
-    heal: s.lifesteal + (sp?.heal ?? 0) + (base * math.min(leechCap + (shot == AmmoType.leech ? 6 : 0), s.leech + (shot == AmmoType.leech ? 6 : 0)) / 100).round(),
+    // (A special's heal grows with you: a flat 20 was a fair gulp at level 5 and nothing at 40.)
+    heal: s.lifesteal + ((sp?.heal ?? 0) * (1 + k.level / 10)).round() + (base * math.min(leechCap + (shot == AmmoType.leech ? 6 : 0), s.leech + (shot == AmmoType.leech ? 6 : 0)) / 100).round(),
     leech: s.leech > 0 || shot == AmmoType.leech,
     devastating: devastating,
     glancing: glancing,
@@ -426,7 +470,7 @@ SwingDamage swingDamage(GameState state, double roll, {Special? special, AmmoTyp
 
 /// How hard the foe at [foeIndex] (or a rare variant) hits back each turn, before armour. Grows
 /// with its level and continent; bosses and rare foes hit harder.
-const foeHitGrowth = .45, bossHit = 1.6;
+const foeHitGrowth = .45, bossHit = 1.3;
 int foeAttack(int foeIndex, Rare? rare, int level) {
   final f = encounterType(foeIndex, rare), realm = landTier(realmAt(rare?.base ?? foeIndex));
   var a = (13 + 5.6 * level + 1.4 * math.max(0, level - 8)) * (1 + .05 * realm);
@@ -440,6 +484,7 @@ int foeAttack(int foeIndex, Rare? rare, int level) {
   // Bosses hit hard (Gorbo, the very first, a little less: he's where a new hero learns bosses).
   if (f.boss) a *= (realm == 0 ? 1.2 : bossHit) * f.hit;
   if (!f.boss && !ownTuning(rare)) a *= continents[realmAt(rare?.base ?? foeIndex)].foeHit;
+  if (!f.boss && rare == null) a *= commonLift(commonHit, level);
   if (f.dragon) a += 1;
   if (f.rare) a *= f.boss ? risenHit : (f.named ? 1.35 : 1.2);
   if (f.pack) a *= 1.1;
@@ -449,7 +494,10 @@ int foeAttack(int foeIndex, Rare? rare, int level) {
 
 /// The chance the foe's blow misses you outright (more for nimble rangers). Up to 40% (rangers 50%):
 /// it stacks with parrying, blocking and armour.
-double dodgeChance(Knight k, [FoeType? foe]) => math.min(k.heroClass == HeroClass.ranger ? .5 : .4, (k.heroClass == HeroClass.ranger ? .25 : .15) + heroStats(k).dodge / 100 + (foe?.look == 'cyclops' ? cyclopsDodge : 0));
+/// (Tried lower, 35% and 30%: it reined in the dodging suits, but every other player too, and the
+/// road's knockouts went up by half. The suits are tuned on their own instead, in loot's _setPower.)
+const dodgeCap = .4, parryCap = .4;
+double dodgeChance(Knight k, [FoeType? foe]) => math.min(k.heroClass == HeroClass.ranger ? .5 : dodgeCap, (k.heroClass == HeroClass.ranger ? .25 : .15) + heroStats(k).dodge / 100 + (foe?.look == 'cyclops' ? cyclopsDodge : 0));
 
 /// How the foe's blow went.
 enum Guard { dodge, parry, block, hit, frozen, warded, slowed, guarded, asleep, stunned, roared }
@@ -487,7 +535,7 @@ double parryChance(Knight k) {
   final s = heroStats(k);
   // Two blades catch a blow better than one.
   final twin = dualWielding(k) && k.heroClass == HeroClass.knight ? 3 : 0;
-  return ((base + s.crit ~/ 2 + s.parry + twin) / 100).clamp(0.0, .4);
+  return ((base + s.crit ~/ 2 + s.parry + twin) / 100).clamp(0.0, parryCap);
 }
 
 /// The chance to block (or, for mages, ward off) most of the blow, from class, shield and guard.
@@ -523,7 +571,11 @@ int counterDamage(GameState s) {
   final hide = s.wolfTurns > 0 ? wolfHide : 1.0;
   // The full Drakesworn set: dragon scale turns fire.
   final scale = foeIn(s).strike == Strike.fire && activeSets(k.setGear).any((e) => e.$1.dragonhide && e.$2 >= e.$1.full) ? dragonhideFire : 1.0;
-  return math.max(1, (foeAttack(s.foe, s.rare, s.foeLevel) * (1 - damageReduction(k)) * weakened * bones * bark * hide * scale * manaShield(s) * outmatched(s.foeLevel, k.level) * ngFoeHit(s.ng)).round());
+  // A boss that keeps beating you hits a little softer each time too, as well as having less HP
+  // (see doggedFor): a hero who can't win yet still gets there, rather than losing for ever.
+  final c = realmAt(s.foe);
+  final dogged = s.rare == null && foeIn(s).boss && !s.bossesDown.contains(c) && !s.wildFight && !s.dungeonFight ? 1 - math.min(doggedHitMax, doggedHitStep * (s.bossLosses[c] ?? 0)) : 1.0;
+  return math.max(1, (foeAttack(s.foe, s.rare, s.foeLevel) * (1 - damageReduction(k)) * weakened * bones * bark * hide * scale * dogged * manaShield(s) * outmatched(s.foeLevel, k.level) * ngFoeHit(s.ng)).round());
 }
 
 /// The Bloodmoon Pelt: when a blow leaves you under [wolfAt] of your HP, the wolf comes out (once a
@@ -600,7 +652,7 @@ class SuitArt {
 
 const suitArts = <String, SuitArt>{
   'ashen': SuitArt('Cinder Slam', 'Ashen Cut', 'IGNITE', 0xFFFF6A2A, 'Sets it ablaze'),
-  'nightblood': SuitArt('Blood Rend', 'Crimson Cut', 'DRINK', 0xFFE0405A, 'Heals you a sixth of the blow'),
+  'nightblood': SuitArt('Blood Rend', 'Crimson Cut', 'DRINK', 0xFFE0405A, 'Heals you an eighth of the blow'),
   'moonfang': SuitArt('Savage Maul', 'Moonfang Rake', 'BLEED', 0xFFC8C4BC, 'Opens a bleeding wound'),
   'silverleaf': SuitArt('Moonlit Feint', 'Silver Cut', 'WEAKEN', 0xFFE8E0B0, 'It hits softer for 2 turns'),
   'deepforge': SuitArt('Anvil Strike', 'Runed Cut', 'STUN', 0xFFE8C060, 'Always stuns, bosses too'),
@@ -686,7 +738,7 @@ Rarity sightingRarity(double odds) => odds >= .05 ? Rarity.uncommon : (odds >= .
 /// The rarer things that can turn up in land [c] when you set out, with the chance of each a fight
 /// (as the road rolls them): its golems, elementals, the Hidden Ones (and their Prior), its packs
 /// and its named foes. Commonest first.
-List<(Rare, double)> sightingsIn(int c, {required bool cindervaleClear}) {
+List<(Rare, double)> sightingsIn(int c, {required bool cindervaleClear, bool gloomfenClear = true}) {
   final l = continents[c], at = foeIndexes(c).first, out = <(Rare, double)>[];
   for (final (m, odds) in golemLands[c] ?? const <(Metal, double)>[]) {
     out.add((Rare(at, m.aura, look: m.golemLook), odds));
@@ -696,8 +748,9 @@ List<(Rare, double)> sightingsIn(int c, {required bool cindervaleClear}) {
   }
   final hidden = hiddenChance(c, cindervaleClear: cindervaleClear);
   if (hidden > 0) {
-    out.add((Rare(at, Aura.cursed, look: 'hiddenAcolyte'), hidden * (1 - hiddenPriorShare)));
-    out.add((Rare(at, Aura.cursed, look: hiddenPrior, name: 'The Veiled Prior'), hidden * hiddenPriorShare));
+    final prior = priorShare(gloomfenClear);
+    out.add((Rare(at, Aura.cursed, look: 'hiddenAcolyte'), hidden * (1 - prior)));
+    if (prior > 0) out.add((Rare(at, Aura.cursed, look: hiddenPrior, name: 'The Veiled Prior'), hidden * prior));
   }
   for (final (look, name) in l.packs) {
     final i = lookIndex(look, c);
@@ -712,11 +765,54 @@ List<(Rare, double)> sightingsIn(int c, {required bool cindervaleClear}) {
 /// How rare the rare foe in front of you is to meet, graded like [sightingsIn] (any of the Hidden
 /// Ones counts as one sighting). A rare that isn't on that list (a foe turned rare by an aura, a
 /// nemesis, Sir Malric) is plain [Rarity.rare].
-Rarity sightingRarityOf(Rare rare, int c, {required bool cindervaleClear}) {
+Rarity sightingRarityOf(Rare rare, int c, {required bool cindervaleClear, bool gloomfenClear = true}) {
   final hiddenLook = hiddenRanks.containsKey(rare.look) && rare.look != hiddenPrior;
-  for (final (r, odds) in sightingsIn(c, cindervaleClear: cindervaleClear)) {
+  for (final (r, odds) in sightingsIn(c, cindervaleClear: cindervaleClear, gloomfenClear: gloomfenClear)) {
     final same = hiddenLook ? r.look == 'hiddenAcolyte' : (r.look == rare.look && r.name == rare.name && r.pack == rare.pack && (r.look != null || r.name != null || r.pack));
     if (same) return sightingRarity(odds);
   }
   return Rarity.rare;
+}
+
+// ------------------------------------------------------------------ what a piece is really worth
+
+/// What [item] is worth to [k] in place of [replacing] (what's in its slot now, if anything): its
+/// stats as they'd really work on this hero. Plain [GearItem.score] adds every stat up whole, so late
+/// on a piece full of critical chance looked like an upgrade when crit was already at its cap
+/// (and parry, dodge and block the same), a two-hander's extra edge counted for nothing, and fire,
+/// frost and venom counted like raw damage though they never crit or take a bash's or a rite's
+/// lift. Here a capped stat counts only for the room left under its cap, the two-hand edge counts
+/// as damage, and the elements for what they do.
+double gearWorth(Knight k, GearItem item, GearItem? replacing) {
+  final rest = [for (final g in k.setGear) if (!identical(g, replacing) && g.id != replacing?.id) g];
+  final base = heroStats(k, gear: rest);
+  final stats = <Stat, int>{...item.stats};
+  if (item.enchant case final e?) stats[e.info.stat] = (stats[e.info.stat] ?? 0) + e.value;
+  final weapon = item.slot == GearSlot.weapon ? item : k.loadout.weapon;
+  final petCrit = petStage(k)?.$2.crit ?? 0;
+  // Room under each cap, in the stat's own points.
+  final critRoom = 45 - base.crit - weaponCrit(weapon) - petCrit;
+  final room = <Stat, num>{
+    Stat.crit: critRoom,
+    Stat.dodge: 100 * (k.heroClass == HeroClass.ranger ? .5 : dodgeCap) - (k.heroClass == HeroClass.ranger ? 25 : 15) - base.dodge,
+    Stat.parry: 100 * parryCap - 10 - base.crit / 2 - base.parry,
+    Stat.block: 100 * (classOf(k)?.id == 'deepforge' ? .5 : .4) - 18 - base.guard / 2 - base.block,
+    Stat.guard: 100 * (.6 - base.armour) - base.guard,
+    Stat.leech: leechCap - base.leech,
+    Stat.wyrmbane: wyrmbaneCap - base.wyrmbane,
+  };
+  var t = 0.0;
+  stats.forEach((s, v) {
+    final r = room[s];
+    final useful = r == null ? v.toDouble() : v.clamp(0, math.max(0, r)).toDouble();
+    final w = switch (s) {
+      Stat.burn || Stat.poison || Stat.bleed => statWeight(s) * .6,
+      Stat.frost => statWeight(s) * .7,
+      _ => statWeight(s),
+    };
+    t += useful * w;
+  });
+  if (item.slot == GearSlot.weapon) t += twoHandBonus(item) * statWeight(Stat.damage);
+  if (item.special != null) t *= 1.35;
+  return t;
 }

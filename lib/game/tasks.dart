@@ -41,7 +41,7 @@ class GameTask {
 final gameTasks = <GameTask>[
   GameTask('win', 'Win a fight', (s) => s.foesFelled >= 1, const TaskReward(gold: 25, xp: .2)),
   GameTask('potion', 'Buy a health potion from Mags', (s) => s.did.contains('potion'), const TaskReward(potions: 1)),
-  GameTask('equip', 'Wear a find from your chest, in your tent', (s) => s.did.contains('equip'), const TaskReward(gold: 40)),
+  GameTask('equip', 'Wear a find from your chest, at home', (s) => s.did.contains('equip'), const TaskReward(gold: 40)),
   GameTask('train', 'Spend a training point', (s) => Trait.values.any((t) => trained(s.knight, t) > 0), const TaskReward(xp: .2)),
   GameTask('dye', 'Buy a new dye from Mags', (s) => s.knight.ownedDyes.length > 1, const TaskReward(gold: 30)),
   GameTask('mend', 'Mend the Soot & Kettle', (s) => s.innRepaired, const TaskReward(xp: .3)),

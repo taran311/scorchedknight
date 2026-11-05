@@ -38,8 +38,10 @@ class Audit {
   final String player;
   final int seed;
   final problems = <String>[];
-  int fights = 0, knockouts = 0;
+  int fights = 0, knockouts = 0, coins = 0, level = 0;
   bool won = false;
+  /// Gold held when each main boss fell: land → coins.
+  final goldAt = <int, int>{};
 
   /// Each step the Road card showed, in order: its words, the level and fight it first showed at,
   /// how many fights it stayed up, and the knockouts along the way.
@@ -51,9 +53,15 @@ class Audit {
 }
 
 /// A turn's move: a potion at a third of HP, the foe's weakness, rites, the skill and companion.
+/// 'smart' reads the foe's card and picks the hardest-landing move; 'full' the old fixed order
+/// (weakness, bash, any rite, companion, bolt); 'melee' only the two attacks (and potions).
+var policy = 'smart';
+
 BattleAction choose(GameEngine e) {
   final k = e.state.knight, f = encounterType(e.state.foe, e.state.rare);
   if (k.hp < maxHp(k) * .35 && e.whyNot(BattleAction.potion) == null) return BattleAction.potion;
+  if (policy == 'melee') return e.whyNot(BattleAction.skill) == null ? BattleAction.skill : BattleAction.attack;
+  if (policy == 'smart') return smart(e);
   bool rite() {
     for (final id in k.rites) {
       if (e.whyNotRite(id) == null) {
@@ -71,6 +79,37 @@ BattleAction choose(GameEngine e) {
   final blade = (f.aloft ? aloftMelee : 1) * triangle(f.kind, AttackStyle.blade);
   final bolt = crossbowShare(k) * (f.aloft ? aloftShot : 1) * triangle(f.kind, AttackStyle.bolt);
   return bolt > blade && e.whyNot(BattleAction.shoot) == null ? BattleAction.shoot : BattleAction.attack;
+}
+
+/// A player who reads the foe's card: the move that lands hardest on this foe, from how each way of
+/// fighting lands on it (the triangle, flying, stone and spirits), the bash when it's ready, a
+/// bolt when it's the better shot, a damage rite when there's mana for it.
+BattleAction smart(GameEngine e) {
+  final k = e.state.knight, f = foeIn(e.state);
+  final might = mightBoost(k);
+  final blade = styleEdgeOn(f, AttackStyle.blade);
+  var best = BattleAction.attack;
+  var score = blade;
+  if (e.whyNot(BattleAction.skill) == null && blade * bashMult > score) {
+    best = BattleAction.skill;
+    score = blade * bashMult;
+  }
+  final bolt = styleEdgeOn(f, AttackStyle.bolt) * crossbowShare(k) * aimBoost(k) / might;
+  if (bolt > score) {
+    best = BattleAction.shoot;
+    score = bolt;
+  }
+  for (final id in k.rites) {
+    final sp = spellById(id);
+    if (sp == null || e.whyNotRite(id) != null) continue;
+    final dmg = styleEdgeOn(f, AttackStyle.rite) * sp.mult * arcanaBoost(k) / might + (sp.element == null ? 0 : .3);
+    if (sp.mult > 0 && dmg > score) {
+      best = BattleAction.cast;
+      score = dmg;
+      k.preparedSpell = id;
+    }
+  }
+  return best;
 }
 
 /// Between fights: rest, rites, training, and (unless careless) the shops and the forge. (Places
@@ -94,11 +133,12 @@ void inTown(GameEngine e, {required bool careless, bool wards = true, bool forge
   for (final t in tiersFor(k.heroClass).skip(1).where((t) => !t.dropOnly && !isCrafted(t.id))) {
     if (!e.owns(t.id) && k.coins >= e.priceOf(t.id) * 1.2) e.purchase(t.id);
   }
-  if (careless) return;
-  if (k.coins > e.priceOf('crossbow') * 1.5) e.purchase('crossbow');
+  // (Wards even for the careless: the map offers one at the door of an unwarded land.)
   for (var w = 1; w < continents.length && wards; w++) {
     e.craftWard(w);
   }
+  if (careless) return;
+  if (k.coins > e.priceOf('crossbow') * 1.5) e.purchase('crossbow');
   for (final g in Gem.values) {
     while (e.fletch(g)) {}
   }
@@ -144,7 +184,7 @@ void takeLoot(GameEngine e) {
   for (final g in List.of(s.pendingLoot)) {
     final old = e.equippedFor(g);
     final usable = (g.heroClass == null || g.heroClass == k.heroClass) && e.whyNotWear(g) == null;
-    final better = g.slot == GearSlot.armour ? armourTierById(g.art).reduction > armourTierById(k.loadout.armour).reduction : old == null || g.score > old.score;
+    final better = g.slot == GearSlot.armour ? armourTierById(g.art).reduction > armourTierById(k.loadout.armour).reduction : old == null || gearWorth(k, g, old) > gearWorth(k, old, old);
     if (usable && better) {
       e.equipLoot(g.id);
     } else if (isKeepsake(g)) {
@@ -159,8 +199,12 @@ void takeLoot(GameEngine e) {
 }
 
 /// Fights the fight in front of you out. True if you were knocked out.
+/// Called after every fight: (engine, foe type, turns, share of max HP lost, knocked out).
+void Function(GameEngine e, FoeType f, int turns, double lost, bool ko)? onFight;
+
 bool fight(GameEngine e, Random rng, Audit a) {
   final s = e.state;
+  final f0 = s.inBattle ? encounterType(s.foe, s.rare) : null, hp0 = s.knight.hp / maxHp(s.knight);
   var turns = 0, ko = false;
   while (s.inBattle && turns < 400) {
     final m = choose(e);
@@ -169,6 +213,7 @@ bool fight(GameEngine e, Random rng, Audit a) {
     if (r.knockedOut) ko = true;
   }
   if (turns >= 400) a.flag('a fight never ended (${encounterType(s.foe, s.rare).name})');
+  if (f0 != null) onFight?.call(e, f0, turns, hp0 - s.knight.hp / maxHp(s.knight), ko);
   a.fights++;
   if (ko) a.knockouts++;
   if (s.encounter != null) e.resolveEncounter(rng.nextInt(2));
@@ -197,17 +242,21 @@ String? checkStep(GameEngine e, RoadStep st, {required bool road}) {
       if (e.whyNotTravel(st.land) != null) return '"${st.title}": ${continents[st.land].name} is shut';
     case RoadKind.forge:
       if (!e.forgeReady && e.upgradesReady == 0) return '"${st.title}": nothing at the forge to do';
+    case RoadKind.arena:
+      if (e.whyNotArena() != null) return '"${st.title}": ${e.whyNotArena()}';
+    case RoadKind.hall:
+      if (e.whyNotHall() != null) return '"${st.title}": ${e.whyNotHall()}';
     case RoadKind.wild:
       break;
   }
-  // "Until the X opens at level N": the next land on the road, and you're below N.
-  final m = RegExp(r'Until (.+) opens at level (\d+)').firstMatch(st.sub);
+  // "Level N opens the X": the next land on the road, and you're below N.
+  final m = RegExp(r'Level (\d+) opens (.+)').firstMatch(st.sub);
   if (m != null) {
     final next = [for (var i = 0; i < mainLands; i++) i].firstWhere((i) => !s.bossesDown.contains(i));
-    final need = int.parse(m.group(2)!);
+    final need = int.parse(m.group(1)!);
     if (need != continents[next].minLevel) return '"${st.sub}": the next land opens at ${continents[next].minLevel}';
     if (k.level >= need) return '"${st.sub}": you\'re already level ${k.level}';
-    if (!continents[next].name.toLowerCase().endsWith(m.group(1)!.toLowerCase().replaceFirst('the ', ''))) return '"${st.sub}": the next land is ${continents[next].name}';
+    if (!continents[next].name.toLowerCase().endsWith(m.group(2)!.toLowerCase().replaceFirst('the ', ''))) return '"${st.sub}": the next land is ${continents[next].name}';
   }
   final g = RegExp(r'reach level (\d+)').firstMatch(st.title);
   if (g != null && k.level >= int.parse(g.group(1)!)) return '"${st.title}": you\'re already level ${k.level}';
@@ -226,6 +275,8 @@ void take(GameEngine e, RoadStep st, Random rng, Audit a) {
       } else {
         e.travel(st.land);
         if (st.kind != RoadKind.train && e.bossReady && !s.bossesDown.contains(st.land)) {
+          // A player sleeps it off before a boss (the inn's free), unless it only comes out at night.
+          if (!continents[st.land].boss.night) e.rest();
           e.challengeBoss();
         } else {
           e.explore();
@@ -233,6 +284,7 @@ void take(GameEngine e, RoadStep st, Random rng, Audit a) {
       }
       fight(e, rng, a);
     case RoadKind.heroic:
+      e.rest();
       e.travel(st.land);
       e.exploreHeroic();
       fight(e, rng, a);
@@ -264,6 +316,12 @@ void take(GameEngine e, RoadStep st, Random rng, Audit a) {
       // The road says the forge: everything Dunstan can do, then back to the road.
       forgeChores(e);
       e.lookedInForge();
+    case RoadKind.arena:
+      e.rest();
+      if (e.startArenaBout() != null) fight(e, rng, a);
+    case RoadKind.hall:
+      e.rest();
+      if (e.startHallFight() != null) fight(e, rng, a);
     case RoadKind.wild:
       break;
   }
@@ -275,6 +333,8 @@ double? winOdds(GameEngine e, RoadStep st, int n) {
   if (!const {RoadKind.boss, RoadKind.side, RoadKind.heroic}.contains(st.kind) || st.why != null) return null;
   final json = jsonEncode(e.state.toJson());
   var won = 0;
+  final hook = onFight;
+  onFight = null;
   for (var i = 0; i < n; i++) {
     final s = GameState.fromJson((jsonDecode(json) as Map).cast<String, dynamic>());
     final t = GameEngine(s, random: Random(1000 + i), clock: () => DateTime(2026, 6, 1));
@@ -290,6 +350,7 @@ double? winOdds(GameEngine e, RoadStep st, int n) {
     final a = Audit('trial', 0);
     if (!fight(t, Random(i), a)) won++;
   }
+  onFight = hook;
   return won / n;
 }
 
@@ -298,6 +359,8 @@ final odds = <String, (int, double, int)>{};
 
 Audit play(int seed, String player, {int maxFights = 2500}) {
   final a = Audit(player, seed);
+  final was = policy;
+  if (player == 'careless') policy = 'full';
   final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(seed), clock: () => DateTime(2026, 6, 1));
   final rng = Random(seed * 7 + 1), s = e.state, k = s.knight;
   e.takeHobsJob();
@@ -387,7 +450,10 @@ Audit play(int seed, String player, {int maxFights = 2500}) {
     if (!s.day && !(e.whyNotTravel(pick.land) == null && continents[pick.land].boss.night)) e.rest();
   }
   close();
+  policy = was;
   a.won = s.won;
+  a.coins = k.coins;
+  a.level = k.level;
   if (!s.won) a.flag('never beat Vharrax: stuck on "$showing" ($shownSub) at level ${k.level} after ${a.fights} fights');
   // Steps that hung on, or kept knocking you out.
   for (final st in a.steps) {

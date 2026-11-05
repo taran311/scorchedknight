@@ -941,7 +941,7 @@ void main() {
     k.level = continents[1].minLevel - 1;
     final step = e.roadStep()!;
     expect(step.kind, isNot(RoadKind.boss), reason: 'the Gloomfen waits on a level');
-    expect(step.sub, contains('level ${continents[1].minLevel}'));
+    expect(step.sub, contains('Level ${continents[1].minLevel}'));
     // With nothing left to explore or delve, at worst: grow stronger.
     s.explored.addAll(places.map((p) => p.id));
     s.dungeonsDone.addAll(dungeons.map((d) => d.id));
@@ -1000,6 +1000,20 @@ void main() {
       s.setbacks['dungeon:${delve.id}'] = giveUpLosses;
       expect(e.roadStep()!.id, isNot(delve.id));
     }
+  });
+
+  test('after the Ember King, the road goes on to the lands still standing', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(4));
+    final s = e.state;
+    s.innRepaired = true;
+    s.knight.level = 50;
+    for (var i = 0; i < continents.length; i++) {
+      if (i != 14) s.bossesDown.add(i);
+    }
+    s.risenDown.addAll(List.generate(continents.length, (i) => i));
+    final step = e.roadStep()!;
+    expect(step.kind, RoadKind.side);
+    expect(step.land, 14);
   });
 
   test('a risen boss that beats you comes back a little weaker', () {

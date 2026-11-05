@@ -122,6 +122,10 @@ void run(String style, int seed, Stats st, {void Function(GameEngine e, int land
       final better = g.slot == GearSlot.armour ? armourTierById(g.art).reduction > armourTierById(k.loadout.armour).reduction : old == null || g.score > old.score;
       if (usable && better) {
         e.equipLoot(g.id);
+      } else if (isKeepsake(g)) {
+        // (Kept, not sold: a keepsake can't be sold, and left in the spoils it was counted again
+        // after every fight, which made the late lands look like they rained legendaries.)
+        e.keepLoot(g.id);
       } else {
         e.sellLoot(g.id);
       }

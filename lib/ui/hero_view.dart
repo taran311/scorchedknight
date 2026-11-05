@@ -16,8 +16,8 @@ import '../game/catalog.dart' show sweepingWeapons;
 import '../game/classes.dart';
 import '../game/loot.dart';
 import '../game/vault.dart' show isKeepsake;
-import '../game/models.dart' show Loadout;
-import '../game/rules.dart' show dualStrikeShare;
+import '../game/models.dart' show Knight, Loadout;
+import '../game/rules.dart' show dualStrikeShare, gearWorth;
 import 'item_icons.dart';
 import 'stat_icons.dart';
 import 'theme.dart';
@@ -375,7 +375,7 @@ class SetChips extends StatelessWidget {
 /// whose [kit] it joins, against [worn] (what's in that slot now). Armour goes by how much damage
 /// it takes off; anything else by its overall worth (within 5% counts as the same). 2: an
 /// off-hand your weapon leaves no hand free for (no use to you as you are). 3: one of a kind.
-int upgradeVerdict(GearItem item, GearItem? worn, Loadout kit) {
+int upgradeVerdict(GearItem item, GearItem? worn, Loadout kit, [Knight? k]) {
   // One of a kind (the vault's, a relic, a trophy): yours to keep, so no better-or-worse arrow
   // nudging you to part with it, just its own mark.
   if (isKeepsake(item)) return 3;
@@ -390,7 +390,9 @@ int upgradeVerdict(GearItem item, GearItem? worn, Loadout kit) {
     return d > .005 ? 1 : (d < -.005 ? -1 : 0);
   }
   if (worn == null) return 1;
-  final r = item.score / (worn.score < 1 ? 1 : worn.score);
+  // (What each is really worth on this hero, caps and all, when we know the hero.)
+  final a = k == null ? item.score.toDouble() : gearWorth(k, item, worn), b = k == null ? worn.score.toDouble() : gearWorth(k, worn, worn);
+  final r = a / (b < 1 ? 1 : b);
   return r > 1.05 ? 1 : (r < .95 ? -1 : 0);
 }
 

@@ -926,7 +926,7 @@ class _FoeCard extends StatelessWidget {
         // How rare a find it is, in the same grades and colours as the trail's "Rarer sightings".
         else if (aura != null)
           if (c.shownRare case final rare?)
-            _gradeBadge(sightingRarityOf(rare, realm, cindervaleClear: c.state.bossesDown.contains(0)), foe.pack, aura)
+            _gradeBadge(sightingRarityOf(rare, realm, cindervaleClear: c.state.bossesDown.contains(0), gloomfenClear: c.state.bossesDown.contains(1)), foe.pack, aura)
           else
             FoeBadge(label: foe.pack ? 'PACK' : 'RARE', colour: colour, solid: true, tip: aura.label),
         if (foe.boss && aura == null) const FoeBadge(label: 'BOSS', colour: Palette.amber, solid: true),
@@ -1533,7 +1533,7 @@ class _Result extends StatelessWidget {
             // Any rite the new level brings, by name, in its own colour.
             if (k.levelUps > 0)
               for (final sp in spells.where((sp) => sp.order == null && sp.earned == null && sp.level > s.knight.level - k.levelUps && sp.level <= s.knight.level))
-                _Spoil(Icon(riteIcon(sp), size: 18, color: Color(sp.argb)), 'New rite: ${sp.name}', Color(sp.argb), big: true, tip: s.knight.rites.contains(sp.id) ? 'On your hotbar' : 'Swap it onto your hotbar in your tent'),
+                _Spoil(Icon(riteIcon(sp), size: 18, color: Color(sp.argb)), 'New rite: ${sp.name}', Color(sp.argb), big: true, tip: s.knight.rites.contains(sp.id) ? 'On your hotbar' : 'Swap it onto your hotbar in your ${homes[s.home].name.toLowerCase()}'),
             if (c.engine.rankUp case final up?) _Spoil(const Icon(Icons.military_tech, size: 18, color: Color(0xFFFFB04A)), up, const Color(0xFFFFB04A), big: true),
             _Spoil(const Icon(Icons.auto_awesome, size: 17, color: Color(0xFFB8D8FF)), '+${fmt(k.xp)} XP', const Color(0xFFB8D8FF)),
             if (k.wild)

@@ -30,7 +30,7 @@ class Mount {
 
 const mounts = <Mount>[
   Mount('pony', 'Sturdy pony', 'Small, stubborn and surprisingly brave. Opens every fight by riding the foe down: a free charge worth 30% of a blow', .3, price: 180),
-  Mount('warhorse', 'Warhorse', 'A barded destrier trained for the lists. Opens every fight by riding the foe down: a free charge worth 50% of a blow', .5, price: 700),
+  Mount('warhorse', 'Warhorse', 'A barded destrier trained for the lists. Opens every fight by riding the foe down: a free charge worth 50% of a blow', .5, price: 300),
   Mount('hellsteed', 'Hellsteed', 'Bred in the Caldera\'s smoke and broken with ember cores in its feed. Opens every fight by riding the foe down: a free charge worth 68% of a blow, and the foe burns', .68, price: 3500, burn: true, level: 28, cores: 2),
   Mount('unicorn', 'Unicorn', 'Tamed in the Thornwild, very politely. Opens every fight by riding the foe down: a free charge worth 55% of a blow, and its horn mends 8% of your health', .55, mend: .08),
   Mount('nightmare', 'Nightmare', 'A ghostly black horse from the Bone Colossus\'s ribcage. It snorts embers. Opens every fight by riding the foe down: a free charge worth 60% of a blow, and the foe burns', .6, burn: true),

@@ -481,7 +481,7 @@ class _MapPageState extends State<MapPage> {
                                 if (phone && s.knight.level < 3)
                                   Padding(
                                     padding: const EdgeInsets.only(top: 4),
-                                    child: Text('Drag to look around · pinch in to see every name', textAlign: TextAlign.center, style: Txt.label(size: 12, color: Palette.parch2)),
+                                    child: Text('Drag to look around · zoom in to see every name', textAlign: TextAlign.center, style: Txt.label(size: 12, color: Palette.parch2)),
                                   ),
                                 SizedBox(height: phone ? 6 : 10),
                                 if (_arenaPick)

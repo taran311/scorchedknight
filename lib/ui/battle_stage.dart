@@ -156,6 +156,41 @@ class _Mark {
   Rect? box;
 }
 
+/// What's on the foe and on you, as the stage shows it (see _BattleStageState._st).
+class _Status {
+  const _Status({this.stacks = 1, this.burn = false, this.venom = false, this.bleed = false, this.frozen = false, this.asleep = false, this.slowed = false, this.weak = false, this.exposed = false, this.poisoned = false, this.roar = false, this.cowed = false});
+  factory _Status.of(GameState s) => _Status(
+    burn: s.foeBurnTurns > 0,
+    venom: s.foeVenom > 0 || s.foeToxin > 0,
+    bleed: s.foeBleedTurns > 0,
+    frozen: s.foeFrozen,
+    asleep: s.foeAsleep > 0,
+    slowed: s.foeSlowed > 0,
+    weak: s.foeWeakened > 0,
+    exposed: s.foeExposed > 0,
+    poisoned: s.heroPoison > 0,
+    roar: s.heroRoar > 0,
+    cowed: s.heroCowed > 0,
+  );
+
+  /// How far the venom has built (more motes the more there is).
+  final int stacks;
+
+  /// The same, with affliction [kind] the foe's only one ([n] times laid on).
+  _Status only(String kind, int n) => _Status(stacks: n, burn: kind == 'burn', venom: kind == 'venom', bleed: kind == 'bleed', frozen: frozen, asleep: asleep, slowed: slowed, weak: weak, exposed: exposed, poisoned: poisoned, roar: roar, cowed: cowed);
+
+  /// On the foe: burning, venom in it, bleeding, frozen, asleep, slowed, weakened, exposed.
+  final bool burn, venom, bleed, frozen, asleep, slowed, weak, exposed;
+
+  /// On you: poison, your War Cry, cowed by its roar.
+  final bool poisoned, roar, cowed;
+
+  _Status withStacks(int n) => _Status(stacks: n, burn: burn, venom: venom, bleed: bleed, frozen: frozen, asleep: asleep, slowed: slowed, weak: weak, exposed: exposed, poisoned: poisoned, roar: roar, cowed: cowed);
+
+  bool same(_Status o) =>
+      burn == o.burn && venom == o.venom && bleed == o.bleed && frozen == o.frozen && asleep == o.asleep && slowed == o.slowed && weak == o.weak && exposed == o.exposed && poisoned == o.poisoned && roar == o.roar && cowed == o.cowed;
+}
+
 /// How long a damage number or word stays up (ms): long enough to read.
 const _markMs = 1500.0;
 
@@ -372,6 +407,73 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   }
 
   static const _maxParticles = 220;
+
+  /// What's on the foe and on you, as the stage shows it: taken from the game between turns, not
+  /// mid-swing, so a fire doesn't start burning before the blow that lit it has landed.
+  var _st = const _Status();
+  bool _stSeeded = false;
+
+  /// Keeps [_st] up with the game while nothing's playing, with a little flourish as a condition
+  /// takes hold (the words only for those the blow itself doesn't already announce).
+  void _syncStatus() {
+    void spark(String kind, Offset at, int n, {double dir = -math.pi / 2, double spread = 3, double speed = 4, double life = 500, double radius = 4, double gravity = .12}) {
+      if (!_reduceMotion) _spark(kind, at, n, dir: dir, spread: spread, speed: speed, life: life, radius: radius, gravity: gravity);
+    }
+
+    if (!c.state.inBattle || fx['enter']! > .05) {
+      _st = const _Status();
+      _stSeeded = false;
+      return;
+    }
+    if (c.busy) return;
+    final n = _Status.of(c.state), o = _st;
+    // A fight picked up again (or just begun) shows what's already on whom without a word: every
+    // one of them announced at once piled up over the foe.
+    if (!_stSeeded) {
+      _stSeeded = true;
+      _st = n;
+      return;
+    }
+    if (n.same(o)) return;
+    _st = _Status.of(c.state).withStacks(o.stacks);
+    final chest = _foeChest, me = Offset(_knightFeet.dx, _groundY - 170);
+    // (Fire, venom and wounds are shown as the blow lays them on: _playAfflict.)
+    if (n.frozen && !o.frozen) spark('rime', chest, 22, speed: 3.5, life: 700, radius: 3.5, gravity: .02);
+    if (n.asleep && !o.asleep) spark('curse', chest + const Offset(0, -50), 10, speed: 1.2, life: 900, radius: 3, gravity: -.01);
+    if (n.slowed && !o.slowed) _mark('Slowed', _frost, chest + const Offset(-20, -110), icon: Icons.hourglass_bottom_rounded);
+    if (n.weak && !o.weak) _mark('Weakened', const [Color(0xFFB08AE8), Color(0xFF4A2E7A)], chest + const Offset(20, -110), icon: Icons.south_rounded);
+    if (n.exposed && !o.exposed) _mark('Exposed', const [Color(0xFFE86A5A), Color(0xFF7A221A)], chest + const Offset(0, -110), icon: Icons.gps_fixed_rounded);
+    if (n.poisoned && !o.poisoned) spark('venom', me, 12, speed: 2, life: 800, radius: 3.5, gravity: -.02);
+    if (n.cowed && !o.cowed) _mark('Cowed', const [Color(0xFFA8A49A), Color(0xFF4A4640)], me + const Offset(-10, -100));
+  }
+
+  /// A condition's steady show while it lasts: a few drifting motes a second from whoever has it
+  /// (background motes: they never hold the stage at full frame rate, and a phone's lighter look
+  /// sheds fewer).
+  void _statusMotes(double dt) {
+    final st = _st;
+    if (fx['dying']! > .05 || fx['enter']! > .05) return;
+    final rate = dt / 1000 * (_lite ? .6 : 1) * (_reduceMotion ? .5 : 1);
+    final lift = _foeLift, h = _foeHeight;
+    final base = Offset(_foeX - fx['lunge']! * 90 + lift.dx, _groundY + lift.dy);
+    Offset onFoe(double lo, double hi) => base + Offset((_rng.nextDouble() - .5) * h * .45, -h * (lo + _rng.nextDouble() * (hi - lo)));
+    void emit(bool on, double perSec, String kind, Offset Function() at, Offset vel, double life, double radius, double gravity) {
+      if (!on || _rng.nextDouble() > perSec * rate) return;
+      if (_particles.length >= _maxParticles) return;
+      _particles.add(_Particle(kind, at(), vel + Offset((_rng.nextDouble() - .5) * .4, 0), life * (.8 + _rng.nextDouble() * .4), radius * (.7 + _rng.nextDouble() * .6), gravity, ambient: true));
+    }
+
+    emit(st.burn, 16, 'fire', () => onFoe(.05, .7), const Offset(0, -1.7), 650, 6, -.02);
+    emit(st.venom, 5 + 2.0 * math.min(st.stacks, 5), 'venom', () => onFoe(.1, .8), const Offset(0, -.7), 1100, 3.2, -.004);
+    emit(st.bleed, 5, 'blood', () => onFoe(.35, .7), const Offset(0, .4), 900, 2.6, .12);
+    emit(st.frozen, 6, 'rime', () => onFoe(.1, 1), const Offset(0, -.3), 1000, 2.6, .003);
+    emit(st.weak, 4, 'curse', () => onFoe(.6, 1), const Offset(0, .7), 900, 2.8, .01);
+    final me = _knightFeet;
+    Offset onMe(double lo, double hi) => me + Offset((_rng.nextDouble() - .5) * 70, -220 * (lo + _rng.nextDouble() * (hi - lo)));
+    emit(st.poisoned, 7, 'venom', () => onMe(.1, .8), const Offset(0, -.7), 1100, 3.2, -.004);
+    emit(st.roar, 6, 'ember', () => onMe(0, .5), const Offset(0, -1.4), 800, 3, -.01);
+    emit(st.cowed, 3, 'smoke', () => onMe(.7, 1), const Offset(0, .5), 900, 5, .01);
+  }
 
   void _mark(String text, List<Color> colours, Offset at, {IconData? icon}) => _marks.add(_Mark(text, colours, at, now, icon: icon));
 
@@ -1150,8 +1252,13 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     // summoned dead. The foe answers once the last of them has landed.
     final hound = r.pet != null && r.pet!.$1 != Pet.fairy;
     final houndAt = hitAt + 250, bonesAt = hitAt + (hound ? 800 : 120);
-    final counterAt = [hitAt + 160 * nEffects + 440, if (dragonFire) hitAt + 760.0, if (hound) houndAt + 820, if (r.summonHit > 0) bonesAt + swingHitMs + 300].reduce(math.max);
-    final end = [950.0, hitAt + 160 * nEffects + 60, if (dragonFire) hitAt + 580, if (hound) houndAt + 1060, if (r.summonHit > 0) bonesAt + swingHitMs + 420, if (r.counter != null) counterAt + 760, if (r.knockedOut || r.cheatedDeath) counterAt + strikeMs + _reapMs].reduce(math.max);
+    // Then what the blow left in the wound takes hold (it catches fire, venom gets in), and
+    // after everyone's blows, it eats at the foe: one beat each, before the foe answers.
+    final afflictAt = hitAt + 160 * nEffects + 140;
+    final ticks = r.burned + r.venomed + r.bled > 0;
+    final tickAt = [if (r.afflicted != null) afflictAt + 460 else hitAt + 160 * nEffects + 140, if (hound) houndAt + 640, if (r.summonHit > 0) bonesAt + swingHitMs + 180].reduce(math.max);
+    final counterAt = [hitAt + 160 * nEffects + 440, if (r.afflicted != null) afflictAt + 520, if (ticks) tickAt + 420, if (dragonFire) hitAt + 760.0, if (hound) houndAt + 820, if (r.summonHit > 0) bonesAt + swingHitMs + 300].reduce(math.max);
+    final end = [950.0, hitAt + 160 * nEffects + 60, if (r.afflicted != null) afflictAt + 560, if (ticks) tickAt + 480, if (dragonFire) hitAt + 580, if (hound) houndAt + 1060, if (r.summonHit > 0) bonesAt + swingHitMs + 420, if (r.counter != null) counterAt + 760, if (r.knockedOut || r.cheatedDeath) counterAt + strikeMs + _reapMs].reduce(math.max);
     // Mounted: the day's first strike opens with a charge, played before the blow.
     if (r.chargeHit > 0 && r.mount != null) _playCharge(r);
     // A special attack is a show of its own, about as long again as the blow: a build-up first
@@ -1186,7 +1293,8 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         c.revealDamage(-r.regrew);
       });
     }
-    _playLingering(r, d0 + end - 520);
+    if (r.afflicted != null) _at(d0 + afflictAt, () => _playAfflict(r));
+    _playLingering(r, d0 + tickAt);
     if (r.froze) _at(d0 + end - 520, () => _mark('Frozen!', const [Color(0xFF9ADFFF), Color(0xFF2A5A8A)], _foeChest + const Offset(0, -90)));
     if (r.regrown > 0) _at(d0 + end - 300, () => _heal(r.regrown, const Offset(_knightX + 10, _groundY - 250)));
     final k = c.state.knight, look = heroLook(k);
@@ -1771,6 +1879,43 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   /// A turn without an attack: a potion, the companion's command, or trying to flee.
   /// Fire, venom and wounds eating at the foe at the end of the turn, whatever you did with it
   /// (a swing, a potion, a command): the foe is still burning, poisoned or bleeding.
+  /// The blow's affliction taking hold, between your hit's number and its first bite: the foe
+  /// catches fire, venom splashes into it, a wound opens. Only ever one (a foe carries one at a
+  /// time). Venom laid on again shows how far it's built up; fire and wounds renewed just flare.
+  void _playAfflict(SwingResult r) {
+    final kind = r.afflicted!, chest = _foeChest, n = r.afflictStacks;
+    _st = _st.only(kind, n);
+    if (r.afflictReplaced != null && !_reduceMotion) _spark('smoke', chest, 8, speed: 1.6, life: 600, radius: 7, gravity: -.02);
+    void spark(String k, Offset at, int count, {double dir = -math.pi / 2, double spread = 3, double speed = 4, double life = 500, double radius = 4, double gravity = .12}) {
+      if (!_reduceMotion) _spark(k, at, count, dir: dir, spread: spread, speed: speed, life: life, radius: radius, gravity: gravity);
+    }
+
+    final h = _foeHeight, feet = chest + Offset(0, h * .55);
+    switch (kind) {
+      case 'burn':
+        if (r.afflictNew) {
+          // It goes up: flames from its feet to its head.
+          spark('fire', feet, 16, dir: -math.pi / 2, spread: .9, speed: 4.5, life: 700, radius: 8, gravity: -.05);
+          spark('fire', chest, 10, dir: -math.pi / 2, spread: 2.2, speed: 3, life: 600, radius: 6, gravity: -.04);
+          _mark('Burning', _orange, chest + const Offset(-10, -110), icon: Icons.local_fire_department_rounded);
+          Audio.play(Sfx.castFire);
+        } else {
+          spark('fire', chest, 7, dir: -math.pi / 2, spread: 1.4, speed: 2.6, life: 500, radius: 6, gravity: -.04);
+        }
+      case 'venom':
+        // A splash of venom, bigger the more there is in it.
+        spark('venom', chest, 8 + 3 * math.min(n, 5), speed: 2.6 + .3 * math.min(n, 5), life: 700, radius: 3.5, gravity: .02);
+        _mark(r.afflictNew ? 'Poisoned' : 'Poison ×$n', _green, chest + const Offset(10, -110), icon: Icons.science_rounded);
+      case 'bleed':
+        if (r.afflictNew) {
+          if (!_reduceMotion) _spill(chest, .8);
+          _mark('Bleeding', _red, chest + const Offset(0, -110), icon: Icons.water_drop_rounded);
+        } else if (!_reduceMotion) {
+          _spill(chest, .35);
+        }
+    }
+  }
+
   void _playLingering(SwingResult r, double at) {
     final total = r.burned + r.venomed + r.bled;
     if (total <= 0) return;
@@ -1779,7 +1924,14 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     final ticks = [if (r.burned > 0) (r.burned, _orange, 'fire'), if (r.venomed > 0) (r.venomed, _green, 'venom'), if (r.bled > 0) (r.bled, _red, 'bleed')];
     for (final (i, (n, col, kind)) in ticks.indexed) {
       _at(at + i * 180, () {
-        _mark('$n', col, _foeChest + Offset(-20 + i * 26, -60 - i * 34));
+        // (With its element's mark on it, so a fire tick never reads as a plain hit.)
+        // (Out to its left, in the open between you, where the blow's own column of labels isn't:
+        // up among them, a tick got pushed up under the foe's card and was never seen.)
+        _mark('$n', col, _foeChest + Offset(-120, 20 + i * 44), icon: switch (kind) {
+          'fire' => Icons.local_fire_department_rounded,
+          'venom' => Icons.science_rounded,
+          _ => Icons.water_drop_rounded,
+        });
         switch (kind) {
           case 'fire':
             _spark('fire', _foeChest + const Offset(0, -20), 6, dir: -math.pi / 2, spread: 1, speed: 2, life: 500, radius: 6, gravity: -.02);
@@ -2117,6 +2269,10 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         );
       }
     }
+    // (Even with reduced motion asked for, at half the rate: they say what's on whom, and many
+    // phones ask for reduced motion whenever battery saver is on.)
+    _statusMotes(dt);
+    _syncStatus();
     _marks.removeWhere((m) => t - m.start > _markMs + 50);
     _shots.removeWhere((p) => t - p.start > p.duration);
     _drops.removeWhere((m) => t - m.start > 1700);
@@ -2261,6 +2417,67 @@ TextPainter _laidOut(String key, TextPainter Function() make) {
 class _ScenePainter extends CustomPainter {
   _ScenePainter(this.s) : super(repaint: s._time);
   final _BattleStageState s;
+
+  /// The foe's conditions drawn on it (the motes come from _statusMotes): a glow under a burning
+  /// foe, a shell of ice on a frozen one, sleep's Zs, a slow ring round its feet, a mark on an
+  /// exposed one. A handful of flat shapes each: no blurs, no gradients made afresh.
+  void _statusLooks(Canvas canvas, double t, double x, double y, bool still) {
+    final st = s._st, fx = s.fx;
+    if (fx['dying']! > .05 || fx['enter']! > .05) return;
+    final h = s._foeHeight, w = h * .5;
+    final flicker = still ? .5 : .5 + .5 * math.sin(t / 90) * math.sin(t / 37);
+    if (st.burn) {
+      canvas.drawOval(Rect.fromCenter(center: Offset(x, y - 4), width: w * 1.5, height: 26), Paint()..color = Color.fromRGBO(255, 120, 30, .18 + .12 * flicker));
+      canvas.drawOval(Rect.fromCenter(center: Offset(x, y - 4), width: w * .9, height: 14), Paint()..color = Color.fromRGBO(255, 200, 90, .16 + .1 * flicker));
+    }
+    if (st.slowed) {
+      final spin = still ? 0.0 : t / 700, ring = Rect.fromCenter(center: Offset(x, y), width: w * 1.6, height: 30);
+      for (var i = 0; i < 3; i++) {
+        canvas.drawArc(ring, spin + i * 2.094, 1.2, false, strokePaint(const Color(0xFF8AD4F0).withValues(alpha: .55), 2.4)..strokeCap = StrokeCap.round);
+      }
+    }
+    if (st.frozen) {
+      // A shell of ice over the body, a glint running up it, and crystals at its feet.
+      final body = Rect.fromCenter(center: Offset(x, y - h * .48), width: w * 1.25, height: h * 1.0);
+      final shell = RRect.fromRectAndRadius(body, Radius.circular(w * .35));
+      canvas.drawRRect(shell, Paint()..color = const Color(0xFFBFEFFF).withValues(alpha: .22));
+      canvas.drawRRect(shell, strokePaint(const Color(0xFFEAFBFF).withValues(alpha: .6), 2));
+      final g = still ? .5 : (t / 1600) % 1;
+      final gy = body.bottom - body.height * g;
+      canvas.drawLine(Offset(body.left + 8, gy + 14), Offset(body.right - 8, gy - 14), strokePaint(Colors.white.withValues(alpha: .45 * math.sin(g * math.pi)), 3));
+      final ice = Paint()..color = const Color(0xFFD6F4FF).withValues(alpha: .8);
+      for (var i = 0; i < 5; i++) {
+        final cx = body.left + body.width * (.1 + i * .2), tall = 16.0 + (i * 7) % 13;
+        canvas.drawPath(Path()..moveTo(cx - 7, y)..lineTo(cx, y - tall)..lineTo(cx + 7, y)..close(), ice);
+      }
+    }
+    if (st.exposed) {
+      final at = Offset(x, y - h * .62), pulse = still ? .5 : .5 + .5 * math.sin(t / 220);
+      final p = strokePaint(const Color(0xFFFF6A5A).withValues(alpha: .35 + .25 * pulse), 2);
+      canvas.drawCircle(at, 22 + 4 * pulse, p);
+      for (var i = 0; i < 4; i++) {
+        final d = Offset(math.cos(i * math.pi / 2), math.sin(i * math.pi / 2));
+        canvas.drawLine(at + d * (14 + 4 * pulse), at + d * (30 + 4 * pulse), p);
+      }
+    }
+    if (st.asleep) {
+      // Zs drifting up off its head, each growing and fading as it goes.
+      final head = Offset(x + w * .3, y - h * 1.02);
+      // (Drawn as strokes, not text: a fading letter needs a layer each, every frame.)
+      for (var i = 0; i < 3; i++) {
+        final ph = still ? i / 3 : (t / 1500 + i / 3) % 1;
+        final a = math.sin(ph * math.pi), r = 5 + ph * 6;
+        final c = Offset(head.dx + ph * 34 + math.sin(ph * 6) * 6, head.dy - ph * 70);
+        final zig = Path()
+          ..moveTo(c.dx - r, c.dy - r)
+          ..lineTo(c.dx + r, c.dy - r)
+          ..lineTo(c.dx - r, c.dy + r)
+          ..lineTo(c.dx + r, c.dy + r);
+        canvas.drawPath(zig, strokePaint(const Color(0xFF2A1E4A).withValues(alpha: .8 * a), 5)..strokeJoin = StrokeJoin.round..strokeCap = StrokeCap.round);
+        canvas.drawPath(zig, strokePaint(const Color(0xFFD8C8FF).withValues(alpha: a), 2.6)..strokeJoin = StrokeJoin.round..strokeCap = StrokeCap.round);
+      }
+    }
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -2989,6 +3206,8 @@ class _ScenePainter extends CustomPainter {
         }
       }
     }
+
+    _statusLooks(canvas, t, fx0, fy, still);
 
     for (final p in s._particles) {
       final kk = 1 - p.age / p.life, alpha = math.min(1.0, kk * 1.4);

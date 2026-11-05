@@ -14,6 +14,7 @@ import 'hero_view.dart';
 import 'item_icons.dart';
 import 'stat_icons.dart';
 import '../game/models.dart' show Loadout;
+import '../game/rules.dart' show gearWorth;
 import 'theme.dart';
 
 /// Before selling a legendary, a second thought: they do drop again, but so rarely that one tap
@@ -179,7 +180,7 @@ class _LootWindowState extends State<_LootWindow> {
     final cant = controller.engine.whyNotWear(item);
     final stowed = old != null && old.slot == GearSlot.offhand && !offhandWorksWith(k.loadouts[item.heroClass ?? k.heroClass]!.weapon, old);
     // (Never "Upgrade!" over one of a kind you're wearing: the stats say which suits you.)
-    final better = cant == null && !(old != null && isKeepsake(old)) && (item.slot == GearSlot.armour ? armourTierById(item.art).reduction > armourTierById(k.loadouts[item.heroClass ?? k.heroClass]!.armour).reduction : old == null || item.score > old.score);
+    final better = cant == null && !(old != null && isKeepsake(old)) && (item.slot == GearSlot.armour ? armourTierById(item.art).reduction > armourTierById(k.loadouts[item.heroClass ?? k.heroClass]!.armour).reduction : old == null || gearWorth(k, item, old) > gearWorth(k, old, old));
     return PopScope(
       canPop: false,
       child: Dialog(
@@ -210,7 +211,7 @@ class _LootWindowState extends State<_LootWindow> {
                         children: [
                           _Halo(rarity: item.rarity, child: GearIcon(item: item, size: 72, heroClass: k.heroClass, dye: k.dye)),
                           // Better or worse than what you wear, at a glance.
-                          Positioned(right: -4, top: -4, child: UpgradeBadge(upgradeVerdict(item, old, k.loadouts[item.heroClass ?? k.heroClass]!), size: 24)),
+                          Positioned(right: -4, top: -4, child: UpgradeBadge(upgradeVerdict(item, old, k.loadouts[item.heroClass ?? k.heroClass]!, k), size: 24)),
                         ],
                       ),
                       const SizedBox(width: 12),
@@ -284,7 +285,7 @@ class _LootWindowState extends State<_LootWindow> {
                           child: StoneButton(
                             title: 'Keep',
                             icon: const ChestIcon(size: 24),
-                            caption: controller.stashFull && !isKeepsake(item) ? 'Chest full' : '${controller.state.knight.stash.length}/${controller.stashCap}',
+                            caption: controller.stashFull && !isKeepsake(item) ? 'Chest full' : 'Chest ${controller.state.knight.stash.length}/${controller.stashCap}',
                             onPressed: controller.stashFull && !isKeepsake(item) ? null : () => Navigator.of(context).pop('keep'),
                           ),
                         ),

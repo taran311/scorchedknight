@@ -264,6 +264,9 @@ class _StoneButtonState extends State<StoneButton> {
                     Text(
                       caption!,
                       textAlign: TextAlign.center,
+                      // (Two lines at most: a long reason used to wrap to four and stretch its row.)
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: Txt.onStone(size: 12.5, color: tone == ButtonTone.blood ? const Color(0xFFEEC4B6) : Palette.parch2),
                     ),
                 ],

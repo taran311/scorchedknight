@@ -766,7 +766,7 @@ class StatusBadges extends StatelessWidget {
       if (state.inBattle && state.heroPoison > 0) ('Poisoned · ${state.heroPoison}', const Color(0xFF8FD36A), 'Poison eats ${(heroPoisonShare * 100).round()}% of your HP a turn. A health potion cures it.'),
       if (state.summons > 0) ('Skeletons ×${state.summons} · ${state.summonTurns} turns', const Color(0xFFC89AFF), 'Your summoned dead strike with you'),
       if (state.wards > 0) ('Ward ×${state.wards}', const Color(0xFF7FB8E8), 'Absorbs the foe\'s next blow'),
-      if (state.mirror > 0) ('Mirror ×${state.mirror}', const Color(0xFFCFE8F8), 'You take half; the foe takes the whole blow back'),
+      if (state.mirror > 0) ('Mirror ×${state.mirror}', const Color(0xFFCFE8F8), 'You take half; the foe takes the other half back'),
     ];
     final bolt = ammoById(k.ammoLoaded), carried = k.ammo.values.any((n) => n > 0);
     return Wrap(

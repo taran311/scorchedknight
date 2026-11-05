@@ -4,7 +4,7 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
@@ -43,6 +43,8 @@ import 'tasks_view.dart';
 import 'item_icons.dart';
 import 'journal_panel.dart';
 import 'loot_window.dart';
+import 'arena_page.dart';
+import 'hall_page.dart';
 import 'map_page.dart';
 import 'merchant.dart';
 import 'quest_dialog.dart';
@@ -143,7 +145,12 @@ class _InnPageState extends State<InnPage> with RouteAware {
         await nav.push(MaterialPageRoute<void>(builder: (_) => MapPage(controller: c, wild: int.tryParse(step.id ?? ''))));
       case RoadKind.forge:
         // The upgrades first: tempering and honing if there are any, else the forge itself.
-        await showForgeWindow(context, c, tab: c.engine.upgradesReady > 0 ? 'temper' : 'forge');
+        // (After the war it names one piece to strengthen: that one's lit up.)
+        await showForgeWindow(context, c, tab: c.engine.upgradesReady > 0 || step.id != null ? 'temper' : 'forge', focus: step.id == null ? null : 'hone:${step.id}');
+      case RoadKind.arena:
+        await nav.push(MaterialPageRoute<void>(builder: (_) => ArenaPage(controller: c)));
+      case RoadKind.hall:
+        await nav.push(MaterialPageRoute<void>(builder: (_) => HallPage(controller: c)));
       case RoadKind.boss || RoadKind.heroic || RoadKind.train || RoadKind.side:
         if (c.whyNotTravel(step.land) != null) return _openMap();
         c.travel(step.land);
@@ -234,12 +241,13 @@ class _InnPageState extends State<InnPage> with RouteAware {
       };
       final taps = <TownSpot, VoidCallback?>{
                             TownSpot.gate: s.inBattle ? _resume : (offered ? _talk : (s.wild != null ? _openWilds : _openMap)),
-                            TownSpot.stall: s.inBattle ? null : () => showMerchantWindow(context, c),
+                            // (Raided: the stall's button gives chase, as its note says, not Mags' usual chat.)
+                            TownSpot.stall: s.inBattle ? () => _shut('Finish your fight first') : (s.raid == 'stall' ? _chase : () => showMerchantWindow(context, c)),
                             TownSpot.inn: () => visitInn(context, c, onHunt: _hunt),
                             TownSpot.tent: _openKit,
-                            TownSpot.forge: s.inBattle ? null : () => c.whyShut('forge') == null ? showForgeWindow(context, c, tab: c.engine.upgradesReady > 0 ? 'temper' : null) : _shut(c.whyShut('forge')!),
+                            TownSpot.forge: s.inBattle ? () => _shut('Finish your fight first') : () => c.whyShut('forge') == null ? showForgeWindow(context, c, tab: c.engine.upgradesReady > 0 ? 'temper' : null) : _shut(c.whyShut('forge')!),
                             // (Opened where its note points: bolts to make opens on the bolts.)
-                            TownSpot.enchanter: s.inBattle ? null : () => c.whyShut('tower') == null ? showEnchanterWindow(context, c, tab: notes[TownSpot.enchanter] == 'Bolts to make' ? 'bolts' : null) : _shut(c.whyShut('tower')!),
+                            TownSpot.enchanter: s.inBattle ? () => _shut('Finish your fight first') : () => c.whyShut('tower') == null ? showEnchanterWindow(context, c, tab: notes[TownSpot.enchanter] == 'Bolts to make' ? 'bolts' : null) : _shut(c.whyShut('tower')!),
                           };
       return Scaffold(
         body: Column(
@@ -1245,17 +1253,17 @@ class _StoryWindow extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 'Vharrax the Ember King burned the world. You survived: singed, sooty, half an eyebrow short. '
-                'Six continents and their bosses stand between you and his Ember Throne.',
+                'Six lands and their bosses stand between you and his Ember Throne.',
                 style: Txt.onStone(size: 14.5, color: Palette.cream),
               ),
               const SizedBox(height: 12),
-              for (final (icon, colour, text) in const [
+              for (final (icon, colour, text) in [
                 (Icons.explore, Palette.amber, 'Set out, pick a land, fight what turns up'),
-                (Icons.sports_kabaddi, Color(0xFFE07A5A), 'Blade, Rites, Crossbow, Potion: keys 1 to 7'),
-                (Icons.flight, Color(0xFF8FC3D9), 'Flyers and casters? Crossbow or Rites'),
+                (Icons.sports_kabaddi, const Color(0xFFE07A5A), isPhone(context) ? 'Tap a move to use it; hold it to see what it does' : 'Blade, Rites, Crossbow, Potion: number keys'),
+                (Icons.flight, const Color(0xFF8FC3D9), 'Flyers and casters? Crossbow or Rites'),
                 (Icons.inventory_2, Palette.amber, 'Every win drops gear'),
-                (Icons.workspace_premium, Color(0xFFFFD98A), 'Win $winsForBoss fights to find the boss'),
-                (Icons.local_fire_department, Color(0xFFFF8A3A), 'Rest at the inn to heal, free'),
+                (Icons.workspace_premium, const Color(0xFFFFD98A), 'Win $winsForBoss fights to find the boss'),
+                (Icons.local_fire_department, const Color(0xFFFF8A3A), 'Rest at the inn to heal, free'),
               ])
                 Padding(
                   padding: const EdgeInsets.only(bottom: 6),
@@ -1398,7 +1406,7 @@ class _SettingsWindowState extends State<_SettingsWindow> {
               _toggle('Mute all', Icons.volume_off_rounded, _s.muted, (v) => _set((s) => s.muted = v)),
               // (Two graphs at the top of the screen: the upper one is drawing to the screen, the
               // lower one is the game working out each frame. Red bars are frames that ran late.)
-              if (!kIsWeb) _toggle('Show frame timings', Icons.speed_rounded, _s.frameTimes, (v) => _set((s) => s.frameTimes = v)),
+              if (!kIsWeb && kDebugMode) _toggle('Show frame timings', Icons.speed_rounded, _s.frameTimes, (v) => _set((s) => s.frameTimes = v)),
               _slider(Icons.music_note_rounded, _s.music, (v) => _set((s) => s.music = v)),
               _slider(Icons.volume_up_rounded, _s.sound, (v) => _set((s) => s.sound = v), onEnd: () => Audio.play(Sfx.hit)),
               const SizedBox(height: 6),
@@ -1419,7 +1427,7 @@ class _SettingsWindowState extends State<_SettingsWindow> {
               TextButton(onPressed: _newHero, child: Text('Start a new hero…', style: Txt.label(size: 13, color: const Color(0xFFE07A5A)))),
               // Which build this is: to tell at a glance that a phone has the latest.
               Center(child: Text('Build $buildStamp', style: Txt.onStone(size: 11.5, color: Palette.parch2))),
-              if (Audio.report() case final r?) Padding(padding: const EdgeInsets.only(top: 4), child: Center(child: Text(r, textAlign: TextAlign.center, style: Txt.onStone(size: 10.5, color: Palette.parch2)))),
+              if (Audio.report() case final r? when kDebugMode) Padding(padding: const EdgeInsets.only(top: 4), child: Center(child: Text(r, textAlign: TextAlign.center, style: Txt.onStone(size: 10.5, color: Palette.parch2)))),
             ],
           )),
           ),
@@ -1947,6 +1955,8 @@ class _RoadCard extends StatelessWidget {
       RoadKind.train => const Icon(Icons.trending_up, color: Palette.amber, size: 30),
       RoadKind.wild => const Icon(Icons.forest, color: Palette.amber, size: 30),
       RoadKind.forge => const Icon(Icons.hardware, color: Palette.amber, size: 30),
+      RoadKind.arena => const Icon(Icons.stadium, color: Palette.amber, size: 30),
+      RoadKind.hall => const Icon(Icons.groups, color: Palette.amber, size: 30),
     };
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),

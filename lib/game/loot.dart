@@ -125,29 +125,34 @@ class GearSet {
 
 /// How hard each forged set's pieces roll, so every set's pieces come out about as strong as one
 /// another (and a little stronger than a random epic piece): their stats are worth different amounts.
+// (Tuned last by how each whole suit fares against the Ember King at the end of the road, about
+// four times in five: see tool/builds.dart. Scores alone count capped stats in full.)
 const _setPower = <String, double>{
   'ashen': 1.3,
-  'nightblood': 1.0,
+  'nightblood': 0.85,
   'moonfang': 1.25,
-  'silverleaf': 1.6,
+  'silverleaf': 0.6,
   'deepforge': 1.0,
-  'faceless': 1.22,
-  'sunscale': 1.4,
-  'tidecaller': 1.03,
-  'changeling': 0.97,
-  'skyborn': 1.5,
+  'faceless': 1.1,
+  'sunscale': 1.15,
+  'tidecaller': 0.97,
+  'changeling': 0.9,
+  'skyborn': 1.4,
   'bushido': 0.9,
-  'drakesworn': 1.0,
+  'drakesworn': 0.95,
   'arena': 1.15,
 };
 
 /// Turns the full Moonfang set adds to the wolf; what the full Deepforge set mends on a block.
-const dragonhideFire = .8;
+const dragonhideFire = .85;
+
+/// The full Nightblood set's Bloodthirst: under half health, what your blows heal you, this much over.
+const bloodthirstBoost = 1.3;
 
 /// The Champion's set: how much harder the blow after a dodge, parry or block lands.
 const showmanBoost = 1.3;
 
-const longWolfTurns = 2, forgeheartHeal = .06, regrowthHeal = .04, undertowChance = .25, adaptBoost = 1.2, updraftBoost = 1.25, bushidoStep = .05, bushidoCap = .25;
+const longWolfTurns = 2, forgeheartHeal = .06, regrowthHeal = .03, undertowChance = .25, adaptBoost = 1.2, updraftBoost = 1.25, bushidoStep = .05, bushidoCap = .25;
 
 const gearSets = <GearSet>[
   GearSet('embersworn', 'Embersworn', {Stat.burn: 6}, {Stat.burn: 10, Stat.crit: 5}, '+6 fire on every full swing', '+10 more fire and +5% crit: a fire build'),
@@ -156,13 +161,13 @@ const gearSets = <GearSet>[
   GearSet('bulwark', 'Bulwark', {Stat.block: 5}, {Stat.block: 5, Stat.thorns: 25, Stat.guard: 5}, '+5% block', '+5% more block, +5% guard and thorns: a wall'),
   GearSet('arcanist', 'Arcanist', {Stat.wisdom: 20, Stat.crit: 3}, {}, '+20% XP and +3% crit', 'Every spell costs 1 less mana', heroClass: HeroClass.mage, cheaperSpells: true, perk: 'Spells cost 1 less mana'),
   // Forged from blueprints: the Ashen Order's, Ravenmoor's vampires' and the Weald's werewolves'.
-  GearSet('ashen', 'Ashen', {Stat.guard: 4, Stat.burn: 3}, {Stat.thorns: 20, Stat.burn: 4}, '+4% guard and +3 fire', '+20 thorns and +4 more fire: whoever strikes you burns', forged: true),
-  GearSet('nightblood', 'Nightblood', {Stat.lifesteal: 2, Stat.crit: 3}, {Stat.leech: 1}, 'Heal 2 a swing, and +3% crit', 'Bloodthirst: under half health, everything your blows heal you is half as much again', forged: true, bloodthirst: true, perk: 'Under half HP: heals +50%'),
+  GearSet('ashen', 'Ashen', {Stat.vigour: 15, Stat.burn: 3}, {Stat.thorns: 20, Stat.burn: 4}, '+15 vigour and +3 fire', '+20 thorns and +4 more fire: whoever strikes you catches fire', forged: true, perk: 'Strike me and burn'),
+  GearSet('nightblood', 'Nightblood', {Stat.lifesteal: 2, Stat.crit: 3}, {Stat.leech: 1}, 'Heal 2 a swing, and +3% crit', 'Bloodthirst: under half health, everything your blows heal you is 30% more', forged: true, bloodthirst: true, perk: 'Under half HP: heals +30%'),
   GearSet('moonfang', 'Moonfang', {Stat.crit: 5, Stat.dodge: 3}, {Stat.crit: 4, Stat.dodge: 3, Stat.damage: 3}, '+5% crit and +3% dodge', '+4% crit, +3% dodge, +3 damage, and the Bloodmoon Pelt\'s wolf stays $longWolfTurns turns longer', forged: true, longWolf: true, perk: 'Wolf form lasts 2 turns longer'),
   GearSet('silverleaf', 'Silverleaf', {Stat.dodge: 4, Stat.crit: 4}, {Stat.dodge: 4, Stat.regen: 8}, '+4% dodge and +4% crit', '+4% more dodge, regeneration, and the first blow at you each fight always misses', forged: true, firstMiss: true, perk: 'First blow at you misses'),
   GearSet('deepforge', 'Deepforge', {Stat.guard: 5, Stat.block: 4}, {Stat.block: 5, Stat.vigour: 20}, '+5% guard and +4% block', '+5% more block, +20 vigour, and every blow you block mends you 6% of your HP', forged: true, forgeheart: true, perk: 'Blocks heal 6% HP'),
   GearSet('faceless', 'Faceless', {Stat.crit: 5, Stat.parry: 4}, {Stat.crit: 5, Stat.damage: 4}, '+5% crit and +4% parry', '+5% more crit, +4 damage, and your first blow each fight is always a critical hit', forged: true, firstCrit: true, perk: 'First blow always crits'),
-  GearSet('sunscale', 'Sunscale', {Stat.vigour: 20, Stat.regen: 6}, {Stat.thorns: 15, Stat.guard: 4}, '+20 vigour and regeneration', '+15 thorns and +4% guard, and under half health you regrow 4% of your HP every turn, like a lizard', forged: true, regrowth: true, perk: 'Under half HP: regrow 4% a turn'),
+  GearSet('sunscale', 'Sunscale', {Stat.vigour: 20, Stat.regen: 6}, {Stat.thorns: 15, Stat.guard: 4}, '+20 vigour and regeneration', '+15 thorns and +4% guard, and under half health you regrow 3% of your HP every turn, like a lizard', forged: true, regrowth: true, perk: 'Under half HP: regrow 3% a turn'),
   GearSet('tidecaller', 'Tidecaller', {Stat.frost: 5, Stat.dodge: 3}, {Stat.frost: 4, Stat.regen: 6}, '+5 frost on every full swing and +3% dodge', '+4 more frost, regeneration, and now and then your frost drags the foe down like the undertow: half its blows miss for two turns', forged: true, undertow: true, perk: 'Frost can slow the foe'),
   GearSet('changeling', 'Changeling', {Stat.dodge: 4, Stat.crit: 4}, {Stat.damage: 2, Stat.crit: 4}, '+4% dodge and +4% crit', '+2 damage, +4% more crit, and whenever you change how you strike from the turn before (blade, rite or bolt), the blow lands 20% harder', forged: true, adapt: true, perk: 'Switch style: +20% damage'),
   // The Ember Vault's own six (vault.dart): found only behind Hob's cellar door, never forged or
@@ -170,7 +175,7 @@ const gearSets = <GearSet>[
   GearSet('vault', 'Vaultkeeper', {Stat.burn: 4, Stat.fortune: 10}, {Stat.burn: 5, Stat.guard: 3}, '+4 fire on every full swing and +10% gold', '+5 more fire and +3% guard: the vault\'s embers burn for you', forged: true),
   GearSet('arena', 'Champion\'s', {Stat.damage: 4, Stat.crit: 4}, {Stat.damage: 3, Stat.parry: 4}, '+4 damage and +4% crit', '+3 more damage, +4% parry, and after you dodge, parry or block a blow your next one lands 30% harder: the crowd loves a counter', forged: true, showman: true, perk: 'Counter after a dodge, parry or block: +30%'),
   GearSet('bushido', 'Bushido', {Stat.parry: 4, Stat.crit: 4}, {Stat.damage: 3, Stat.parry: 3}, '+4% parry and +4% crit', '+3 damage, +3% more parry, and every turn a fight goes on, your blows land 5% harder (up to 25%): the longer the duel, the surer the cut', forged: true, bushido: true, perk: '+5% a turn, up to 25%'),
-  GearSet('drakesworn', 'Drakesworn', {Stat.burn: 4, Stat.vigour: 10}, {Stat.burn: 3, Stat.guard: 3}, '+4 fire on every full swing and +10 vigour', '+3 more fire, +3% guard, and dragon scale over your steel: fire hits you 20% softer (dragons, demons, the Ember King)', forged: true, dragonhide: true, perk: 'Fire hits you 20% softer'),
+  GearSet('drakesworn', 'Drakesworn', {Stat.burn: 4, Stat.vigour: 10}, {Stat.burn: 3, Stat.guard: 3}, '+4 fire on every full swing and +10 vigour', '+3 more fire, +3% guard, and dragon scale over your steel: fire hits you 15% softer (dragons, demons, the Ember King)', forged: true, dragonhide: true, perk: 'Fire hits you 15% softer'),
   GearSet('skyborn', 'Skyborn', {Stat.dodge: 5, Stat.crit: 3}, {Stat.crit: 4, Stat.dodge: 3}, '+5% dodge and +3% crit', '+4% more crit, +3% dodge, and against anything in the air (fliers, ghosts, archers on the cliffs) all your blows land 25% harder', forged: true, updraft: true, perk: '+25% against fliers'),
 ];
 
@@ -444,9 +449,9 @@ const specials = <String, Special>{
   'verdict': Special('Royal Verdict', 'A crushing blow for triple damage, and holy fire', 3, 0xFFFFD45A, element: Stat.smite, sure: true),
   'crownvolley': Special('Volley of the Crown', 'Five golden arrows at once: triple damage', 3, 0xFFFFD45A, volley: 4, sure: true),
   'edict': Special('Edict of Light', 'A beam of holy light: 2.5x damage plus holy fire', 2.5, 0xFFFFF0A0, element: Stat.smite, sure: true),
-  'harvest': Special('Harvest Home', 'A mighty heave: double damage, and you recover 20 HP', 2, 0xFF9BE27A, heal: 20),
+  'harvest': Special('Harvest Home', 'A mighty heave: double damage, and you recover some health', 2, 0xFF9BE27A, heal: 20),
   'luckyshot': Special('Lucky Shot', 'Always a critical hit, and 25 gold found on the foe', 1, 0xFFF2C14E, crit: true, coins: 25, sure: true),
-  'hearth': Special('Hearth Charm', 'A warm spell: 1.8x damage, and you recover 25 HP', 1.8, 0xFFFFB060, heal: 25),
+  'hearth': Special('Hearth Charm', 'A warm charm: 1.8x damage, and you recover some health', 1.8, 0xFFFFB060, heal: 25),
   'fate': Special('Twist of Fate', 'Fate guides the blade: 1.5x damage, always critical', 1.5, 0xFFC07AFF, crit: true, sure: true),
   'omen': Special('Foretold Shot', 'An arrow that was always going to land: quadruple damage', 4, 0xFFC07AFF, sure: true),
   'glimpse': Special('Glimpse Beyond', 'Strike where the foe will be: double damage, always critical', 2, 0xFFC07AFF, crit: true, sure: true),
@@ -457,16 +462,16 @@ const specials = <String, Special>{
   'tidalwave': Special('Tidal Wave', 'A wall of seawater crashes over the foe: 2.8x damage plus frost', 2.8, 0xFF3AA8D8, element: Stat.frost, wave: true, sure: true),
   'krakencall': Special('Call of the Kraken', 'Tentacles burst from the earth and crush the foe: triple damage', 3, 0xFF4E8A8A, kraken: true, sure: true),
   'tidevolley': Special('Tidecaller Volley', 'Arrows of living seawater ride a breaking wave: 2.5x damage plus frost', 2.5, 0xFF3AA8D8, volley: 4, element: Stat.frost, wave: true, sure: true),
-  'reelin': Special('Reel \'Em In', 'Hook the foe and haul it close: double damage, always critical, and 30 gold shaken loose', 2, 0xFFC8B070, crit: true, coins: 30, sure: true),
+  'reelin': Special('Reel \'Em In', 'Hook the foe and haul it close: a sure critical hit, and 30 gold shaken loose', 1.3, 0xFFC8B070, crit: true, coins: 30, sure: true),
   // Every legendary weapon carries its class's special.
   'arrowrain': Special('Arrow Rain', 'A storm of arrows falls from the sky: 2.2x damage', 2.2, 0xFFF2C14E, rain: true, sure: true),
   'arcanestorm': Special('Arcane Storm', 'Bolts of raw magic rain down on the foe: 2.2x damage', 2.2, 0xFFB07AFF, rain: true, sure: true),
   'cleave': Special('Mighty Cleave', 'A great sweeping blow: 2.2x damage', 2.2, 0xFFE8E2D0, cleave: true, sure: true),
   'oath': Special('Unbroken Oath', 'Every promise you kept strikes at once: triple damage plus holy fire', 3, 0xFFF0E2B8, element: Stat.smite, sure: true),
-  'gungnir': Special('Allfather\'s Throw', 'The spear leaves your hand and comes back to it: it never misses, and lands as a critical 3x blow', 3, 0xFFCFE0F0, crit: true, sure: true),
+  'gungnir': Special('Allfather\'s Throw', 'The spear leaves your hand and comes back to it: it never misses, and always lands as a critical 1.7x blow', 1.7, 0xFFCFE0F0, crit: true, sure: true),
   'kingsfall': Special('Fall of Kings', 'The crack in the blade splits open: a sweeping blow of crown-fire for 3.2x damage plus fire', 3.2, 0xFFFF8A3A, element: Stat.burn, cleave: true, sure: true),
-  'bramblelash': Special('Bramblelash', 'The briar lashes out and roots the foe: 3x damage plus poison, and you recover 15 HP', 3, 0xFF6FBF4A, element: Stat.poison, heal: 15, sure: true),
-  'briarvolley': Special('Briarsong', 'Arrows that burst into thorns where they land: 3x damage plus poison, and you recover 15 HP', 3, 0xFF6FBF4A, volley: 4, element: Stat.poison, heal: 15, sure: true),
+  'bramblelash': Special('Bramblelash', 'The briar lashes out and roots the foe: 3x damage plus poison, and you recover some health', 3, 0xFF6FBF4A, element: Stat.poison, heal: 15, sure: true),
+  'briarvolley': Special('Briarsong', 'Arrows that burst into thorns where they land: 3x damage plus poison, and you recover some health', 3, 0xFF6FBF4A, volley: 4, element: Stat.poison, heal: 15, sure: true),
   'meteor': Special('Meteor', 'Calls down a falling star: triple damage plus fire', 3, 0xFFFF7A2A, element: Stat.burn, meteor: true, sure: true),
   // The legendary specials: each named legendary weapon carries one of its class's (see
   // [legendSpecial]). All are worth about the same; they just do it differently.
@@ -476,7 +481,7 @@ const specials = <String, Special>{
   'unluckyroll': Special('Unlucky!', 'Snake eyes: a plain hit, and the dice bite back (8% of your health and a point of mana)', 1, 0xFFB06AE0, dice: true, selfHurt: .08, sure: true),
   'deadcharge': Special('Charge of the Dead', 'A host of the dead rides out of the ground and straight through the foe: 2.3x damage', 2.3, 0xFFB07AFF, deadrun: true, sure: true),
   'stormcall': Special('Stormcall', 'Lightning splits the sky and strikes the foe: 2x damage, and half the time it\'s stunned out of its next blow', 2, 0xFFCFE8FF, storm: true, stun: .5, sure: true),
-  'nightswarm': Special('Night Swarm', 'A storm of bats pours over the foe: 2x damage, and you drink 15 HP from it', 2, 0xFF9A8ABA, bats: true, heal: 15, sure: true),
+  'nightswarm': Special('Night Swarm', 'A storm of bats pours over the foe: 2x damage, and you drink some health from it', 2, 0xFF9A8ABA, bats: true, heal: 15, sure: true),
   'hellgate': Special('Hellgate', 'A demon claws out of a burning rift and strikes: double damage plus fire, but it takes its price (5% of your health)', 2, 0xFFE0402A, element: Stat.burn, demon: true, selfHurt: .05, sure: true),
   'legion': Special('Rise, Legion', 'The dead claw up out of the ground and tear at the foe: 2x damage, and one stays to fight for 2 turns', 2, 0xFF8A5AC0, legion: true, summon: 1, sure: true),
   'avalanche': Special('Avalanche', 'The mountain answers: a fall of ice crashes down on the foe, 2x damage plus frost, and half the time it\'s frozen out of its next blow', 2, 0xFFBFE8FF, element: Stat.frost, avalanche: true, stun: .5, sure: true),
@@ -511,7 +516,7 @@ extension StatInfo on Stat {
 
   String describe(int v) => switch (this) {
     Stat.damage => '+$v damage per swing',
-    Stat.poison => 'Venom: +$v a turn more with every hit, till the fight ends',
+    Stat.poison => 'Venom $v: poison that builds with every hit, till the fight ends',
     Stat.burn => 'Sets it alight: $v fire a turn for 3 turns',
     Stat.frost => '+$v frost per swing, and now and then it freezes the foe',
     Stat.bleed => 'Opens a wound: $v a turn for 2 turns (double on a crit; the bloodless don\'t bleed)',
@@ -1326,7 +1331,12 @@ class LootTable {
       gearSet: wyrmSet,
       value: _value(level, rarity, slot) * 2,
       stats: {
-        for (final e in stats.entries) e.key: _roll(e.key, level, e.value * (rarity == Rarity.legendary ? 1.25 : (rarity == Rarity.epic ? 1.1 : 1)), _r),
+        // (A wyrmscale weapon is tuned like the other farmed weapons, against a random epic one:
+        // rolled plain, it came out 40% weaker than a random epic greatsword.)
+        if (slot == GearSlot.weapon)
+          ..._tuned(stats, level, heroClass, farmedEdge * (rarity == Rarity.legendary ? 1.2 : (rarity == Rarity.epic ? 1 : .85)))
+        else
+          for (final e in stats.entries) e.key: _roll(e.key, level, e.value * (rarity == Rarity.legendary ? 1.25 : (rarity == Rarity.epic ? 1.1 : 1)), _r),
         if (slot != GearSlot.armour) Stat.wyrmbane: bane,
       },
     );
@@ -1901,20 +1911,24 @@ class LootTable {
     final set = gearSetById(setId)!;
     // (A suit's helm rolls like its sabatons: the sturdy pieces.)
     final (main, second, third) = switch ((setId, slot == GearSlot.helm ? GearSlot.boots : slot)) {
-      ('ashen', GearSlot.gloves) => (Stat.damage, Stat.burn, Stat.guard),
-      ('ashen', GearSlot.boots) => (Stat.guard, Stat.block, Stat.vigour),
-      ('ashen', _) => (Stat.burn, Stat.thorns, Stat.guard),
+      // (Guard used to be in every piece; armour runs into its cap by the time a suit is worn whole,
+      // so it was the weakest suit by far. Vigour and edge instead.)
+      ('ashen', GearSlot.gloves) => (Stat.damage, Stat.burn, Stat.vigour),
+      ('ashen', GearSlot.boots) => (Stat.vigour, Stat.block, Stat.burn),
+      ('ashen', _) => (Stat.burn, Stat.thorns, Stat.vigour),
       // (Its healing comes from the set's own bonus and Bloodthirst; the pieces add only a little
       // more, or the Blood Knight would never need to rest.)
       ('nightblood', GearSlot.gloves) => (Stat.damage, Stat.crit, Stat.lifesteal),
       ('nightblood', GearSlot.boots) => (Stat.dodge, Stat.vigour, Stat.crit),
       ('nightblood', _) => (Stat.damage, Stat.vigour, Stat.crit),
-      ('silverleaf', GearSlot.gloves) => (Stat.crit, Stat.damage, Stat.dodge),
-      ('silverleaf', GearSlot.boots) => (Stat.dodge, Stat.regen, Stat.crit),
-      ('silverleaf', _) => (Stat.crit, Stat.regen, Stat.dodge),
-      ('deepforge', GearSlot.gloves) => (Stat.damage, Stat.guard, Stat.block),
+      // (Silverleaf and Changeling carried no vigour at all: a full suit had about half the HP of
+      // any other, and lost to the Ember King nearly one time in two.)
+      ('silverleaf', GearSlot.gloves) => (Stat.crit, Stat.damage, Stat.vigour),
+      ('silverleaf', GearSlot.boots) => (Stat.dodge, Stat.regen, Stat.vigour),
+      ('silverleaf', _) => (Stat.crit, Stat.regen, Stat.vigour),
+      ('deepforge', GearSlot.gloves) => (Stat.damage, Stat.block, Stat.vigour),
       // (Guard and block both run into their caps in a full suit, so it carries some damage too.)
-      ('deepforge', GearSlot.boots) => (Stat.guard, Stat.vigour, Stat.damage),
+      ('deepforge', GearSlot.boots) => (Stat.vigour, Stat.damage, Stat.block),
       ('deepforge', _) => (Stat.block, Stat.damage, Stat.thorns),
       // (The duellists' suits lean on damage and vigour: parry and crit both run into their caps
       // fast, so a suit made of them alone would waste half its worth.)
@@ -1927,9 +1941,9 @@ class LootTable {
       ('tidecaller', GearSlot.gloves) => (Stat.frost, Stat.damage, Stat.crit),
       ('tidecaller', GearSlot.boots) => (Stat.dodge, Stat.frost, Stat.vigour),
       ('tidecaller', _) => (Stat.frost, Stat.regen, Stat.dodge),
-      ('changeling', GearSlot.gloves) => (Stat.damage, Stat.crit, Stat.dodge),
-      ('changeling', GearSlot.boots) => (Stat.dodge, Stat.crit, Stat.damage),
-      ('changeling', _) => (Stat.crit, Stat.damage, Stat.dodge),
+      ('changeling', GearSlot.gloves) => (Stat.damage, Stat.crit, Stat.vigour),
+      ('changeling', GearSlot.boots) => (Stat.dodge, Stat.crit, Stat.vigour),
+      ('changeling', _) => (Stat.crit, Stat.damage, Stat.vigour),
       ('skyborn', GearSlot.gloves) => (Stat.crit, Stat.damage, Stat.dodge),
       ('skyborn', GearSlot.boots) => (Stat.dodge, Stat.vigour, Stat.crit),
       ('skyborn', _) => (Stat.dodge, Stat.crit, Stat.fortune),

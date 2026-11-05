@@ -319,9 +319,14 @@ Widget? _nightPill(GameState s, Continent l) {
     icon: s.day ? Icons.wb_sunny : Icons.nightlight_round,
     text: s.day ? 'Day' : 'Night',
     colour: s.day ? Palette.amber : const Color(0xFFCFD8FF),
-    tip: s.day
-        ? 'Day: the ${night.join(', ')} and ${l.boss.name} are hiding. Night falls in $left more ${left == 1 ? 'fight' : 'fights'}.'
-        : 'Night: the ${night.join(', ')} are out, and ${l.boss.name} with them. A night at the Soot & Kettle brings the morning.',
+    tip: () {
+      // Who only comes out after dark, as a list a person would say: 'the Bats, the Ghouls and Gorbo'.
+      final who = [for (final n in night) 'the $n', if (l.boss.night) l.boss.name];
+      final list = who.length == 1 ? who.first : '${who.take(who.length - 1).join(', ')} and ${who.last}';
+      return s.day
+          ? 'Day: $list ${who.length == 1 ? 'is' : 'are'} hiding. Night falls in $left more ${left == 1 ? 'fight' : 'fights'}.'
+          : 'Night: $list ${who.length == 1 ? 'is' : 'are'} out. A night at the Soot & Kettle brings the morning.';
+    }(),
   );
 }
 
@@ -869,7 +874,7 @@ class _Lurking extends StatelessWidget {
           Wrap(children: [for (final f in l.foes) portrait(f, 58)]),
           // The rarer things that turn up here, bordered by how rare: packs, golems, elementals,
           // the Hidden Ones and the land's named foes.
-          if (sightingsIn(land, cindervaleClear: s.bossesDown.contains(0)) case final rare when rare.isNotEmpty) ...[
+          if (sightingsIn(land, cindervaleClear: s.bossesDown.contains(0), gloomfenClear: s.bossesDown.contains(1)) case final rare when rare.isNotEmpty) ...[
             Text('Rarer sightings', style: Txt.label(size: 12, color: Palette.parch2)),
             const SizedBox(height: 4),
             Wrap(children: [for (final (r, odds) in rare) portrait(r.type, 50, seen: (sightingRarity(odds), odds))]),
@@ -890,7 +895,9 @@ class _Lurking extends StatelessWidget {
                       spacing: 8,
                       runSpacing: 6,
                       children: [
-                        _Pill(icon: Icons.shield_moon, text: 'Lv ${bossLevel(land)}', tip: 'Best faced at level ${bossLevel(land)}'),
+                        // (The level it fights at: yours, never below the land's. It used to say "best faced
+                        // at" the next land's level, which the road never waited for.)
+                        _Pill(icon: Icons.shield_moon, text: 'Lv ${bossLevelFor(land, s.knight.level)}', tip: 'It fights at your level, from ${l.minLevel} up to ${l.minLevel + bossLevelSpan}: past that, every level you gain is on your side'),
                         _Pill(icon: rewardIcon, text: rewardName, tip: 'It guards $reward'),
                         if (relic != null && !beaten) _Pill(icon: Icons.description, text: 'Relic blueprint', tip: 'A blueprint for ${relic.name}: its parts are found around the world, and $smithName forges it'),
                         if (l.hazard != null)

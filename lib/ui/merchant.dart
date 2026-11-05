@@ -268,7 +268,7 @@ class MerchantWares extends StatelessWidget {
         // Mags' find of the day: one piece, seen before you buy, new every day.
         Builder(
           builder: (context) {
-            final g = c.dailyDeal, sold = c.whyNotDeal == 'Sold out: back tomorrow';
+            final g = c.dailyDeal, sold = c.engine.dealSoldOut;
             final left = c.untilNextDeal, hours = left.inHours, mins = left.inMinutes % 60;
             final when = hours > 0 ? '${hours}h ${mins}m' : '${mins}m';
             return x.ware(
@@ -279,7 +279,7 @@ class MerchantWares extends StatelessWidget {
                   children: [
                     GearIcon(item: g, size: 30, heroClass: k.heroClass, dye: k.dye),
                     // Better or worse than what you wear, before you pay for it.
-                    if (!sold) Positioned(right: -8, top: -8, child: UpgradeBadge(upgradeVerdict(g, e.equippedFor(g), k.loadouts[g.heroClass ?? k.heroClass]!), size: 18)),
+                    if (!sold) Positioned(right: -8, top: -8, child: UpgradeBadge(upgradeVerdict(g, e.equippedFor(g), k.loadouts[g.heroClass ?? k.heroClass]!, k), size: 18)),
                   ],
                 ),
               ),
@@ -519,17 +519,20 @@ class ForgeWares extends StatelessWidget {
         // Honing: a little more out of a piece you love, for more gold each time.
         x.heading('Strengthen · +${(honeStep * 100).round()}% to every stat a step, up to +$honeMax'),
         for (final g in c.honeables)
-          x.ware(
-            GearIcon(item: g, size: 30, heroClass: k.heroClass, dye: k.dye),
-            g.name,
-            g.hone == 0 ? 'Not strengthened yet' : 'Strengthened +${g.hone}',
-            CostButton(
-              label: '+${g.hone + 1} · ${honeCost(g, k.level)} gold',
-              onTap: c.whyNotHone(g) == null
-                  ? () {
-                      if (c.hone(g)) Audio.play(Sfx.clang);
-                    }
-                  : null,
+          Spotlit(
+            on: focus == 'hone:${g.id}',
+            child: x.ware(
+              GearIcon(item: g, size: 30, heroClass: k.heroClass, dye: k.dye),
+              g.name,
+              g.hone == 0 ? 'Not strengthened yet' : 'Strengthened +${g.hone}',
+              CostButton(
+                label: '+${g.hone + 1} · ${honeCost(g, k.level)} gold',
+                onTap: c.whyNotHone(g) == null
+                    ? () {
+                        if (c.hone(g)) Audio.play(Sfx.clang);
+                      }
+                    : null,
+              ),
             ),
           ),
         if (c.honeables.isEmpty) Text('Rare or finer gear you wear (your vault pieces are beyond Dunstan\'s hammer)', style: Txt.onStone(size: 12.5)),
@@ -623,9 +626,10 @@ class ForgeWares extends StatelessWidget {
               ),
         ],
         // Relics: a blueprint and its parts, forged into a legend.
-        if (relics.keys.any((l) => c.heroicOpen(l) && !s.forged.contains(l))) x.heading('Relics'),
+        // (On the Forge tab only: they used to repeat under every tab.)
+        if (on('forge') && relics.keys.any((l) => c.heroicOpen(l) && !s.forged.contains(l))) x.heading('Relics'),
         for (final e in relics.entries)
-          if (c.heroicOpen(e.key) && !s.forged.contains(e.key)) ...[
+          if (on('forge') && c.heroicOpen(e.key) && !s.forged.contains(e.key)) ...[
             Spotlit(
               on: focus == 'relic:${e.key}',
               child: x.ware(
@@ -942,14 +946,15 @@ class CostButton extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
+        // (A little taller and never narrower than a thumb: it was about 28px, easy to miss on a phone.)
         child: Ink(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
           decoration: BoxDecoration(
             border: Border.all(color: Colors.black),
             borderRadius: BorderRadius.circular(2),
             gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFFEFC675), Color(0xFFB98634)]),
           ),
-          child: Text(label, style: Txt.inkLabel(size: 13, color: const Color(0xFF2A1C0C))),
+          child: ConstrainedBox(constraints: const BoxConstraints(minWidth: 30), child: Text(label, textAlign: TextAlign.center, style: Txt.inkLabel(size: 13, color: const Color(0xFF2A1C0C)))),
         ),
       ),
     ),

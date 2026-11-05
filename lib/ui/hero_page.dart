@@ -501,7 +501,7 @@ class _SlotSheetState extends State<_SlotSheet> {
                                   clipBehavior: Clip.none,
                                   children: [
                                     Center(child: GearIcon(item: g, size: 42, heroClass: k.heroClass, dye: k.dye)),
-                                    Positioned(right: -6, top: -6, child: UpgradeBadge(upgradeVerdict(g, worn, kit ?? k.loadout))),
+                                    Positioned(right: -6, top: -6, child: UpgradeBadge(upgradeVerdict(g, worn, kit ?? k.loadout, k))),
                                   ],
                                 ),
                               ),
@@ -646,7 +646,7 @@ class _Satchel extends StatelessWidget {
                             clipBehavior: Clip.none,
                             children: [
                               Center(child: GearIcon(item: g, size: 46, heroClass: k.heroClass, dye: k.dye)),
-                              Positioned(right: -6, top: -6, child: UpgradeBadge(upgradeVerdict(g, c.engine.equippedFor(g), k.loadouts[g.heroClass ?? k.heroClass]!))),
+                              Positioned(right: -6, top: -6, child: UpgradeBadge(upgradeVerdict(g, c.engine.equippedFor(g), k.loadouts[g.heroClass ?? k.heroClass]!, k))),
                             ],
                           ),
                         ),
@@ -1318,6 +1318,24 @@ class _Home extends StatelessWidget {
 }
 
 /// Training: a point to spend every level, on Might, Arcana, Aim or Vigour. Your build.
+/// Before wiping your training: a second thought, with the price.
+Future<void> _confirmReset(BuildContext context, GameController c) async {
+  final cost = resetTrainingCost(c.state.knight);
+  final yes = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: Palette.stone2,
+      title: Text('Reset your training?', style: Txt.label(size: 18, color: Palette.cream)),
+      content: Text('Every point comes back to spend again, for $cost gold.', style: Txt.onStone(size: 14, color: Palette.cream)),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text('Keep it', style: Txt.label(size: 14))),
+        TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text('Reset for $cost gold', style: Txt.label(size: 14, color: const Color(0xFFE07A5A)))),
+      ],
+    ),
+  );
+  if (yes == true) c.resetTraining();
+}
+
 class _Training extends StatelessWidget {
   const _Training({required this.controller});
   final GameController controller;
@@ -1346,12 +1364,12 @@ class _Training extends StatelessWidget {
               children: [
                 Expanded(child: Text(free > 0 ? 'Training · $free to spend' : 'Training${style == null ? '' : ' · $style'}', style: Txt.label(size: 14, color: Palette.amber))),
                 if (any)
-                  GestureDetector(
-                    onTap: k.coins >= resetTrainingCost(k) && !c.state.inBattle ? c.resetTraining : null,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [const Icon(Icons.restart_alt, size: 16, color: Palette.parch2), Text(' ${resetTrainingCost(k)}', style: Txt.label(size: 12, color: Palette.parch2))],
-                    ),
+                  // (A real button, asking first: it used to be a bare icon and number that spent
+                  // the gold and wiped the training at a touch.)
+                  TextButton.icon(
+                    onPressed: k.coins >= resetTrainingCost(k) && !c.state.inBattle ? () => _confirmReset(context, c) : null,
+                    icon: const Icon(Icons.restart_alt, size: 16, color: Palette.parch2),
+                    label: Text('Reset · ${resetTrainingCost(k)} gold', style: Txt.label(size: 12, color: Palette.parch2)),
                   ),
               ],
             ),
@@ -1370,6 +1388,11 @@ class _Training extends StatelessWidget {
                           child: InkWell(
                             borderRadius: BorderRadius.circular(4),
                             onTap: free > 0 ? () => c.train(t) : null,
+                            // (Hold for what a point does: on a phone the tooltip never got a look in,
+                            // the tap spends the point.)
+                            onLongPress: () => ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                              SnackBar(behavior: SnackBarBehavior.floating, backgroundColor: Palette.stone2, duration: const Duration(seconds: 3), content: Text('${t.label}: ${t.perPoint}', style: Txt.label(size: 13, color: Palette.cream))),
+                            ),
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 4),
                               decoration: BoxDecoration(borderRadius: BorderRadius.circular(4), border: Border.all(color: free > 0 ? _colours[t]!.withValues(alpha: .7) : Palette.stone3)),
@@ -1421,7 +1444,7 @@ class _Training extends StatelessWidget {
               ),
               if (any)
                 TextButton(
-                  onPressed: k.coins >= resetTrainingCost(k) && !c.state.inBattle ? c.resetTraining : null,
+                  onPressed: k.coins >= resetTrainingCost(k) && !c.state.inBattle ? () => _confirmReset(context, c) : null,
                   child: Text('Reset (${resetTrainingCost(k)} gold)', style: Txt.label(size: 12, color: Palette.parch2)),
                 ),
             ],
