@@ -333,7 +333,7 @@ class _InnPageState extends State<InnPage> with RouteAware {
                           const SizedBox(height: 10),
                         ],
                         // The roads (the first, New Game+, Hardcore): up top when there's one to start
-                        // or you're on a hardcore road; otherwise down by the log, always in sight.
+                        // or you're on a hardcore road; otherwise down by the log, always in sight (from the very start).
                         if (s.won || s.hardcore) ...[
                           _RoadsCard(controller: c),
                           const SizedBox(height: 10),
@@ -413,7 +413,7 @@ class _InnPageState extends State<InnPage> with RouteAware {
                           _Banner(icon: Icons.inventory_2, text: c.nextLoot!.name, button: 'Open', onTap: () => resolvePendingLoot(context, c)),
                           const SizedBox(height: 10),
                         ],
-                        if (!s.won && !s.hardcore && !s.inBattle && s.innRepaired) ...[
+                        if (!s.won && !s.hardcore) ...[
                           _RoadsCard(controller: c),
                           const SizedBox(height: 10),
                         ],
