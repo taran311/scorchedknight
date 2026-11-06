@@ -107,7 +107,7 @@ class _DungeonPageState extends State<DungeonPage> {
                             children: [
                               InnBackButton(label: 'Map', icon: Icons.public, onPressed: () => Navigator.of(context).pop()),
                               const SizedBox(width: 10),
-                              Expanded(child: Text(d.name, overflow: TextOverflow.ellipsis, style: Txt.label(size: 22, color: col, weight: FontWeight.w800))),
+                              Expanded(child: FitText(d.name, style: Txt.label(size: 22, color: col, weight: FontWeight.w800))),
                             ],
                           ),
                           const SizedBox(height: 10),

@@ -222,7 +222,7 @@ class _WaveRow extends StatelessWidget {
               child: Center(child: won ? const Icon(Icons.check, size: 16, color: green) : Text('${index + 1}', style: Txt.label(size: 13, color: col, weight: FontWeight.w800))),
             ),
             const SizedBox(width: 8),
-            Expanded(child: Text('${wave.name} · ${wave.warriors.length} in a row', maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.label(size: 14, color: won || now ? Palette.cream : Palette.parch2))),
+            Expanded(child: FitText('${wave.name} · ${wave.warriors.length} in a row', style: Txt.label(size: 14, color: won || now ? Palette.cream : Palette.parch2))),
             if (prize != null)
               Row(
                 mainAxisSize: MainAxisSize.min,

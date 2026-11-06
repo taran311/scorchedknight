@@ -402,3 +402,32 @@ double fitWidth(BuildContext context, {required double aspect, required double b
   final w = (h - chrome - below) * aspect;
   return w < 860 ? 860 : (w > 1040 ? 1040 : w);
 }
+
+/// One line of text that shrinks to fit (down to [minScale] of its size) before it truncates: a
+/// long land or lair name on a phone ("The Kennels of Flame ahead") reads whole, a little smaller,
+/// rather than as "The Kennels of F…".
+class FitText extends StatelessWidget {
+  const FitText(this.text, {super.key, required this.style, this.textAlign, this.minScale = .7});
+  final String text;
+  final TextStyle style;
+  final TextAlign? textAlign;
+  final double minScale;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (context, box) {
+      var scale = 1.0;
+      if (box.hasBoundedWidth) {
+        final tp = TextPainter(
+          text: TextSpan(text: text, style: style),
+          maxLines: 1,
+          textDirection: TextDirection.ltr,
+          textScaler: MediaQuery.textScalerOf(context),
+        )..layout();
+        if (tp.width > box.maxWidth) scale = (box.maxWidth / tp.width).clamp(minScale, 1.0);
+      }
+      final size = style.fontSize ?? 14;
+      return Text(text, maxLines: 1, softWrap: false, overflow: TextOverflow.ellipsis, textAlign: textAlign, style: style.copyWith(fontSize: size * scale - (scale < 1 ? .1 : 0)));
+    });
+  }
+}

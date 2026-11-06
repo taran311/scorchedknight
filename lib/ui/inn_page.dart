@@ -514,7 +514,7 @@ class _ResumeBanner extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('CARRY ON WHERE YOU LEFT OFF', style: Txt.label(size: 11.5, color: const Color(0xFFFF9A7A))),
-                      Text(foe.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.label(size: 16, color: colour, weight: FontWeight.w800)),
+                      FitText(foe.name, style: Txt.label(size: 16, color: colour, weight: FontWeight.w800)),
                       const SizedBox(height: 4),
                       Bar(value: s.foeHp, max: s.foeMax, height: 12, colours: const [Color(0xFF7FCB5A), Color(0xFF2F6A1F)], label: '${fmt(s.foeHp)} / ${fmt(s.foeMax)}'),
                     ],
@@ -1087,7 +1087,7 @@ class _Sign extends StatelessWidget {
           children: [
             Icon(icon, size: 15, color: lit ? const Color(0xFFFFE6A0) : Palette.amber),
             const SizedBox(width: 5),
-            Flexible(child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.label(size: 13, color: lit ? Colors.white : Palette.cream))),
+            Flexible(child: FitText(text, style: Txt.label(size: 13, color: lit ? Colors.white : Palette.cream))),
           ],
         ),
       ),
@@ -1559,8 +1559,8 @@ class _PlaceButton extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.label(size: big ? 15.5 : 14, color: Palette.cream, weight: FontWeight.w800)),
-                          Text(note!, maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.label(size: big ? 12.5 : 11.5, color: Palette.amber)),
+                          FitText(label, style: Txt.label(size: big ? 15.5 : 14, color: Palette.cream, weight: FontWeight.w800)),
+                          FitText(note!, style: Txt.label(size: big ? 12.5 : 11.5, color: Palette.amber)),
                         ],
                       ),
               ),
@@ -1924,16 +1924,16 @@ class _RoadCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(header ?? (boss ? 'THE ROAD · ${road + 1} / $mainLands' : 'ON THE WAY · ${road + 1} / $mainLands'), style: Txt.label(size: 11, color: Palette.parch2)),
-                Text(step.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.label(size: 14.5, color: Palette.cream, weight: FontWeight.w800)),
+                FitText(step.title, style: Txt.label(size: 14.5, color: Palette.cream, weight: FontWeight.w800)),
                 const SizedBox(height: 3),
                 if (step.why != null)
-                  Text(step.why!, maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.label(size: 12, color: const Color(0xFFE0A070)))
+                  FitText(step.why!, style: Txt.label(size: 12, color: const Color(0xFFE0A070)))
                 else if (!boss)
-                  Text(step.sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.label(size: 12, color: Palette.amber))
+                  FitText(step.sub, style: Txt.label(size: 12, color: Palette.amber))
                 else
                   Row(
                     children: [
-                      Flexible(child: Text(l.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.label(size: 12, color: Palette.amber))),
+                      Flexible(child: FitText(l.name, style: Txt.label(size: 12, color: Palette.amber))),
                       const SizedBox(width: 8),
                       // The trail's stops, one pip each, then the lair.
                       for (var i = 0; i < winsForBoss; i++)
@@ -1991,9 +1991,9 @@ class _BoardCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('NOTICE BOARD · ${board.length} ${board.length == 1 ? 'CONTRACT' : 'CONTRACTS'}', style: Txt.label(size: 11, color: Palette.parch2)),
-                    Text(p.foe!.$4, maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.label(size: 14.5, color: Palette.cream, weight: FontWeight.w800)),
+                    FitText(p.foe!.$4, style: Txt.label(size: 14.5, color: Palette.cream, weight: FontWeight.w800)),
                     const SizedBox(height: 3),
-                    Text('${top.client} · ${continents[p.land].name}', maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.label(size: 12, color: pin)),
+                    FitText('${top.client} · ${continents[p.land].name}', style: Txt.label(size: 12, color: pin)),
                   ],
                 ),
               ),

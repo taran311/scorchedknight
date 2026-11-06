@@ -116,10 +116,8 @@ class TaskCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(done ? 'TASK DONE${more > 0 ? ' · +$more more' : ''}' : 'TASK', style: Txt.label(size: 11, color: done ? _taskGold : Palette.parch2)),
-                Text(
+                FitText(
                   t.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                   style: Txt.label(size: 14.5, color: Palette.cream, weight: FontWeight.w800),
                 ),
                 const SizedBox(height: 2),

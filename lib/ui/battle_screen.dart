@@ -1760,7 +1760,7 @@ class _Spoil extends StatelessWidget {
         children: [
           IconTheme.merge(data: IconThemeData(color: colour), child: SizedBox(width: 18, height: 18, child: Center(child: icon))),
           const SizedBox(width: 6),
-          Flexible(child: Text(text, overflow: TextOverflow.ellipsis, style: Txt.label(size: 14, color: big ? colour : Palette.cream, weight: FontWeight.w800))),
+          Flexible(child: FitText(text, style: Txt.label(size: 14, color: big ? colour : Palette.cream, weight: FontWeight.w800))),
         ],
       ),
     );

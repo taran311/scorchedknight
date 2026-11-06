@@ -290,7 +290,7 @@ class _PaperDoll extends StatelessWidget {
                           children: [
                             SizedBox(width: 24, height: 24, child: FittedBox(child: armourIcon(tier))),
                             const SizedBox(width: 6),
-                            Flexible(child: Text(tier.name, overflow: TextOverflow.ellipsis, style: Txt.label(size: 13, color: Palette.cream))),
+                            Flexible(child: FitText(tier.name, style: Txt.label(size: 13, color: Palette.cream))),
                             if (k.gloves) ...[const SizedBox(width: 8), const Tooltip(message: 'Gripped gauntlets: +3 damage a swing', child: ItemIcon(Item.gauntlets, size: 20))],
                           ],
                         ),
@@ -331,7 +331,7 @@ class _PaperDoll extends StatelessWidget {
                         if (!phone) const SizedBox(height: 2),
                         Text(value, style: Txt.label(size: phone ? 13 : 15, color: Palette.cream)),
                         // A word under each number, so nobody has to hover to know what it is.
-                        Text(_statWord(tip), maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.label(size: phone ? 9.5 : 10.5, color: Palette.parch2)),
+                        FitText(_statWord(tip), style: Txt.label(size: phone ? 9.5 : 10.5, color: Palette.parch2)),
                       ],
                     ),
                   ),

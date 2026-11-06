@@ -2903,4 +2903,22 @@ void main() {
     e.wearGearSet(1);
     expect(suitWorn(k), 'deepforge');
   });
+
+  test('partway through a side land, the road says finish it before the main road', () {
+    final e = GameEngine(GameEngine.newGame(), random: Random(1), clock: () => DateTime(2026, 6, 1));
+    final s = e.state, k = s.knight;
+    while (k.level < 30) {
+      e.grantXp(xpToNext(k));
+    }
+    s.innRepaired = true;
+    for (var c = 0; c < 5; c++) {
+      s.bossesDown.add(c);
+    }
+    expect(e.roadStep()?.title ?? '', isNot(startsWith('Finish')));
+    s.continent = throneKeyLand;
+    s.wins[throneKeyLand] = 3;
+    expect(e.roadStep()?.title, startsWith('Finish Deepforge Hold'));
+    s.bossesDown.add(throneKeyLand);
+    expect(e.roadStep()?.title ?? '', isNot(startsWith('Finish')));
+  });
 }

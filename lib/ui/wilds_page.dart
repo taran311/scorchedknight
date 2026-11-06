@@ -220,7 +220,7 @@ class _WildsPageState extends State<WildsPage> {
                   right: 10,
                   child: Row(
                     children: [
-                      Expanded(child: Text(area.name, overflow: TextOverflow.ellipsis, style: Txt.label(size: 20, color: col, weight: FontWeight.w800))),
+                      Expanded(child: FitText(area.name, style: Txt.label(size: 20, color: col, weight: FontWeight.w800))),
                       Text(d == 0 ? 'At the edge' : 'Step $d', style: Txt.label(size: 18, color: Palette.cream)),
                     ],
                   ),
@@ -473,7 +473,7 @@ class _AreaCard extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Flexible(child: Text(area.name, overflow: TextOverflow.ellipsis, style: Txt.label(size: 20, color: col, weight: FontWeight.w800))),
+                      Flexible(child: FitText(area.name, style: Txt.label(size: 20, color: col, weight: FontWeight.w800))),
                       if (suggested) ...[
                         const SizedBox(width: 8),
                         Container(

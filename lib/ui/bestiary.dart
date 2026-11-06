@@ -185,7 +185,7 @@ class BestiaryPreview extends StatelessWidget {
                     child: CustomPaint(painter: _Tile(paint), size: Size.infinite),
                   ),
                 ),
-                Text(name, style: Txt.label(size: 12, color: Palette.cream), overflow: TextOverflow.ellipsis),
+                FitText(name, style: Txt.label(size: 12, color: Palette.cream)),
               ],
             ),
         ],

@@ -556,9 +556,8 @@ class _ContinentPanel extends StatelessWidget {
                   Icon(step == TrailStep.patrol ? Icons.flag : Icons.workspace_premium, size: 20, color: step == TrailStep.stop ? Palette.stone3 : Palette.amber),
                   const SizedBox(width: 6),
                   Flexible(
-                    child: Text(
+                    child: FitText(
                       step == TrailStep.patrol ? '${land.boss.name} beaten' : (step == TrailStep.lair ? 'The lair is open!' : '${trailLairs[index]} ahead'),
-                      overflow: TextOverflow.ellipsis,
                       style: Txt.label(size: 14, color: Palette.parch),
                     ),
                   ),

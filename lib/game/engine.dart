@@ -469,6 +469,13 @@ class GameEngine {
     if (grow != null && k.level < grow && whyNotTravel(next) == null) {
       return _meanwhile('Level $grow, then back to ${continents[next].boss.name.split(',').first}', grow);
     }
+    // Partway through a side land's trail: finish it, its lord too, before the road calls you on
+    // (it used to send you straight back to the main road from a lair door). Its lord is a seal
+    // on the Ember Throne, too. Not when it's beaten you again and again: then the road goes on.
+    final here = state.continent;
+    if (isSideLand(here) && !state.bossesDown.contains(here) && here < state.wins.length && state.wins[here] > 0 && (state.bossLosses[here] ?? 0) < giveUpLosses && whyNotTravel(here) == null) {
+      return RoadStep(RoadKind.side, 'Finish ${continents[here].name.replaceFirst('The ', 'the ')}: beat ${continents[here].boss.name.split(',').first}', 'You\'re partway there · then back to the road', here);
+    }
     // The Ember Throne sealed: the road runs through the side lands, a seal a lord.
     if (next == throneLand && throneSealed) return _sealStep();
     // The Ember King has beaten you: hunt down one of his generals first (see _knockOut).

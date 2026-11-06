@@ -66,10 +66,8 @@ class WrenCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(runnerNames[r].toUpperCase(), style: Txt.label(size: 11, color: _wrenColour)),
-                Text(
+                FitText(
                   e == null ? 'Home, and bored' : (back ? 'Back from the errand!' : e.name),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                   style: Txt.label(size: 14.5, color: Palette.cream, weight: FontWeight.w800),
                 ),
                 if (e != null && !back)
