@@ -59,6 +59,14 @@
           }
         },
         {
+          "client_id": "1043295469823-ofcv2uh52ha7iu0nj2tvgbfql6fls7i2.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.scorchedknight.scorchedknight",
+            "certificate_hash": "2f0656727b3504a331aa6e49359a995d89ea6abc"
+          }
+        },
+        {
           "client_id": "1043295469823-nrau93utqm75slefdnldme5q0ooir12p.apps.googleusercontent.com",
           "client_type": 3
         }
