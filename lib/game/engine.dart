@@ -663,21 +663,27 @@ class GameEngine {
   int get sealsLeft => math.max(throneSeals - sealsBroken, state.bossesDown.contains(throneKeyLand) ? 0 : 1);
 
   /// Deepforge's lord, as the seals' notes name him.
-  String get _keyLord => '${continents[throneKeyLand].boss.name.split(',').first} of ${continents[throneKeyLand].name}';
+  String get _keyLord => '${continents[throneKeyLand].boss.name.split(',').first.replaceFirst(' Deepforge', '')} of ${continents[throneKeyLand].name}';
 
   /// Why you can't go to continent [c] yet (null: you can).
   String? whyNotTravel(int c) {
     if (c < 0 || c >= continents.length) return 'No such land';
     final from = openers(c);
     // (A land you've already been into stays open: saves from when the road forked.)
-    if (from.isNotEmpty && !from.any(state.bossesDown.contains) && !_beenTo(c)) {
-      return 'Beat ${from.map((f) => '${continents[f].boss.name} (${continents[f].name})').join(' or ')} to find the way';
-    }
+    // The Ember Throne's seals, said together with the road's own lock when both still stand (it
+    // used to name only Scorchmaw, and the seals came as a surprise after).
+    String? seals;
     if (c == throneLand && throneSealed) {
       final left = sealsLeft, key = !state.bossesDown.contains(throneKeyLand);
-      if (key && left == 1) return 'Sealed: $_keyLord holds the last seal';
-      return 'Sealed: beat the lords of $left more side land${left == 1 ? '' : 's'}${key ? ', $_keyLord among them' : ''} ($sealsBroken of $throneSeals)';
+      seals = key && left == 1
+          ? '$_keyLord holds the last seal'
+          : 'beat the lords of $left more side land${left == 1 ? '' : 's'}${key ? ', $_keyLord among them' : ''} ($sealsBroken of $throneSeals)';
     }
+    if (from.isNotEmpty && !from.any(state.bossesDown.contains) && !_beenTo(c)) {
+      final road = 'Beat ${from.map((f) => '${continents[f].boss.name} (${continents[f].name})').join(' or ')}';
+      return seals == null ? '$road to find the way' : '$road, and break its seals: $seals';
+    }
+    if (seals != null) return 'Sealed: $seals';
     final need = continents[c].minLevel;
     if (state.knight.level < need) return 'Reach level $need to enter';
     return null;
