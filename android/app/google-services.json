@@ -51,6 +51,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "1043295469823-goen83152nllbh1f9apdatm1he25rabl.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.scorchedknight.scorchedknight",
+            "certificate_hash": "70da8326b4f50dad0ad88057304f03388419b4e7"
+          }
+        },
+        {
           "client_id": "1043295469823-nrau93utqm75slefdnldme5q0ooir12p.apps.googleusercontent.com",
           "client_type": 3
         }
