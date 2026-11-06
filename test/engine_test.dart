@@ -2921,4 +2921,29 @@ void main() {
     s.bossesDown.add(throneKeyLand);
     expect(e.roadStep()?.title ?? '', isNot(startsWith('Finish')));
   });
+
+  test('without the full game, the free lands play and the rest are locked', () {
+    GameEngine.fullGame = false;
+    try {
+    final e = GameEngine(GameEngine.newGame(), random: Random(1), clock: () => DateTime(2026, 6, 1));
+    final s = e.state, k = s.knight;
+    while (k.level < 30) {
+      e.grantXp(xpToNext(k));
+    }
+    s.innRepaired = true;
+    for (var c = 0; c <= 3; c++) {
+      s.bossesDown.add(c);
+    }
+    expect(e.whyNotTravel(3), isNull);
+    expect(e.whyNotTravel(7), isNull, reason: 'Ravenmoor is free');
+    expect(e.whyNotTravel(4), contains('full game'));
+    expect(e.whyNotTravel(throneKeyLand), contains('full game'));
+    expect(e.roadStep()?.title, contains('full game'));
+    expect(e.beyondFreeLands, isFalse);
+    GameEngine.fullGame = true;
+    expect(e.whyNotTravel(4), isNull);
+    } finally {
+      GameEngine.fullGame = true;
+    }
+  });
 }

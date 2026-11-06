@@ -22,6 +22,26 @@ play.google.com/console → **Create app**
 - Default language: English (United Kingdom)
 - App or game: **Game** · Free or paid: **Free**
 
+## 2b. The full game (in-app product)
+
+The free lands are Cindervale to the Grimtusk Badlands (Krugg), plus Ravenmoor, the Howling Weald,
+the Shattered Sea and the Hollowdeep. One purchase unlocks the rest for good.
+
+1. **Monetise → Products → In-app products → Create product** (Play asks for a merchant account:
+   you have one from The Calorie Card).
+   - Product ID: **`full_game`** (exactly this: the game asks for it by name).
+   - Name: *Scorched Knight: the full game*. Description: *Every land, the Ember King, all three
+     knights, New Game+, Hardcore and the Fortress. Yours for good.*
+   - Price: **£4.99** (Play fills in other countries). Then **Activate**.
+   - In-app products only show up once a build with billing has been uploaded to a test track, so
+     upload to Internal testing first, then make the product.
+2. **Setup → License testing**: add your Google account (and any testers). Your purchases are then
+   test purchases and nothing is charged.
+3. Your own builds are already unlocked: the web game on localhost, and any save that had been past
+   the free lands before. A fresh phone install built by you can be unlocked with
+   `flutter build apk --dart-define=SK_FULL=true` (never use that flag for the Play upload).
+4. The web game (scorchedknight.com) stays the free lands, with a "Get it on Google Play" button.
+
 ## 3. Store listing (Grow users → Store presence → Main store listing)
 
 **App name** (30): Scorched Knight
@@ -61,8 +81,9 @@ play.google.com/console → **Create app**
 > **When you've won**
 > New Game+ brings tougher foes and better spoils. Hardcore gives you one life.
 >
-> No adverts. No energy timers. Sign in (optional) to carry your hero between your phone and
-> scorchedknight.com.
+> Free to start: play the first four lands, Ravenmoor and more, then unlock the full game once.
+> No subscription, no adverts, no energy timers. Sign in (optional) to carry your hero between your
+> phone and scorchedknight.com.
 
 **App icon**: `web\icons\Icon-512.png` (512×512).
 
@@ -79,6 +100,7 @@ legendary special going off, the map, Your Tent with a class suit on, the forge.
 
 - **Privacy policy**: https://scorchedknight.com/privacy.html
 - **Ads**: No, the app doesn't contain ads.
+- **In-app purchases**: Yes (the one-off unlock). Play shows "In-app purchases" on the listing.
 - **App access**: All functionality is available without special access (sign-in is optional).
 - **Content rating** (IARC questionnaire): category **Game**.
   - Violence: yes, fantasy violence (non-realistic characters, cartoon style). Blood: no realistic
@@ -95,6 +117,8 @@ legendary special going off, the map, Your Tent with a class suit on, the forge.
   - User IDs: collected, not shared. Purpose: account management, app functionality. Optional.
   - App activity → other user-generated content (the game save): collected, not shared. Purpose:
     app functionality. Optional.
+  - Purchase history: **not** collected by us (Google Play handles the payment; the game only learns
+    that the unlock was bought).
   - Encrypted in transit: **Yes**. Users can request deletion: **Yes**.
   - Account deletion URL: https://scorchedknight.com/delete-account.html
 - **Government app / financial features / health**: No.

@@ -483,6 +483,8 @@ class GameEngine {
     if (next == throneLand && down < (state.setbacks['hunt'] ?? 0) && down < emberGenerals.length && whyNotTravel(next) == null) {
       return RoadStep(RoadKind.train, 'Hunt the Ember King\'s generals', '$down of ${emberGenerals.length} down · each leaves him ${(generalCut * 100).round()}% weaker', next);
     }
+    // The free lands done: the road goes on in the full game.
+    if (lockedByFullGame(next)) return RoadStep(RoadKind.boss, 'The road goes on: the full game', '${continents[next].name}, the Ember King and more', next);
     final boss = RoadStep(RoadKind.boss, 'Beat ${continents[next].boss.name}', continents[next].name, next);
     final shut = whyNotTravel(next);
     if (shut == null) return boss;
@@ -675,6 +677,7 @@ class GameEngine {
   /// Why you can't go to continent [c] yet (null: you can).
   String? whyNotTravel(int c) {
     if (c < 0 || c >= continents.length) return 'No such land';
+    if (lockedByFullGame(c)) return '${continents[c].name} is in the full game';
     final from = openers(c);
     // (A land you've already been into stays open: saves from when the road forked.)
     // The Ember Throne's seals, said together with the road's own lock when both still stand (it
@@ -695,6 +698,17 @@ class GameEngine {
     if (state.knight.level < need) return 'Reach level $need to enter';
     return null;
   }
+
+  /// Whether the one-off unlock is owned (services/full_game.dart sets it; tests and the balance
+  /// tools play the whole game).
+  static bool fullGame = true;
+
+  /// Land [c] is past the free lands, and the full game isn't unlocked.
+  bool lockedByFullGame(int c) => !fullGame && !freeLands.contains(c);
+
+  /// The hero has been further than the free lands (a save from before the unlock existed, or
+  /// carried over from the web): it keeps the whole game (see FullGame.grandfather).
+  bool get beyondFreeLands => [for (var c = 0; c < continents.length; c++) if (!freeLands.contains(c) && _beenTo(c)) c].isNotEmpty || state.ng > 0 || state.won;
 
   /// Travels to continent [c], if it's open to you and you're its level.
   bool travel(int c) {
@@ -1326,6 +1340,7 @@ class GameEngine {
 
   /// Why you can't head into wild area [a] (null if you can).
   String? whyNotWild(int a) {
+    if (!fullGame && wildAreas[a].opensAfter > freeWildsAfter) return '${wildAreas[a].name} is in the full game';
     if (!wildOpen(a)) return 'Opens when ${continents[wildAreas[a].opensAfter].boss.name} falls';
     if (state.inBattle) return 'You\'re in a fight';
     if (state.wild != null && state.wild != a) return 'You\'re already out in ${wildAreas[state.wild!].name}';
@@ -1643,6 +1658,7 @@ class GameEngine {
   String? whyNotDungeon(String id) {
     final d = dungeonById(id);
     if (d == null) return 'No such place';
+    if (lockedByFullGame(d.land)) return '${d.name} is in the full game';
     if (!dungeonOpen(d)) return 'Opens when ${continents[d.land].boss.name} falls';
     if (state.dungeon == id) return null;
     if (state.knight.level < d.minLevel) return 'Reach level ${d.minLevel} to go down';

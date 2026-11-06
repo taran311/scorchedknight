@@ -30,6 +30,7 @@ import '../game/models.dart' show GameState;
 import 'arena_page.dart';
 import 'hall_page.dart';
 import 'dungeon_page.dart';
+import 'full_game_sheet.dart';
 
 /// The map is 1000 wide and this tall: the lands, and the Shattered Sea along the bottom.
 const _mapH = 700.0;
@@ -602,12 +603,15 @@ class _ContinentPanel extends StatelessWidget {
             ],
           ],
         ),
-        StoneButton(
-          title: blocked == null ? 'Enter' : 'Locked',
-          caption: blocked == null ? land.name : null,
-          tone: ButtonTone.blood,
-          onPressed: blocked == null ? onEnter : null,
-        ),
+        // Past the free lands: the way to the full game, rather than a dead "Locked".
+        c.engine.lockedByFullGame(index)
+            ? StoneButton(title: 'Full game', caption: 'Unlock', tone: ButtonTone.amber, onPressed: () => showFullGame(context, c))
+            : StoneButton(
+                title: blocked == null ? 'Enter' : 'Locked',
+                caption: blocked == null ? land.name : null,
+                tone: ButtonTone.blood,
+                onPressed: blocked == null ? onEnter : null,
+              ),
       ),
     );
   }

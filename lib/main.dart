@@ -11,6 +11,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'audio/audio.dart';
 import 'services/cloud.dart';
+import 'services/full_game.dart';
 
 import 'game/controller.dart';
 import 'ui/moves_preview.dart';
@@ -53,7 +54,7 @@ Future<void> main() async {
   // every face of the game's fonts, fetched before the first frame. (They used to load as they
   // were first needed: the title flashed up in a plain font, and the first bold banner or damage
   // number of a session made the text around it jump as its face arrived mid-fight.)
-  await Future.wait([CloudSave.instance.init(), _fonts()]);
+  await Future.wait([CloudSave.instance.init(), _fonts(), FullGame.instance.init()]);
   runApp(const ScorchedKnightApp());
 }
 
@@ -83,7 +84,16 @@ class ScorchedKnightApp extends StatefulWidget {
 }
 
 class _ScorchedKnightAppState extends State<ScorchedKnightApp> {
-  late final GameController _game = widget.controller ?? (GameController(cloud: CloudSave.instance.available ? CloudSave.instance : null)..load());
+  late final GameController _game = widget.controller ?? _make();
+
+  /// The saved hero, loaded; a hero already past the free lands (a save from before the unlock,
+  /// or one carried over from the cloud) keeps the whole game.
+  GameController _make() {
+    final c = GameController(cloud: CloudSave.instance.available ? CloudSave.instance : null);
+    c.addListener(() => FullGame.instance.grandfather(c.engine));
+    c.load();
+    return c;
+  }
   final _nav = GlobalKey<NavigatorState>();
   late final AppLifecycleListener _life;
   bool _asking = false;

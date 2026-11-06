@@ -19,6 +19,8 @@ dependencies:
   google_sign_in: ^7.2.0
   # Sound effects in the app (the browser uses Web Audio): audio/audio_native.dart.
   audioplayers: ^6.1.0
+  # The full game, bought once on Google Play (services/full_game.dart).
+  in_app_purchase: ^3.2.0
   path_provider: ^2.1.4
 
 dev_dependencies:

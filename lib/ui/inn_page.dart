@@ -55,6 +55,7 @@ import 'theme.dart';
 import 'wilds_page.dart';
 import 'trail_data.dart' show trailAt;
 import 'trail_page.dart';
+import 'full_game_sheet.dart';
 import '../game/contracts.dart';
 
 class InnPage extends StatefulWidget {
@@ -154,6 +155,7 @@ class _InnPageState extends State<InnPage> with RouteAware {
       case RoadKind.hall:
         await nav.push(MaterialPageRoute<void>(builder: (_) => HallPage(controller: c)));
       case RoadKind.boss || RoadKind.heroic || RoadKind.train || RoadKind.side:
+        if (c.engine.lockedByFullGame(step.land)) return showFullGame(context, c);
         if (c.whyNotTravel(step.land) != null) return _openMap();
         c.travel(step.land);
         await nav.push(MaterialPageRoute<void>(builder: (_) => TrailPage(controller: c, land: step.land)));

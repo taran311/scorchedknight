@@ -398,6 +398,14 @@ bool isSideLand(int continent) => continent >= mainLands;
 /// the map unseen.)
 const throneLand = mainLands - 1, throneSeals = 6;
 
+/// The lands free to play before the one-off unlock (services/full_game.dart): the road from
+/// Cindervale to Krugg in the Grimtusk Badlands, and the side lands that open from it at those
+/// levels (Ravenmoor and the Blood Knight's suit among them). Everything past them is the full game.
+const freeLands = {0, 1, 2, 3, 7, 8, 13, 17};
+
+/// The Ashen Wilds open with those lands (the Wilds past the Grimtusk Badlands are the full game's).
+const freeWildsAfter = 3;
+
 /// The one seal that must be among them: Deepforge Hold's, the Forge Knight's home. (Ravenmoor, the
 /// Blood Knight's, is on nearly every road there anyway, and the Dragon Knight's dragons are on the
 /// main road; Deepforge was the class a hero could reach the King without ever seeing.)
