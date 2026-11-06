@@ -256,11 +256,12 @@ class GameController extends ChangeNotifier {
 
   void _changed() {
     // A whole faction suit worn once counts for its task, even after you take a piece off.
-    final suit = suitWorn(state.knight);
+    final suit = suitWorn(state.knight), firstTime = suit != null && !state.did.contains('suit:$suit');
     if (suit != null) engine.mark('suit:$suit');
-    // The whole suit of a class just went on: you're that knight now.
+    // The whole suit of a class just went on: you're that knight now. (The awakening plays the first
+    // time you become each knight; changing back into a suit you've worn before is just a change.)
     final cls = classOf(state.knight)?.id;
-    if (loaded && cls != null && cls != _lastClass) classAwakened.value = cls;
+    if (loaded && cls != null && cls != _lastClass && firstTime) classAwakened.value = cls;
     _lastClass = cls;
     // Gear changed out of a fight (a piece swapped, armour reforged): never more HP than the new
     // most.
@@ -790,6 +791,13 @@ class GameController extends ChangeNotifier {
   void saveGearSet(int i) {
     engine.saveGearSet(i);
     _changed();
+  }
+
+  /// Changes into a whole class suit from the gear chest (see GameEngine.wearSuit).
+  int wearSuit(String setId) {
+    final n = engine.wearSuit(setId);
+    if (n > 0) _changed();
+    return n;
   }
 
   int wearGearSet(int i) {

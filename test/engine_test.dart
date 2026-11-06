@@ -2829,4 +2829,27 @@ void main() {
     s.bossLosses[throneLand] = kingMercyAfter + 2;
     expect(e.doggedFor(king), lessThan(1));
   });
+
+  test('a suit can be changed for another in one go, and the body armour taken off is kept', () {
+    final e = GameEngine(GameEngine.newGame(), random: Random(1), clock: () => DateTime(2026, 6, 1));
+    final s = e.state, k = s.knight;
+    while (k.level < 35) {
+      e.grantXp(xpToNext(k));
+    }
+    for (final set in ['nightblood', 'deepforge']) {
+      for (final slot in setPieceSlots) {
+        k.stash.add(e.loot.setPiece(set, slot, k.heroClass, k.level));
+      }
+    }
+    expect(e.wearSuit('nightblood'), setPieceSlots.length);
+    expect(suitWorn(k), 'nightblood');
+    expect(e.holdsSuit('deepforge'), isTrue);
+    expect(e.wearSuit('deepforge'), setPieceSlots.length);
+    expect(suitWorn(k), 'deepforge');
+    // The Blood Knight's breastplate went in the chest, not into thin air.
+    expect(k.stash.any((g) => g.slot == GearSlot.armour && g.art == setArmourId('nightblood')), isTrue);
+    expect(e.holdsSuit('nightblood'), isTrue);
+    expect(e.wearSuit('nightblood'), setPieceSlots.length);
+    expect(suitWorn(k), 'nightblood');
+  });
 }

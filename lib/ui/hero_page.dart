@@ -277,6 +277,8 @@ class _PaperDoll extends StatelessWidget {
                     // Which road you're on (the first, New Game+ or Hardcore): tap for all three.
                     RoadLabel(controller: c),
                     if (fill) Expanded(child: figure) else SizedBox(height: phone ? 200 : 300, child: figure),
+                    // The other class suits you hold, a tap to change into (see GameEngine.wearSuit).
+                    _SuitSwap(controller: c),
                     // The armour you wear, under your feet.
                     Tooltip(
                       message: '${tier.name}: −${(tier.reduction * 100).round()}% damage taken${k.loadout.armourEnchant == null ? '' : ' · ${k.loadout.armourEnchant!.title}: ${k.loadout.armourEnchant!.describe}'}',
@@ -1502,4 +1504,58 @@ void _pickRite(BuildContext context, GameController c, String id) {
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
     ..showSnackBar(const SnackBar(content: Text('Your hotbar is full. Tap a rite on it to take it off first.'), duration: Duration(milliseconds: 1800)));
+}
+
+/// The class suits you hold but aren't wearing, as small chips: tap one to change into the whole
+/// suit at once (what it replaces goes in your gear chest). Nothing when there's none to change to.
+class _SuitSwap extends StatelessWidget {
+  const _SuitSwap({required this.controller});
+  final GameController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = controller, k = c.state.knight, worn = classOf(k)?.id;
+    final others = [for (final cls in knightClasses) if (cls.id != worn && c.engine.holdsSuit(cls.id)) cls];
+    if (others.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 6,
+        runSpacing: 4,
+        children: [
+          for (final cls in others)
+            Tooltip(
+              message: 'Change into the whole ${cls.name}\'s suit (what it replaces goes in your gear chest)',
+              child: GestureDetector(
+                onTap: c.state.inBattle
+                    ? null
+                    : () {
+                        if (c.wearSuit(cls.id) > 0) Audio.play(Sfx.clang);
+                      },
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(6, 2, 8, 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0x99000000),
+                      border: Border.all(color: Color(cls.argb).withValues(alpha: .8), width: 1.3),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.swap_horiz_rounded, size: 15, color: Color(cls.argb)),
+                        const SizedBox(width: 4),
+                        Text('Become ${cls.name}', style: Txt.label(size: 12, color: Palette.cream)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }

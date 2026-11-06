@@ -4092,7 +4092,7 @@ class GameEngine {
     } else if (item.slot == GearSlot.ring) {
       k.ring = item;
     } else if (item.slot == GearSlot.armour) {
-      k.loadouts[item.heroClass ?? k.heroClass]!.armour = item.art;
+      _putOnArmour(item.heroClass ?? k.heroClass, item.art);
     } else {
       k.loadouts[item.heroClass ?? k.heroClass]!.put(item);
     }
@@ -4115,6 +4115,35 @@ class GameEngine {
       _note('Your ${kit.offhand!.name} won\'t be used with ${kit.weapon?.name ?? 'bare hands'}: it waits in your kit.');
     }
     return sold;
+  }
+
+  /// Puts body armour [art] on [cls]'s kit. A class suit's body armour you take off goes in your
+  /// gear chest, so changing suits never loses one. (It used to vanish: body armour is worn as a
+  /// tier, not carried as a piece.)
+  void _putOnArmour(HeroClass cls, String art) {
+    final k = state.knight, kit = k.loadouts[cls]!, old = kit.armour;
+    kit.armour = art;
+    final set = setOfArmour(old);
+    if (old != art && set != null && gearSetById(set) != null && !k.stash.any((g) => g.slot == GearSlot.armour && g.art == old)) {
+      k.stash.add(loot.setPiece(set, GearSlot.armour, cls, k.level));
+    }
+  }
+
+  /// Whether you hold every piece of suit [setId], worn or in your gear chest.
+  bool holdsSuit(String setId) => setPieceSlots.every((slot) => hasSetPiece(setId, slot));
+
+  /// Changes into the whole of suit [setId] from your gear chest, in one go: what it replaces goes
+  /// in the chest (another suit's pieces always do). The number of pieces put on.
+  int wearSuit(String setId) {
+    if (state.inBattle) return 0;
+    final k = state.knight;
+    var n = 0;
+    for (final slot in setPieceSlots) {
+      final g = k.stash.where((g) => g.slot == slot && (slot == GearSlot.armour ? g.art == setArmourId(setId) : g.gearSet == setId)).firstOrNull;
+      if (g != null && equipFromStash(g.id)) n++;
+    }
+    if (n > 0) _note('You change into the ${knightClassById(setId)?.name ?? gearSetById(setId)?.name ?? 'other'}\'s suit.', EntryKind.gold);
+    return n;
   }
 
   /// What [item] would replace: the trinket, the ring, or that slot in its own class's kit.
@@ -4383,7 +4412,7 @@ class GameEngine {
           what = '${dyeById(d).name.toLowerCase()} dye';
         } else {
           final tier = armourTierById(id);
-          k.loadouts[tier.heroClass]!.armour = tier.id;
+          _putOnArmour(tier.heroClass, tier.id);
           what = tier.name.toLowerCase();
         }
     }
@@ -4608,7 +4637,7 @@ class GameEngine {
       state.addMat(barKey(e.key), -e.value);
     }
     state.knight.coins -= recipe.gold;
-    state.knight.loadouts[tier.heroClass]!.armour = tier.id;
+    _putOnArmour(tier.heroClass, tier.id);
     state.knight.hp = math.min(state.knight.hp, maxHp(state.knight));
     _note('Dunstan hammers the bars into shape: ${tier.name}! Damage taken −${(tier.reduction * 100).round()}%.', EntryKind.gold);
     return true;
