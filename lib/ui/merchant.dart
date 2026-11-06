@@ -548,8 +548,11 @@ class ForgeWares extends StatelessWidget {
         if (!forgedSets.any((f) => s.mat(trophyKey(f.trophy)) > 0 || setPieceSlots.any((slot) => s.mat(blueprintKey(f.id, slot)) > 0)))
           Padding(padding: const EdgeInsets.only(top: 8), child: Text('Faction suits: their foes drop trophies and blueprints, and $smithName forges the pieces', style: Txt.onStone(size: 12.5))),
         // Set pieces, from the blueprints the Ashen Order, the vampires and the werewolves carry.
+        // A suit you hold all of, with nothing to reforge: one quiet line (at the bottom), not the
+        // whole list of pieces you've already got.
         for (final f in forgedSets)
-          if (s.mat(trophyKey(f.trophy)) > 0 || setPieceSlots.any((slot) => s.mat(blueprintKey(f.id, slot)) > 0)) ...[
+          if (c.engine.holdsSuit(f.id) && !setPieceSlots.any((slot) => c.canReforge(f.id, slot))) ...[]
+          else if (s.mat(trophyKey(f.trophy)) > 0 || setPieceSlots.any((slot) => s.mat(blueprintKey(f.id, slot)) > 0)) ...[
             x.heading('${gearSetById(f.id)!.name} set'),
             SetChips(set: gearSetById(f.id)!, dense: true, named: false),
             // An order's suit is a class: say so, and what kind of knight it makes you.
@@ -607,6 +610,24 @@ class ForgeWares extends StatelessWidget {
                   const SizedBox(),
                 ),
           ],
+        for (final f in forgedSets)
+          if (c.engine.holdsSuit(f.id) && !setPieceSlots.any((slot) => c.canReforge(f.id, slot)))
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle, size: 16, color: Color(0xFF9BE27A)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text.rich(TextSpan(children: [
+                      TextSpan(text: '${gearSetById(f.id)!.name} set', style: Txt.label(size: 13, color: Palette.cream)),
+                      if (knightClassById(f.id) case final cls?) TextSpan(text: '  ${cls.name}', style: Txt.label(size: 12, color: Color(cls.argb))),
+                      TextSpan(text: '  · every piece forged', style: Txt.onStone(size: 12)),
+                    ])),
+                  ),
+                ],
+              ),
+            ),
         // The suits not begun yet: what there is to find, and who carries it.
         if (forgedSets.any((f) => !(s.mat(trophyKey(f.trophy)) > 0 || setPieceSlots.any((slot) => s.mat(blueprintKey(f.id, slot)) > 0)))) ...[
           x.heading('Still to find'),
@@ -632,6 +653,7 @@ class ForgeWares extends StatelessWidget {
                 ),
               ),
         ],
+        ], // (End of the Suits tab: the relics below sat inside it once, on no tab at all.)
         // Relics: a blueprint and its parts, forged into a legend.
         // (On the Forge tab only: they used to repeat under every tab.)
         if (on('forge') && relics.keys.any((l) => c.heroicOpen(l) && !s.forged.contains(l))) x.heading('Relics'),
@@ -662,7 +684,6 @@ class ForgeWares extends StatelessWidget {
             ),
             ),
           ],
-        ],
       ],
     );
   }

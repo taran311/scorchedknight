@@ -1271,6 +1271,10 @@ class GameEngine {
   /// forge; cleared once offered.
   int? relicReady;
 
+  /// A relic with every part in hand, not yet forged (its land): the forge's badge says so, and
+  /// opens on it.
+  int? get relicToForge => [for (final r in relics.keys) if (heroicOpen(r) && !state.forged.contains(r) && relicPartsFound(state.relicParts, r) == relics[r]!.parts.length) r].firstOrNull;
+
   /// Why Dunstan can't forge land [c]'s relic yet (null if he can).
   String? whyNotForge(int c) {
     final relic = relics[c];

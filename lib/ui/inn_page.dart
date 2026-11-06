@@ -252,7 +252,10 @@ class _InnPageState extends State<InnPage> with RouteAware {
           TownSpot.enchanter: 'Bolts to make'
         else if (c.whyShut('tower') == null && Elemental.values.any((el) => c.whyNotBind(el) == null))
           TownSpot.enchanter: 'A rune to bind',
-        if (c.whyShut('forge') == null && c.engine.upgradesReady > 0) TownSpot.forge: '${c.engine.upgradesReady} upgrade${c.engine.upgradesReady == 1 ? '' : 's'} ready',
+        if (c.whyShut('forge') == null && c.engine.relicToForge != null)
+          TownSpot.forge: '${relics[c.engine.relicToForge]!.name} to forge'
+        else if (c.whyShut('forge') == null && c.engine.upgradesReady > 0)
+          TownSpot.forge: '${c.engine.upgradesReady} upgrade${c.engine.upgradesReady == 1 ? '' : 's'} ready',
       };
       final taps = _away && !s.inBattle
           ? <TownSpot, VoidCallback?>{
@@ -269,7 +272,10 @@ class _InnPageState extends State<InnPage> with RouteAware {
                             TownSpot.stall: s.inBattle ? () => _shut('Finish your fight first') : (s.raid == 'stall' ? _chase : () => showMerchantWindow(context, c)),
                             TownSpot.inn: () => visitInn(context, c, onHunt: _hunt),
                             TownSpot.tent: _openKit,
-                            TownSpot.forge: s.inBattle ? () => _shut('Finish your fight first') : () => c.whyShut('forge') == null ? showForgeWindow(context, c, tab: c.engine.upgradesReady > 0 ? 'temper' : null) : _shut(c.whyShut('forge')!),
+                            TownSpot.forge: s.inBattle ? () => _shut('Finish your fight first') : () => c.whyShut('forge') == null
+                                // (A relic with every part in: straight to it, lit up.)
+                                ? showForgeWindow(context, c, tab: c.engine.relicToForge != null ? 'forge' : (c.engine.upgradesReady > 0 ? 'temper' : null), focus: c.engine.relicToForge == null ? null : 'relic:${c.engine.relicToForge}')
+                                : _shut(c.whyShut('forge')!),
                             // (Opened where its note points: bolts to make opens on the bolts.)
                             TownSpot.enchanter: s.inBattle ? () => _shut('Finish your fight first') : () => c.whyShut('tower') == null ? showEnchanterWindow(context, c, tab: notes[TownSpot.enchanter] == 'Bolts to make' ? 'bolts' : null) : _shut(c.whyShut('tower')!),
                           };
