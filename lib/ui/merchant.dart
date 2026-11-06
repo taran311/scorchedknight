@@ -503,7 +503,8 @@ class ForgeWares extends StatelessWidget {
         x.heading('Bring up to your level'),
         for (final w in c.temperables)
           Spotlit(
-            on: c.engine.upgradeReady(w),
+            on: false,
+            ready: c.engine.upgradeReady(w),
             child: x.ware(
             GearIcon(item: w, size: 30, heroClass: k.heroClass, dye: k.dye),
             w.name,
@@ -525,7 +526,8 @@ class ForgeWares extends StatelessWidget {
         // marked Ready, so "1 upgrade ready" points at something; rare ones after.
         for (final g in [...c.honeables.where(c.engine.upgradeReady), ...c.honeables.where((g) => !c.engine.upgradeReady(g))])
           Spotlit(
-            on: focus == 'hone:${g.id}' || c.engine.upgradeReady(g),
+            on: focus == 'hone:${g.id}',
+            ready: c.engine.upgradeReady(g),
             child: x.ware(
               GearIcon(item: g, size: 30, heroClass: k.heroClass, dye: k.dye),
               g.name,
@@ -1241,10 +1243,12 @@ Future<bool> promptRelicForge(BuildContext context, GameController c) async {
 }
 
 /// A ware you were sent for: scrolled into view as the window opens, and ringed in a glow that
-/// pulses a few times, so it's the first thing you see. [on] false: just the child.
+/// pulses a few times, so it's the first thing you see. [on] false: just the child, or, with
+/// [ready] (an upgrade you can afford), a faint, still amber edge: noticeable when you look, not
+/// shouting at you every time you open the forge.
 class Spotlit extends StatefulWidget {
-  const Spotlit({super.key, required this.on, required this.child});
-  final bool on;
+  const Spotlit({super.key, required this.on, required this.child, this.ready = false});
+  final bool on, ready;
   final Widget child;
 
   @override
@@ -1276,7 +1280,14 @@ class _SpotlitState extends State<Spotlit> with SingleTickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    if (!widget.on) return widget.child;
+    if (!widget.on) {
+      if (!widget.ready) return widget.child;
+      return DecoratedBox(
+        // (No rounded corners: Flutter only rounds a border that's the same all the way round.)
+        decoration: BoxDecoration(border: Border(left: BorderSide(color: Palette.amber.withValues(alpha: .7), width: 3))),
+        child: widget.child,
+      );
+    }
     return AnimatedBuilder(
       animation: _pulse,
       builder: (context, child) {

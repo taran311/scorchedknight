@@ -2282,7 +2282,8 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       final mid = Offset.lerp(_edgeHilt, _edgePoint, .5)!;
       _burst(mid, blood, .9);
       _spark('blood', mid, 12, speed: 2.2, life: 600, radius: 3, gravity: .15);
-      _mark('Next blow can\'t miss', [blood, shade(blood, -.5)], const Offset(_knightX + 20, _groundY - 300));
+      // (Low, by the blade: up at head height the boons row over the stage hid it.)
+      _mark('Can\'t miss!', [blood, shade(blood, -.5)], const Offset(_knightX + 40, _groundY - 190));
     });
   }
 
