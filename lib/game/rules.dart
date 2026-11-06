@@ -258,12 +258,19 @@ const bossTurnsPerTier = .05;
 /// A land's boss grows with you only this many levels past the land's own (see GameEngine._begin).
 const bossLevelSpan = 4;
 
+/// The Ember King stops growing with you at the same point as any boss. (Tried further, 8 levels:
+/// with no weakening for losses, growing a few levels stopped helping, and he became a wall.)
+const kingLevelSpan = 4;
+
+/// How far past its land's level [continent]'s boss keeps pace with you.
+int bossSpanFor(int continent) => continent == throneLand ? kingLevelSpan : bossLevelSpan;
+
 /// A foe carries one lasting affliction at a time (see GameEngine.foeAffliction). Only the balance
 /// tools turn it off, to compare against the old rule (every kind at once).
 var oneAffliction = true;
 
 /// The level land [continent]'s own boss fights a hero of [heroLevel] at.
-int bossLevelFor(int continent, int heroLevel) => math.min(foeLevelFor(continent, heroLevel), continents[continent].minLevel + bossLevelSpan);
+int bossLevelFor(int continent, int heroLevel) => math.min(foeLevelFor(continent, heroLevel), continents[continent].minLevel + bossSpanFor(continent));
 
 /// Ordinary foes (not bosses, not rares): a little tougher and harder-hitting than the formula
 /// alone, so a plain fight lasts a few real turns and costs a real share of your HP, and picking
@@ -293,10 +300,13 @@ int foeMenace(GameState s) {
 /// with next to nothing), and the full weight lands from the Grimtusk Badlands on. Bosses get
 /// less of it than the foes on their trails: they're tuned close to the edge already, and at full
 /// weight the first ones stood in the road like walls.
-const ngHp = 1.4, ngHit = 1.25, ngBossShare = .5;
+/// (The Ember King takes a smaller share again, [ngKingShare]: he's tougher than the other bosses
+/// to start with, and at their share New Game+ stood him in the road like a wall.)
+const ngHp = 1.4, ngHit = 1.25, ngBossShare = .5, ngKingShare = .25;
 double _ngRamp(int? land) => land == null ? 1 : (.15 + .85 * landTier(land) / 3).clamp(0.0, 1.0);
-double ngFoeHp(int ng, [int? land, bool boss = false]) => ng > 0 ? 1 + (ngHp - 1) * _ngRamp(land) * (boss ? ngBossShare : 1) : 1;
-double ngFoeHit(int ng, [int? land, bool boss = false]) => ng > 0 ? 1 + (ngHit - 1) * _ngRamp(land) * (boss ? ngBossShare : 1) : 1;
+double _ngShare(int? land, bool boss) => !boss ? 1 : (land == mainLands - 1 ? ngKingShare : ngBossShare);
+double ngFoeHp(int ng, [int? land, bool boss = false]) => ng > 0 ? 1 + (ngHp - 1) * _ngRamp(land) * _ngShare(land, boss) : 1;
+double ngFoeHit(int ng, [int? land, bool boss = false]) => ng > 0 ? 1 + (ngHit - 1) * _ngRamp(land) * _ngShare(land, boss) : 1;
 
 /// A foe's HP, fixed when the fight starts.
 int spawnHp(int foeIndex, int level, [Rare? rare]) {
@@ -511,9 +521,18 @@ const dodgeCap = .4, parryCap = .4;
 /// with a crit blade: it felt like nothing ever landed). Ordinary knights sit well under this.
 const avoidCap = .55;
 
+/// Against the Ember King, less: his blows come on a wall of fire that's hard to slip. (Tried for
+/// every foe, at 45%: it reined in the builds that dodge, parry and block everything, but New Game+
+/// became a wall of knockouts. Only the last fight needs it.)
+const kingAvoidCap = .45;
+
+/// How much of [foe]'s blows dodging and parrying can turn aside between them.
+double avoidCapFor(FoeType? foe) => foe?.look == 'emberKing' ? kingAvoidCap : avoidCap;
+
+
 /// The Blood Knight's bash (Blood Rend) heals this share of the blow. (An eighth, it made the Blood
 /// Knight with a big two-handed legendary all but unkillable: see tool/sweep.dart.)
-const bloodRendHeal = .1;
+const bloodRendHeal = .06;
 double dodgeChance(Knight k, [FoeType? foe]) => math.min(k.heroClass == HeroClass.ranger ? .5 : dodgeCap, (k.heroClass == HeroClass.ranger ? .25 : .15) + heroStats(k).dodge / 100 + (foe?.look == 'cyclops' ? cyclopsDodge : 0));
 
 /// How the foe's blow went.
@@ -591,7 +610,7 @@ int counterDamage(GameState s) {
   // A boss that keeps beating you hits a little softer each time too, as well as having less HP
   // (see doggedFor): a hero who can't win yet still gets there, rather than losing for ever.
   final c = realmAt(s.foe);
-  final dogged = s.rare == null && foeIn(s).boss && !s.bossesDown.contains(c) && !s.wildFight && !s.dungeonFight ? 1 - math.min(doggedHitMax, doggedHitStep * (s.bossLosses[c] ?? 0)) : 1.0;
+  final dogged = s.rare == null && foeIn(s).boss && !s.bossesDown.contains(c) && !s.wildFight && !s.dungeonFight ? 1 - math.min(doggedHitMax, doggedHitStep * (c == throneLand ? math.max(0, (s.bossLosses[c] ?? 0) - kingMercyAfter) : (s.bossLosses[c] ?? 0))) : 1.0;
   return math.max(1, (foeAttack(s.foe, s.rare, s.foeLevel) * (1 - damageReduction(k)) * weakened * bones * bark * hide * scale * dogged * manaShield(s) * outmatched(s.foeLevel, k.level) * ngFoeHit(s.ng, realmAt(s.rare?.base ?? s.foe), foeIn(s).boss)).round());
 }
 

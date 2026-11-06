@@ -469,6 +469,13 @@ class GameEngine {
     if (grow != null && k.level < grow && whyNotTravel(next) == null) {
       return _meanwhile('Level $grow, then back to ${continents[next].boss.name.split(',').first}', grow);
     }
+    // The Ember Throne sealed: the road runs through the side lands, a seal a lord.
+    if (next == throneLand && throneSealed) return _sealStep();
+    // The Ember King has beaten you: hunt down one of his generals first (see _knockOut).
+    final down = state.generalsDown.where(emberGenerals.contains).length;
+    if (next == throneLand && down < (state.setbacks['hunt'] ?? 0) && down < emberGenerals.length && whyNotTravel(next) == null) {
+      return RoadStep(RoadKind.train, 'Hunt the Ember King\'s generals', '$down of ${emberGenerals.length} down · each leaves him ${(generalCut * 100).round()}% weaker', next);
+    }
     final boss = RoadStep(RoadKind.boss, 'Beat ${continents[next].boss.name}', continents[next].name, next);
     final shut = whyNotTravel(next);
     if (shut == null) return boss;
@@ -477,6 +484,22 @@ class GameEngine {
     if (k.level >= need) return boss.blocked(shut);
     // (The level first: on a phone the line is cut short, and the level is what you're after.)
     return _meanwhile('Level $need opens ${continents[next].name.replaceFirst('The ', 'the ')}', need);
+  }
+
+  /// The way to the Ember Throne: the toughest side land open to you with its lord still standing
+  /// (the nearest your level: a lord left far behind falls in a blow or two, and that's no seal
+  /// broken), one that hasn't beaten you again and again if there's another; or, with none in reach
+  /// yet, the level that opens the next.
+  RoadStep _sealStep() {
+    final k = state.knight, seal = 'Seal ${sealsBroken + 1} of $throneSeals on the Ember Throne';
+    final standing = [for (var i = mainLands; i < continents.length; i++) if (!state.bossesDown.contains(i) && openers(i).any(state.bossesDown.contains)) i]
+      ..sort((a, b) => continents[a].minLevel - continents[b].minLevel);
+    bool wall(int i) => (state.bossLosses[i] ?? 0) >= giveUpLosses;
+    final open = [for (final i in standing.reversed) if (whyNotTravel(i) == null) i];
+    final pick = open.where((i) => !wall(i)).firstOrNull ?? open.firstOrNull;
+    if (pick != null) return RoadStep(RoadKind.side, 'Break a seal: beat ${continents[pick].boss.name.split(',').first}', '$seal · ${continents[pick].name}', pick);
+    final need = standing.isEmpty ? k.level + 1 : continents[standing.first].minLevel;
+    return _meanwhile('Level $need for the next seal', need) ?? RoadStep(RoadKind.side, 'Break a seal', seal, standing.firstOrNull ?? throneLand);
   }
 
   /// The Ash Colosseum's next bout, or the Hall of the Slain's next wave, while either still has
@@ -626,6 +649,13 @@ class GameEngine {
   /// You've set foot in land [c] before (fought on its trail, or beaten its boss).
   bool _beenTo(int c) => state.bossesDown.contains(c) || (c < state.wins.length && state.wins[c] > 0);
 
+  /// Seals on the Ember Throne broken so far: side lands whose lords are down (see [throneSeals]).
+  int get sealsBroken => state.bossesDown.where(isSideLand).length;
+
+  /// The way to the Ember Throne is still sealed. (Once you've been in, it stays open: saves from
+  /// before the seals.)
+  bool get throneSealed => sealsBroken < throneSeals && !_beenTo(throneLand);
+
   /// Why you can't go to continent [c] yet (null: you can).
   String? whyNotTravel(int c) {
     if (c < 0 || c >= continents.length) return 'No such land';
@@ -633,6 +663,10 @@ class GameEngine {
     // (A land you've already been into stays open: saves from when the road forked.)
     if (from.isNotEmpty && !from.any(state.bossesDown.contains) && !_beenTo(c)) {
       return 'Beat ${from.map((f) => '${continents[f].boss.name} (${continents[f].name})').join(' or ')} to find the way';
+    }
+    if (c == throneLand && throneSealed) {
+      final left = throneSeals - sealsBroken;
+      return 'Sealed: beat the lords of $left more side land${left == 1 ? '' : 's'} to break it ($sealsBroken of $throneSeals)';
     }
     final need = continents[c].minLevel;
     if (state.knight.level < need) return 'Reach level $need to enter';
@@ -823,8 +857,17 @@ class GameEngine {
   /// (So a wall can always be climbed; the first try is the full fight.)
   double doggedFor(int foe) {
     final c = realmAt(foe);
+    // (The Ember King only after [kingMercyAfter] losses: the last fight is the full fight, and you
+    // come back stronger instead, hunting his generals and growing. The mercy is a last resort, so
+    // nobody is stuck at the very end for ever.)
     if (foe != bossIndex(c) || state.bossesDown.contains(c)) return 1;
-    return 1 - math.min(doggedMax, doggedStep * (state.bossLosses[c] ?? 0));
+    return 1 - math.min(doggedMax, doggedStep * doggedLosses(c));
+  }
+
+  /// The losses to land [c]'s boss that count towards its weakening (see [doggedFor]).
+  int doggedLosses(int c) {
+    final n = state.bossLosses[c] ?? 0;
+    return c == throneLand ? math.max(0, n - kingMercyAfter) : n;
   }
 
   /// The Ember King's HP, against what it would be: less for every general you've felled.
@@ -1925,7 +1968,8 @@ class GameEngine {
     _begin(bossIndex(c), null);
     final dogged = doggedFor(bossIndex(c));
     final weak = (c == mainLands - 1 && kingStrength < 1 ? ' His generals are dead, and it shows: he is ${((1 - kingStrength) * 100).round()}% weaker.' : '') +
-        (dogged < 1 ? ' You know its ways by now (${((1 - dogged) * 100).round()}% weaker).' : '');
+        (dogged < 1 ? ' You know its ways by now (${((1 - dogged) * 100).round()}% weaker).' : '') +
+        (c == throneLand && dogged == 1 && (state.bossLosses[c] ?? 0) > 0 ? ' He does not tire, and he does not forget.' : '');
     _note('${foeAt(bossIndex(c)).name} rises to meet you!$weak', EntryKind.gold);
     return true;
   }
@@ -2905,7 +2949,9 @@ class GameEngine {
       _note(text);
     }
 
-    if (bashed && (!foe.boss || suitWorn(k) == 'deepforge' || _rng.nextBool())) {
+    // (The Forge Knight stuns any boss, every time; but not the Ember King, too vast to stagger
+    // every time: with it he was a punching bag for a Forge Knight with a good blade.)
+    if (bashed && (!foe.boss || (suitWorn(k) == 'deepforge' && foe.look != 'emberKing') || _rng.nextBool())) {
       r.stunned = true;
       spared(Guard.stunned, '$foeName is seeing stars and can\'t hit back.');
       return;
@@ -2934,7 +2980,7 @@ class GameEngine {
     } else if (state.wards > 0) {
       state.wards--;
       spared(Guard.warded, '$foeName strikes. Your arcane ward absorbs it.');
-    } else if (roll < dodge) {
+    } else if (roll < math.min(dodge, avoidCapFor(foe))) {
       _primed = true;
       r
         ..counter = 0
@@ -2960,7 +3006,7 @@ class GameEngine {
         ..counter = 0
         ..guard = Guard.dodge;
       _note('$foeName strikes, and finds only a drift of silver leaves where you were.');
-    } else if (roll < math.min(avoidCap, dodge + (1 - dodge) * parry)) {
+    } else if (roll < math.min(avoidCapFor(foe), dodge + (1 - dodge) * parry)) {
       // Parry: deflect the blow and strike back.
       _primed = true;
       final hit = riposte(k);
@@ -3002,9 +3048,10 @@ class GameEngine {
         r.reflected += back;
       }
       if (blocked && k.hp > 0 && activeSets(k.setGear).any((e) => e.$1.forgeheart && e.$2 >= e.$1.full)) {
-        // Deepforge: the block rings like an anvil, and you feel it in your bones.
+        // Deepforge: the block rings like an anvil, and you feel it in your bones. (Half as much
+        // against the Ember King: his fire scorches the anvil.)
         final before = k.hp;
-        k.hp = math.min(maxHp(k), k.hp + (maxHp(k) * forgeheartHeal).round());
+        k.hp = math.min(maxHp(k), k.hp + (maxHp(k) * forgeheartHeal * (foe.look == 'emberKing' ? .5 : 1)).round());
         r.mended += k.hp - before;
         r.mendedFrom = 'Forgeheart';
       }
@@ -3117,7 +3164,17 @@ class GameEngine {
       final n = state.bossLosses[c] = (state.bossLosses[c] ?? 0) + 1;
       // Every third loss to a road boss: the road sends you off to grow a few levels first (the boss
       // stops growing with you past [bossLevelSpan], so the levels tell).
-      if (c < mainLands && n % giveUpLosses == 0) {
+      if (c == throneLand) {
+        // The Ember King doesn't weaken for losing to him. Instead the road sends you off to hunt
+        // one of his generals (each that falls leaves him weaker, and the hunt is fights, gold and
+        // gear at his level); with all of them down, a couple of levels before you go back.
+        if (emberGenerals.any((g) => !state.generalsDown.contains(g))) {
+          state.setbacks['hunt'] = state.generalsDown.where(emberGenerals.contains).length + 1;
+        } else {
+          final cap = continents[c].minLevel + bossSpanFor(c) + kingGrowPast;
+          if (k.level < cap) state.setbacks['grow:$c'] = math.min(cap, k.level + 2);
+        }
+      } else if (c < mainLands && n % giveUpLosses == 0) {
         final cap = continents[c].minLevel + bossLevelSpan + 2;
         if (k.level < cap) state.setbacks['grow:$c'] = math.min(cap, k.level + 2);
       }
@@ -3307,7 +3364,16 @@ class GameEngine {
       state.struggle.remove(c);
       state.bossLosses.remove(c);
       if (firstBoss) {
+        final sealedBefore = throneSealed;
         state.bossesDown.add(c);
+        if (isSideLand(c) && sealedBefore) {
+          _note(throneSealed
+              ? 'Far off, one of the seals on the Ember Throne cracks and falls: $sealsBroken of $throneSeals.'
+              : 'The last seal on the Ember Throne shatters. The way to Vharrax is open.', EntryKind.good);
+        }
+        if (c == throneLand - 1 && throneSealed) {
+          _note('Scorchmaw falls, but the way on to the Ember Throne is sealed in old fire. The lords of the lands off the road hold its seals: beat ${throneSeals - sealsBroken} of them to break it.', EntryKind.good);
+        }
         if (c == 0) _note('Up the lane, Old Wick\'s tower door creaks open at last. "Is that one-eyed brute gone? Good. Come in, come in."', EntryKind.good);
         companion = land.companionText;
         switch (land.companion) {

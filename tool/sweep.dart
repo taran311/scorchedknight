@@ -57,9 +57,11 @@ void main(List<String> args) {
         }
       }
       final oddsLate = [for (final e in ra.odds.values) if (e.$3 / e.$1 >= 15) e.$2 / e.$1];
+      final king = [for (final e in ra.odds.entries) if (e.key.contains('Vharrax the Ember King')) e.value.$2 / e.value.$1].firstOrNull;
+      final kingLv = [for (final e in ra.odds.entries) if (e.key.contains('Vharrax the Ember King')) e.value.$3 / e.value.$1].firstOrNull;
       final odds = oddsLate.isEmpty ? 0 : oddsLate.reduce((a, b) => a + b) / oddsLate.length;
       String f1(num x) => x.toStringAsFixed(1);
-      print('${'$suit + $w'.padRight(34)} ${'$won/$seeds'.padLeft(5)} ${(fights / seeds).round().toString().padLeft(6)} ${f1(kos / seeds).padLeft(4)} ${f1(late / seeds).padLeft(5)} | ${f1(cT / (cN == 0 ? 1 : cN)).padLeft(13)} ${(cH / (cN == 0 ? 1 : cN) * 100).round().toString().padLeft(3)} | ${f1(bT / (bN == 0 ? 1 : bN)).padLeft(11)} ${(bH / (bN == 0 ? 1 : bN) * 100).round().toString().padLeft(3)} ${(bL / (bN == 0 ? 1 : bN) * 100).round().toString().padLeft(4)}% | ${(odds * 100).round().toString().padLeft(4)}%');
+      print('${'$suit + $w'.padRight(34)} ${'$won/$seeds'.padLeft(5)} ${(fights / seeds).round().toString().padLeft(6)} ${f1(kos / seeds).padLeft(4)} ${f1(late / seeds).padLeft(5)} | ${f1(cT / (cN == 0 ? 1 : cN)).padLeft(13)} ${(cH / (cN == 0 ? 1 : cN) * 100).round().toString().padLeft(3)} | ${f1(bT / (bN == 0 ? 1 : bN)).padLeft(11)} ${(bH / (bN == 0 ? 1 : bN) * 100).round().toString().padLeft(3)} ${(bL / (bN == 0 ? 1 : bN) * 100).round().toString().padLeft(4)}% | ${(odds * 100).round().toString().padLeft(4)}% | King ${king == null ? '-' : '${(king * 100).round()}% at Lv ${kingLv!.round()}'}');
     }
   }
 }

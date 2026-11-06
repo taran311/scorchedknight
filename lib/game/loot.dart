@@ -129,10 +129,10 @@ class GearSet {
 // four times in five: see tool/builds.dart. Scores alone count capped stats in full.)
 const _setPower = <String, double>{
   'ashen': 1.3,
-  'nightblood': 0.7,
+  'nightblood': 1.05,
   'moonfang': 1.25,
   'silverleaf': 0.6,
-  'deepforge': 1.0,
+  'deepforge': 0.85,
   'faceless': 1.1,
   'sunscale': 1.15,
   'tidecaller': 0.97,
@@ -1098,11 +1098,11 @@ const farmedEdge = 1.05, legendEdge = 1.2, relicEdge = 1.35;
 /// living, came out far ahead at the same budget; the two-handers with no guard far behind (they
 /// give up the shield). Unlisted: 1. (A var, so the sweep can try others: EDGES=...)
 var legendWeaponEdge = <String, double>{
-  'The Bat-King\'s Flail': .5,
+  'The Bat-King\'s Flail': .4,
   'Oathkeeper': .5,
-  'Grimtooth': .6,
-  'Gambler\'s Edge': .65,
-  'Moonfang': .75,
+  'Grimtooth': .5,
+  'Gambler\'s Edge': .5,
+  'Moonfang': .55,
   'Legion\'s Due': .9,
 };
 
@@ -1217,11 +1217,11 @@ const _legends = <_Legend>[
   _Legend('Oathkeeper', _w, 'longsword', HeroClass.knight, {Stat.damage: 1.6, Stat.lifesteal: 1.5, Stat.guard: 1.0}, 'It has never broken a promise, nor a shield.', special: 'cleave'),
   _Legend('Dawnbreaker', _w, 'mace', HeroClass.knight, {Stat.damage: 1.8, Stat.smite: 1.2, Stat.burn: .5}, 'The dead flinch at its shadow. Raise it high, and the sky answers.', special: 'stormcall'),
   _Legend('Grimtooth', _w, 'axe', HeroClass.knight, {Stat.damage: 1.9, Stat.crit: 1.4}, 'Notched from a hundred quarrels. Something below the earth likes the sound it makes.', special: 'hellgate'),
-  _Legend('Gambler\'s Edge', _w, 'rapier', HeroClass.knight, {Stat.damage: 1.5, Stat.crit: 1.8}, 'Won in a game of bones from a man who swore he never lost. The dice came with it.', special: 'fatesroll'),
+  _Legend('Gambler\'s Edge', _w, 'rapier', HeroClass.knight, {Stat.damage: 1.7, Stat.crit: 1.2}, 'Won in a game of bones from a man who swore he never lost. The dice came with it.', special: 'fatesroll'),
   _Legend('Gravewarden', _w, 'halberd', HeroClass.knight, {Stat.damage: 1.8, Stat.smite: .7, Stat.guard: 1.0}, 'Carried by the last captain of the barrow guard. His men still answer when it calls.', special: 'deadcharge'),
   _Legend('Legion\'s Due', _w, 'greatsword', HeroClass.knight, {Stat.damage: 1.8, Stat.guard: 1.0}, 'Forged on a battlefield from the swords of the fallen, who never quite left it.', special: 'legion'),
   _Legend('Wyrmcaller', _w, 'spear', HeroClass.knight, {Stat.damage: 1.8, Stat.burn: .7, Stat.guard: 1.0}, 'Its head is a dragon\'s tooth. Hold it up, and somewhere in the ash, something big turns its head.', special: 'wyrmcall'),
-  _Legend('Moonfang', _w, 'scimitar', HeroClass.knight, {Stat.damage: 1.6, Stat.dodge: 1.2, Stat.crit: 1.0}, 'Silver, curved like a new moon. Wolves no one can see run beside whoever holds it.', special: 'moonpack'),
+  _Legend('Moonfang', _w, 'scimitar', HeroClass.knight, {Stat.damage: 1.8, Stat.dodge: .6, Stat.crit: 1.0}, 'Silver, curved like a new moon. Wolves no one can see run beside whoever holds it.', special: 'moonpack'),
   _Legend('The Bat-King\'s Flail', _w, 'flail', HeroClass.knight, {Stat.damage: 1.6, Stat.leech: 1.0}, 'Taken from the Bat Tower. Swing it, and the dark itself takes wing.', special: 'nightswarm'),
   _Legend("The Warden's Bulwark", _o, 'tower', HeroClass.knight, {Stat.guard: 2.2, Stat.thorns: 2.0, Stat.vigour: 1.0}, 'Carried by the last keeper of the Cindervale gate.'),
   _Legend('Crown of the Last King', _h, 'sallet', HeroClass.knight, {Stat.vigour: 1.8, Stat.crit: 1.5, Stat.fortune: 1.0}, 'The last king before the Great Burning wore it. He would want it worn.'),

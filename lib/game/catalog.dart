@@ -385,6 +385,12 @@ const mainLands = 7;
 /// Off the road: Ravenmoor and the Howling Weald.
 bool isSideLand(int continent) => continent >= mainLands;
 
+/// The Ember Throne, the road's last land: sealed till the lords of [throneSeals] side lands are
+/// down (any of them), so the way there runs through the rest of the world, not past it. (Straight
+/// down the road, a run could reach the Ember King having never set foot off it: no class suit, half
+/// the map unseen.)
+const throneLand = mainLands - 1, throneSeals = 6;
+
 /// The roads between the lands: a land opens once the boss of the land before it is down (the side
 /// lands, the one that leads to them). The road is one line, land by land, in the order of their
 /// levels: it used to fork (Cindervale opened two ways, the Thornwild reached the Sunken Sands),
@@ -618,7 +624,7 @@ const continents = <Continent>[
       FoeType('Elder Ember Wyrm', 'elderWyrm', dragon: true, hp: 1.15, aloft: true, strike: Strike.fire),
       FoeType('Azgar, Herald of Vharrax', 'demonlord', demon: true, hp: 1.3, armoured: true),
     ],
-    boss: FoeType('Vharrax the Ember King', 'emberKing', boss: true, hp: 1.5, hit: 1.2, dragon: true, aloft: true, strike: Strike.fire),
+    boss: FoeType('Vharrax the Ember King', 'emberKing', boss: true, hp: 1.85, hit: 1.3, dragon: true, aloft: true, strike: Strike.fire),
     companion: Companion.none,
     companionText: 'The Ember King falls, and for the first time since the Great Burning, it rains.',
     prize: 'emberheart',
@@ -1277,6 +1283,14 @@ const rareChance = .08, namedRareShare = .35;
 /// [generalChance] of the Throne's fights.
 List<String> get emberGenerals => [for (final n in continents[mainLands - 1].named) n.name];
 const generalCut = .05, generalChance = .12;
+
+/// How far past the Ember King's own level the road will send you to grow, once his generals are
+/// all down and he still beats you (he stops growing with you at his land's level + its span).
+const kingGrowPast = 8;
+
+/// Losses to the Ember King before he starts to weaken like any other boss (a last resort: by then
+/// you've hunted his generals and grown, and still can't, so the road mustn't end there).
+const kingMercyAfter = 8;
 
 /// A boss you keep falling to: what each knockout it deals you takes off it, and the most.
 const doggedStep = .05, doggedMax = .2;

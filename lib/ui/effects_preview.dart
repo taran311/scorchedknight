@@ -44,6 +44,15 @@ final _shows = <_Show>[
   (id: 'fester', title: 'Fester: the fire erupts (venom: &only=festerv, bleed: festerb)', wound: {Stat.burn: 30}, lay: null),
   (id: 'festerv', title: 'Fester on venom', wound: {Stat.poison: 30}, lay: null),
   (id: 'festerb', title: 'Fester on a bleed', wound: {Stat.bleed: 30}, lay: null),
+  (id: 'swarm', title: 'Night Swarm (the Bat-King\'s Flail)', wound: {}, lay: null),
+  (id: 'cleave', title: 'Mighty Cleave (Oathkeeper)', wound: {}, lay: null),
+  (id: 'storm', title: 'Stormcall (Dawnbreaker)', wound: {}, lay: null),
+  (id: 'hellgate', title: 'Grimtooth\'s Hellgate', wound: {}, lay: null),
+  (id: 'fate', title: 'Gambler\'s Edge: Roll of Fate', wound: {}, lay: null),
+  (id: 'deadrun', title: 'Charge of the Dead (Gravewarden)', wound: {}, lay: null),
+  (id: 'legion', title: 'Rise, Legion (Legion\'s Due)', wound: {}, lay: null),
+  (id: 'wyrm', title: 'Wyrmcall (Wyrmcaller)', wound: {}, lay: null),
+  (id: 'wolves', title: 'Moonfang\'s Moon Pack', wound: {}, lay: null),
   (id: 'edge', title: 'Blood Edge: charge the blade, then the blow', wound: {}, lay: null),
   (id: 'dual', title: 'Two blades: katana and wakizashi', wound: {}, lay: null),
   (id: 'you', title: 'You: poisoned · war cry', wound: {}, lay: (s) => s
@@ -90,6 +99,8 @@ class _EffectsPreviewState extends State<EffectsPreview> {
     w.stats.removeWhere((st, _) => st == Stat.burn || st == Stat.poison || st == Stat.bleed || st == Stat.frost || st == Stat.smite);
     w.stats.addAll(sh.wound);
     w.enchant = null;
+    final legend = _legendFor[sh.id];
+    if (legend != null) k.loadout.weapon = c.engine.loot.legendNamed(legend, k.heroClass, k.level);
     if (sh.id == 'edge') {
       // A Blood Knight, whole suit, top rank.
       for (final slot in setPieceSlots) {
@@ -170,11 +181,26 @@ class _EffectsPreviewState extends State<EffectsPreview> {
         continue;
       }
       _festered[c] = false;
+      // (Night Swarm's cell: the special every swing.)
+      if (_legendFor.containsKey(sh.id)) s.specialCharge = 99;
       c.act(BattleAction.attack);
     }
   }
 
   final _festered = <GameController, bool>{};
+
+  /// The legendary each special's cell carries (the special every swing).
+  static const _legendFor = {
+    'swarm': 'The Bat-King\'s Flail',
+    'cleave': 'Oathkeeper',
+    'storm': 'Dawnbreaker',
+    'hellgate': 'Grimtooth',
+    'fate': 'Gambler\'s Edge',
+    'deadrun': 'Gravewarden',
+    'legion': 'Legion\'s Due',
+    'wyrm': 'Wyrmcaller',
+    'wolves': 'Moonfang',
+  };
 
   @override
   void dispose() {

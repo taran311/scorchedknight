@@ -436,6 +436,10 @@ double? winOdds(GameEngine e, RoadStep st, int n) {
 /// The odds each boss step was shown at, across every game: step → (times, summed odds).
 final odds = <String, (int, double, int)>{};
 
+/// Where each game stood when the Ember King's card first came up: (player, level, side lords
+/// beaten, side lands set foot in, fights so far).
+final atKing = <(String, int, int, int, int)>[];
+
 Audit play(int seed, String player, {int maxFights = 2500}) {
   final a = Audit(player, seed);
   _suitAt = _weaponAt = -99;
@@ -478,10 +482,17 @@ Audit play(int seed, String player, {int maxFights = 2500}) {
       shownLevel = k.level;
       streak = worst = 0;
     }
+    if (road.land == throneLand && road.kind == RoadKind.boss && !tried.contains('king@')) {
+      tried.add('king@');
+      final side = [for (var c = mainLands; c < continents.length; c++) c];
+      atKing.add((player, k.level, side.where(s.bossesDown.contains).length, side.where((c) => s.bossesDown.contains(c) || (c < s.wins.length && s.wins[c] > 0)).length, a.fights));
+    }
     // The first time a boss card can actually be taken on (its trail walked): how good are the odds?
     if (player == 'road' && (road.kind == RoadKind.heroic || ((road.kind == RoadKind.boss || road.kind == RoadKind.side) && s.winsToBoss(road.land) == 0)) && !tried.contains(road.title)) {
       tried.add(road.title);
-      if (winOdds(e, road, 12) case final w?) {
+      // KINGONLY=1: only the Ember King's odds (much faster), with KINGTRIES tries.
+      final kingOnly = Platform.environment['KINGONLY'] == '1';
+      if ((!kingOnly || road.land == throneLand ? winOdds(e, road, kingOnly ? int.parse(Platform.environment['KINGTRIES'] ?? '24') : 12) : null) case final w?) {
         final key = road.title.replaceAll(RegExp(r' · .*'), '');
         final (n, sum, lv) = odds[key] ?? (0, 0.0, 0);
         odds[key] = (n + 1, sum + w, lv + k.level);

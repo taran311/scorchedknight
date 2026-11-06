@@ -290,6 +290,8 @@ void main() {
     for (var c = 0; c < mainLands - 1; c++) {
       s.bossesDown.add(c);
     }
+    // (The Ember Throne's seals: half the side lands' lords down.)
+    s.bossesDown.addAll([for (var i = 0; i < throneSeals; i++) mainLands + i]);
     e.travel(mainLands - 1);
     s.wins[mainLands - 1] = winsForBoss;
     expect(e.challengeBoss(), isTrue);
@@ -2783,5 +2785,48 @@ void main() {
     }
     expect(hits, 40);
     expect(charged / plain, greaterThan(2.5));
+  });
+
+  test('the Ember Throne is sealed till half the side lands\' lords are down, and the road says so', () {
+    final e = GameEngine(GameEngine.newGame(), random: Random(1), clock: () => DateTime(2026, 6, 1));
+    final s = e.state, k = s.knight;
+    while (k.level < 40) {
+      e.grantXp(xpToNext(k));
+    }
+    s.innRepaired = true;
+    for (var c = 0; c < throneLand; c++) {
+      s.bossesDown.add(c);
+    }
+    expect(e.whyNotTravel(throneLand), contains('Sealed'));
+    expect(e.roadStep()?.title, startsWith('Break a seal'));
+    expect(isSideLand(e.roadStep()!.land), isTrue);
+    s.bossesDown.addAll([for (var i = 0; i < throneSeals - 1; i++) mainLands + i]);
+    expect(e.whyNotTravel(throneLand), contains('1 more side land'));
+    s.bossesDown.add(mainLands + throneSeals - 1);
+    expect(e.whyNotTravel(throneLand), isNull);
+    expect(e.roadStep()?.land, throneLand);
+  });
+
+  test('the Ember King doesn\'t weaken for losing to him: the road sends you after his generals', () {
+    final e = GameEngine(GameEngine.newGame(), random: Random(1), clock: () => DateTime(2026, 6, 1));
+    final s = e.state, k = s.knight;
+    while (k.level < 40) {
+      e.grantXp(xpToNext(k));
+    }
+    s.innRepaired = true;
+    for (var c = 0; c < throneLand; c++) {
+      s.bossesDown.add(c);
+    }
+    s.bossesDown.addAll([for (var i = 0; i < throneSeals; i++) mainLands + i]);
+    final king = bossIndex(throneLand);
+    s.bossLosses[throneLand] = 3;
+    expect(e.doggedFor(king), 1);
+    s.setbacks['hunt'] = 1;
+    expect(e.roadStep()?.title, startsWith('Hunt the Ember King'));
+    s.generalsDown.add(emberGenerals.first);
+    expect(e.roadStep()?.title, startsWith('Beat Vharrax'));
+    // (A last resort, long after: he does give, so the road can't end at his feet for ever.)
+    s.bossLosses[throneLand] = kingMercyAfter + 2;
+    expect(e.doggedFor(king), lessThan(1));
   });
 }

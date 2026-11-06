@@ -99,7 +99,7 @@ const spells = <Spell>[
   Spell('nightveil', 'Night Veil', 'Shadows wrap you: half its blows miss for 3 turns', 1, 3, SpellKind.slow, 0xFF6A4A8A, hex: 3, order: 'nightblood', rank: 7),
   // The Forge Knight (Deepforge): guard and stun.
   Spell('anvilward', 'Anvil Ward', 'Runes of iron ring round you: the next 2 blows are stopped dead', 1, 3, SpellKind.ward, 0xFFE8C060, wards: 2, order: 'deepforge', rank: 1),
-  Spell('moltenhammer', 'Molten Hammer', 'A white-hot blow: 2x damage, and it hits 40% softer for 3 turns', 1, 4, SpellKind.weaken, 0xFFFF8A3A, mult: 2, hex: 3, order: 'deepforge', rank: 4),
+  Spell('moltenhammer', 'Molten Hammer', 'A white-hot blow: 1.6x damage, and it hits 40% softer for 2 turns', 1, 4, SpellKind.weaken, 0xFFFF8A3A, mult: 1.6, hex: 2, order: 'deepforge', rank: 4),
   Spell('earthshaker', 'Earthshaker', 'You split the ground under it: 1.4x, and it can\'t hit back this turn', 1, 5, SpellKind.nova, 0xFFB08A5A, mult: 1.4, order: 'deepforge', rank: 7),
 ];
 

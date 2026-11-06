@@ -202,7 +202,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   bool _reduceMotion = false;
 
   // animation state
-  final Map<String, double> fx = {'flash': 0, 'kflash': 0, 'alpha': 1, 'enter': 0, 'dying': 0, 'slash': 0, 'fire': 0, 'lunge': 0, 'wyrm': 0, 'bones': 0, 'ward': 0, 'pounce': 0, 'wave': 0, 'grasp': 0, 'charge': 0, 'spectral': 0, 'flee': 0, 'ko': 0, 'dash': 0, 'screen': 0, 'zoom': 0, 'swoop': 0, 'kback': 0, 'gloom': 0, 'reaper': 0, 'reap': 0, 'soul': 0, 'scar': 0, 'wolf': 0, 'deadrun': 0, 'legion': 0, 'demon': 0, 'wolves': 0, 'bats': 0, 'storm': 0, 'die': 0, 'blade': 0, 'ice': 0, 'elder': 0, 'vanish': 0, 'sflash': 0};
+  final Map<String, double> fx = {'flash': 0, 'kflash': 0, 'alpha': 1, 'enter': 0, 'dying': 0, 'slash': 0, 'fire': 0, 'lunge': 0, 'wyrm': 0, 'bones': 0, 'ward': 0, 'pounce': 0, 'wave': 0, 'grasp': 0, 'charge': 0, 'spectral': 0, 'flee': 0, 'ko': 0, 'dash': 0, 'screen': 0, 'zoom': 0, 'swoop': 0, 'kback': 0, 'gloom': 0, 'reaper': 0, 'reap': 0, 'soul': 0, 'scar': 0, 'wolf': 0, 'deadrun': 0, 'legion': 0, 'demon': 0, 'wolves': 0, 'bats': 0, 'storm': 0, 'die': 0, 'blade': 0, 'ice': 0, 'elder': 0, 'vanish': 0, 'sflash': 0, 'veil': 0, 'crescent': 0, 'rays': 0};
 
   /// The elder wyrm of Cataclysm is pouring out its fire (jaw dropped).
   bool _elderBreath = false;
@@ -265,6 +265,17 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   /// The legendary specials' show: the face the dice of fate land on, when the demon and the
   /// risen dead swing, and the shape of the last lightning bolt.
   int _dieFace = 6, _stormSeed = 0;
+
+  /// A legendary special's veil over the field ([fx]'s 'veil'): the dark it brings, the light
+  /// it pours round the foe, and a full moon in the sky for the Moon Pack.
+  Color _veilDark = const Color(0xFF0A0610), _veilGlow = const Color(0xFFFFFFFF);
+  bool _veilMoon = false;
+
+  /// Wyrmcall's dragon comes in bigger than Summon Dragonfire's.
+  bool _wyrmBig = false;
+
+  /// The great crescent of a cleave ([fx]'s 'crescent') and the golden rays of a lucky roll ([fx]'s 'rays').
+  Color _crescentTint = const Color(0xFFFFFFFF);
 
 
   /// The colour the blade blazes in ([fx]'s 'blade'): gold for a lucky roll, else the special's own.
@@ -373,6 +384,18 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   static const _flashy = {'flash', 'kflash', 'screen', 'zoom', 'gloom', 'scar', 'storm'};
 
   void _at(double delay, VoidCallback f) => _schedule.add((now + delay, f));
+
+  /// Draws the field dark for [ms] from [at] (in and out), with [glow] pooled round the foe.
+  void _veil(double at, double ms, Color dark, Color glow, {bool moon = false}) {
+    _at(at, () {
+      _veilDark = dark;
+      _veilGlow = glow;
+      _veilMoon = moon;
+      fx['veil'] = .001;
+      _tween('veil', .999, ms, ease: (p) => p);
+    });
+    _at(at + ms, () => fx['veil'] = 0);
+  }
 
   /// Starts an event's timeline after any timeline already playing.
   double _slot(double length) {
@@ -808,7 +831,16 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       });
       _at(d0 + lead, () => fx['die'] = 0);
       final settle = 120 + (lead - 120) * .55;
+      _veil(d0 + 60, lead + hitAt + 500, lucky ? const Color(0xFF140E02) : const Color(0xFF0E0618), lucky ? const Color(0xFFFFD24A) : const Color(0xFF9A4AE0));
       if (lucky) {
+        _at(d0 + settle, () {
+          fx['rays'] = .001;
+          _tween('rays', .999, off - settle + 500, ease: (p) => p);
+          _punch(.7);
+          Audio.play(Sfx.crit, power: 1.2);
+          _spark('holy', const Offset((_knightX + _foeX) / 2, _groundY - 215), 40, speed: 6, life: 1100, radius: 5, gravity: -.02);
+        });
+        _at(d0 + off + 500, () => fx['rays'] = 0);
         _at(d0 + settle, () {
           _bladeTint = const Color(0xFFFFE27A);
           _tween('blade', 1, 160);
@@ -818,7 +850,8 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         });
       } else {
         _at(d0 + settle + 100, () {
-          _spark('curse', const Offset((_knightX + _foeX) / 2, _groundY - 215), 18, speed: 3, life: 700, radius: 3.5);
+          _punch(.5);
+          _spark('curse', const Offset((_knightX + _foeX) / 2, _groundY - 215), 40, speed: 5, life: 900, radius: 4.5);
           _mark('Unlucky', [colour, shade(colour, -.5)], const Offset((_knightX + _foeX) / 2, _groundY - 165));
         });
       }
@@ -870,11 +903,22 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       _at(d0 + hit + 60, () => _spark(cls == HeroClass.ranger ? 'spark' : 'curse', _foeChest, 26, speed: 5, life: 600, radius: 3.5));
     }
     if (sp.cleave) {
-      // A great sweeping arc through the foe.
+      // A great sweeping arc through the foe: the field dims, and a crescent of white steel the
+      // height of the stage sweeps through it, with two echoes behind.
+      _veil(d0 + hit - 420, 1200, const Color(0xFF06080C), const Color(0xFFE8F0FF));
+      _at(d0 + hit - 90, () {
+        _crescentTint = colour;
+        fx['crescent'] = .001;
+        _tween('crescent', .999, 520, ease: (p) => p);
+      });
+      _at(d0 + hit + 430, () => fx['crescent'] = 0);
       _at(d0 + hit - 40, () {
         _trail = (now, colour, false, true, 'arc');
-        for (var i = 0; i < 5; i++) {
-          _spark('spark', _foeChest + Offset(-30 + i * 14.0, -50 + i * 22.0), 6, dir: .3, spread: 1, speed: 6, life: 380, radius: 3.5);
+        _punch(1.1);
+        _tween('screen', .5, 40);
+        _tween('screen', 0, 300, delay: 40);
+        for (var i = 0; i < 9; i++) {
+          _spark('spark', _foeChest + Offset(-60 + i * 15.0, -110 + i * 26.0), 8, dir: .3, spread: 1.2, speed: 9, life: 520, radius: 4);
         }
       });
     }
@@ -898,34 +942,65 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     }
     if (sp.dragon) {
       // A dragon sweeps down behind you and pours fire over the foe.
-      _at(d0 + 40, () => _tween('wyrm', 1, 520, ease: easeOut));
-      for (var i = 0; i < 7; i++) {
-        _at(d0 + hit - 320 + i * 40.0, () => _shots.add(_Projectile('bolt', const Offset(_knightX + 210, _groundY - 300), _foeChest + Offset(-20 + (i % 3) * 20.0, -40 + i * 12.0), now, 300, colour)));
+      _veil(d0, hit + 1200, const Color(0xFF1A0600), const Color(0xFFFF6A1A));
+      _at(d0 + 40, () {
+        _wyrmBig = true;
+        _tween('wyrm', 1, 520, ease: easeOut);
+      });
+      for (var i = 0; i < 16; i++) {
+        _at(d0 + hit - 380 + i * 30.0, () => _shots.add(_Projectile('bolt', const Offset(_knightX + 230, _groundY - 330), _foeChest + Offset(-40 + (i % 4) * 26.0, -70 + (i % 6) * 22.0), now, 300, colour)));
       }
-      _at(d0 + hit, () => _spark('fire', _foeChest, 30, speed: 6, life: 800, radius: 12, lift: 1, gravity: -.02));
+      _at(d0 + hit, () {
+        _punch(1.1);
+        _spark('fire', _foeChest, 60, speed: 8, life: 1000, radius: 14, lift: 1, gravity: -.02);
+        _spark('fire', const Offset(_foeX, _groundY), 24, dir: -math.pi / 2, spread: 1.4, speed: 6, life: 900, radius: 10, gravity: -.05);
+      });
+      _at(d0 + hit + 1100, () => _wyrmBig = false);
       _at(d0 + hit + 500, () => _tween('wyrm', 0, 600, ease: easeIn));
     }
     if (sp.deadrun) {
       // A line of the dead rides out of the left of the field and through the foe.
+      _veil(d0 + hit - 800, 1700, const Color(0xFF080414), const Color(0xFFB07AFF));
       _at(d0 + hit - 650, () {
         fx['deadrun'] = .001;
         _tween('deadrun', .999, 1300, ease: (p) => p);
       });
+      for (var i = 0; i < 6; i++) {
+        // Grave-dust kicked up under the hooves as the host thunders across.
+        _at(d0 + hit - 560 + i * 110.0, () => _spark('smoke', Offset(_knightX - 120 + i * 90.0, _groundY), 6, dir: -math.pi / 2, spread: 1.6, speed: 3, life: 700, radius: 9, gravity: -.02));
+      }
       _at(d0 + hit + 700, () => fx['deadrun'] = 0);
-      _at(d0 + hit, () => _spark('curse', _foeChest, 30, dir: 0, spread: 1.6, speed: 6, life: 700, radius: 4, gravity: 0));
+      _at(d0 + hit, () {
+        _punch(1.1);
+        _spark('curse', _foeChest, 60, dir: 0, spread: 1.8, speed: 9, life: 900, radius: 5, gravity: 0);
+      });
     }
     if (sp.storm) {
-      // The sky splits: a bolt of lightning straight down onto the foe, and the field flashes.
+      // The sky goes black, splits twice in warning, then the great bolt comes straight down onto
+      // the foe, and the whole field flashes white.
+      _veil(d0 + hit - 700, 1500, const Color(0xFF02050E), const Color(0xFFB8D8FF));
+      for (final (lead, power) in const [(420.0, .5), (230.0, .6)]) {
+        _at(d0 + hit - lead, () {
+          _stormSeed = _rng.nextInt(1 << 20);
+          fx['storm'] = power;
+          _tween('storm', 0, 200, ease: easeOut);
+          _tween('screen', .2, 30);
+          _tween('screen', 0, 160, delay: 30);
+        });
+      }
       _at(d0 + hit - 60, () {
         _stormSeed = _rng.nextInt(1 << 20);
         fx['storm'] = 1;
-        _tween('storm', 0, 520, ease: easeOut);
-        _tween('screen', .45, 40);
-        _tween('screen', 0, 260, delay: 40);
-        _punch(.9);
-        Audio.play(Sfx.crit, power: 1.4);
+        _tween('storm', 0, 700, ease: easeOut);
+        _tween('screen', .8, 40);
+        _tween('screen', 0, 420, delay: 40);
+        _punch(1.3);
+        Audio.play(Sfx.crit, power: 1.6);
       });
-      _at(d0 + hit, () => _spark('bolt', _foeChest + const Offset(0, -30), 30, speed: 7, life: 500, radius: 3));
+      _at(d0 + hit, () {
+        _spark('bolt', _foeChest + const Offset(0, -30), 50, speed: 9, life: 650, radius: 3.5);
+        _spark('bolt', const Offset(_foeX, _groundY), 24, dir: -math.pi / 2, spread: 2.4, speed: 7, life: 600, radius: 3);
+      });
       _at(d0 + hit + 200, () {
         if (c.lastSwing?.specialStun == true) _mark('Stunned!', [colour, shade(colour, -.5)], _foeChest + const Offset(0, -110));
       });
@@ -949,23 +1024,31 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       });
     }
     if (sp.bats) {
-      // A storm of bats pours out of the dark behind you and over the foe.
-      _at(d0 + hit - 600, () {
+      // Night falls, and a storm of bats pours out of the dark behind you, whirls round the foe in
+      // a tightening knot as the blow lands, and bursts away; and its blood runs back to you.
+      _at(d0 + hit - 700, () {
         fx['bats'] = .001;
-        _tween('bats', .999, 1400, ease: (p) => p);
+        _tween('bats', .999, batsMs, ease: (p) => p);
+        Audio.play(Sfx.swing, power: .5);
       });
-      _at(d0 + hit + 800, () => fx['bats'] = 0);
+      _at(d0 + hit - 700 + batsMs, () => fx['bats'] = 0);
+      _at(d0 + hit, () => _punch(.4));
     }
     if (sp.demon) {
       // A rift tears open before the foe; a demon climbs out, strikes, and sinks back.
+      _veil(d0 + hit - 800, 1800, const Color(0xFF1A0202), const Color(0xFFFF3A12));
       _at(d0 + hit - 700, () {
         fx['demon'] = .001;
         _tween('demon', .999, 1500, ease: (p) => p);
-        _spark('fire', const Offset(_foeX - 190, _groundY), 16, dir: -math.pi / 2, spread: 1, speed: 4, life: 800, radius: 9, gravity: -.04);
+        _punch(.5);
+        _spark('fire', const Offset(_foeX - 200, _groundY), 36, dir: -math.pi / 2, spread: 1.2, speed: 6, life: 1000, radius: 12, gravity: -.05);
       });
       _at(d0 + hit - swingHitMs, () => _demonAt = now);
       _at(d0 + hit + 800, () => fx['demon'] = 0);
-      _at(d0 + hit, () => _spark('fire', _foeChest, 24, speed: 6, life: 700, radius: 10, lift: 1, gravity: -.02));
+      _at(d0 + hit, () {
+        _punch(1.2);
+        _spark('fire', _foeChest, 50, speed: 8, life: 900, radius: 13, lift: 1, gravity: -.02);
+      });
       _at(d0 + hit + 300, () {
         final hurt = c.lastSwing?.selfHurt ?? 0;
         if (hurt > 0) {
@@ -985,12 +1068,18 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     }
     if (sp.legion) {
       // The dead claw up out of the ground round the foe and tear at it.
+      _veil(d0 + hit - 800, 1800, const Color(0xFF060A08), const Color(0xFF9A6AE0));
       _at(d0 + hit - 700, () {
         fx['legion'] = .001;
         _tween('legion', .999, 1500, ease: (p) => p);
-        for (final dx in const [-200.0, -130.0, -60.0]) {
-          _spark('smoke', Offset(_foeX + dx, _groundY), 8, dir: -math.pi / 2, spread: 1.2, speed: 2, life: 800, radius: 8, gravity: -.02);
+        _punch(.6);
+        for (final dx in const [-280.0, -220.0, -160.0, -100.0, 40.0, 100.0]) {
+          _spark('smoke', Offset(_foeX + dx, _groundY), 12, dir: -math.pi / 2, spread: 1.4, speed: 3.5, life: 1000, radius: 10, gravity: -.02);
         }
+      });
+      _at(d0 + hit, () {
+        _punch(1);
+        _spark('curse', _foeChest, 44, speed: 7, life: 800, radius: 4.5);
       });
       _at(d0 + hit - swingHitMs, () => _legionAt = now);
       _at(d0 + hit + 800, () {
@@ -1000,12 +1089,16 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     }
     if (sp.wolves) {
       // Ghost wolves race out of the dark, through the foe, and away.
+      _veil(d0 + hit - 800, 1700, const Color(0xFF020818), const Color(0xFF9ADFFF), moon: true);
       _at(d0 + hit - 600, () {
         fx['wolves'] = .001;
         _tween('wolves', .999, 1200, ease: (p) => p);
       });
       _at(d0 + hit + 600, () => fx['wolves'] = 0);
-      _at(d0 + hit, () => _spark('rime', _foeChest, 24, dir: 0, spread: 1.6, speed: 6, life: 700, radius: 4, gravity: 0));
+      _at(d0 + hit, () {
+        _punch(1);
+        _spark('rime', _foeChest, 56, dir: 0, spread: 1.8, speed: 9, life: 900, radius: 4.5, gravity: 0);
+      });
     }
     _at(d0 + hit, () {
       _spark(kind, _foeChest, 30, speed: 6, life: 900, radius: 5, gravity: .02);
@@ -1342,8 +1435,8 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     final afflictAt = struck + 160 * nEffects + 140, afflictLong = _afflictMs(r);
     final ticks = r.burned + r.venomed + r.bled > 0;
     final tickAt = [if (r.festered > 0) hitAt + 760, if (r.afflicted != null) afflictAt + afflictLong + 80 else struck + 160 * nEffects + 140, if (hound) houndAt + 640, if (r.summonHit > 0) bonesAt + swingHitMs + 180].reduce(math.max);
-    final counterAt = [struck + 160 * nEffects + 440, if (r.festered > 0) hitAt + 1000, if (r.afflicted != null) afflictAt + afflictLong + 140, if (ticks) tickAt + 420, if (dragonFire) hitAt + 760.0, if (hound) houndAt + 820, if (r.summonHit > 0) bonesAt + swingHitMs + 300].reduce(math.max);
-    final end = [950.0, struck + 160 * nEffects + 60, if (r.festered > 0) hitAt + 1100, if (r.afflicted != null) afflictAt + afflictLong + 180, if (ticks) tickAt + 480, if (dragonFire) hitAt + 580, if (hound) houndAt + 1060, if (r.summonHit > 0) bonesAt + swingHitMs + 420, if (r.counter != null) counterAt + 760, if (r.knockedOut || r.cheatedDeath) counterAt + strikeMs + _reapMs].reduce(math.max);
+    final counterAt = [struck + 160 * nEffects + 440, if (r.festered > 0) hitAt + 1000, if (r.damage.special?.bats == true) hitAt + 1050, if (r.afflicted != null) afflictAt + afflictLong + 140, if (ticks) tickAt + 420, if (dragonFire) hitAt + 760.0, if (hound) houndAt + 820, if (r.summonHit > 0) bonesAt + swingHitMs + 300].reduce(math.max);
+    final end = [950.0, struck + 160 * nEffects + 60, if (r.festered > 0) hitAt + 1100, if (r.damage.special?.bats == true) hitAt + 1100, if (r.afflicted != null) afflictAt + afflictLong + 180, if (ticks) tickAt + 480, if (dragonFire) hitAt + 580, if (hound) houndAt + 1060, if (r.summonHit > 0) bonesAt + swingHitMs + 420, if (r.counter != null) counterAt + 760, if (r.knockedOut || r.cheatedDeath) counterAt + strikeMs + _reapMs].reduce(math.max);
     // Mounted: the day's first strike opens with a charge, played before the blow.
     if (r.chargeHit > 0 && r.mount != null) _playCharge(r);
     // A special attack is a show of its own, about as long again as the blow: a build-up first
@@ -1646,11 +1739,15 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       for (final (i, (_, _, kind)) in effects.indexed) {
         _at(120.0 * (i + 1), () => _spark(kind, chest + const Offset(-20, 20), 9, lift: 2, speed: 2.2, life: 650, radius: 3.4, gravity: kind == 'ember' ? -.04 : .05));
       }
-      if (r.healed > 0 && dmg.leech) {
-        // Bloodleech: a crimson stream from the wound back to you.
-        for (var i = 0; i < 5; i++) {
-          _at(60.0 * i, () => _shots.add(_Projectile('bolt', chest + Offset(0, 8.0 * (i % 3) - 8), const Offset(_knightX + 10, _groundY - 140), now, 360, const Color(0xFFB0302A))));
+      final swarm = dmg.special?.bats == true;
+      if (r.healed > 0 && (dmg.leech || swarm)) {
+        // Bloodleech: a crimson stream from the wound back to you (Night Swarm's a flood of it,
+        // as the bats carry the foe's blood home to you).
+        final n = swarm ? 14 : 5;
+        for (var i = 0; i < n; i++) {
+          _at(60.0 * i, () => _shots.add(_Projectile('bolt', chest + Offset((i % 4) * 14.0 - 20, 10.0 * (i % 5) - 20), Offset(_knightX + 10, _groundY - 150 + (i % 3) * 20.0), now, 420, const Color(0xFFC8303A))));
         }
+        if (swarm) _at(60.0 * n + 300, () => _burst(const Offset(_knightX, _groundY - 160), const Color(0xFFC8303A), .7));
       }
       if (r.healed > 0) {
         _at(120, () {
@@ -2834,6 +2931,26 @@ class _ScenePainter extends CustomPainter {
       }
     }
 
+    // A legendary special's veil: the field goes dark (a red dark for Hellgate, a moonlit one for
+    // the Moon Pack...), with its light pooled round the foe, in and out over the special.
+    final veil = fx['veil']!;
+    if (veil > .002) {
+      final world = Rect.fromLTWH(left - 2, -above - 2, visibleW + 4, sceneSize.height + above + below + 4);
+      final a = math.sin(veil.clamp(0.0, 1.0) * math.pi).clamp(0.0, 1.0) * 1.4;
+      final v = a.clamp(0.0, 1.0);
+      canvas.drawRect(world, Paint()..color = s._veilDark.withValues(alpha: .62 * v));
+      final at = const Offset(_foeX, _groundY - 150);
+      canvas.drawRect(world, Paint()..shader = ui.Gradient.radial(at, 460, [s._veilGlow.withValues(alpha: .34 * v), s._veilGlow.withValues(alpha: .1 * v), s._veilGlow.withValues(alpha: 0)], const [0, .45, 1]));
+      if (s._veilMoon) {
+        // A great full moon over the field, the pack's light.
+        final moon = Offset(left + visibleW * .5, -above + 120);
+        softGlow(canvas, moon, 150, const Color(0xFFCFEFFF).withValues(alpha: .4 * v), 40);
+        canvas.drawCircle(moon, 62, Paint()..color = const Color(0xFFEAF6FF).withValues(alpha: .95 * v));
+        canvas.drawCircle(moon + const Offset(-18, -10), 13, Paint()..color = const Color(0xFFC8DCEA).withValues(alpha: .7 * v));
+        canvas.drawCircle(moon + const Offset(16, 18), 9, Paint()..color = const Color(0xFFC8DCEA).withValues(alpha: .6 * v));
+      }
+    }
+
     // Every figure is drawn into a picture first, then laid down as a backlit silhouette.
     lightGlows = s._lite;
     ghostFadeOutside = !dying;
@@ -3021,12 +3138,13 @@ class _ScenePainter extends CustomPainter {
     // A summoned dragon swooping in for Summon Dragonfire.
     final wyrm = fx['wyrm']!;
     if (wyrm > .01) {
-      final at = Offset.lerp(const Offset(_knightX - 200, _groundY - 420), const Offset(_knightX + 150, _groundY - 170), wyrm)!;
+      final big = s._wyrmBig;
+      final at = Offset.lerp(Offset(_knightX - (big ? 320 : 200), _groundY - (big ? 520 : 420)), Offset(_knightX + 150, _groundY - (big ? 230 : 170)), wyrm)!;
       canvas.save();
       canvas.translate(at.dx, 0);
       canvas.scale(-1, 1);
       canvas.translate(-at.dx, 0);
-      drawFoeDragon(canvas, foeDragons['elderWyrm']!, at, .45, t, alpha: wyrm.clamp(0.0, 1.0), still: still);
+      drawFoeDragon(canvas, foeDragons['elderWyrm']!, at, big ? .75 : .45, t, alpha: wyrm.clamp(0.0, 1.0), still: still);
       canvas.restore();
     }
 
@@ -3215,11 +3333,12 @@ class _ScenePainter extends CustomPainter {
     // ---- The legendary specials that come for the foe in person ----
     final deadrun = fx['deadrun']!;
     if (deadrun > 0) {
-      // Charge of the Dead: four of the dead race in from the left, through the foe and away.
+      // Charge of the Dead: a host of the dead race in from the left, through the foe and away,
+      // two ranks deep.
       final bone = foeLooks['skeleton']!;
-      for (var i = 0; i < 4; i++) {
-        final x = -160 + (fx0 + 420) * deadrun - i * 80.0;
-        drawHumanoid(canvas, bone, walkPose(bone.stance, t * 2.2 + i * 140, 1, still: still), t, DrawOptions(at: Offset(x, _groundY + 4 - (i % 2) * 6), scale: .8), still: still);
+      for (var i = 0; i < 8; i++) {
+        final x = -200 + (fx0 + 560) * deadrun - (i ~/ 2) * 90.0 - (i % 2) * 45;
+        drawHumanoid(canvas, bone, walkPose(bone.stance, t * 2.6 + i * 140, 1, still: still), t, DrawOptions(at: Offset(x, _groundY + 4 - (i % 2) * 14), scale: i.isEven ? .95 : .82), still: still);
       }
     }
     final legion = fx['legion']!;
@@ -3229,10 +3348,20 @@ class _ScenePainter extends CustomPainter {
       final bone = foeLooks['skeleton']!;
       canvas.save();
       canvas.clipRect(const Rect.fromLTRB(-200, -400, 1200, _groundY + 10));
-      for (final (i, dx) in const [-210.0, -150.0, -90.0].indexed) {
+      for (final (i, dx) in const [-300.0, -240.0, -180.0, -120.0, 60.0, 120.0].indexed) {
+        // Glowing graves torn open under each of them.
+        blurredOval(canvas, Rect.fromCenter(center: Offset(fx0 + dx, _groundY + 6), width: 80 * up, height: 14 * up), const Color(0xFF9A6AE0).withValues(alpha: .7 * up), 6);
         final idle = idlePose(bone.stance, t, phase: i * 1.7, still: still);
-        final pose = still ? idle : (sampleClip(idle, swingClip, t - s._legionAt - i * 60) ?? idle);
-        drawHumanoid(canvas, bone, pose, t, DrawOptions(at: Offset(fx0 + dx, _groundY + 6 + (1 - Curves.easeOut.transform(up)) * 170), scale: .76), still: still);
+        final pose = still ? idle : (sampleClip(idle, swingClip, t - s._legionAt - i * 50) ?? idle);
+        canvas.save();
+        if (dx > 0) {
+          // The ones behind it face back the other way, onto it.
+          canvas.translate(fx0 + dx, 0);
+          canvas.scale(-1, 1);
+          canvas.translate(-(fx0 + dx), 0);
+        }
+        drawHumanoid(canvas, bone, pose, t, DrawOptions(at: Offset(fx0 + dx, _groundY + 6 + (1 - Curves.easeOut.transform(up)) * 200), scale: i.isEven ? .88 : .8), still: still);
+        canvas.restore();
       }
       canvas.restore();
     }
@@ -3241,22 +3370,24 @@ class _ScenePainter extends CustomPainter {
       // Hellgate: a rift opens before the foe and a demon climbs out to strike.
       final up = demon < .3 ? demon / .3 : (demon > .78 ? 1 - (demon - .78) / .22 : 1.0);
       final at = Offset(fx0 - 200, _groundY);
-      blurredOval(outer, Rect.fromCenter(center: at + const Offset(0, 4), width: 170 * up, height: 26 * up), const Color(0xFFFF5A1A).withValues(alpha: .8 * up), 8);
-      outer.drawOval(Rect.fromCenter(center: at + const Offset(0, 4), width: 120 * up, height: 14 * up), Paint()..color = const Color(0xFFFFE08A).withValues(alpha: up));
+      blurredOval(outer, Rect.fromCenter(center: at + const Offset(0, 4), width: 320 * up, height: 44 * up), const Color(0xFFFF5A1A).withValues(alpha: .9 * up), 12);
+      outer.drawOval(Rect.fromCenter(center: at + const Offset(0, 4), width: 220 * up, height: 22 * up), Paint()..color = const Color(0xFFFFE08A).withValues(alpha: up));
+      // A pillar of hellfire out of the rift.
+      outer.drawRect(Rect.fromCenter(center: at + Offset(0, -200 * up), width: 180 * up, height: 400 * up), Paint()..shader = ui.Gradient.linear(at, at + const Offset(0, -420), [const Color(0xFFFF5A1A).withValues(alpha: .55 * up), const Color(0x00FF2A0A)]));
       final look = foeLooks['pitdemon']!;
       final idle = idlePose(look.stance, t, still: still);
       final pose = still ? idle : (sampleClip(idle, swingClip, t - s._demonAt) ?? idle);
       canvas.save();
       canvas.clipRect(const Rect.fromLTRB(-200, -400, 1200, _groundY + 10));
-      drawHumanoid(canvas, look, pose, t, DrawOptions(at: at + Offset(0, (1 - Curves.easeOut.transform(up)) * 230), scale: .95), still: still);
+      drawHumanoid(canvas, look, pose, t, DrawOptions(at: at + Offset(0, (1 - Curves.easeOut.transform(up)) * 320), scale: 1.3), still: still);
       canvas.restore();
     }
     final wolves = fx['wolves']!;
     if (wolves > 0) {
-      // Moon Pack: three ghost wolves bound in from the left, through the foe and away.
-      for (var i = 0; i < 3; i++) {
-        final x = -180 + (fx0 + 460) * wolves - i * 110.0;
-        drawHound(canvas, wolfLook, Offset(x, _groundY + 4 + (i % 2) * 8), 1.05, t, pounce: (math.sin(t / 70 + i) * .5 + .5) * .7, still: still);
+      // Moon Pack: a pack of ghost wolves bound in from the left, through the foe and away.
+      for (var i = 0; i < 7; i++) {
+        final x = -220 + (fx0 + 620) * wolves - i * 85.0 - (i % 2) * 30;
+        drawHound(canvas, wolfLook, Offset(x, _groundY + 4 + (i % 3) * 8), i.isEven ? 1.3 : 1.1, t, pounce: (math.sin(t / 60 + i) * .5 + .5) * .9, still: still);
       }
     }
 
@@ -3284,8 +3415,18 @@ class _ScenePainter extends CustomPainter {
         final p = Offset.lerp(top, end, i / 7)! + (i < 7 ? Offset((r.nextDouble() - .5) * 60, 0) : Offset.zero);
         path.lineTo(p.dx, p.dy);
       }
-      canvas.drawPath(path, strokePaint(const Color(0xFFB8D8FF).withValues(alpha: (lightGlows ? .28 : .6) * storm), lightGlows ? 22 : 16)..maskFilter = edgeBlur(10));
-      canvas.drawPath(path, strokePaint(const Color(0xFFFFFFFF).withValues(alpha: storm), 4));
+      // Forks branching off the main bolt.
+      for (var f = 0; f < 3; f++) {
+        final from = Offset.lerp(top, end, .25 + f * .2)! + Offset((r.nextDouble() - .5) * 40, 0);
+        var p = from;
+        path.moveTo(p.dx, p.dy);
+        for (var j = 0; j < 3; j++) {
+          p += Offset((f.isEven ? -1 : 1) * (20 + r.nextDouble() * 30), 30 + r.nextDouble() * 30);
+          path.lineTo(p.dx, p.dy);
+        }
+      }
+      canvas.drawPath(path, strokePaint(const Color(0xFFB8D8FF).withValues(alpha: (lightGlows ? .28 : .6) * storm), lightGlows ? 30 : 24)..maskFilter = edgeBlur(14));
+      canvas.drawPath(path, strokePaint(const Color(0xFFFFFFFF).withValues(alpha: storm), 6));
       softGlow(canvas, end, 60 * storm, const Color(0xFFCFE8FF).withValues(alpha: .5 * storm), 20);
     }
     final ice = fx['ice']!;
@@ -3305,13 +3446,58 @@ class _ScenePainter extends CustomPainter {
     }
     final bats = fx['bats']!;
     if (bats > 0) {
-      for (var i = 0; i < 28; i++) {
-        // Each bat flies from behind you to the foe on its own wavering line, a little behind the last.
-        final p = ((bats * 1.6) - i * .022).clamp(0.0, 1.0);
-        if (p <= 0 || p >= 1) continue;
-        final from = Offset(_knightX - 220 + (i % 5) * 18.0, _groundY - 330 + (i % 7) * 22.0), to = Offset(fx0 + ((i * 37) % 90) - 45.0, fy - s._foeHeight * (.3 + (i % 4) * .12));
-        final at = Offset.lerp(from, to, p)! + Offset(math.sin(p * 9 + i) * 26, math.cos(p * 7 + i * 1.3) * 18);
-        _bat(canvas, at, 7 + (i % 3) * 2.0, math.sin(t / 45 + i * 1.7), (1 - (p - .85).clamp(0.0, .15) / .15));
+      // Night falls over the field while they fly (a violet dark, deepest as they knot round the foe).
+      final dark = math.sin((bats * math.pi).clamp(0.0, math.pi)) * .55;
+      canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFF120A1E).withValues(alpha: dark));
+      final centre = Offset(fx0, fy - s._foeHeight * .55);
+      for (var i = 0; i < 56; i++) {
+        // Each bat: in from behind you on its own wavering line (a little behind the one before),
+        // round and round the foe in a knot that pulls tighter, and away up into the dark.
+        final own = (bats - i * .006).clamp(0.0, 1.0);
+        if (own <= 0) continue;
+        final from = Offset(_knightX - 260 + (i % 6) * 22.0, _groundY - 380 + (i % 9) * 26.0);
+        final spin = t / 260 + i * 2.4, wide = 70 + (i % 5) * 16.0;
+        Offset at;
+        double alpha = 1;
+        if (own < .35) {
+          // Pouring in.
+          final p = own / .35, ring = centre + Offset(math.cos(spin) * wide * 1.5, math.sin(spin) * wide * .7);
+          at = Offset.lerp(from, ring, Curves.easeIn.transform(p))! + Offset(math.sin(p * 9 + i) * 20, math.cos(p * 7 + i) * 14);
+        } else if (own < .78) {
+          // The knot: round the foe, tighter as the blow lands.
+          final p = (own - .35) / .43, r = wide * (1.5 - .9 * p);
+          at = centre + Offset(math.cos(spin) * r, math.sin(spin) * r * .5 + math.sin(spin * 2.3 + i) * 30);
+        } else {
+          // Away: scattering up and out, fading.
+          final p = (own - .78) / .22, r = wide * .6 + p * 260;
+          at = centre + Offset(math.cos(spin) * r, math.sin(spin) * r * .4 - p * 220);
+          alpha = 1 - p;
+        }
+        _bat(canvas, at, 10 + (i % 4) * 2.5, math.sin(t / 40 + i * 1.7), alpha);
+      }
+    }
+    final crescent = fx['crescent']!;
+    if (crescent > 0) {
+      // Mighty Cleave: a crescent of white steel the height of the stage sweeps down through the
+      // foe, with two echoes trailing it.
+      final centre = Offset(fx0 - 60, fy - s._foeHeight * .5);
+      for (var e = 2; e >= 0; e--) {
+        final p = (crescent - e * .08).clamp(0.0, 1.0);
+        if (p <= 0) continue;
+        final a = (1 - p) * (e == 0 ? 1 : .45 / e), sweep = -2.3 + p * 3.0;
+        final rect = Rect.fromCircle(center: centre, radius: 230 - e * 18);
+        canvas.drawArc(rect, sweep - 1.1, 1.1, false, strokePaint(s._crescentTint.withValues(alpha: .5 * a), 34)..maskFilter = edgeBlur(14));
+        canvas.drawArc(rect, sweep - 1.1, 1.1, false, strokePaint(const Color(0xFFFFFFFF).withValues(alpha: a), 9));
+      }
+    }
+    final rays = fx['rays']!;
+    if (rays > 0) {
+      // A lucky roll: golden rays wheel out from the dice across the field.
+      final centre = const Offset((_knightX + _foeX) / 2, _groundY - 215), a = math.sin(rays * math.pi);
+      for (var i = 0; i < 14; i++) {
+        final ang = i * math.pi * 2 / 14 + t / 1400;
+        final tip = centre + Offset(math.cos(ang), math.sin(ang)) * 520;
+        canvas.drawPath(poly([centre, tip + Offset(-math.sin(ang), math.cos(ang)) * 40, tip - Offset(-math.sin(ang), math.cos(ang)) * 40]), Paint()..shader = ui.Gradient.radial(centre, 520, [const Color(0xFFFFE27A).withValues(alpha: .45 * a), const Color(0x00FFE27A)]));
       }
     }
     final die = fx['die']!;
@@ -3321,7 +3507,7 @@ class _ScenePainter extends CustomPainter {
       // Thrown from your hand out into the middle of the field, where it lands.
       final throwP = (die / .55).clamp(0.0, 1.0), mid = const Offset((_knightX + _foeX) / 2, _groundY - 215);
       final centre = Offset.lerp(const Offset(_knightX + 30, _groundY - 250), mid, easeOut(throwP))! + Offset(0, -math.sin(throwP * math.pi) * 110);
-      _die(canvas, centre, 46, settled ? 0 : t / 90, face, a, s._dieFace == 6 ? const Color(0xFFF2C14E) : const Color(0xFFB06AE0), settled);
+      _die(canvas, centre, 70, settled ? 0 : t / 90, face, a, s._dieFace == 6 ? const Color(0xFFF2C14E) : const Color(0xFFB06AE0), settled);
     }
 
     // Sea specials: a breaking wave, and the Kraken's arms.
@@ -4141,6 +4327,9 @@ Pose inClassStance(Pose idle, Map<J, double> stance) {
 /// How long a class's stroke lingers, in milliseconds.
 /// Dual wielding: when the off hand's blade lands, after the main blow's.
 const offAt = 60 + offhandHitMs;
+
+/// Night Swarm's bats: how long they're out, from pouring in to gone.
+const batsMs = 1700.0;
 
 /// Dual wielding: how much later the move (and the walk home) goes on, for the off hand's strike.
 const offhandHold = offhandMs;

@@ -897,7 +897,7 @@ class _Lurking extends StatelessWidget {
                       children: [
                         // (The level it fights at: yours, never below the land's. It used to say "best faced
                         // at" the next land's level, which the road never waited for.)
-                        _Pill(icon: Icons.shield_moon, text: 'Lv ${bossLevelFor(land, s.knight.level)}', tip: 'It fights at your level, from ${l.minLevel} up to ${l.minLevel + bossLevelSpan}: past that, every level you gain is on your side'),
+                        _Pill(icon: Icons.shield_moon, text: 'Lv ${bossLevelFor(land, s.knight.level)}', tip: 'It fights at your level, from ${l.minLevel} up to ${l.minLevel + bossSpanFor(land)}: past that, every level you gain is on your side'),
                         _Pill(icon: rewardIcon, text: rewardName, tip: 'It guards $reward'),
                         if (relic != null && !beaten) _Pill(icon: Icons.description, text: 'Relic blueprint', tip: 'A blueprint for ${relic.name}: its parts are found around the world, and $smithName forges it'),
                         if (l.hazard != null)
