@@ -3670,6 +3670,16 @@ class GameEngine {
       );
     }
     if (trophies > 0) _note('You take ${trophies == 1 ? withArticle(trophy!.label.toLowerCase()) : '$trophies ${trophy!.label.toLowerCase()}'} (${state.mat(trophyKey(trophy))}). $smithName can forge with it, given the blueprint.', EntryKind.gold);
+    // The first of a class suit's trophies: a word on what it could make of you. (No quest to
+    // unlock the classes: they're found, but nobody should walk past one without knowing.)
+    if (trophies > 0) {
+      for (final f in forgedSets) {
+        final cls = knightClassById(f.id);
+        if (f.trophy != trophy || cls == null || state.did.contains('classhint:${f.id}')) continue;
+        state.did.add('classhint:${f.id}');
+        _note('$smithName will want to see that: the ${cls.name}s forge their plate with ${f.trophy.label.toLowerCase()}. Wear a whole suit of it and you\'d fight as one of them.', EntryKind.gold);
+      }
+    }
     if (formTrophy != null) _note('It died wearing that shape so well it left ${withArticle(formTrophy.label.toLowerCase())} behind!', EntryKind.gold);
     if (blueprint != null) _note('Folded inside its armour: a blueprint! The $blueprint. Take it to $smithName.', EntryKind.gold);
     if (won) _note('Vharrax the Ember King is no more. The Great Burning is over. The world can start growing back.', EntryKind.gold);

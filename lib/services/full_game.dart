@@ -75,6 +75,18 @@ class FullGame extends ChangeNotifier {
     if (!owned && e.beyondFreeLands) _set(true);
   }
 
+  /// A code that unlocks the full game without buying it: for Google Play's reviewers (who can't
+  /// make purchases), given in Play Console's sign-in details. Change it if it ever gets about.
+  /// (Kept as character codes so it isn't sitting in the app as plain text.)
+  static final _code = String.fromCharCodes(const [69, 77, 66, 69, 82, 45, 82, 69, 86, 73, 69, 87, 45, 55, 81, 52, 75]);
+
+  /// Tries [code]: true, and the whole game is yours, if it's the reviewers' code.
+  bool redeem(String code) {
+    if (code.trim().toUpperCase().replaceAll(' ', '') != _code) return false;
+    _set(true);
+    return true;
+  }
+
   Future<void> buy() async {
     if (owned || busy) return;
     problem = null;

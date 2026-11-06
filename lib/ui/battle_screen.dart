@@ -944,7 +944,6 @@ class _FoeCard extends StatelessWidget {
     final realm = realmAt(c.state.rare?.base ?? c.state.foe);
     final aura = foe.aura;
     final weak = weakTo(foe), shrug = shrugsOff(foe);
-    final hazard = c.state.inBattle && c.state.hazardIn(realm);
     final card = FoeCard(
       fill: fill,
       face: fill ? TypePortrait(type: foe, tier: foeMenace(c.state)) : null,
@@ -1012,7 +1011,7 @@ class _FoeCard extends StatelessWidget {
             colour: const Color(0xFFC8C4CC),
             tip: 'The Faceless learn: it\'s braced for ${styleName(AttackStyle.values.byName(c.state.lastStyle!))} now (${((1 - mimicBrace) * 100).round()}% less). Switch it up!',
           ),
-        if (hazard) FoeBadge(icons: const [Icon(Icons.warning_amber, size: 15, color: Color(0xFFE0A070))], text: '−${(hazardShare * 100).round()}%/turn', colour: const Color(0xFFE0A070), tip: '${continents[realm].hazard}: you lose ${(hazardShare * 100).round()}% HP a turn'),
+        // (The land's hazard is yours, not the foe's: it's with your own badges, over the stage.)
       ],
     );
     if (!fill) return card;

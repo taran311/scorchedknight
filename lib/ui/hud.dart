@@ -800,6 +800,9 @@ class StatusBadges extends StatelessWidget {
         ),
       if (state.inBattle && state.wolfTurns > 0) ('Wolfform · ${state.wolfTurns}', const Color(0xFFFF6A5A), 'The Bloodmoon Pelt: you hit ${((wolfDamage - 1) * 100).round()}% harder, heal ${(wolfHeal * 100).round()}% of what you deal, and take ${((1 - wolfHide) * 100).round()}% less'),
       if (wearsPelt(k) && !state.wolfUsed && (!state.inBattle || state.wolfTurns == 0)) ('Bloodmoon Pelt', const Color(0xFFC8302A), 'Under ${(wolfAt * 100).round()}% health, the wolf comes out for ${wolfTurnsFor(k)} turns (once a fight)'),
+      // The land's hazard (choking ash, bog-rot...): it eats at you, not the foe, every turn.
+      if (state.inBattle && state.hazardIn(realmAt(state.rare?.base ?? state.foe)))
+        ('${continents[realmAt(state.rare?.base ?? state.foe)].hazard} · −${(hazardShare * 100).round()}% a turn', const Color(0xFFE0A070), '${continents[realmAt(state.rare?.base ?? state.foe)].hazard}: you lose ${(hazardShare * 100).round()}% of your health every turn here. Old Wick can make a ward against it.'),
       if (state.inBattle && state.heroPoison > 0) ('Poisoned · ${state.heroPoison}', const Color(0xFF8FD36A), 'Poison eats ${(heroPoisonShare * 100).round()}% of your HP a turn. A health potion cures it.'),
       if (state.summons > 0) ('Skeletons ×${state.summons} · ${state.summonTurns} turns', const Color(0xFFC89AFF), 'Your summoned dead strike with you'),
       if (state.wards > 0) ('Ward ×${state.wards}', const Color(0xFF7FB8E8), 'Absorbs the foe\'s next blow'),

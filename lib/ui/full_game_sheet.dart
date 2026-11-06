@@ -79,6 +79,7 @@ class _FullGameDialog extends StatelessWidget {
             ),
           ),
           actions: [
+            TextButton(onPressed: () => _askCode(context), child: Text('Code', style: Txt.label(size: 14, color: Palette.parch2))),
             if (g.canBuy)
               TextButton(
                 onPressed: g.busy ? null : g.restore,
@@ -104,4 +105,41 @@ class _FullGameDialog extends StatelessWidget {
       },
     );
   }
+}
+
+/// "Have a code?": a code that unlocks the full game (Google Play's reviewers get one).
+Future<void> _askCode(BuildContext context) async {
+  final field = TextEditingController();
+  String? wrong;
+  await showDialog<void>(
+    context: context,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setState) {
+        void tryIt() {
+          if (FullGame.instance.redeem(field.text)) {
+            Navigator.of(context).pop();
+          } else {
+            setState(() => wrong = 'That code doesn\'t work');
+          }
+        }
+
+        return AlertDialog(
+          backgroundColor: Palette.stone1,
+          title: Text('Have a code?', style: Txt.label(size: 18, color: Palette.cream, weight: FontWeight.w800)),
+          content: TextField(
+            controller: field,
+            autofocus: true,
+            textCapitalization: TextCapitalization.characters,
+            style: Txt.label(size: 16, color: Palette.cream),
+            decoration: InputDecoration(hintText: 'XXXXX-XXXXXX-XXXX', errorText: wrong),
+            onSubmitted: (_) => tryIt(),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(), child: Text('Cancel', style: Txt.label(size: 14, color: Palette.parch2))),
+            StoneButton(title: 'Unlock', tone: ButtonTone.amber, compact: true, onPressed: tryIt),
+          ],
+        );
+      },
+    ),
+  );
 }

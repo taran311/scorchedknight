@@ -321,6 +321,9 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   }
   double _clock = 0;
 
+  /// An entrance has come since the stage was built (see initState).
+  bool _entered = false;
+
   @override
   void initState() {
     super.initState();
@@ -334,6 +337,14 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     // up again), never already standing there.
     fx['enter'] = 1;
     _sub = c.events.listen(_onEvent);
+    // ...unless no entrance ever comes: the stage rebuilt round a fight already under way (back
+    // from another app, when Android had put the game away). Then the foe walks back on by itself,
+    // rather than standing off stage for the rest of the fight, unseen.
+    _at(1500, () {
+      if (!_entered && c.state.inBattle && fx['enter']! > .99 && !_tweens.any((w) => w.key == 'enter')) {
+        _tween('enter', 0, 700, ease: easeOut);
+      }
+    });
     SchedulerBinding.instance.addTimingsCallback(_onTimings);
   }
 
@@ -709,6 +720,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
         final d0 = _playCharge(result);
         _at(d0 + 1260, () => c.chargeFinished(result));
       case EnterEvent(:final foe, :final banner):
+        _entered = true;
         // The entrance: the foe charges in from the right with its name up, skids to a stop in a
         // puff of dust, and squares up. Your turn opens as it lands, so the wait IS the entrance.
         final big = foe.boss || foe.named || foe.pack;
