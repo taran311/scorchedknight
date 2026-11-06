@@ -491,12 +491,15 @@ class GameEngine {
   /// broken), one that hasn't beaten you again and again if there's another; or, with none in reach
   /// yet, the level that opens the next.
   RoadStep _sealStep() {
-    final k = state.knight, seal = 'Seal ${sealsBroken + 1} of $throneSeals on the Ember Throne';
+    final k = state.knight, seal = 'Seal ${math.min(throneSeals, sealsBroken + 1)} of $throneSeals on the Ember Throne';
     final standing = [for (var i = mainLands; i < continents.length; i++) if (!state.bossesDown.contains(i) && openers(i).any(state.bossesDown.contains)) i]
       ..sort((a, b) => continents[a].minLevel - continents[b].minLevel);
     bool wall(int i) => (state.bossLosses[i] ?? 0) >= giveUpLosses;
     final open = [for (final i in standing.reversed) if (whyNotTravel(i) == null) i];
-    final pick = open.where((i) => !wall(i)).firstOrNull ?? open.firstOrNull;
+    // Deepforge Hold's seal first whenever it's open to you (it must be broken; the count could fill
+    // without it), then the toughest open side land.
+    final key = open.contains(throneKeyLand) && (!wall(throneKeyLand) || sealsBroken >= throneSeals);
+    final pick = key ? throneKeyLand : (open.where((i) => !wall(i)).firstOrNull ?? open.firstOrNull);
     if (pick != null) return RoadStep(RoadKind.side, 'Break a seal: beat ${continents[pick].boss.name.split(',').first}', '$seal · ${continents[pick].name}', pick);
     final need = standing.isEmpty ? k.level + 1 : continents[standing.first].minLevel;
     return _meanwhile('Level $need for the next seal', need) ?? RoadStep(RoadKind.side, 'Break a seal', seal, standing.firstOrNull ?? throneLand);
@@ -654,7 +657,13 @@ class GameEngine {
 
   /// The way to the Ember Throne is still sealed. (Once you've been in, it stays open: saves from
   /// before the seals.)
-  bool get throneSealed => sealsBroken < throneSeals && !_beenTo(throneLand);
+  bool get throneSealed => (sealsBroken < throneSeals || !state.bossesDown.contains(throneKeyLand)) && !_beenTo(throneLand);
+
+  /// Seals still to break: the count still short, or (with the count made) Deepforge Hold's.
+  int get sealsLeft => math.max(throneSeals - sealsBroken, state.bossesDown.contains(throneKeyLand) ? 0 : 1);
+
+  /// Deepforge's lord, as the seals' notes name him.
+  String get _keyLord => '${continents[throneKeyLand].boss.name.split(',').first} of ${continents[throneKeyLand].name}';
 
   /// Why you can't go to continent [c] yet (null: you can).
   String? whyNotTravel(int c) {
@@ -665,8 +674,9 @@ class GameEngine {
       return 'Beat ${from.map((f) => '${continents[f].boss.name} (${continents[f].name})').join(' or ')} to find the way';
     }
     if (c == throneLand && throneSealed) {
-      final left = throneSeals - sealsBroken;
-      return 'Sealed: beat the lords of $left more side land${left == 1 ? '' : 's'} to break it ($sealsBroken of $throneSeals)';
+      final left = sealsLeft, key = !state.bossesDown.contains(throneKeyLand);
+      if (key && left == 1) return 'Sealed: $_keyLord holds the last seal';
+      return 'Sealed: beat the lords of $left more side land${left == 1 ? '' : 's'}${key ? ', $_keyLord among them' : ''} ($sealsBroken of $throneSeals)';
     }
     final need = continents[c].minLevel;
     if (state.knight.level < need) return 'Reach level $need to enter';
@@ -3368,11 +3378,11 @@ class GameEngine {
         state.bossesDown.add(c);
         if (isSideLand(c) && sealedBefore) {
           _note(throneSealed
-              ? 'Far off, one of the seals on the Ember Throne cracks and falls: $sealsBroken of $throneSeals.'
+              ? 'Far off, one of the seals on the Ember Throne cracks and falls: $sealsBroken of $throneSeals${sealsLeft > 0 && sealsBroken >= throneSeals ? '. One holds still: $_keyLord\'s' : ''}.'
               : 'The last seal on the Ember Throne shatters. The way to Vharrax is open.', EntryKind.good);
         }
         if (c == throneLand - 1 && throneSealed) {
-          _note('Scorchmaw falls, but the way on to the Ember Throne is sealed in old fire. The lords of the lands off the road hold its seals: beat ${throneSeals - sealsBroken} of them to break it.', EntryKind.good);
+          _note('Scorchmaw falls, but the way on to the Ember Throne is sealed in old fire. The lords of the lands off the road hold its seals: beat $sealsLeft more of them to break it${state.bossesDown.contains(throneKeyLand) ? '' : ', $_keyLord among them'}.', EntryKind.good);
         }
         if (c == 0) _note('Up the lane, Old Wick\'s tower door creaks open at last. "Is that one-eyed brute gone? Good. Come in, come in."', EntryKind.good);
         companion = land.companionText;
@@ -4015,9 +4025,11 @@ class GameEngine {
     state.ironScrap -= h.iron;
     state.home++;
     _note(
-      h.name == 'Cottage'
-          ? 'Hob lends a hand and a ladder. By sundown your tent is a snug little cottage, with a herb garden out front and a chest big enough to sit on.'
-          : 'Stone by stone, your cottage becomes a keep: walls, a tower, a banner with your flame on it, and an armoury racked with your gear.',
+      switch (h.name) {
+        'Cottage' => 'Hob lends a hand and a ladder. By sundown your tent is a snug little cottage, with a herb garden out front and a chest big enough to sit on.',
+        'Keep' => 'Stone by stone, your cottage becomes a keep: walls, a tower, a banner with your flame on it, and an armoury racked with your gear.',
+        _ => 'With the Ember King\'s gold, the keep grows into a fortress: a second tower, a longer wall, a third armoury rack, and Pip, a stable lad who swears he can run faster than Wren.',
+      },
       EntryKind.gold,
     );
     return true;
@@ -4026,7 +4038,9 @@ class GameEngine {
   /// Saves what you're wearing as gear set [i] in the keep's armoury.
   void saveGearSet(int i) {
     final k = state.knight, l = k.loadout;
-    final ids = [for (final g in [l.weapon, l.offhand, l.helm, l.gloves, l.boots, l.cape, k.trinket, k.ring]) if (g != null) g.id];
+    // (The body armour too, by its tier: a saved outfit used to leave it out, so it couldn't change
+    // you from one class's suit to another's.)
+    final ids = ['armour:${l.armour}', for (final g in [l.weapon, l.offhand, l.helm, l.gloves, l.boots, l.cape, k.trinket, k.ring]) if (g != null) g.id];
     while (state.gearSets.length <= i) {
       state.gearSets.add([]);
     }
@@ -4036,10 +4050,17 @@ class GameEngine {
 
   /// Puts on gear set [i]: every piece of it that's in your chest.
   int wearGearSet(int i) {
-    if (i >= state.gearSets.length || state.inBattle) return 0;
+    if (i >= state.gearSets.length || i >= armouryRacks(state.home) || state.inBattle) return 0;
     var n = 0;
+    final k = state.knight;
     for (final id in state.gearSets[i]) {
-      if (equipFromStash(id)) n++;
+      if (id.startsWith('armour:')) {
+        final art = id.substring(7);
+        final g = k.stash.where((g) => g.slot == GearSlot.armour && g.art == art).firstOrNull;
+        if (g != null && equipFromStash(g.id)) n++;
+      } else if (equipFromStash(id)) {
+        n++;
+      }
     }
     if (n > 0) _note('You change into gear set ${i + 1}.');
     return n;
@@ -4123,9 +4144,14 @@ class GameEngine {
   void _putOnArmour(HeroClass cls, String art) {
     final k = state.knight, kit = k.loadouts[cls]!, old = kit.armour;
     kit.armour = art;
+    if (old == art || k.stash.any((g) => g.slot == GearSlot.armour && g.art == old)) return;
     final set = setOfArmour(old);
-    if (old != art && set != null && gearSetById(set) != null && !k.stash.any((g) => g.slot == GearSlot.armour && g.art == old)) {
+    if (set != null && gearSetById(set) != null) {
       k.stash.add(loot.setPiece(set, GearSlot.armour, cls, k.level));
+    } else if (state.gearSets.any((o) => o.contains('armour:$old'))) {
+      // Armour in one of your saved outfits goes in the chest too, so the outfit can put it back on.
+      final t = armourTierById(old);
+      k.stash.add(GearItem(id: 'armour${_rng.nextInt(1 << 30)}', name: t.name, slot: GearSlot.armour, art: t.id, rarity: t.reduction >= .3 ? Rarity.epic : Rarity.rare, level: k.level, heroClass: cls, lore: 'Damage taken −${(t.reduction * 100).round()}%, ${t.perkText}.', value: 20 + 4 * k.level, stats: const {}));
     }
   }
 
@@ -4249,42 +4275,65 @@ class GameEngine {
 
   // ---------------- Wren's errands ----------------
 
-  /// Why Wren can't go on [id] now (null: she can).
+  /// How many runners you have: Wren from the cottage, and Pip too from the fortress.
+  int get runners => state.home >= 3 ? 2 : (state.home >= 1 ? 1 : 0);
+
+  /// Runner [r]'s errand under way (null: home).
+  String? errandOf(int r) => r == 0 ? state.errand : state.errand2;
+
+  void _setErrand(int r, String? id) {
+    if (r == 0) {
+      state
+        ..errand = id
+        ..errandAt = state.foesFelled;
+    } else {
+      state
+        ..errand2 = id
+        ..errandAt2 = state.foesFelled;
+    }
+  }
+
+  /// The first runner home and free (null: everyone's out).
+  int? get freeRunner => [for (var r = 0; r < runners; r++) if (errandOf(r) == null) r].firstOrNull;
+
+  /// Why a runner can't go on [id] now (null: one can).
   String? whyNotErrand(String id) {
     final e = errandById(id);
     if (e == null) return 'No such errand';
     if (state.home < 1) return 'Build the cottage first';
     if (state.home < e.home) return 'Build the keep first';
-    if (state.errand != null) return '$retainerName is already out';
+    if (freeRunner == null) return runners > 1 ? 'Both runners are out' : '$retainerName is already out';
     if (state.knight.coins < e.feeAt(state.knight.level)) return 'Needs ${e.feeAt(state.knight.level)} gold';
     return null;
   }
 
-  /// Sends Wren off on [id], paying her fee.
+  /// Sends the first free runner off on [id], paying the fee.
   bool sendErrand(String id) {
     if (whyNotErrand(id) != null) return false;
-    final e = errandById(id)!;
+    final e = errandById(id)!, r = freeRunner!;
     state.knight.coins -= e.feeAt(state.knight.level);
-    state
-      ..errand = id
-      ..errandAt = state.foesFelled;
+    _setErrand(r, id);
     state.did.add('errand');
-    _note('$retainerName sets out to ${e.name.toLowerCase()}. She\'ll be back in ${e.fights} fights.');
+    _note('${runnerNames[r]} sets out to ${e.name.toLowerCase()}, back in ${e.fights} fights.');
     return true;
   }
 
-  /// Fights left before Wren is back (0: she's back, with her finds).
-  int get errandLeft {
-    final e = errandById(state.errand);
-    return e == null ? 0 : math.max(0, e.fights - (state.foesFelled - state.errandAt));
+  /// Fights left before runner [r] is back (0: back, with the finds).
+  int errandLeftOf(int r) {
+    final e = errandById(errandOf(r));
+    return e == null ? 0 : math.max(0, e.fights - (state.foesFelled - (r == 0 ? state.errandAt : state.errandAt2)));
   }
 
-  bool get errandBack => state.errand != null && errandLeft == 0;
+  bool errandBackOf(int r) => errandOf(r) != null && errandLeftOf(r) == 0;
 
-  /// Takes what Wren brought back: each find as a line to show. Gear goes to your pending loot.
-  List<String> collectErrand() {
-    final e = errandById(state.errand);
-    if (e == null || !errandBack) return const [];
+  /// Wren's (kept for the square's older callers).
+  int get errandLeft => errandLeftOf(0);
+  bool get errandBack => errandBackOf(0);
+
+  /// Takes what runner [r] brought back: each find as a line to show. Gear goes to your pending loot.
+  List<String> collectErrand([int r = 0]) {
+    final e = errandById(errandOf(r));
+    if (e == null || !errandBackOf(r)) return const [];
     final k = state.knight, got = <String>[];
     void mat(String key, int n, String name) {
       if (n <= 0) return;
@@ -4335,8 +4384,8 @@ class GameEngine {
           got.add('a Cinder key');
         }
     }
-    state.errand = null;
-    _note('$retainerName is back from the errand with ${got.join(', ')}.', EntryKind.gold);
+    _setErrand(r, null);
+    _note('${runnerNames[r]} is back from the errand with ${got.join(', ')}.', EntryKind.gold);
     return got;
   }
 

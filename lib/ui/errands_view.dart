@@ -18,8 +18,9 @@ IconData _icon(String id) => switch (id) {
   _ => Icons.account_balance,
 };
 
-Future<void> _collect(BuildContext context, GameController c) async {
-  final got = c.collectErrand();
+Future<void> _collect(BuildContext context, GameController c, int r) async {
+  final name = runnerNames[r];
+  final got = c.collectErrand(r);
   if (got.isEmpty) return;
   Audio.play(Sfx.coins);
   ScaffoldMessenger.maybeOf(context)?.showSnackBar(
@@ -27,24 +28,27 @@ Future<void> _collect(BuildContext context, GameController c) async {
       behavior: SnackBarBehavior.floating,
       backgroundColor: Palette.stone2,
       duration: const Duration(seconds: 3),
-      content: Text('$retainerName brought back ${got.join(' · ')}', style: Txt.label(size: 13, color: _wrenColour)),
+      content: Text('$name brought back ${got.join(' · ')}', style: Txt.label(size: 13, color: _wrenColour)),
     ),
   );
-  if (c.nextLoot != null && context.mounted) await resolvePendingLoot(context, c, title: 'From $retainerName\'s errand', line: '"Found it under a fallen beam. Thought of you."');
+  if (c.nextLoot != null && context.mounted) await resolvePendingLoot(context, c, title: 'From $name\'s errand', line: '"Found it under a fallen beam. Thought of you."');
 }
 
 /// Wren in the square: out on an errand (and how long), back with finds, or home with nothing to
 /// do (tap: off to your home's tab to send her out).
 class WrenCard extends StatelessWidget {
-  const WrenCard({super.key, required this.controller, this.onOpen});
+  const WrenCard({super.key, required this.controller, this.onOpen, this.runner = 0});
   final GameController controller;
+
+  /// Which runner: 0 Wren, 1 Pip (from the fortress).
+  final int runner;
 
   /// She's home and idle: open your home's tab.
   final VoidCallback? onOpen;
 
   @override
   Widget build(BuildContext context) {
-    final c = controller, s = c.state, e = errandById(s.errand), back = c.errandBack;
+    final c = controller, r = runner, e = errandById(c.errandOf(r)), back = c.errandBackOf(r), left = c.errandLeftOf(r);
     final card = Container(
       padding: const EdgeInsets.fromLTRB(10, 6, 8, 6),
       decoration: BoxDecoration(
@@ -61,7 +65,7 @@ class WrenCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(retainerName.toUpperCase(), style: Txt.label(size: 11, color: _wrenColour)),
+                Text(runnerNames[r].toUpperCase(), style: Txt.label(size: 11, color: _wrenColour)),
                 Text(
                   e == null ? 'Home, and bored' : (back ? 'Back from the errand!' : e.name),
                   maxLines: 1,
@@ -76,16 +80,16 @@ class WrenCard extends StatelessWidget {
                           width: 7,
                           height: 7,
                           margin: const EdgeInsets.only(right: 3, top: 3),
-                          decoration: BoxDecoration(shape: BoxShape.circle, color: i < e.fights - c.errandLeft ? _wrenColour : Colors.transparent, border: Border.all(color: _wrenColour)),
+                          decoration: BoxDecoration(shape: BoxShape.circle, color: i < e.fights - left ? _wrenColour : Colors.transparent, border: Border.all(color: _wrenColour)),
                         ),
                       const SizedBox(width: 4),
-                      Text('back in ${c.errandLeft} ${c.errandLeft == 1 ? 'fight' : 'fights'}', style: Txt.label(size: 11.5, color: Palette.parch2)),
+                      Text('back in $left ${left == 1 ? 'fight' : 'fights'}', style: Txt.label(size: 11.5, color: Palette.parch2)),
                     ],
                   ),
               ],
             ),
           ),
-          if (back) SizedBox(width: 92, child: StoneButton(title: 'Collect', compact: true, tone: ButtonTone.amber, onPressed: () => _collect(context, c))),
+          if (back) SizedBox(width: 92, child: StoneButton(title: 'Collect', compact: true, tone: ButtonTone.amber, onPressed: () => _collect(context, c, r))),
           if (e == null && onOpen != null) const Icon(Icons.chevron_right, color: Palette.parch2, size: 26),
         ],
       ),
@@ -106,9 +110,10 @@ class ErrandsPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('$retainerName\'S ERRANDS', style: Txt.label(size: 12, color: _wrenColour)),
-          Text('She goes while you fight, and comes back with what she finds.', style: Txt.onStone(size: 12.5)),
-          if (s.errand != null) ...[const SizedBox(height: 8), WrenCard(controller: c)],
+          Text(c.runners > 1 ? 'ERRANDS · ${runnerNames.join(' & ').toUpperCase()}' : '$retainerName\'S ERRANDS', style: Txt.label(size: 12, color: _wrenColour)),
+          Text(c.runners > 1 ? 'They go while you fight, one errand each, and come back with what they find.' : 'She goes while you fight, and comes back with what she finds.', style: Txt.onStone(size: 12.5)),
+          for (var r = 0; r < c.runners; r++)
+            if (c.errandOf(r) != null) ...[const SizedBox(height: 8), WrenCard(controller: c, runner: r)],
           const SizedBox(height: 6),
           for (final e in errands)
             Padding(

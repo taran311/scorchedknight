@@ -309,7 +309,8 @@ class _InnPageState extends State<InnPage> with RouteAware {
                           repaired: s.innRepaired,
                           quest: offered ? 1 : (ready ? 2 : (job ? 3 : 0)),
                           raid: s.raid,
-                          home: s.home,
+                          // (Plus 100 with a hardcore road won: its standard by your door, see paintHome.)
+                          home: s.home + (s.hcBest?['won'] == true ? 100 : 0),
                           hallowash: c.season == Season.hallowash,
                           time: !s.day ? InnSky.night : (s.won ? InnSky.clearDay : InnSky.ashDay),
                           subtitle: c.season == Season.hallowash ? 'Hallowash in the square' : s.won ? 'The Ember King is gone. The ash is settling.' : (s.innRepaired ? 'The square, by the Soot & Kettle' : 'The square, still smoking'),
@@ -414,6 +415,11 @@ class _InnPageState extends State<InnPage> with RouteAware {
                         // notes it on the home button, so the square isn't a stack of cards.
                         if (s.home >= 1 && !_away && (!phone || s.errand == null || c.errandBack)) ...[
                           WrenCard(controller: c, onOpen: () => openTent(context, c, tab: 'home')),
+                          const SizedBox(height: 10),
+                        ],
+                        // Pip (from the fortress): only when he's back with something to collect.
+                        if (c.runners > 1 && !_away && c.errandBackOf(1)) ...[
+                          WrenCard(controller: c, runner: 1),
                           const SizedBox(height: 10),
                         ],
                         // Hob's cellar: while you've a Cinder key to use in it.
@@ -1194,7 +1200,7 @@ class _InnPainter extends CustomPainter {
         detail: .75,
       ),
     );
-    paintHome(canvas, t, home);
+    paintHome(canvas, t, home % 100, trophy: home >= 100);
     if (hallowash) paintHallowash(canvas, t);
   }
 

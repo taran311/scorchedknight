@@ -378,8 +378,10 @@ void _bottle(Canvas c, Offset base, String kind, Color col, double t) {
   c.drawPath(shape, outline);
 }
 
-/// Your home on the right of the square: the tent, then a cottage, then a keep.
-void paintHome(Canvas c, double t, int home) {
+/// Your home on the right of the square: the tent, then a cottage, a keep, a fortress. With
+/// [trophy] (a hardcore road won), the Unbroken's black-and-gold standard stands by the door.
+void paintHome(Canvas c, double t, int home, {bool trophy = false}) {
+  if (trophy) _trophyStandard(c, t, home);
   if (home == 0) return paintTent(c, t);
   c.save();
   if (home == 1) {
@@ -394,8 +396,76 @@ void paintHome(Canvas c, double t, int home) {
     // inn's roof and runs off the side of the scene.
     c.translate(-22, 0);
     _keep(c, t);
+    if (home >= 3) _fortressWorks(c, t);
   }
   c.restore();
+}
+
+/// The fortress: the keep, with a turret raised on the end of its wall (its own banner flying),
+/// a gatehouse arch over the gate, and lamps along the wall-walk.
+void _fortressWorks(Canvas c, double t) {
+  const stone = Color(0xFF17120F), lip = Color(0x30FFB04A);
+  // The turret on the wall's end: taller than the wall, crenellated, with a lit slit.
+  const turret = Rect.fromLTRB(804, 318, 846, _ground);
+  c.drawRect(turret, Paint()..color = stone);
+  for (var y = turret.top + 16; y < turret.bottom; y += 16) {
+    c.drawLine(Offset(turret.left, y), Offset(turret.right, y), strokePaint(const Color(0xFF0C0908), 1));
+  }
+  for (var x = turret.left - 3; x < turret.right + 3; x += 12) {
+    c.drawRect(Rect.fromLTWH(x, turret.top - 11, 8, 12), Paint()..color = stone);
+  }
+  c.drawLine(turret.topLeft, turret.bottomLeft, strokePaint(lip, 1.4));
+  const slit = Rect.fromLTWH(822, 352, 6, 18);
+  c.drawCircle(slit.center, 16, Paint()..color = _lamp.withValues(alpha: .18)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8));
+  c.drawRect(slit, Paint()..color = const Color(0xFFFFC870));
+  // Its banner, rippling the other way to the keep's.
+  const pole = 824.0, top = 262.0;
+  c.drawRect(const Rect.fromLTWH(pole, top, 3, 46), Paint()..color = stone);
+  final wave = math.sin(t / 260 + 1.3) * 3;
+  c.drawPath(
+    Path()
+      ..moveTo(pole + 3, top + 3)
+      ..quadraticBezierTo(pole + 16, top + wave, pole + 32, top + 5)
+      ..lineTo(pole + 28, top + 13)
+      ..lineTo(pole + 32, top + 21)
+      ..quadraticBezierTo(pole + 16, top + 18 - wave, pole + 3, top + 21)
+      ..close(),
+    Paint()..color = const Color(0xFF8E2117),
+  );
+  // A gatehouse arch over the keep's gate.
+  c.drawRect(const Rect.fromLTRB(846, 388, 878, 412), Paint()..color = stone);
+  for (var x = 846.0; x < 878; x += 10) {
+    c.drawRect(Rect.fromLTWH(x, 380, 6, 9), Paint()..color = stone);
+  }
+  // Lamps along the wall-walk.
+  for (final x in const [880.0, 902.0]) {
+    final f = .8 + .2 * math.sin(t / 110 + x);
+    c.drawCircle(Offset(x, 404), 9 * f, Paint()..color = _lamp.withValues(alpha: .3)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6));
+    c.drawCircle(Offset(x, 404), 2.2, Paint()..color = const Color(0xFFFFE0A0));
+  }
+}
+
+/// The Unbroken's standard, for a hardcore road won: a tall pole by your door, a black banner
+/// edged in gold with a gold crown on it, stirring in the wind.
+void _trophyStandard(Canvas c, double t, int home) {
+  final x = home == 0 ? 972.0 : (home == 1 ? 984.0 : 790.0);
+  const gold = Color(0xFFE8C04A);
+  c.drawRect(Rect.fromLTWH(x, _ground - 150, 3, 150), Paint()..color = _ink);
+  c.drawCircle(Offset(x + 1.5, _ground - 152), 3.5, Paint()..color = gold);
+  final sway = math.sin(t / 420) * 2;
+  final banner = Path()
+    ..moveTo(x - 14, _ground - 142)
+    ..lineTo(x + 17, _ground - 142)
+    ..lineTo(x + 17 + sway, _ground - 96)
+    ..lineTo(x + 1.5 + sway, _ground - 84)
+    ..lineTo(x - 14 + sway, _ground - 96)
+    ..close();
+  c.drawRect(Rect.fromLTWH(x - 16, _ground - 145, 35, 3), Paint()..color = _ink);
+  c.drawPath(banner, Paint()..color = const Color(0xFF0E0B0A));
+  c.drawPath(banner, strokePaint(gold, 1.6));
+  // The crown.
+  final cx = x + 1.5 + sway * .6, cy = _ground - 116;
+  c.drawPath(poly([Offset(cx - 8, cy + 5), Offset(cx - 8, cy - 4), Offset(cx - 4, cy), Offset(cx, cy - 7), Offset(cx + 4, cy), Offset(cx + 8, cy - 4), Offset(cx + 8, cy + 5)]), Paint()..color = gold);
 }
 
 /// A cottage: stone below, a thick thatch above, a lit window with a flower box, a chimney with

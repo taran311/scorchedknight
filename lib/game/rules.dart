@@ -300,9 +300,10 @@ int foeMenace(GameState s) {
 /// with next to nothing), and the full weight lands from the Grimtusk Badlands on. Bosses get
 /// less of it than the foes on their trails: they're tuned close to the edge already, and at full
 /// weight the first ones stood in the road like walls.
-/// (The Ember King takes a smaller share again, [ngKingShare]: he's tougher than the other bosses
-/// to start with, and at their share New Game+ stood him in the road like a wall.)
-const ngHp = 1.4, ngHit = 1.25, ngBossShare = .5, ngKingShare = .25;
+/// (The Ember King takes a little less, [ngKingShare]: he's tougher than the other bosses to start
+/// with, and at their full share he was a wall. At a quarter, though, he was easier the second
+/// time than the first: 45% puts him at about twice the first road's knockouts.)
+const ngHp = 1.4, ngHit = 1.25, ngBossShare = .5, ngKingShare = .45;
 double _ngRamp(int? land) => land == null ? 1 : (.15 + .85 * landTier(land) / 3).clamp(0.0, 1.0);
 double _ngShare(int? land, bool boss) => !boss ? 1 : (land == mainLands - 1 ? ngKingShare : ngBossShare);
 double ngFoeHp(int ng, [int? land, bool boss = false]) => ng > 0 ? 1 + (ngHp - 1) * _ngRamp(land) * _ngShare(land, boss) : 1;

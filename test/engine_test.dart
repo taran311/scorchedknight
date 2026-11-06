@@ -2804,6 +2804,14 @@ void main() {
     expect(e.whyNotTravel(throneLand), contains('1 more side land'));
     s.bossesDown.add(mainLands + throneSeals - 1);
     expect(e.whyNotTravel(throneLand), isNull);
+    // Six seals without Deepforge Hold's don't do: its lord holds the one that must break.
+    s.bossesDown
+      ..remove(throneKeyLand)
+      ..add(mainLands + throneSeals);
+    expect(e.whyNotTravel(throneLand), contains('holds the last seal'));
+    expect(e.roadStep()?.land, throneKeyLand);
+    s.bossesDown.add(throneKeyLand);
+    expect(e.whyNotTravel(throneLand), isNull);
     expect(e.roadStep()?.land, throneLand);
   });
 
@@ -2851,5 +2859,48 @@ void main() {
     expect(e.holdsSuit('nightblood'), isTrue);
     expect(e.wearSuit('nightblood'), setPieceSlots.length);
     expect(suitWorn(k), 'nightblood');
+  });
+
+  test('the fortress: after the Ember King; a second runner, a third rack, and outfits keep their body armour', () {
+    final e = GameEngine(GameEngine.newGame(), random: Random(3), clock: () => DateTime(2026, 6, 1));
+    final s = e.state, k = s.knight;
+    s.innRepaired = true;
+    s.home = 2;
+    k.coins = 100000;
+    s.timber = 99;
+    s.ironScrap = 99;
+    expect(e.whyNotBuild, contains('Vharrax'));
+    s.bossesDown.add(mainLands - 1);
+    expect(e.buildHome(), isTrue);
+    expect(homes[s.home].name, 'Fortress');
+    expect(e.stashCap, 120);
+    expect(armouryRacks(s.home), 3);
+    // Two runners, an errand each.
+    expect(e.sendErrand('fields'), isTrue);
+    expect(e.sendErrand('ruins'), isTrue);
+    expect(s.errand2, 'ruins');
+    expect(e.whyNotErrand('wilds'), 'Both runners are out');
+    s.foesFelled += errandById('ruins')!.fights;
+    expect(e.errandBackOf(0) && e.errandBackOf(1), isTrue);
+    expect(e.collectErrand(1), isNotEmpty);
+    expect(s.errand2, isNull);
+    final back = GameState.fromJson(jsonDecode(jsonEncode(s.toJson())) as Map<String, dynamic>);
+    expect(back.errand, 'fields');
+    // An outfit in a class suit, another in plain armour: each puts its own body armour back on.
+    while (k.level < 35) {
+      e.grantXp(xpToNext(k));
+    }
+    final plain = k.loadout.armour;
+    e.saveGearSet(0);
+    for (final slot in setPieceSlots) {
+      k.stash.add(e.loot.setPiece('deepforge', slot, k.heroClass, k.level));
+    }
+    e.wearSuit('deepforge');
+    expect(suitWorn(k), 'deepforge');
+    e.saveGearSet(1);
+    e.wearGearSet(0);
+    expect(k.loadout.armour, plain);
+    e.wearGearSet(1);
+    expect(suitWorn(k), 'deepforge');
   });
 }

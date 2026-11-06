@@ -1106,6 +1106,10 @@ class GameController extends ChangeNotifier {
   String? whyNotErrand(String id) => engine.whyNotErrand(id);
   int get errandLeft => engine.errandLeft;
   bool get errandBack => engine.errandBack;
+  int get runners => engine.runners;
+  String? errandOf(int r) => engine.errandOf(r);
+  int errandLeftOf(int r) => engine.errandLeftOf(r);
+  bool errandBackOf(int r) => engine.errandBackOf(r);
 
   bool sendErrand(String id) {
     final ok = engine.sendErrand(id);
@@ -1113,8 +1117,8 @@ class GameController extends ChangeNotifier {
     return ok;
   }
 
-  List<String> collectErrand() {
-    final got = engine.collectErrand();
+  List<String> collectErrand([int r = 0]) {
+    final got = engine.collectErrand(r);
     if (got.isNotEmpty) _changed();
     return got;
   }

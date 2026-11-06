@@ -278,7 +278,14 @@ const homes = [
   HomeTier('Tent', stashSize, '$stashSize-piece chest · a fire to sit by'),
   HomeTier('Cottage', 40, '40-piece chest · a free potion each morning · Wren runs errands', gold: 900, timber: 6, iron: 3, after: 0),
   HomeTier('Keep', 80, '80-piece chest · an armoury: save two outfits, swap in one tap · Wren searches the ruins', gold: 4500, timber: 10, iron: 8, after: 2),
+  // After the war: somewhere for the gold that piles up once the Ember King is down, and room for
+  // the suits of every knight you've been. (Convenience, like every home: no power in a fight.)
+  HomeTier('Fortress', 120, '120-piece chest · a third armoury rack · Pip runs errands beside Wren', gold: 20000, timber: 18, iron: 14, after: mainLands - 1),
 ];
+
+/// Armoury racks (saved outfits) in home tier [home]: none before the keep, two in it, three in the
+/// fortress.
+int armouryRacks(int home) => home >= 3 ? 3 : (home >= 2 ? 2 : 0);
 
 /// Levels past its land's own that a beaten boss rises again, to be faced once more (once).
 const risenAfter = 4;
@@ -390,6 +397,11 @@ bool isSideLand(int continent) => continent >= mainLands;
 /// down the road, a run could reach the Ember King having never set foot off it: no class suit, half
 /// the map unseen.)
 const throneLand = mainLands - 1, throneSeals = 6;
+
+/// The one seal that must be among them: Deepforge Hold's, the Forge Knight's home. (Ravenmoor, the
+/// Blood Knight's, is on nearly every road there anyway, and the Dragon Knight's dragons are on the
+/// main road; Deepforge was the class a hero could reach the King without ever seeing.)
+final throneKeyLand = continents.indexWhere((c) => c.name == 'Deepforge Hold');
 
 /// The roads between the lands: a land opens once the boss of the land before it is down (the side
 /// lands, the one that leads to them). The road is one line, land by land, in the order of their

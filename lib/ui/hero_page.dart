@@ -1152,6 +1152,31 @@ Color petColour(Pet p) => switch (p) {
   Pet.fairy => const Color(0xFFE6B8FF),
 };
 
+/// The way up as one row (where the full ladder won't fit): each home, lit once it's built.
+Widget _ladderStrip(int built, List<IconData> icons) => Stone(
+  child: Row(
+    children: [
+      for (final (i, h) in homes.indexed) ...[
+        if (i > 0) Icon(Icons.chevron_right, size: 18, color: i <= built ? Palette.amber : Palette.parch2),
+        Expanded(
+          child: Opacity(
+            opacity: i <= built ? 1 : .55,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icons[i], size: 22, color: i <= built ? Palette.amber : Palette.parch2),
+                const SizedBox(width: 4),
+                Flexible(child: Text(h.name, overflow: TextOverflow.ellipsis, style: Txt.label(size: 13, color: Palette.cream))),
+                if (i <= built) const Padding(padding: EdgeInsets.only(left: 3), child: Icon(Icons.check_circle, size: 14, color: Color(0xFF9BE27A))),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ],
+  ),
+);
+
 /// Your home: what it gives you, what you've got to build with, the next one up, and (in a keep)
 /// the armoury's gear sets.
 class _Home extends StatelessWidget {
@@ -1174,7 +1199,7 @@ class _Home extends StatelessWidget {
     );
     // The way up, tent to keep: what each gives, built or not. Last, so on a tall phone it takes
     // the room that's left (given a height, it spreads out to fill it).
-    const extras = ['a campfire', 'herbs, and Wren\'s errands', 'an armoury, and the ruins'], icons = [Icons.holiday_village, Icons.cottage, Icons.castle];
+    const extras = ['a campfire', 'herbs, and Wren\'s errands', 'an armoury, and the ruins', 'a third rack, and Pip\'s errands'], icons = [Icons.holiday_village, Icons.cottage, Icons.castle, Icons.fort];
     final ladder = Stone(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1218,7 +1243,7 @@ class _Home extends StatelessWidget {
         Stone(
           child: Row(
             children: [
-              Icon(s.home == 0 ? Icons.holiday_village : (s.home == 1 ? Icons.cottage : Icons.castle), size: 44, color: Palette.amber),
+              Icon(icons[s.home], size: 44, color: Palette.amber),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -1226,6 +1251,8 @@ class _Home extends StatelessWidget {
                   children: [
                     Text('Your ${home.name}', style: Txt.label(size: 20, color: Palette.cream, weight: FontWeight.w800)),
                     Text(home.perk, style: Txt.onStone(size: 14)),
+                    // A hardcore road won: its banner hangs over your door (bragging rights, no more).
+                    if (s.hcBest?['won'] == true) Text('⚑ The Unbroken\'s banner hangs over your door: a hardcore road, won', style: Txt.label(size: 12.5, color: const Color(0xFFE8C04A))),
                     const SizedBox(height: 6),
                     Wrap(
                       crossAxisAlignment: WrapCrossAlignment.center,
@@ -1293,7 +1320,7 @@ class _Home extends StatelessWidget {
               children: [
                 Text('THE ARMOURY', style: Txt.label(size: 12, color: Palette.amber)),
                 const SizedBox(height: 6),
-                for (var i = 0; i < 2; i++)
+                for (var i = 0; i < armouryRacks(s.home); i++)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Row(
@@ -1318,7 +1345,12 @@ class _Home extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 10),
-        if (box.hasBoundedHeight) Expanded(child: ladder) else ladder,
+        // (On a phone with the armoury and errands above it, the full ladder doesn't fit: then it's
+        // one row, tent to keep, rather than cropped.)
+        if (box.hasBoundedHeight)
+          Expanded(child: LayoutBuilder(builder: (context, room) => room.maxHeight >= 70.0 * homes.length + 40 ? ladder : _ladderStrip(s.home, icons)))
+        else
+          ladder,
       ],
     ));
   }

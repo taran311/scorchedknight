@@ -503,6 +503,8 @@ class GameState {
     this.hcBest,
     this.errand,
     this.errandAt = 0,
+    this.errand2,
+    this.errandAt2 = 0,
     Set<String>? did,
     Set<String>? tasksClaimed,
   }) : did = did ?? {},
@@ -798,6 +800,10 @@ class GameState {
   String? errand;
   int errandAt;
 
+  /// The same for Pip, your second runner (from the fortress).
+  String? errand2;
+  int errandAt2;
+
   /// Firsts you've done that the game can't otherwise tell from your save ('brew', 'deal',
   /// 'temper'…), for the tasks; and the tasks whose rewards you've claimed.
   final Set<String> did, tasksClaimed;
@@ -946,6 +952,8 @@ class GameState {
     if (hcBest != null) 'hcBest': hcBest,
     if (errand != null) 'errand': errand,
     if (errand != null) 'errandAt': errandAt,
+    if (errand2 != null) 'errand2': errand2,
+    if (errand2 != null) 'errandAt2': errandAt2,
     if (did.isNotEmpty) 'did': did.toList(),
     if (tasksClaimed.isNotEmpty) 'tasks': tasksClaimed.toList(),
   };
@@ -1102,6 +1110,8 @@ class GameState {
       hcBest: (j['hcBest'] as Map?)?.cast<String, dynamic>(),
       errand: j['errand'] as String?,
       errandAt: n('errandAt'),
+      errand2: j['errand2'] as String?,
+      errandAt2: n('errandAt2'),
       did: {...((j['did'] as List?) ?? const []).whereType<String>()},
       tasksClaimed: {...((j['tasks'] as List?) ?? const []).whereType<String>()},
     );

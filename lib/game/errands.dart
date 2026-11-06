@@ -6,6 +6,9 @@
 /// Your housekeeper.
 const retainerName = 'Wren';
 
+/// Your runners: Wren, and from the fortress Pip too, each on an errand of their own.
+const runnerNames = [retainerName, 'Pip'];
+
 class Errand {
   const Errand(this.id, this.name, this.blurb, {required this.fee, required this.perLevel, required this.fights, required this.home});
   final String id, name, blurb;
