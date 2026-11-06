@@ -51,6 +51,7 @@ import 'map_page.dart';
 import 'merchant.dart';
 import 'quest_dialog.dart';
 import '../services/cloud.dart';
+import '../services/desktop.dart';
 import 'theme.dart';
 import 'wilds_page.dart';
 import 'trail_data.dart' show trailAt;
@@ -1444,7 +1445,13 @@ class _SettingsWindowState extends State<_SettingsWindow> {
               ),
               _toggle('Faster fights', Icons.fast_forward_rounded, _s.fastFights, (v) => _set((s) => s.fastFights = v)),
               _toggle('Blood & gore', Icons.water_drop_rounded, _s.gore, (v) => _set((s) => s.gore = v)),
-              _toggle('Vibration', Icons.vibration_rounded, _s.vibrate, (v) => _set((s) => s.vibrate = v)),
+              if (!isDesktopApp) _toggle('Vibration', Icons.vibration_rounded, _s.vibrate, (v) => _set((s) => s.vibrate = v)),
+              // On a PC: fullscreen (F11 or Alt+Enter too), straight away rather than on Save.
+              if (isDesktopApp)
+                ListenableBuilder(
+                  listenable: Desktop.instance,
+                  builder: (context, _) => _toggle('Fullscreen  (F11)', Icons.fullscreen_rounded, Desktop.instance.fullscreen, Desktop.instance.setFullscreen),
+                ),
               _toggle('Sell junk where it falls', Icons.sell_rounded, _s.autoSellJunk, (v) => _set((s) => s.autoSellJunk = v)),
               _toggle('Mute all', Icons.volume_off_rounded, _s.muted, (v) => _set((s) => s.muted = v)),
               // (Two graphs at the top of the screen: the upper one is drawing to the screen, the
@@ -1467,6 +1474,19 @@ class _SettingsWindowState extends State<_SettingsWindow> {
               const SizedBox(height: 14),
               _CloudSection(controller: c),
               const SizedBox(height: 6),
+              if (isDesktopApp) ...[
+                StoneButton(
+                  title: 'Quit to desktop',
+                  compact: true,
+                  onPressed: () {
+                    _done = true;
+                    c.applySettings(_s);
+                    c.setName(_name.text);
+                    Desktop.instance.quit(c.saveNow);
+                  },
+                ),
+                const SizedBox(height: 4),
+              ],
               TextButton(onPressed: _newHero, child: Text('Start a new hero…', style: Txt.label(size: 13, color: const Color(0xFFE07A5A)))),
               // Which build this is: to tell at a glance that a phone has the latest.
               Center(child: Text('Build $buildStamp', style: Txt.onStone(size: 11.5, color: Palette.parch2))),
@@ -1596,6 +1616,8 @@ class _CloudSection extends StatelessWidget {
       builder: (context, _) {
         final note = Txt.onStone(size: 12.5);
         if (!cloud.available) {
+          if (steamBuild) return Text('Your hero is saved on this computer, and Steam Cloud keeps a copy for any other PC you play on.', textAlign: TextAlign.center, style: note);
+          if (isDesktopApp) return Text('Your hero is saved on this computer.', textAlign: TextAlign.center, style: note);
           return Text('Your hero is kept on this device. Clearing the browser\'s site data (or uninstalling the app) wipes it.', textAlign: TextAlign.center, style: note);
         }
         final synced = cloud.lastSync;

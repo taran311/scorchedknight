@@ -146,6 +146,9 @@ class GameController extends ChangeNotifier {
     _schedulePush();
   }
 
+  /// Writes the hero away now and waits for it (quitting to the desktop).
+  Future<void> saveNow() => storage.save(state);
+
   // ---- cloud saves ----
 
   /// Signed in or out: on signing in, match this device's save with the cloud's. Signing out

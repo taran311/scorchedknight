@@ -30,3 +30,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  # The game's fonts, built in, so a PC or phone with no connection still shows them on the first
+  # run (google_fonts finds them here before trying to download; licences alongside).
+  assets:
+    - assets/google_fonts/

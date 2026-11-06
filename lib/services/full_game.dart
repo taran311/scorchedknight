@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../game/engine.dart';
+import 'desktop.dart' show steamBuild;
 import 'full_game_stub.dart' if (dart.library.io) 'full_game_native.dart' as store;
 
 /// The one-off product's id in Play Console (Monetise → Products → In-app products).
@@ -45,6 +46,8 @@ class FullGame extends ChangeNotifier {
     // --dart-define=SK_FULL=true.
     if (kIsWeb && const {'localhost', '127.0.0.1'}.contains(Uri.base.host)) have = true;
     if (const bool.fromEnvironment('SK_FULL')) have = true;
+    // Bought on Steam: the whole game, nothing more to buy.
+    if (steamBuild) have = true;
     _set(have, keep: false);
     // (Not waited for: a slow Google Play mustn't hold the game's first screen up.)
     store.init(this).catchError((Object _) {

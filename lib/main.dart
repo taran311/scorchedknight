@@ -11,6 +11,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'audio/audio.dart';
 import 'services/cloud.dart';
+import 'services/desktop.dart';
 import 'services/full_game.dart';
 
 import 'game/controller.dart';
@@ -54,7 +55,7 @@ Future<void> main() async {
   // every face of the game's fonts, fetched before the first frame. (They used to load as they
   // were first needed: the title flashed up in a plain font, and the first bold banner or damage
   // number of a session made the text around it jump as its face arrived mid-fight.)
-  await Future.wait([CloudSave.instance.init(), _fonts(), FullGame.instance.init()]);
+  await Future.wait([CloudSave.instance.init(), _fonts(), FullGame.instance.init(), Desktop.instance.init()]);
   runApp(const ScorchedKnightApp());
 }
 
