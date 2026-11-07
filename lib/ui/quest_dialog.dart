@@ -10,6 +10,7 @@ import '../art/body.dart';
 import '../audio/audio.dart';
 import '../art/looks.dart';
 import '../art/rig.dart';
+import '../game/raids.dart';
 import '../game/catalog.dart';
 import '../game/controller.dart';
 import '../game/rules.dart';
@@ -143,15 +144,13 @@ const _hobChatter = [
 /// and a seat by the fire.
 /// Bandits have hit the town: Hob or Mags tells you about it. True if you give chase.
 Future<bool> raidAlarm(BuildContext context, GameController c) async {
-  final inn = c.state.raid == 'inn', name = c.state.settings.name;
+  final inn = c.state.raid == 'inn', name = c.state.settings.name, r = raidersById(c.state.raiders);
   Audio.play(Sfx.quest);
   final go = await showDialog<bool>(
     context: context,
     builder: (_) => _HobDialog(
       mags: !inn,
-      pages: inn
-          ? ['$name! Bandits! They came through the back while I was changing a barrel.', 'Took the strongbox, the candlesticks, and my good kettle. They can\'t have got far with all that.']
-          : ['$name, thank the stars. Bandits turned my stall over not ten minutes ago!', 'Half my potions and every pouch of coin. They went off down the road, laughing. Bring it back and I\'ll make it worth your while.'],
+      pages: [for (final p in inn ? r.inn : r.stall) p.replaceAll('{name}', name)],
       accept: 'Chase them',
       decline: 'Not now',
     ),

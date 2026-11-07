@@ -273,7 +273,7 @@ class _BattleScreenState extends State<BattleScreen> {
     return ListenableBuilder(
       listenable: c,
       builder: (context, _) {
-        final s = c.state, foe = c.shownFoeType, land = continents[realmAt(c.shownRare?.base ?? c.shownFoe)];
+        final s = c.state, foe = c.shownFoeType, land = continents[s.raidFight ? 0 : realmAt(c.shownRare?.base ?? c.shownFoe)]; // (A raid is fought at home, whoever came.)
         // Mid-turn, the log waits for the stage: it stops where the turn began.
         final held = c.logHeldAt == null ? -1 : s.journal.indexOf(c.logHeldAt!);
         final upTo = c.busy && c.logHeldAt != null && held >= 0 ? held + 1 : s.journal.length;

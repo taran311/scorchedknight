@@ -28,6 +28,7 @@ import 'gear_glance.dart';
 import 'hud.dart';
 import 'hero_view.dart' show GearIcon, rarityColour;
 import 'map_page.dart';
+import 'risen_ready.dart';
 import 'item_icons.dart';
 import 'stat_icons.dart' show InfoChip;
 import 'theme.dart';
@@ -99,7 +100,20 @@ class _TrailPageState extends State<TrailPage> {
     // Knocked out: you wake up back at the inn.
     if (exit == BattleExit.inn) Navigator.of(context).popUntil((r) => r.isFirst);
     // The boss is down: on to the land it opened, its own trail in place of this one.
-    if (exit == BattleExit.onward) _onward();
+    if (exit == BattleExit.onward) return _onward();
+    if (exit != BattleExit.inn) await _risenWoke();
+  }
+
+  /// Grown strong enough for a boss risen again (here or anywhere): it's said, once, and you can
+  /// go straight after it.
+  Future<void> _risenWoke() async {
+    if (!mounted || c.state.inBattle || c.risenToAnnounce == null) return;
+    final to = await announceRisen(context, c);
+    if (to == null || !mounted) return;
+    if (to == land) return _goHeroic();
+    if (c.whyNotTravel(to) != null) return;
+    c.travel(to);
+    Navigator.of(context).pushReplacement(MaterialPageRoute<void>(builder: (_) => TrailPage(controller: c, land: to)));
   }
 
   Future<void> _onward() async {

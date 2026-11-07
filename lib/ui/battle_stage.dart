@@ -27,6 +27,7 @@ import '../art/reaper.dart';
 import '../art/rare_looks.dart';
 import '../art/rig.dart';
 import '../art/scenery.dart';
+import '../game/raids.dart';
 import '../game/ammo.dart';
 import '../game/catalog.dart';
 import '../game/dungeons.dart' show dungeonById;
@@ -232,7 +233,7 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   /// Whether the foe has already wobbled ("I've made a terrible mistake") this fight.
   bool _hurtSaid = false;
 
-  Banter get _lines => _foe.name == 'Bandit Gang' ? raidBanter : banterFor(_foe);
+  Banter get _lines => raiders.where((r) => r.gang == _foe.name).firstOrNull?.banter ?? banterFor(_foe);
 
   void _say(List<String> lines, {double chance = 1, double hold = 2800}) {
     if (lines.isEmpty || _rng.nextDouble() > chance) return;
@@ -667,16 +668,24 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   Look? _veteranOf, _veteran;
   int _veteranTier = 0;
   static const _dragonScale = .78;
+
+  /// Vharrax the Ember King dwarfs everything else: drawn [_kingScale] times a dragon's size and
+  /// [_kingShift] further right, so his head and forelegs loom over the field and the rest of him
+  /// (wings, tail) runs off the edge of it.
+  static const _kingScale = 1.7, _kingShift = 150.0;
+  bool get _isKing => _foe.look == 'emberKing';
   static const _chestAt = Offset((_knightX + _foeX) / 2 + 40, _groundY + 6);
   double get _foeScale => _isDragon ? _dragonScale : _foeLook.scale * 1.1;
   bool get _isBeast => isBeastLook(_foe.look);
   double get _foeHeight => _menaceScale * _foeHeightPlain;
-  double get _foeHeightPlain => _isBeast ? beastHeight(_foe.look) * (_foe.aura != null ? 1.06 : 1) : _isKraken ? seaHeight(_foe.look) * _krakenScale * .9 : _isHound ? 92 * _houndScale * .95 : _isDragon ? dragonHeight * _dragonScale * _dragonLook.scale * .8 : builds[_foeLook.build]!.height * _foeScale * .95;
+  double get _foeHeightPlain => _isBeast ? beastHeight(_foe.look) * (_foe.aura != null ? 1.06 : 1) : _isKraken ? seaHeight(_foe.look) * _krakenScale * .9 : _isHound ? 92 * _houndScale * .95 : _isDragon ? dragonHeight * _dragonScale * _dragonLook.scale * .8 * (_isKing ? 1.75 : 1) : builds[_foeLook.build]!.height * _foeScale * .95;
   Offset get _foeChest => Offset(_foeX, _groundY - _foeHeight * .62) + _foeLift;
 
   /// Where a fire-breathing foe's fire comes out: a hound's jaws (drawn mirrored at its feet, 30
   /// behind, at [_houndScale], then grown by the menace scale); others' fire comes off the chest.
   Offset get _foeFireFrom {
+    // (The Ember King's jaws are well up and out in front of his chest.)
+    if (_isKing) return _foeChest + const Offset(-182, -41);
     if (!_isHound) return _foeChest + const Offset(-50, -20);
     final feet = Offset(_foeX + fx['enter']! * 440 - fx['lunge']! * 90, _groundY) + _foeLift;
     // The muzzle's tip in the hound's own drawing ((46, 3) in its head, turned and placed), at its scale.
@@ -803,7 +812,8 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
       _banner = ('${spell.name}!', colour, now);
       fx['elder'] = .001;
       _tween('elder', 1, 620, ease: easeOut);
-      Audio.play(Sfx.crit, power: .7);
+      // (A roar of fire as it comes, not the clash of a blade: no blade has moved yet.)
+      Audio.play(Sfx.castFire, power: 1.3);
     });
     final from = 560.0, until = _elderLead + hitAt + 140;
     _at(d0 + from - 40, () => _elderBreath = true);
@@ -1128,6 +1138,23 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     });
   }
 
+  /// Your own dragon, if it's out and old enough to breathe (its stage's name), else null.
+  String? get _ownDragon => ownDragonFire(c.state.knight) > 0 ? dragonStage(c.state.knight)?.name : null;
+
+  /// Your dragon pours fire on the foe from [at] for [ms].
+  void _ownBreath(String name, double at, double ms) {
+    _at(at, () {
+      fx['fire'] = 1;
+      _tween('fire', 0, ms + 300);
+    });
+    for (var t = 0.0; t < ms; t += 34) {
+      _at(at + t, () {
+        final mouth = dragonMouth(name, now, still: _reduceMotion), ang = math.atan2(_foeChest.dy - mouth.dy, _foeChest.dx - mouth.dx);
+        _spark('fire', mouth, 4, dir: ang, spread: .25, speed: 11, life: 520, radius: 11, lift: 0, gravity: 0);
+      });
+    }
+  }
+
   /// A mage's spell: its name, then the show each kind of spell calls for.
   void _playSpell(SwingResult r, double d0) {
     final spell = r.damage.spell!, colour = Color(spell.argb);
@@ -1139,7 +1166,9 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
     });
     switch (spell.kind) {
       case SpellKind.dragon when elder:
-        // (The wyrm came down in the build-up: see _playElderLead.) The fire engulfs the foe.
+        // (The wyrm came down in the build-up: see _playElderLead.) Your own dragon breathes with
+        // it, and the fire engulfs the foe.
+        if (_ownDragon case final name?) _ownBreath(name, d0 + hit - 420, 380);
         _at(d0 + hit - 30, () {
           _tween('screen', .35, 40);
           _tween('screen', 0, 320, delay: 40);
@@ -1154,6 +1183,14 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
             _spark('smoke', Offset(_knightX + 160 + x, _groundY - 20), 10, lift: 2, speed: 1.6, life: 900, radius: 8, gravity: -.02);
             _spark('curse', Offset(_knightX + 160 + x, _groundY - 30), 8, lift: 3, speed: 2, life: 800, radius: 3);
           }
+        });
+      case SpellKind.dragon when _ownDragon != null:
+        // Your own dragon breathes it: a long gout of fire from its jaws, and a fireball with it.
+        _ownBreath(_ownDragon!, d0 + hit - 360, 420);
+        _at(d0 + hit - 300, () => _shots.add(_Projectile('bolt', dragonMouth(_ownDragon!, now, still: _reduceMotion), _foeChest, now, 300, colour)));
+        _at(d0 + hit, () {
+          _spark('fire', _foeChest, 22, speed: 7, life: 800, radius: 12, lift: 1, gravity: -.02);
+          _punch(.6);
         });
       case SpellKind.dragon:
         // A dragon sweeps down from the sky and breathes a fireball.
@@ -3328,8 +3365,8 @@ class _ScenePainter extends CustomPainter {
       drawFoeDragon(
         canvas,
         s._dragonLook,
-        Offset(fx0 + 30, fy),
-        _BattleStageState._dragonScale,
+        Offset(fx0 + 30 + (s._isKing ? _BattleStageState._kingShift : 0), fy),
+        _BattleStageState._dragonScale * (s._isKing ? _BattleStageState._kingScale : 1),
         t,
         alpha: ownAlpha,
         hit: hit,

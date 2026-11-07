@@ -401,6 +401,7 @@ class GameState {
     this.jobTaken = true,
     this.raid,
     this.raidSeen = false,
+    this.raiders,
     Set<String>? trophies,
     this.raidCalm = 0,
     this.raidFight = false,
@@ -583,6 +584,9 @@ class GameState {
   /// [raidFight] while you're chasing them down.
   String? raid;
   bool raidSeen, raidFight;
+
+  /// Who raided (see raids.dart; null: bandits, as every raid was once).
+  String? raiders;
 
   /// One-of-a-kind prizes already found (the ork club, heartwood gear, rune weapon, dragon gear):
   /// each turns up once a game, so finding one is an event.
@@ -851,6 +855,7 @@ class GameState {
     'inn': innRepaired,
     'job': jobTaken,
     if (raid != null) 'raid': raid,
+    if (raid != null && raiders != null) 'raiders': raiders,
     'raidSeen': raidSeen,
     if (trophies.isNotEmpty) 'trophies': trophies.toList(),
     'raidCalm': raidCalm,
@@ -1006,6 +1011,7 @@ class GameState {
       jobTaken: j['job'] as bool? ?? ((j['inn'] as bool? ?? true) || n('timber') > 0 || n('iron') > 0),
       raid: j['raid'] as String?,
       raidSeen: j['raidSeen'] as bool? ?? false,
+      raiders: j['raiders'] as String?,
       trophies: {...((j['trophies'] as List?) ?? const []).whereType<String>()},
       raidCalm: n('raidCalm'),
       raidFight: j['raidFight'] as bool? ?? false,

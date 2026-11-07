@@ -1099,6 +1099,26 @@ double randomEpicWeapon(HeroClass c, int level) {
 /// above (they're farmed for), legendaries well above (and they carry a special), relics above that.
 const farmedEdge = 1.05, legendEdge = 1.2, relicEdge = 1.35;
 
+/// The score a random [rarity] piece for [slot] comes out at, on average, at [level] (its base stat
+/// with material and rarity, and its enchantments). Farmed pieces are tuned against it.
+double randomPiece(HeroClass c, GearSlot slot, Rarity rarity, int level) {
+  final bases = _bases[c]![slot] ?? const <_Base>[];
+  if (bases.isEmpty) return randomEpicWeapon(c, level);
+  final made = 1 + _band(level) * .07;
+  var primary = 0.0;
+  for (final b in bases) {
+    primary += statWeight(b.primary) * _base(b.primary, level) * b.scale * rarity.power * (b.make == _Make.none ? 1 : made);
+  }
+  primary /= bases.length;
+  final pool = _affixes.where((a) => a.slots.contains(slot)).toList();
+  final accessory = slot == GearSlot.gloves || slot == GearSlot.boots || slot == GearSlot.ring ? .55 : 1.0;
+  var affix = 0.0;
+  for (final a in pool) {
+    affix += statWeight(a.stat) * _base(a.stat, level) * .8 * rarity.power * accessory;
+  }
+  return primary + rarity.index * (pool.isEmpty ? 0 : affix / pool.length);
+}
+
 /// Each named legendary weapon's own power (see _Legend.edge), set by the balance sweep so each,
 /// found from level 15, leaves the rest of the road at about 4 to 7 knockouts and 75-85% first-try
 /// odds at the bosses (found gear: about 13, and 58%). Those that heal as they hit, or crit for a
@@ -1386,7 +1406,10 @@ class LootTable {
         if (slot == GearSlot.weapon)
           ..._tuned(stats, level, heroClass, farmedEdge * (rarity == Rarity.legendary ? 1.2 : (rarity == Rarity.epic ? 1 : .85)))
         else
-          for (final e in stats.entries) e.key: _roll(e.key, level, e.value * (rarity == Rarity.legendary ? 1.25 : (rarity == Rarity.epic ? 1.1 : 1)), _r),
+          // (The rest are tuned against a random piece of their slot and rarity, a little under it
+          // for the set's bonus and the dragon-slaying: rolled plain, a legendary dragonslayer
+          // shield came out at under half a random epic buckler.)
+          ..._tuned(stats, level, heroClass, .9, against: randomPiece(heroClass, slot, rarity, level)),
         if (slot != GearSlot.armour) Stat.wyrmbane: bane,
       },
     );
@@ -1867,10 +1890,10 @@ class LootTable {
   /// A signature weapon's stats: [recipe]'s mix, scaled so that on average it scores [edge] times a
   /// random epic weapon of [heroClass]'s at [level]. (Recipes say what a weapon is; this says how
   /// strong, the same way for all of them, so none falls behind the random drops.)
-  Map<Stat, int> _tuned(Map<Stat, double> recipe, int level, HeroClass heroClass, double edge) {
+  Map<Stat, int> _tuned(Map<Stat, double> recipe, int level, HeroClass heroClass, double edge, {double? against}) {
     var raw = 0.0;
     recipe.forEach((s, m) => raw += statWeight(s) * _base(s, level) * m);
-    final k = edge * randomEpicWeapon(heroClass, level) / raw;
+    final k = edge * (against ?? randomEpicWeapon(heroClass, level)) / raw;
     return {for (final e in recipe.entries) e.key: _roll(e.key, level, e.value * k, _r)};
   }
 

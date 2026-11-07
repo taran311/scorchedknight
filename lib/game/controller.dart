@@ -320,6 +320,13 @@ class GameController extends ChangeNotifier {
 
   bool heroicOpen(int c) => engine.heroicOpen(c);
   bool risenReady(int c) => engine.risenReady(c);
+
+  /// See GameEngine.risenToAnnounce.
+  int? get risenToAnnounce => engine.risenToAnnounce;
+  void risenAnnounced() {
+    engine.markRisenAnnounced();
+    _changed();
+  }
   bool heroicCleared(int c) => engine.heroicCleared(c);
   String? whyNotForge(int c) => engine.whyNotForge(c);
 

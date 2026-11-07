@@ -297,8 +297,3 @@ Banter banterFor(FoeType f) {
   );
 }
 
-/// The raiders who hit the town get their own lines.
-const raidBanter = Banter(
-  enter: ['Uh oh. It\'s the hero.', 'Run! No wait, fight! No, run!', 'We were just... borrowing it.'],
-  fall: ['Fine! Keep your stupid potions!'],
-);

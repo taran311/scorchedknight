@@ -19,6 +19,7 @@ import '../art/silhouette_inn.dart';
 import '../art/town_props.dart';
 import '../audio/audio.dart';
 import '../build_info.dart';
+import '../game/raids.dart';
 import '../game/loot.dart';
 import '../game/errands.dart' show retainerName;
 import '../game/vault.dart';
@@ -52,6 +53,7 @@ import 'merchant.dart';
 import 'quest_dialog.dart';
 import '../services/cloud.dart';
 import '../services/desktop.dart';
+import 'risen_ready.dart';
 import 'suit_ready.dart';
 import 'journey.dart';
 import 'throne_seals.dart';
@@ -101,8 +103,18 @@ class _InnPageState extends State<InnPage> with RouteAware {
   void didPopNext() => _checkRaid().then((_) async {
         if (mounted && c.sealNews && !c.state.inBattle && (ModalRoute.of(context)?.isCurrent ?? false)) await showThroneSeals(context, c);
         if (mounted && (ModalRoute.of(context)?.isCurrent ?? false)) await maybeShowJourney(context, c);
+        await _checkRisen();
         await _checkSuits();
       });
+
+  /// A boss risen again that you've just grown strong enough for: said once (see announceRisen).
+  Future<void> _checkRisen() async {
+    if (!mounted || _away || c.state.inBattle || c.jobOffered || c.risenToAnnounce == null || !(ModalRoute.of(context)?.isCurrent ?? false)) return;
+    final to = await announceRisen(context, c);
+    if (to == null || !mounted || c.whyNotTravel(to) != null) return;
+    c.travel(to);
+    await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => TrailPage(controller: c, land: to)));
+  }
 
   /// Bandits hit the town while you were out: whoever was robbed runs up to tell you, once.
   Future<void> _checkRaid() async {
@@ -153,6 +165,7 @@ class _InnPageState extends State<InnPage> with RouteAware {
       if (mounted) await _checkRaid();
       if (mounted && c.sealNews && !c.state.inBattle) await showThroneSeals(context, c);
       if (mounted) await maybeShowJourney(context, c);
+      if (mounted) await _checkRisen();
       if (mounted) await _checkSuits();
       // A seasonal event: welcomed once a year.
       final season = mounted ? c.greetSeason() : null;
@@ -399,7 +412,7 @@ class _InnPageState extends State<InnPage> with RouteAware {
                         if (s.raid != null && !s.inBattle && !_away) ...[
                           _Banner(
                             icon: Icons.warning_amber_rounded,
-                            text: s.raid == 'inn' ? 'Bandits robbed the Soot & Kettle!' : 'Bandits raided Mags\' stall!',
+                            text: s.raid == 'inn' ? raidersById(s.raiders).innBanner : raidersById(s.raiders).stallBanner,
                             button: 'Chase',
                             onTap: _chase,
                           ),

@@ -26,6 +26,7 @@ import 'vault.dart';
 import 'tasks.dart';
 import 'events.dart';
 import 'encounters.dart';
+import 'raids.dart';
 import 'rules.dart';
 import 'wilds.dart';
 import 'dungeons.dart';
@@ -1169,8 +1170,9 @@ class GameEngine {
     if (s.raid != null) {
       // Left too long, the bandits get clean away.
       if (s.raidSeen && --s.raidCalm <= raidCalm - 3) {
+        final r = raidersById(s.raiders);
         s.raid = null;
-        _note('Word from town: the bandits got clean away. Maybe next time.');
+        _note('Word from town: ${r.who} ${r.gone}. Maybe next time.');
       }
       return;
     }
@@ -1182,6 +1184,10 @@ class GameEngine {
     }
     if (_rng.nextDouble() < raidChance) {
       s.raid = s.innRepaired && _rng.nextBool() ? 'inn' : 'stall';
+      // Whoever's about: bandits from the start, then whatever's come loose in the lands whose lords
+      // you've put down. (The newest lot a little more often: word travels.)
+      final open = [for (final r in raiders) if (r.openTo(s.bossesDown)) r];
+      s.raiders = (_rng.nextDouble() < .35 ? open.last : open[_rng.nextInt(open.length)]).id;
       s.raidSeen = false;
       s.raidCalm = raidCalm;
     }
@@ -1190,23 +1196,19 @@ class GameEngine {
   /// Chases down the bandits who raided the town: a band of them, carrying a gilded haul.
   bool startRaid() {
     if (state.inBattle || state.raid == null) return false;
-    final at = lookIndex('rogue', 0);
-    _begin(at, Rare(at, Aura.gilded, name: 'Bandit Gang', pack: true));
+    final r = raidersById(state.raiders), at = r.foeIndex;
+    _begin(at, Rare(at, Aura.gilded, name: r.gang, pack: true));
     state.raidFight = true;
-    _note(
-      state.raid == 'inn'
-          ? 'You catch the bandits in the lane behind the Soot & Kettle, arms full of Hob\'s silver!'
-          : 'You catch the bandits at the edge of the square, Mags\' stock bulging in their sacks!',
-      EntryKind.gold,
-    );
+    _note(state.raid == 'inn' ? r.caughtInn : r.caughtStall, EntryKind.gold);
     return true;
   }
 
   /// Lets the bandits go (they get away with it).
   void letRaidGo() {
     if (state.raid == null) return;
+    final r = raidersById(state.raiders);
     state.raid = null;
-    _note('You let the bandits go. Somebody else\'s problem.');
+    _note('You let ${r.who} go. Somebody else\'s problem.');
   }
 
   // ---------------- the Ash Colosseum ----------------
@@ -1328,6 +1330,23 @@ class GameEngine {
   /// (It replaced the Heroic trail: five elites before it, the same land again only harder, which
   /// the wilds and the side lands already did better.)
   bool risenReady(int c) => heroicOpen(c) && !heroicCleared(c) && !state.risenDown.contains(c) && state.knight.level >= risenLevel(c);
+
+  /// A risen boss you've just grown strong enough for and haven't been told of yet: its land (the
+  /// toughest, if more than one woke at once), or null.
+  int? get risenToAnnounce {
+    int? best;
+    for (var c = 0; c < continents.length; c++) {
+      if (risenReady(c) && !state.did.contains('risenwake:$c') && (best == null || risenLevel(c) > risenLevel(best))) best = c;
+    }
+    return best;
+  }
+
+  /// Told: every risen boss waiting now counts as told (one call to arms, not a queue of them).
+  void markRisenAnnounced() {
+    for (var c = 0; c < continents.length; c++) {
+      if (risenReady(c)) state.did.add('risenwake:$c');
+    }
+  }
 
   /// Why land [c]'s boss can't be faced risen (null: it can).
   String? whyNotRisen(int c) {

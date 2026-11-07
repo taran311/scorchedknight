@@ -225,6 +225,14 @@ String? activeCompanion(Knight k) {
 }
 
 /// The dragon's stage, if the dragon is the companion fighting.
+/// Your own dragon's fire, if it's out and old enough to breathe (0: no dragon, an egg, or a pet
+/// in its place): what it adds to each blow, and twice over to a dragon rite.
+int ownDragonFire(Knight k) {
+  final ds = dragonStage(k);
+  if (ds == null || ds.chip == 0 || petStage(k) != null) return 0;
+  return ds.chip + k.level ~/ 5 + heroStats(k).dragonkin;
+}
+
 DragonStage? dragonStage(Knight k) {
   final xp = k.dragonXp;
   if (xp == null || activeCompanion(k) != 'dragon') return null;
@@ -415,6 +423,9 @@ SwingDamage swingDamage(GameState state, double roll, {Special? special, AmmoTyp
   var base = fullSwing(k);
   final exposed = state.foeExposed > 0 ? 1.25 : 1.0; // Sunder Armour
   base = (base * mult * (sp?.mult ?? 1) * (cast?.mult ?? 1) * exposed * outmatchedHits(state.foeLevel, k.level)).round();
+  // A dragon rite with your own dragon out: it's your dragon that breathes it, and its fire (its
+  // age, your level and your dragonkin gear) goes in on top, twice over.
+  if (cast?.kind == SpellKind.dragon) base += 2 * ownDragonFire(k);
   // Hit variety: crits (more likely with quick and rare weapons, and now and then devastating),
   // and glancing blows that only graze.
   final weapon = k.loadouts[k.heroClass]!.weapon, chance = critChance(k);
@@ -854,8 +865,15 @@ double gearWorth(Knight k, GearItem item, GearItem? replacing) {
     Stat.leech: leechCap - base.leech,
     Stat.wyrmbane: wyrmbaneCap - base.wyrmbane,
   };
-  var t = 0.0;
+  // Damage and crit are worth what they add to your blow together: crit multiplies everything
+  // you hit with, and a weapon brings its own crit and how hard its crits land. (Weighed one by
+  // one, crit came out far too cheap: an epic blade with more damage looked better than a
+  // legendary one that crits half the time for two and a half times.)
+  double blow(int damage, int crit, GearItem? w) => (8 + 2 * k.level + damage) * (1 + math.min(45, crit + weaponCrit(w) + petCrit) / 100 * (critMultiplier(w) - 1));
+  final without = item.slot == GearSlot.weapon ? null : k.loadout.weapon;
+  var t = (blow(base.damage + (stats[Stat.damage] ?? 0), base.crit + (stats[Stat.crit] ?? 0), weapon) - blow(base.damage, base.crit, without)) * statWeight(Stat.damage);
   stats.forEach((s, v) {
+    if (s == Stat.damage || s == Stat.crit) return;
     final r = room[s];
     final useful = r == null ? v.toDouble() : v.clamp(0, math.max(0, r)).toDouble();
     final w = switch (s) {

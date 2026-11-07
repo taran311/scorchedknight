@@ -67,7 +67,7 @@ const spells = <Spell>[
   Spell('bloodbolt', 'Blood Siphon', 'A crimson bolt that drinks: 1.5x damage, and you heal a fifth of it', 6, 3, SpellKind.drain, 0xFFB0302A, mult: 1.5, drain: .2),
   Spell('arcaneward', 'Arcane Ward', 'A shimmering ward that absorbs the next 2 counters', 7, 4, SpellKind.ward, 0xFF7FB8E8, wards: 2),
   Spell('sunder', 'Sunder Armour', 'A cracking blow (1.4x), and the foe\'s defences give: your hits deal 25% more for 4 turns', 8, 3, SpellKind.expose, 0xFFE0A050, mult: 1.4, hex: 4),
-  Spell('dragonfire', 'Summon Dragonfire', 'Call a dragon from the sky to breathe a fireball: 2.5x damage plus fire', 9, 4, SpellKind.dragon, 0xFFFF7A2A, mult: 2.5, element: Stat.burn),
+  Spell('dragonfire', 'Summon Dragonfire', 'A dragon breathes a fireball: 2.5x damage plus fire. With your own dragon out, it breathes it, and its fire adds twice over', 9, 4, SpellKind.dragon, 0xFFFF7A2A, mult: 2.5, element: Stat.burn),
   Spell('slumber', 'Slumber', 'Lull the foe to sleep: it sleeps through its next 2 blows (bosses shake it off after 1, and a foe lulled again in the same fight sleeps through just 1)', 10, 3, SpellKind.sleep, 0xFFB8A0E8, hex: 2),
   Spell('fester', 'Fester', 'A heavy blow (2x), and whatever is eating at the foe erupts: $festerTurns turns of its fire, venom or bleeding at once (fire and bleeding are kept going)', 12, 3, SpellKind.fester, 0xFFB4D25A, mult: 2),
   Spell('spectralcharge', 'Spectral Charge', 'A ghostly warhorse thunders out of the mist and tramples the foe: 2.3x damage', 11, 3, SpellKind.charge, 0xFF9ADFFF, mult: 2.3),
@@ -82,7 +82,7 @@ const spells = <Spell>[
   Spell('ashenhex', 'Ashen Hex', 'Choking ash in its lungs: its counters hit 40% softer for 4 turns', 26, 2, SpellKind.weaken, 0xFFA89C8C, hex: 4),
   Spell('phoenix', 'Phoenix Flame', 'Wings of fire fold round you: an attack that also mends 35% of your health', 30, 5, SpellKind.heal, 0xFFFFB04A, mend: .35, mult: 1.5),
   Spell('bonelegion', 'Bone Legion', 'Four skeletons in rusted mail rise and fight for 3 turns', 35, 5, SpellKind.summon, 0xFF9A7AD0, summons: 4, turns: 3),
-  Spell('cataclysm', 'Cataclysm', 'An elder wyrm darkens the sky and pours its fire over the foe: 3.5x damage plus fire', 40, 5, SpellKind.dragon, 0xFFFF5A2A, mult: 3.5, element: Stat.burn),
+  Spell('cataclysm', 'Cataclysm', 'An elder wyrm darkens the sky and pours its fire over the foe: 3.5x damage plus fire. Your own dragon breathes with it, its fire twice over', 40, 5, SpellKind.dragon, 0xFFFF5A2A, mult: 3.5, element: Stat.burn),
   // Won, not learned: the Hall of the Slain teaches its War Cry to the living who survive its second wave.
   Spell('warcry', 'War Cry', 'A roar from the old hall: your blows land 25% harder for 3 turns, and any war cry the foe has raised is drowned out', 1, 3, SpellKind.warcry, 0xFFCFE0F0, hex: 3, earned: 'the Hall of the Slain'),
 

@@ -18,6 +18,7 @@ import 'package:scorchedknight/game/loot.dart';
 import 'package:scorchedknight/game/tasks.dart';
 import 'package:scorchedknight/game/models.dart';
 import 'package:scorchedknight/game/mounts.dart';
+import 'package:scorchedknight/game/raids.dart';
 import 'package:scorchedknight/game/rules.dart';
 import 'package:scorchedknight/game/tarot.dart';
 import 'package:scorchedknight/game/vault.dart';
@@ -72,6 +73,67 @@ void main() {
     // Against a foe that cares for neither, no tip: they hit it the same.
     final plain = foes.firstWhere((f) => !f.ent && !f.demon && !f.venomous && f.element == null && !f.stone && !f.undead && f.boss);
     expect(betterWeaponFor(k, plain), isNull);
+  });
+
+  test('crit is weighed by what it does to every blow: a legendary crit blade beats a harder-hitting epic', () {
+    final k = GameEngine.newGame(heroClass: HeroClass.knight).knight..level = 42;
+    // (A level-42 hero's other gear: plenty of damage already.)
+    k.loadout.helm = GearItem(id: 'hm', name: 'Helm', slot: GearSlot.helm, art: 'helm', rarity: Rarity.epic, level: 42, value: 5, stats: {Stat.damage: 160, Stat.crit: 6});
+    final edge = GearItem(id: 'edge', name: 'Edge', slot: GearSlot.weapon, art: 'rapier', rarity: Rarity.legendary, level: 42, value: 5, heroClass: HeroClass.knight, special: 'fatesroll', stats: {Stat.damage: 76, Stat.crit: 29});
+    final gladius = GearItem(id: 'gl', name: 'Gladius', slot: GearSlot.weapon, art: 'gladius', rarity: Rarity.epic, level: 42, value: 5, heroClass: HeroClass.knight, stats: {Stat.damage: 117, Stat.frost: 29, Stat.smite: 54});
+    k.loadout.weapon = edge;
+    expect(gearWorth(k, edge, edge), greaterThan(gearWorth(k, gladius, edge)));
+    // ...and with no crit in it, more damage is simply better.
+    final plain = GearItem(id: 'p', name: 'Plain', slot: GearSlot.weapon, art: 'rapier', rarity: Rarity.legendary, level: 42, value: 5, heroClass: HeroClass.knight, stats: {Stat.damage: 76});
+    final harder = GearItem(id: 'h', name: 'Harder', slot: GearSlot.weapon, art: 'rapier', rarity: Rarity.legendary, level: 42, value: 5, heroClass: HeroClass.knight, stats: {Stat.damage: 96});
+    expect(gearWorth(k, harder, plain), greaterThan(gearWorth(k, plain, plain)));
+  });
+
+  test('a wyrmscale piece holds its own against a random one of its rarity (a little under, for its set)', () {
+    final loot = LootTable(Random(7)), k = GameEngine.newGame(heroClass: HeroClass.knight).knight..level = 42;
+    double score(GearItem g) => [for (final e in g.stats.entries) if (e.key != Stat.wyrmbane) statWeight(e.key) * e.value].fold(0.0, (a, b) => a + b);
+    var wyrm = 0.0, plain = 0.0;
+    for (var i = 0; i < 40; i++) {
+      wyrm += score(loot.wyrmDrop(HeroClass.knight, 42, wyrmTiers.last, only: GearSlot.offhand));
+    }
+    plain = randomPiece(HeroClass.knight, GearSlot.offhand, Rarity.legendary, 42) * 40;
+    expect(wyrm / plain, inInclusiveRange(.8, 1.0));
+    expect(k.level, 42);
+  });
+
+  test('more than bandits raid the town: each lot once its land\'s lord is down, and they\'re who you chase', () {
+    expect(raiders.first.openTo({}), isTrue, reason: 'bandits from the start');
+    for (final r in raiders) {
+      expect(foes[r.foeIndex].look, r.look, reason: '${r.id} is drawn as itself');
+      if (r.from != null) {
+        expect(continents.any((l) => l.name == r.from), isTrue, reason: '${r.id} comes from a real land');
+        expect(r.openTo({}), isFalse);
+        expect(r.openTo({continents.indexWhere((l) => l.name == r.from)}), isTrue);
+      }
+      expect([...r.inn, ...r.stall].every((p) => !p.contains('mage') && !p.contains('ranger')), isTrue);
+    }
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(4)), s = e.state;
+    s
+      ..raid = 'stall'
+      ..raiders = 'ghosts';
+    final back = GameState.fromJson(jsonDecode(jsonEncode(s.toJson())) as Map<String, dynamic>);
+    expect(back.raiders, 'ghosts');
+    expect(e.startRaid(), isTrue);
+    expect(foeIn(s).look, 'ghost');
+    expect(s.journal.last.text, contains('fog'));
+  });
+
+  test('a dragon rite with your own dragon out is breathed by it: its fire goes in twice over', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(2)), k = e.state.knight..level = 30;
+    final fire = spellById('dragonfire')!;
+    int blow() => swingDamage(e.state, .99, spell: fire, hitRoll: .99).base;
+    expect(ownDragonFire(k), 0);
+    final alone = blow();
+    k.dragonXp = 0; // an egg: nothing yet
+    expect(ownDragonFire(k), 0);
+    k.dragonXp = 3500; // an elder dragon
+    expect(ownDragonFire(k), greaterThan(0));
+    expect(blow(), alone + 2 * ownDragonFire(k));
   });
 
   test('no foe is both weak to and resistant to the same thing', () {
@@ -1381,8 +1443,13 @@ void main() {
     k.level = continents[0].minLevel + risenAfter - 1;
     expect(e.risenReady(0), isFalse);
     expect(e.whyNotRisen(0), contains('level'));
+    expect(e.risenToAnnounce, isNull);
     k.level++;
     expect(e.risenReady(0), isTrue);
+    // ...and it's said, once.
+    expect(e.risenToAnnounce, 0);
+    e.markRisenAnnounced();
+    expect(e.risenToAnnounce, isNull);
     s.continent = 0;
     e.exploreHeroic();
     expect(foeIn(s).boss, isTrue);
