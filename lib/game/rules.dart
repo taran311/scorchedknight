@@ -871,9 +871,39 @@ double gearWorth(Knight k, GearItem item, GearItem? replacing) {
   // legendary one that crits half the time for two and a half times.)
   double blow(int damage, int crit, GearItem? w) => (8 + 2 * k.level + damage) * (1 + math.min(45, crit + weaponCrit(w) + petCrit) / 100 * (critMultiplier(w) - 1));
   final without = item.slot == GearSlot.weapon ? null : k.loadout.weapon;
-  var t = (blow(base.damage + (stats[Stat.damage] ?? 0), base.crit + (stats[Stat.crit] ?? 0), weapon) - blow(base.damage, base.crit, without)) * statWeight(Stat.damage);
+  // The off hand with this piece and without it (a weapon brings no off hand of its own: the
+  // one you hold stays, if it still goes with it).
+  final heldOff = k.loadout.offhand;
+  final offWith = item.slot == GearSlot.offhand ? item : (offhandWorksWith(weapon, heldOff) ? heldOff : null);
+  final offWithout = item.slot == GearSlot.offhand ? null : (offhandWorksWith(without, heldOff) ? heldOff : null);
+  // A second blade strikes after every swing.
+  double twin(GearItem? w, GearItem? off) => isDualWield(w, off) ? 1 + dualStrikeShare : 1;
+  final blowWithout = blow(base.damage, base.crit, without) * twin(without, offWithout);
+  var t = (blow(base.damage + (stats[Stat.damage] ?? 0), base.crit + (stats[Stat.crit] ?? 0), weapon) * twin(weapon, offWith) - blowWithout) * statWeight(Stat.damage);
+  // Staying up is worth as much as hitting hard: a fight is won by the blows you land before
+  // you fall, so 10% less damage taken is worth about what 10% more damage is. Armour and guard,
+  // dodging, parrying, blocking (a shield blocks more often and lets less through) and your HP
+  // all go into what one of the foe's blows really costs you. (Weighed flat, a shield's guard and
+  // block came out a tenth of a dagger's damage, so dropping a shield for any blade looked like
+  // an upgrade.)
+  const shields = {'buckler', 'kite', 'tower', 'round', 'dragonshield'};
+  final hpBase = maxHp(k) - heroStats(k).vigour;
+  int plus(Stat st) => stats[st] ?? 0;
+  double cost(bool use, GearItem? w, GearItem? off) {
+    final g = base.guard + (use ? plus(Stat.guard) : 0), crit = base.crit + (use ? plus(Stat.crit) : 0);
+    final shield = shields.contains(off?.art);
+    final guard = math.min(.6, base.armour + g / 100);
+    final dodge = math.min(k.heroClass == HeroClass.ranger ? .5 : dodgeCap, (k.heroClass == HeroClass.ranger ? .25 : .15) + (base.dodge + (use ? plus(Stat.dodge) : 0)) / 100);
+    final parryBase = switch (k.heroClass) { HeroClass.knight => 10, HeroClass.ranger => 7, HeroClass.mage => 5 };
+    final parry = ((parryBase + crit ~/ 2 + base.parry + (use ? plus(Stat.parry) : 0) + (isDualWield(w, off) && k.heroClass == HeroClass.knight ? 3 : 0)) / 100).clamp(0.0, parryCap);
+    final blockBase = switch (k.heroClass) { HeroClass.knight => 10, HeroClass.mage => 12, HeroClass.ranger => 5 };
+    final block = ((blockBase + (shield ? 8 : 0) + g ~/ 2 + base.block + (use ? plus(Stat.block) : 0)) / 100).clamp(0.0, classOf(k)?.id == 'deepforge' ? .5 : .4);
+    final hp = hpBase + base.vigour + (use ? plus(Stat.vigour) : 0);
+    return (1 - guard) * (1 - dodge) * (1 - parry) * (1 - block * (1 - (shield ? .3 : .45))) / math.max(1, hp);
+  }
+  t += blowWithout * statWeight(Stat.damage) * (cost(false, without, offWithout) / cost(true, weapon, offWith) - 1);
   stats.forEach((s, v) {
-    if (s == Stat.damage || s == Stat.crit) return;
+    if (const {Stat.damage, Stat.crit, Stat.guard, Stat.dodge, Stat.parry, Stat.block, Stat.vigour}.contains(s)) return;
     final r = room[s];
     final useful = r == null ? v.toDouble() : v.clamp(0, math.max(0, r)).toDouble();
     final w = switch (s) {

@@ -88,7 +88,7 @@ Skeleton drawHumanoid(Canvas c, Look look, Pose pose, double t, DrawOptions o, {
     c.saveLayer(Rect.fromCenter(center: sk.pelvis, width: reach * 3.2, height: reach * 2.8), p);
   }
   final cape = look.cape;
-  if (look.tail != null) _tail(c, sk, look.tail!, t, still);
+  if (look.tail != null) _tail(c, sk, look.tail!, t, still, look.tailKind);
   if (look.wings != null) _wings(c, sk, look.wings!, t, still, feathered: look.feathered);
   if (cape != null) _cape(c, sk, look, cape, t, still);
   if (look.quiver != null) _quiver(c, sk, look);
@@ -1154,17 +1154,81 @@ void _blackIron(Canvas c, Skeleton sk, Look look, Path path, bool plate) {
 }
 
 /// A demon's tail, curling out behind with a barbed tip.
-void _tail(Canvas c, Skeleton sk, Ramp col, double t, bool still) {
+void _tail(Canvas c, Skeleton sk, Ramp col, double t, bool still, TailKind kind) {
   final root = sk.at(sk.pelvis, -sk.build.hip * .6, 0);
   final swish = still ? 0.0 : math.sin(t / 420) * 12;
-  final mid = root + Offset(-50, 24 + swish * .5), tip = root + Offset(-70, -30 + swish);
-  final path = Path()
-    ..moveTo(root.dx, root.dy)
-    ..quadraticBezierTo(mid.dx, mid.dy, tip.dx, tip.dy);
-  c.drawPath(path, strokePaint(outline, 7)..strokeCap = StrokeCap.round);
-  c.drawPath(path, strokePaint(col[1], 4.6)..strokeCap = StrokeCap.round);
-  final barb = poly([tip + const Offset(-8, 4), tip + const Offset(2, -14), tip + const Offset(8, 4), tip]);
-  fillPath(c, barb, col, tip + const Offset(-8, -14), tip + const Offset(8, 4));
+  switch (kind) {
+    case TailKind.barbed:
+      // A demon's whip, with a barb.
+      final mid = root + Offset(-50, 24 + swish * .5), tip = root + Offset(-70, -30 + swish);
+      final path = Path()
+        ..moveTo(root.dx, root.dy)
+        ..quadraticBezierTo(mid.dx, mid.dy, tip.dx, tip.dy);
+      c.drawPath(path, strokePaint(outline, 7)..strokeCap = StrokeCap.round);
+      c.drawPath(path, strokePaint(col[1], 4.6)..strokeCap = StrokeCap.round);
+      final barb = poly([tip + const Offset(-8, 4), tip + const Offset(2, -14), tip + const Offset(8, 4), tip]);
+      fillPath(c, barb, col, tip + const Offset(-8, -14), tip + const Offset(8, 4));
+    case TailKind.bushy:
+      // A wolf's brush: thick and furred, hanging low and curling up at the end, a few tufts
+      // ruffled along its top.
+      final mid = root + Offset(-34, 30 + swish * .4), tip = root + Offset(-66, 18 + swish);
+      _tapered(c, root, mid, tip, 9, 14, 3, col);
+      for (final f in const [.35, .55, .75]) {
+        final p = _bez(root, mid, tip, f), n = _bezNormal(root, mid, tip, f);
+        final tuft = poly([p - n * 9 + const Offset(3, 0), p - n * 17 + const Offset(-4, -2), p - n * 9 + const Offset(-6, 1)]);
+        fillPath(c, tuft, col, p - n * 17, p);
+      }
+    case TailKind.reptile:
+      // A lizard's tail: thick at the hip, tapering to a point near the ground, swinging slowly.
+      final mid = root + Offset(-40, 40 + swish * .3), tip = root + Offset(-84, 52 + swish * .6);
+      _tapered(c, root, mid, tip, 11, 7, 1.2, col);
+    case TailKind.tuft:
+      // A bull's tail: a hanging cord with a tuft of hair at its end.
+      final mid = root + Offset(-26, 30 + swish * .3), tip = root + Offset(-34, 66 + swish * .5);
+      final path = Path()
+        ..moveTo(root.dx, root.dy)
+        ..quadraticBezierTo(mid.dx, mid.dy, tip.dx, tip.dy);
+      c.drawPath(path, strokePaint(outline, 6)..strokeCap = StrokeCap.round);
+      c.drawPath(path, strokePaint(col[1], 3.6)..strokeCap = StrokeCap.round);
+      final tuft = Path()
+        ..moveTo(tip.dx - 5, tip.dy - 4)
+        ..quadraticBezierTo(tip.dx - 10, tip.dy + 10, tip.dx - 2, tip.dy + 18)
+        ..quadraticBezierTo(tip.dx + 2, tip.dy + 10, tip.dx + 6, tip.dy + 16)
+        ..quadraticBezierTo(tip.dx + 8, tip.dy + 4, tip.dx + 4, tip.dy - 4)
+        ..close();
+      fillPath(c, tuft, [for (final x in col) shade(x, -.25)], tip, tip + const Offset(0, 18));
+  }
+}
+
+/// A point along a quadratic curve, and the unit normal there (pointing up-ish).
+Offset _bez(Offset a, Offset m, Offset b, double t) => a * ((1 - t) * (1 - t)) + m * (2 * (1 - t) * t) + b * (t * t);
+Offset _bezNormal(Offset a, Offset m, Offset b, double t) {
+  final d = (m - a) * (2 * (1 - t)) + (b - m) * (2 * t);
+  final n = Offset(d.dy, -d.dx) / math.max(.001, d.distance);
+  return n.dy > 0 ? -n : n;
+}
+
+/// A tail as a filled shape along a quadratic curve: [r0] wide at the root, [r1] at its widest
+/// (the middle), [r2] at the tip.
+void _tapered(Canvas c, Offset a, Offset m, Offset b, double r0, double r1, double r2, Ramp col) {
+  const steps = 10;
+  final top = <Offset>[], bottom = <Offset>[];
+  for (var i = 0; i <= steps; i++) {
+    final t = i / steps, p = _bez(a, m, b, t), n = _bezNormal(a, m, b, t);
+    final r = t < .5 ? r0 + (r1 - r0) * (t / .5) : r1 + (r2 - r1) * ((t - .5) / .5);
+    top.add(p + n * r);
+    bottom.add(p - n * r);
+  }
+  final path = Path()..moveTo(top.first.dx, top.first.dy);
+  for (final p in top.skip(1)) {
+    path.lineTo(p.dx, p.dy);
+  }
+  path.quadraticBezierTo(b.dx + (b - m).dx * .08, b.dy + (b - m).dy * .08, bottom.last.dx, bottom.last.dy);
+  for (final p in bottom.reversed.skip(1)) {
+    path.lineTo(p.dx, p.dy);
+  }
+  path.close();
+  fillPath(c, path, col, _bez(a, m, b, .5) + _bezNormal(a, m, b, .5) * r1, _bez(a, m, b, .5) - _bezNormal(a, m, b, .5) * r1);
 }
 
 /// Stone bat wings rising from the shoulders, half-spread, with finger bones.

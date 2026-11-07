@@ -54,6 +54,7 @@ import 'quest_dialog.dart';
 import '../services/cloud.dart';
 import '../services/desktop.dart';
 import 'risen_ready.dart';
+import 'roads_card.dart' show showRoads;
 import 'suit_ready.dart';
 import 'journey.dart';
 import 'throne_seals.dart';
@@ -205,6 +206,9 @@ class _InnPageState extends State<InnPage> with RouteAware {
     }
   }
 
+  /// New Game+ or Hardcore there to start (not from a hardcore hero's own save).
+  bool get _roadsOpen => !c.state.hardcore && !c.state.inBattle && ((c.state.won && c.whyNotNewGamePlus == null) || c.engine.hardcoreOpen);
+
   /// Whether a place in the square is still shut (see GameEngine.whyShut).
   /// Out in the wilds with the run still open: the town waits till you're back (only the way back
   /// to the wilds, and your own tent, the kit on your back, stay open).
@@ -330,6 +334,16 @@ class _InnPageState extends State<InnPage> with RouteAware {
       final cards = <Widget>[
                         if (s.inBattle) ...[
                           _ResumeBanner(controller: c, onTap: _resume),
+                          const SizedBox(height: 10),
+                        ],
+                        // After the King: the roads on from here (New Game+, Hardcore), always to hand.
+                        if (_roadsOpen && !_away) ...[
+                          _Banner(
+                            icon: Icons.auto_awesome,
+                            text: c.engine.hardcoreOpen ? (s.won && c.whyNotNewGamePlus == null ? 'The road goes on: New Game+ and Hardcore are open' : 'Hardcore is open: one hero, one life') : 'The road goes on: New Game+ is open',
+                            button: 'The roads',
+                            onTap: () => showRoads(context, c),
+                          ),
                           const SizedBox(height: 10),
                         ],
                         // Hob's job first: the story's quest outranks the side task below it.
@@ -974,6 +988,10 @@ class _LogPanel extends StatefulWidget {
 
 class _LogPanelState extends State<_LogPanel> {
   bool _open = false;
+
+  /// In town, the log's news: what you found, won, opened and earned (and the days turning), not
+  /// every blow of every fight. The whole of it is a tap away (see _sheet).
+  List<JournalEntry> get _news => [for (final e in widget.entries) if (e.kind == EntryKind.gold || e.kind == EntryKind.good || e.kind == EntryKind.day) e];
   @override
   Widget build(BuildContext context) {
     if (widget.fill) {
@@ -985,7 +1003,7 @@ class _LogPanelState extends State<_LogPanel> {
   }
 
   Widget _filled() {
-    final list = widget.entries.reversed.toList();
+    final list = _news.reversed.toList();
     return Parchment(
       padding: const EdgeInsets.fromLTRB(10, 2, 4, 6),
       child: Column(
@@ -996,6 +1014,7 @@ class _LogPanelState extends State<_LogPanel> {
               const Icon(Icons.history_edu, color: Palette.inkSoft, size: 22),
               const SizedBox(width: 8),
               Expanded(child: Text('Adventure log', style: Txt.inkLabel(size: 15))),
+              IconButton(tooltip: 'Every line, fights and all', onPressed: _sheet, icon: const Icon(Icons.format_list_bulleted, color: Palette.inkSoft, size: 20)),
               IconButton(tooltip: 'The story so far', onPressed: widget.onStory, icon: const Icon(Icons.menu_book, color: Palette.blood, size: 20)),
             ],
           ),
@@ -1056,7 +1075,7 @@ class _LogPanelState extends State<_LogPanel> {
   );
 
   Widget _panel({bool sheet = false}) {
-    final last = widget.entries.isEmpty ? null : widget.entries.last, open = _open && !sheet;
+    final news = _news, last = news.isEmpty ? null : news.last, open = _open && !sheet;
     return Parchment(
       padding: const EdgeInsets.fromLTRB(10, 4, 4, 4),
       child: Column(
@@ -1073,13 +1092,14 @@ class _LogPanelState extends State<_LogPanel> {
                       ? Text('Adventure log', style: Txt.inkLabel(size: 15))
                       : Text(last?.text ?? 'Nothing yet', maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.body(size: 14, color: Palette.inkSoft)),
                 ),
+                IconButton(tooltip: 'Every line, fights and all', onPressed: _sheet, icon: const Icon(Icons.format_list_bulleted, color: Palette.inkSoft, size: 20)),
                 IconButton(tooltip: 'The story so far', onPressed: widget.onStory, icon: const Icon(Icons.menu_book, color: Palette.blood, size: 20)),
                 Icon(open ? Icons.expand_less : Icons.expand_more, color: Palette.inkSoft),
                 const SizedBox(width: 6),
               ],
             ),
           ),
-          if (open) Padding(padding: const EdgeInsets.only(right: 6, bottom: 6), child: JournalEntryList(entries: widget.entries)),
+          if (open) Padding(padding: const EdgeInsets.only(right: 6, bottom: 6), child: JournalEntryList(entries: news)),
         ],
       ),
     );

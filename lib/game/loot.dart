@@ -1099,26 +1099,6 @@ double randomEpicWeapon(HeroClass c, int level) {
 /// above (they're farmed for), legendaries well above (and they carry a special), relics above that.
 const farmedEdge = 1.05, legendEdge = 1.2, relicEdge = 1.35;
 
-/// The score a random [rarity] piece for [slot] comes out at, on average, at [level] (its base stat
-/// with material and rarity, and its enchantments). Farmed pieces are tuned against it.
-double randomPiece(HeroClass c, GearSlot slot, Rarity rarity, int level) {
-  final bases = _bases[c]![slot] ?? const <_Base>[];
-  if (bases.isEmpty) return randomEpicWeapon(c, level);
-  final made = 1 + _band(level) * .07;
-  var primary = 0.0;
-  for (final b in bases) {
-    primary += statWeight(b.primary) * _base(b.primary, level) * b.scale * rarity.power * (b.make == _Make.none ? 1 : made);
-  }
-  primary /= bases.length;
-  final pool = _affixes.where((a) => a.slots.contains(slot)).toList();
-  final accessory = slot == GearSlot.gloves || slot == GearSlot.boots || slot == GearSlot.ring ? .55 : 1.0;
-  var affix = 0.0;
-  for (final a in pool) {
-    affix += statWeight(a.stat) * _base(a.stat, level) * .8 * rarity.power * accessory;
-  }
-  return primary + rarity.index * (pool.isEmpty ? 0 : affix / pool.length);
-}
-
 /// Each named legendary weapon's own power (see _Legend.edge), set by the balance sweep so each,
 /// found from level 15, leaves the rest of the road at about 4 to 7 knockouts and 75-85% first-try
 /// odds at the bosses (found gear: about 13, and 58%). Those that heal as they hit, or crit for a
@@ -1177,6 +1157,44 @@ GearItem relevelled(GearItem g, int level) => GearItem(
 )
   ..hone = g.hone
   ..heirloom = g.heirloom;
+
+/// A dragon-set piece's stats roll at its rarity's full power and this much over: it has two
+/// where a random piece of its rarity has its main stat and up to four enchantments.
+const wyrmPower = 1.3;
+
+/// What a dragon-set piece other than its weapon and armour is made of: its stats, and how much
+/// of each, before rarity.
+Map<Stat, double> wyrmRecipe(HeroClass c, GearSlot slot) => switch (slot) {
+  GearSlot.offhand => switch (c) {
+    HeroClass.knight => const {Stat.guard: 1.2, Stat.block: .6},
+    HeroClass.mage => const {Stat.burn: 1.0, Stat.wisdom: .8},
+    HeroClass.ranger => const {Stat.crit: .9, Stat.damage: .4},
+  },
+  GearSlot.helm => const {Stat.guard: .9, Stat.vigour: .8},
+  GearSlot.gloves => const {Stat.damage: .6, Stat.crit: .6},
+  GearSlot.boots => const {Stat.vigour: .8, Stat.dodge: .7},
+  _ => const {},
+};
+
+/// A dragon-set piece (not its weapon or armour) from before they were tuned: they rolled at a
+/// quarter over a plain stat at most, so a legendary dragonslayer shield had barely more guard
+/// than a plain kite shield. Sets its stats where the new ones roll (at its rarity's full power,
+/// without the dice; honing kept). True if it changed.
+bool retuneWyrmPiece(GearItem g) {
+  if (g.gearSet != wyrmSet || g.slot == GearSlot.weapon || g.slot == GearSlot.armour || g.heroClass == null) return false;
+  final recipe = wyrmRecipe(g.heroClass!, g.slot);
+  if (recipe.isEmpty) return false;
+  final honed = 1 + honeStep * g.hone;
+  var changed = false;
+  recipe.forEach((s, m) {
+    final want = math.max(1, (_base(s, g.level) * m * g.rarity.power * wyrmPower * honed).round());
+    if (g.stats[s] != want) {
+      g.stats[s] = want;
+      changed = true;
+    }
+  });
+  return changed;
+}
 
 /// Honing at the forge: each step adds this share of every stat, up to [honeMax] steps.
 const honeStep = .05, honeMax = 5;
@@ -1358,7 +1376,7 @@ class LootTable {
         HeroClass.ranger => ('${tier.name} wyrmhorn bow', 'longbow', <Stat, double>{Stat.damage: 1.25 + .08 * t, Stat.crit: 1.0}, 'Bent from a dragon\'s horn; it never loses its pull.'),
       },
       GearSlot.offhand => switch (heroClass) {
-        HeroClass.knight => ('${tier.name} dragonslayer shield', 'dragonshield', <Stat, double>{Stat.guard: 1.0, Stat.block: .8}, 'A dragon\'s head run through, on a field of its own scales. Fire slides off it.'),
+        HeroClass.knight => ('${tier.name} dragonslayer shield', 'dragonshield', <Stat, double>{Stat.guard: 1.2, Stat.block: .6}, 'A dragon\'s head run through, on a field of its own scales. Fire slides off it.'),
         HeroClass.mage => ('${tier.name} wyrm\'s eye', 'orb', <Stat, double>{Stat.burn: 1.0, Stat.wisdom: .8}, 'A dragon\'s eye, set in glass. It still blinks now and then.'),
         HeroClass.ranger => ('${tier.name} wyrmtooth quiver', 'quiver', <Stat, double>{Stat.crit: .9, Stat.damage: .4}, 'Every arrowhead is a dragon\'s tooth.'),
       },
@@ -1406,10 +1424,10 @@ class LootTable {
         if (slot == GearSlot.weapon)
           ..._tuned(stats, level, heroClass, farmedEdge * (rarity == Rarity.legendary ? 1.2 : (rarity == Rarity.epic ? 1 : .85)))
         else
-          // (The rest are tuned against a random piece of their slot and rarity, a little under it
-          // for the set's bonus and the dragon-slaying: rolled plain, a legendary dragonslayer
-          // shield came out at under half a random epic buckler.)
-          ..._tuned(stats, level, heroClass, .9, against: randomPiece(heroClass, slot, rarity, level)),
+          // (The rest roll their stats at their rarity's full power, as a random piece's main stat
+          // does: they used to get a quarter more at most, so a legendary dragonslayer shield had
+          // barely more guard than a plain kite shield.)
+          for (final e in wyrmRecipe(heroClass, slot).entries) e.key: _roll(e.key, level, e.value * rarity.power * wyrmPower, _r),
         if (slot != GearSlot.armour) Stat.wyrmbane: bane,
       },
     );

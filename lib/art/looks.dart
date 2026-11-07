@@ -12,6 +12,10 @@ import 'paint_kit.dart';
 
 enum Stance { knight, mage, ranger, goblin, rogue, zombie, pillager, rose, ent }
 
+/// What a tail looks like: a demon's whip with a barb, a wolf's brush, a lizard's tapering
+/// tail, or a bull's cord with a tuft at the end.
+enum TailKind { barbed, bushy, reptile, tuft }
+
 enum HeadKind {
   coif,
   bare,
@@ -257,6 +261,7 @@ class Look {
     this.weaponRarity,
     this.wings,
     this.tail,
+    this.tailKind = TailKind.barbed,
     this.ghostly = false,
     this.armourGlow,
     this.wyrmHorns = false,
@@ -344,6 +349,7 @@ class Look {
     weaponRarity: weaponRarity,
     wings: wings,
     tail: tail,
+    tailKind: tailKind,
     ghostly: ghostly,
     armourGlow: armourGlow,
     wyrmHorns: wyrmHorns,
@@ -428,6 +434,7 @@ class Look {
     weaponRarity: weaponRarity,
     wings: wings,
     tail: tail,
+    tailKind: tailKind,
     ghostly: ghostly,
     armourGlow: armourGlow ?? (tier > 1 ? const Color(0xFFE0302A) : null),
     wyrmHorns: wyrmHorns || (tier > 1 && !ghostly),
@@ -501,8 +508,9 @@ class Look {
   /// The wings are feathered (harpies, the aeriekin), not bat-like.
   final bool feathered;
 
-  /// A demon's whip-like tail with a barbed tip.
+  /// A tail (a demon's whip-like tail with a barbed tip, unless [tailKind] says otherwise).
   final Ramp? tail;
+  final TailKind tailKind;
 
   /// The held weapon's rarity colour, for its soft highlight (uncommon and up).
   final Color? weaponRarity;
@@ -1153,6 +1161,7 @@ Look _minotaur({double scale = 1.15, bool lord = false}) {
     pauldron: lord ? _black : null,
     knee: lord ? _black : null,
     tail: dark,
+    tailKind: TailKind.tuft,
     rusty: !lord,
   );
 }
@@ -1440,6 +1449,7 @@ Look _werewolf({int fur = 0xFF6A6460, Color eyes = const Color(0xFFFFD84A), Stri
     head: HeadKind.wolf,
     eyeGlow: eyes,
     tail: dark,
+    tailKind: TailKind.bushy,
   );
 }
 
@@ -1643,6 +1653,7 @@ Look _lizard({String rank = 'guard'}) {
     eyeGlow: king ? const Color(0xFFFFD84A) : const Color(0xFFE8D040),
     crown: king,
     tail: hide,
+    tailKind: TailKind.reptile,
     weapon: switch (rank) {
       'skirmisher' => Weapon.spear,
       'shaman' => Weapon.staff,
@@ -1683,6 +1694,7 @@ Look _merrow({String rank = 'raider'}) {
     plume: caller ? const Color(0xFF8AE0F0) : const Color(0xFFE06A4A),
     eyeGlow: const Color(0xFFCFFFF0),
     tail: hide,
+    tailKind: TailKind.reptile,
     weapon: caller ? Weapon.staff : Weapon.trident,
     weaponGlow: caller ? const Color(0xFF8AE0F0) : null,
     weaponTint: const Color(0xFFE8B8A0),

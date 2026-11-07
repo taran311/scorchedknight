@@ -16,6 +16,7 @@ import '../game/controller.dart';
 import '../game/rules.dart';
 import 'item_icons.dart';
 import 'tarot_card.dart';
+import 'roads_card.dart' show showRoads;
 import 'theme.dart';
 
 /// Hob, as drawn everywhere: in the scene, the portrait and the speech bubble.
@@ -167,6 +168,16 @@ Future<void> visitInn(BuildContext context, GameController c, {VoidCallback? onH
     // Hurt, or it's dark out: a bed for the night, and you wake to the morning.
     final hurt = k.hp < maxHp(k), rest = (hurt || !s.day) && !s.inBattle && c.whyNotRest == null;
     final readNo = c.whyNotReading;
+    // After the King, Hob has the roads on from here to offer (when there's no bed to offer).
+    final ng = s.won && c.whyNotNewGamePlus == null, hc = c.engine.hardcoreOpen;
+    final roads = !rest && !poured && !s.hardcore && !s.inBattle && (ng || hc);
+    if (roads) {
+      line = ng && hc
+          ? 'Still here? The whole world\'s talking about you, ${s.settings.name}. Some say you should do it all again, from the start, harder. Others say you should try it with one life and no second chances. I say: another ale first.'
+          : ng
+          ? 'You did it, ${s.settings.name}. Never thought I\'d see the sky clear. Though... they say the ash remembers. Start again, harder, and you\'d carry three of your best pieces with you.'
+          : 'There\'s one road left, ${s.settings.name}, and folk don\'t come back from it twice. A fresh hero, one life. Fall, and that\'s the end of the tale.';
+    }
     final pick = await showDialog<Object>(
       context: context,
       barrierColor: Colors.black54,
@@ -178,9 +189,9 @@ Future<void> visitInn(BuildContext context, GameController c, {VoidCallback? onH
               ? (hurt ? 'You look done in, ${s.settings.name}. Fire\'s lit, bed\'s made. On the house.' : 'Getting late, ${s.settings.name}. Bed\'s made if you want to sleep till morning.')
               : line,
         ],
-        accept: rest ? (s.day ? 'Rest by the fire' : 'Sleep till morning') : 'Cheers, Hob',
-        decline: rest ? 'Not now' : null,
-        acceptTone: rest ? ButtonTone.blood : ButtonTone.stone,
+        accept: rest ? (s.day ? 'Rest by the fire' : 'Sleep till morning') : (roads ? 'The roads ahead' : 'Cheers, Hob'),
+        decline: rest ? 'Not now' : (roads ? 'Cheers, Hob' : null),
+        acceptTone: rest || roads ? ButtonTone.blood : ButtonTone.stone,
         // Old Corva by the hearth turns a card (one a fight: no greyed-out second offer).
         extra: poured ? null : 'Old Corva\'s cards',
         extraCaption: readNo ?? '${c.readingPrice} gold',
@@ -193,6 +204,10 @@ Future<void> visitInn(BuildContext context, GameController c, {VoidCallback? onH
       line = 'Hob grins. "Corva\'s cards never lie, ${s.settings.name}. Well. Hardly ever."';
       poured = true;
       continue;
+    }
+    if (pick == true && roads && context.mounted) {
+      await showRoads(context, c);
+      return;
     }
     if (pick == true && rest && context.mounted) {
       final morning = !s.day;

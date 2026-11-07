@@ -288,6 +288,15 @@ class GameEngine {
     loot.ng = state.ng;
     sellSpareSetPieces();
     _raiseOldPieces();
+    // Dragon-set pieces from before they were tuned: brought up to the mark, once.
+    if (state.did.add('wyrmtune')) {
+      for (final l in state.knight.loadouts.values) {
+        for (final g in [l.offhand, l.helm, l.gloves, l.boots, l.cape].whereType<GearItem>()) {
+          retuneWyrmPiece(g);
+        }
+      }
+      state.knight.stash.forEach(retuneWyrmPiece);
+    }
     // The deep waystone reached before its dye existed.
     for (final e in state.wildBest.entries) {
       if (e.value >= wildDeepStep && !state.knight.ownedDyes.contains(wildDye(e.key))) state.knight.ownedDyes.add(wildDye(e.key));

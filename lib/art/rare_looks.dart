@@ -99,6 +99,7 @@ Look auraLook(Look base, Aura aura, {bool named = false}) => _lookCache.putIfAbs
     weaponTint: aura == Aura.gilded ? const Color(0xFFE8C060) : (aura == Aura.frost ? const Color(0xFFCFE8F8) : base.weaponTint),
     wings: base.wings == null ? null : _tintRamp(base.wings!, glow, wash),
     tail: base.tail == null ? null : _tintRamp(base.tail!, glow, wash),
+    tailKind: base.tailKind,
     ghostly: base.ghostly,
     bandaged: base.bandaged,
     usekh: base.usekh,

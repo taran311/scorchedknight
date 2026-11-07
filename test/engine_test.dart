@@ -89,16 +89,30 @@ void main() {
     expect(gearWorth(k, harder, plain), greaterThan(gearWorth(k, plain, plain)));
   });
 
-  test('a wyrmscale piece holds its own against a random one of its rarity (a little under, for its set)', () {
-    final loot = LootTable(Random(7)), k = GameEngine.newGame(heroClass: HeroClass.knight).knight..level = 42;
-    double score(GearItem g) => [for (final e in g.stats.entries) if (e.key != Stat.wyrmbane) statWeight(e.key) * e.value].fold(0.0, (a, b) => a + b);
-    var wyrm = 0.0, plain = 0.0;
-    for (var i = 0; i < 40; i++) {
-      wyrm += score(loot.wyrmDrop(HeroClass.knight, 42, wyrmTiers.last, only: GearSlot.offhand));
-    }
-    plain = randomPiece(HeroClass.knight, GearSlot.offhand, Rarity.legendary, 42) * 40;
-    expect(wyrm / plain, inInclusiveRange(.8, 1.0));
-    expect(k.level, 42);
+  test('a dragonslayer shield guards like a shield of its rarity, and old weak ones are brought up to it', () {
+    final loot = LootTable(Random(7));
+    double avg(Iterable<int> xs) => xs.fold(0, (a, b) => a + b) / xs.length;
+    final wyrm = [for (var i = 0; i < 40; i++) loot.wyrmDrop(HeroClass.knight, 42, wyrmTiers.last, only: GearSlot.offhand)];
+    final plain = [
+      for (var i = 0; i < 400; i++) loot.roll(HeroClass.knight, 42, odds: const [0, 0, 0, 0, 1], only: GearSlot.offhand),
+    ].where((g) => const {'kite', 'tower', 'round'}.contains(g.art)).toList();
+    final ratio = avg(wyrm.map((g) => g.stats[Stat.guard]!)) / avg(plain.map((g) => g.stats[Stat.guard] ?? 0));
+    expect(ratio, inInclusiveRange(1.0, 1.8), reason: 'its guard, against a random legendary shield\'s (more: it has fewer stats)');
+    // One from before: guard 12, block 13 at level 42.
+    final old = GearItem(id: 'o', name: 'Elder dragonslayer shield', slot: GearSlot.offhand, art: 'dragonshield', rarity: Rarity.legendary, level: 42, value: 5, heroClass: HeroClass.knight, gearSet: wyrmSet, stats: {Stat.guard: 12, Stat.block: 13, Stat.wyrmbane: 7});
+    expect(retuneWyrmPiece(old), isTrue);
+    expect(old.stats[Stat.guard]!, inInclusiveRange(24, 36));
+    expect(old.stats[Stat.wyrmbane], 7);
+  });
+
+  test('dropping a shield for a blade weighs what the shield did: guard, block, and a block that lets less through', () {
+    final k = GameEngine.newGame(heroClass: HeroClass.knight).knight..level = 43;
+    k.loadout.weapon = GearItem(id: 'edge', name: 'Edge', slot: GearSlot.weapon, art: 'rapier', rarity: Rarity.legendary, level: 42, value: 5, heroClass: HeroClass.knight, special: 'fatesroll', stats: {Stat.damage: 76, Stat.crit: 29});
+    k.loadout.helm = GearItem(id: 'hm', name: 'Helm', slot: GearSlot.helm, art: 'helm', rarity: Rarity.epic, level: 42, value: 5, stats: {Stat.damage: 120, Stat.crit: 6, Stat.vigour: 90});
+    final shield = GearItem(id: 's', name: 'Shield', slot: GearSlot.offhand, art: 'dragonshield', rarity: Rarity.legendary, level: 42, value: 5, heroClass: HeroClass.knight, gearSet: wyrmSet, stats: {Stat.guard: 20, Stat.block: 22, Stat.wyrmbane: 7});
+    k.loadout.offhand = shield;
+    final dirk = GearItem(id: 'd', name: 'Dirk', slot: GearSlot.offhand, art: 'dagger', rarity: Rarity.epic, level: 43, value: 5, heroClass: HeroClass.knight, stats: {Stat.damage: 68, Stat.smite: 57, Stat.thorns: 58});
+    expect(gearWorth(k, shield, shield), greaterThan(gearWorth(k, dirk, shield)));
   });
 
   test('more than bandits raid the town: each lot once its land\'s lord is down, and they\'re who you chase', () {
