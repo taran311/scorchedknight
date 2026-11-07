@@ -64,7 +64,12 @@ class RoadLabel extends StatelessWidget {
 }
 
 /// The three roads, in a sheet over the tent.
-Future<void> showRoads(BuildContext context, GameController controller) => showDialog<void>(
+Future<void> showRoads(BuildContext context, GameController controller) {
+  controller.roadsSeen();
+  return _roads(context, controller);
+}
+
+Future<void> _roads(BuildContext context, GameController controller) => showDialog<void>(
   context: context,
   builder: (context) => Dialog(
     backgroundColor: Colors.transparent,

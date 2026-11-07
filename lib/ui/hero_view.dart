@@ -17,7 +17,7 @@ import '../game/classes.dart';
 import '../game/loot.dart';
 import '../game/vault.dart' show isKeepsake;
 import '../game/models.dart' show Knight, Loadout;
-import '../game/rules.dart' show dualStrikeShare, gearWorth;
+import '../game/rules.dart' show dualStrikeShare, gearWorth, guardRoom;
 import 'item_icons.dart';
 import 'stat_icons.dart';
 import 'theme.dart';
@@ -172,8 +172,11 @@ class _GearPainter extends CustomPainter {
 
 /// Item name in rarity colour with its slot and rarity underneath, and stat lines.
 class GearDetails extends StatelessWidget {
-  const GearDetails({super.key, required this.item, this.compare, this.dense = false, this.kit});
+  const GearDetails({super.key, required this.item, this.compare, this.dense = false, this.kit, this.hero});
   final GearItem item;
+
+  /// Whose it would be: to say when its guard would run into the 60% cap.
+  final Knight? hero;
 
   /// The kit it would join, to say what it pairs with and whether it would be used.
   final Loadout? kit;
@@ -220,6 +223,16 @@ class GearDetails extends StatelessWidget {
         const SizedBox(height: 7),
         Wrap(spacing: 5, runSpacing: 5, children: chips),
         ..._pairWarnings(g),
+        // Guard over the cap counts for nothing: say how much of it would.
+        if (hero case final k? when g.stat(Stat.guard) > 0 && g.slot != GearSlot.armour)
+          if (guardRoom(k, compare ?? (identical(k.loadout.inSlot(g.slot), g) ? g : null)) case final room when room < g.stat(Stat.guard))
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                room == 0 ? 'Damage taken is capped at 60%, and your armour and gear are already there: its guard adds nothing.' : 'Damage taken is capped at 60%: only −$room% of its −${g.stat(Stat.guard)}% would count for you.',
+                style: note.copyWith(color: const Color(0xFFE0A07A)),
+              ),
+            ),
         if (g.enchant != null)
           Padding(
             padding: const EdgeInsets.only(top: 6),

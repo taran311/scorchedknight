@@ -411,7 +411,7 @@ void showGearItem(BuildContext context, GameController controller, GearItem g) =
               children: [
                 GearIcon(item: g, size: 72, heroClass: controller.state.knight.heroClass, dye: controller.state.knight.dye),
                 const SizedBox(width: 12),
-                Expanded(child: GearDetails(item: g, kit: controller.state.knight.loadouts[g.heroClass ?? controller.state.knight.heroClass])),
+                Expanded(child: GearDetails(item: g, kit: controller.state.knight.loadouts[g.heroClass ?? controller.state.knight.heroClass], hero: controller.state.knight)),
               ],
             ),
             const SizedBox(height: 10),
@@ -523,7 +523,7 @@ class _SlotSheetState extends State<_SlotSheet> {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(color: const Color(0x55000000), border: Border.all(color: rarityColour(picked.rarity)), borderRadius: BorderRadius.circular(4)),
-                        child: GearDetails(item: picked, compare: worn, kit: kit),
+                        child: GearDetails(item: picked, compare: worn, kit: kit, hero: k),
                       ),
                       const SizedBox(height: 10),
                       Row(

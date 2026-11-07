@@ -215,7 +215,7 @@ class _LootWindowState extends State<_LootWindow> {
                         ],
                       ),
                       const SizedBox(width: 12),
-                      Expanded(child: GearDetails(item: item, compare: old, kit: k.loadouts[item.heroClass ?? k.heroClass])),
+                      Expanded(child: GearDetails(item: item, compare: old, kit: k.loadouts[item.heroClass ?? k.heroClass], hero: k)),
                     ],
                   ),
                   const SizedBox(height: 12),

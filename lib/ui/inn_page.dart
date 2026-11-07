@@ -207,7 +207,7 @@ class _InnPageState extends State<InnPage> with RouteAware {
   }
 
   /// New Game+ or Hardcore there to start (not from a hardcore hero's own save).
-  bool get _roadsOpen => !c.state.hardcore && !c.state.inBattle && ((c.state.won && c.whyNotNewGamePlus == null) || c.engine.hardcoreOpen);
+  bool get _roadsOpen => c.roadsNews;
 
   /// Whether a place in the square is still shut (see GameEngine.whyShut).
   /// Out in the wilds with the run still open: the town waits till you're back (only the way back
@@ -340,7 +340,9 @@ class _InnPageState extends State<InnPage> with RouteAware {
                         if (_roadsOpen && !_away) ...[
                           _Banner(
                             icon: Icons.auto_awesome,
-                            text: c.engine.hardcoreOpen ? (s.won && c.whyNotNewGamePlus == null ? 'The road goes on: New Game+ and Hardcore are open' : 'Hardcore is open: one hero, one life') : 'The road goes on: New Game+ is open',
+                            text: c.engine.hardcoreOpen
+                                ? (s.won && c.whyNotNewGamePlus == null ? 'The road goes on: New Game+ and Hardcore are open' : 'Hardcore is open: a separate hero with one life (this one stays as they are)')
+                                : 'The road goes on: New Game+ is open',
                             button: 'The roads',
                             onTap: () => showRoads(context, c),
                           ),

@@ -170,13 +170,13 @@ Future<void> visitInn(BuildContext context, GameController c, {VoidCallback? onH
     final readNo = c.whyNotReading;
     // After the King, Hob has the roads on from here to offer (when there's no bed to offer).
     final ng = s.won && c.whyNotNewGamePlus == null, hc = c.engine.hardcoreOpen;
-    final roads = !rest && !poured && !s.hardcore && !s.inBattle && (ng || hc);
+    final roads = !rest && !poured && c.roadsNews;
     if (roads) {
       line = ng && hc
           ? 'Still here? The whole world\'s talking about you, ${s.settings.name}. Some say you should do it all again, from the start, harder. Others say you should try it with one life and no second chances. I say: another ale first.'
           : ng
           ? 'You did it, ${s.settings.name}. Never thought I\'d see the sky clear. Though... they say the ash remembers. Start again, harder, and you\'d carry three of your best pieces with you.'
-          : 'There\'s one road left, ${s.settings.name}, and folk don\'t come back from it twice. A fresh hero, one life. Fall, and that\'s the end of the tale.';
+          : 'There\'s one road left, ${s.settings.name}, and folk don\'t come back from it twice. Not you: someone new, starting out with one life. Fall, and that\'s the end of their tale. You\'d still be here, mind.';
     }
     final pick = await showDialog<Object>(
       context: context,

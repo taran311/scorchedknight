@@ -1328,10 +1328,13 @@ void main() {
     // So does beating him in New Game+.
     s.ng = 1;
     expect(e.hardcoreOpen, isTrue);
-    // Going round New Game+ again keeps it open.
+    // Going round New Game+ again keeps it open, and having been told of it, it isn't news again.
+    e.mark('journey:hc');
+    e.mark('roads:hc');
     expect(e.newGamePlus(), isTrue);
     expect(e.state.hcUnlocked, isTrue);
     expect(e.hardcoreOpen, isTrue);
+    expect(e.state.did, containsAll(['journey:hc', 'roads:hc']));
     // A hardcore road: one life.
     final h = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight)..hardcore = true, random: Random(6));
     expect(h.whyNotNewGamePlus(), isNotNull);

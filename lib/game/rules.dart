@@ -185,6 +185,14 @@ double aimBoost(Knight k) => 1 + aimPer * trained(k, Trait.aim);
 /// Gold to wipe your training and spend it again.
 int resetTrainingCost(Knight k) => 25 * k.level;
 
+/// How much guard (less damage taken, in %) still counts for [k] under the 60% cap, with
+/// [replacing] taken off: what a new piece's guard can add.
+int guardRoom(Knight k, GearItem? replacing) {
+  final rest = [for (final g in k.setGear) if (!identical(g, replacing) && g.id != replacing?.id) g];
+  final s = heroStats(k, gear: rest);
+  return math.max(0, (60 - s.armour * 100 - s.guard).floor());
+}
+
 /// Armour tier plus guard from gear and class, capped at 60%.
 double damageReduction(Knight k) {
   final s = heroStats(k);

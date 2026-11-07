@@ -490,6 +490,23 @@ class GameController extends ChangeNotifier {
     _changed();
   }
 
+  /// The roads on that are open now: New Game+ ('ng'), Hardcore ('hc').
+  List<String> get _roadsOpen => [if (state.won && whyNotNewGamePlus == null) 'ng', if (engine.hardcoreOpen) 'hc'];
+
+  /// A road on (New Game+, Hardcore) has opened that you haven't looked at yet: the town's card
+  /// and Hob point at it until you do. Each is told of once: having looked at Hardcore before
+  /// starting New Game+, it isn't news again in the new run.
+  bool get roadsNews => !state.hardcore && !state.inBattle && _roadsOpen.any((r) => !state.did.contains('roads:$r'));
+
+  /// Looked at the roads.
+  void roadsSeen() {
+    final fresh = _roadsOpen.where((r) => !state.did.contains('roads:$r')).toList();
+    for (final r in fresh) {
+      engine.mark('roads:$r');
+    }
+    if (fresh.isNotEmpty) _changed();
+  }
+
   /// The seal screen has seals to show (see GameEngine.sealNews); and it has shown them.
   bool get sealNews => engine.sealNews;
   void sealsSeen() {

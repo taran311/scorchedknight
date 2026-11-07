@@ -228,9 +228,11 @@ String setArmourId(String set) => 'set-$set';
 /// The questline set a body armour belongs to, or null.
 String? setOfArmour(String id) => id.startsWith('set-') ? id.substring(4) : null;
 
+/// A suit's own armour stops as much as the best Dunstan forges (emberglass): finishing a suit
+/// should never cost you protection.
 final setArmour = <ArmourTier>[
   for (final e in forgedArmour.entries)
-    ArmourTier(setArmourId(e.key), e.value.$1, .4, 0, HeroClass.knight, dropOnly: true, metal: e.value.$2, look: e.key == 'bushido' ? ArmourLook.lamellar : (e.key == 'sunscale' || e.key == 'silverleaf' ? ArmourLook.scales : ArmourLook.plate)),
+    ArmourTier(setArmourId(e.key), e.value.$1, .45, 0, HeroClass.knight, dropOnly: true, metal: e.value.$2, look: e.key == 'bushido' ? ArmourLook.lamellar : (e.key == 'sunscale' || e.key == 'silverleaf' ? ArmourLook.scales : ArmourLook.plate)),
 ];
 
 /// Index within its class (0 is the starting armour).

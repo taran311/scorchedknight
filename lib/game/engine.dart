@@ -5364,6 +5364,9 @@ class GameEngine {
       ..knockouts = old.knockouts
       ..flees = old.flees;
     fresh.vaultFound.addAll(old.vaultFound);
+    // What you've already been told about the roads on (Hardcore's opening above all): it's not
+    // news again in the new run.
+    fresh.did.addAll(old.did.where((d) => d == 'journey:hc' || d.startsWith('roads:')));
     fresh.journal
       ..clear()
       ..add(JournalEntry('New Game+ ${'★' * math.min(fresh.ng, 5)}: the ash comes back thicker, and so do the things in it. You start again in Cindervale${heirlooms.isEmpty ? '' : ', your heirlooms back to level 1 but still yours'}, the vault\'s pieces still on you.', EntryKind.gold));
