@@ -588,6 +588,32 @@ void main() {
     expect(GameState.fromJson(jsonDecode(jsonEncode(s.toJson())) as Map<String, dynamic>).oathUsed, isTrue);
   });
 
+  test('a companion sent in as the foe rears back takes the heavy blow for you', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight)..innRepaired = true, random: Random(5));
+    final s = e.state, k = s.knight;
+    k.pets[Pet.wolf.name] = 0;
+    k.activePet = Pet.wolf.name;
+    for (var i = 0; i < 20 && !s.inBattle; i++) {
+      e.explore();
+    }
+    expect(s.inBattle, isTrue);
+    s.foeHp = s.foeMax = 99999;
+    // A heavy blow coming: the wolf goes in and takes it, whole.
+    k.hp = maxHp(k);
+    s.foeWindup = true;
+    final r = e.takeTurn(BattleAction.pet);
+    expect(r.command, isTrue);
+    expect(r.covered, isTrue);
+    expect(r.guard, Guard.guarded);
+    expect(k.hp, maxHp(k));
+    // Commanded with no heavy blow coming: just its attack, no cover held over to later.
+    s.petWait = 0;
+    s.foeWindup = false;
+    expect(e.takeTurn(BattleAction.pet).covered, isFalse);
+    s.foeWindup = true;
+    expect(e.takeTurn(BattleAction.attack).covered, isFalse);
+  });
+
   test('a clean kill: a crossbow bolt that fells the foe pays a bounty, and the special bolt comes back', () {
     // (Seeds where the shot lands: a bolt can miss.)
     var cleanSeen = false;
@@ -1081,6 +1107,9 @@ void main() {
     }
     expect(riteKnown(k, spellById('scaleward')!), isTrue);
     expect(k.rites, contains('scaleward'));
+    // Marked new till it's first cast.
+    expect(k.newRites, contains('scaleward'));
+    expect(e.rankUpRite?.id, 'scaleward');
     // Out of the suit: a knight again, the class's rites set aside but kept.
     final ring = k.ring;
     k.ring = null;
@@ -1092,6 +1121,39 @@ void main() {
     // Saved and loaded with the rank.
     final back = GameState.fromJson(jsonDecode(jsonEncode(s.toJson())) as Map<String, dynamic>);
     expect(back.knight.classWins['drakesworn'], k.classWins['drakesworn']);
+    expect(back.knight.newRites, k.newRites);
+    // Mastered (rank 10): the order's own dye, earned and worn, and its ceremony asked for.
+    k.classWins['drakesworn'] = rankWins.last - 1;
+    win(e);
+    expect(classRank(k, 'drakesworn'), maxRank);
+    expect(k.ownedDyes, contains(orderDye('drakesworn')));
+    expect(k.dye, orderDye('drakesworn'));
+    expect(e.mastered, 'drakesworn');
+    expect(e.rankUp, 'Dragon Knight mastered');
+    // An old save mastered before the dyes: given it on loading.
+    final old = GameState.fromJson(jsonDecode(jsonEncode(s.toJson())) as Map<String, dynamic>);
+    old.knight.ownedDyes.remove(orderDye('drakesworn'));
+    expect(GameEngine(old).state.knight.ownedDyes, contains(orderDye('drakesworn')));
+    // ...and its crest, earned and set in the frame; saved; a bare frame chosen stays bare.
+    expect(k.crests, ['drakesworn']);
+    expect(k.crest, 'drakesworn');
+    final kept = GameState.fromJson(jsonDecode(jsonEncode(s.toJson())) as Map<String, dynamic>).knight;
+    expect(kept.crests, ['drakesworn']);
+    expect(kept.crest, 'drakesworn');
+    e.wearCrest('nightblood');
+    expect(k.crest, 'drakesworn', reason: 'not earned');
+    e.wearCrest('');
+    expect(k.crest, '');
+    final bare = GameState.fromJson(jsonDecode(jsonEncode(s.toJson())) as Map<String, dynamic>);
+    expect(GameEngine(bare).state.knight.crest, '', reason: 'loading doesn\'t put it back');
+    // A save mastered before the crests: given it, and wearing it.
+    final older = GameState.fromJson(jsonDecode(jsonEncode(s.toJson())) as Map<String, dynamic>);
+    older.knight
+      ..crests.clear()
+      ..crest = null;
+    GameEngine(older);
+    expect(older.knight.crests, ['drakesworn']);
+    expect(older.knight.crest, 'drakesworn');
     // The Blood Knight at rank 10: a killing blow once a fight leaves you on 1 HP.
     final b = suited('nightblood', 5), bk = b.state.knight;
     bk.classWins['nightblood'] = rankWins.last;
@@ -1141,12 +1203,53 @@ void main() {
     expect(k.dye, 'obsidian');
   });
 
+  test('New Game+ carries up to three heirlooms, back to level 1, growing with you; and toughens its foes for them', () {
+    final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(5));
+    final s = e.state, k = s.knight;
+    s.bossesDown.addAll({for (var c = 0; c < mainLands; c++) c});
+    final sword = e.loot.roll(HeroClass.knight, 40, odds: const [0, 0, 0, 0, 1], only: GearSlot.weapon);
+    final helm = e.loot.roll(HeroClass.knight, 40, odds: const [0, 0, 0, 1, 0], only: GearSlot.helm);
+    final ring = e.loot.roll(HeroClass.knight, 40, odds: const [0, 0, 1, 0, 0], only: GearSlot.ring);
+    final boots = e.loot.roll(HeroClass.knight, 40, odds: const [0, 1, 0, 0, 0], only: GearSlot.boots);
+    k.loadout.weapon = sword;
+    k.stash.addAll([helm, ring, boots]);
+    expect(e.heirloomChoices.map((g) => g.id), containsAll([sword.id, helm.id, ring.id, boots.id]));
+    // Four asked for: three come.
+    expect(e.newGamePlus(heirlooms: [sword.id, helm.id, ring.id, boots.id]), isTrue);
+    final n = e.state.knight;
+    expect(n.loadout.weapon!.id, sword.id);
+    expect(n.loadout.weapon!.heirloom, isTrue);
+    expect(n.loadout.weapon!.level, 1);
+    expect(n.loadout.weapon!.stats[Stat.damage]!, lessThan(sword.stats[Stat.damage]!));
+    expect(n.loadout.weapon!.special, sword.special);
+    expect(n.loadout.helm!.id, helm.id);
+    expect(n.ring!.id, ring.id);
+    expect([for (final g in n.stash) g.id], isNot(contains(boots.id)));
+    expect(isKeepsake(n.ring!), isTrue);
+    // The weapon weighs most on New Game+'s foes.
+    expect(e.state.heirlooms, closeTo(1 + 2 * heirloomWeight(GearSlot.helm), .001));
+    expect(ngFoeHp(1, 4, false, e.state.heirlooms), greaterThan(ngFoeHp(1, 4)));
+    // They grow with you.
+    e.grantXp(xpToNext(n));
+    expect(n.loadout.weapon!.level, n.level);
+    // And come back from a save.
+    final back = GameState.fromJson(jsonDecode(jsonEncode(e.state.toJson())) as Map<String, dynamic>);
+    expect(back.knight.loadout.weapon!.heirloom, isTrue);
+    expect(back.heirlooms, e.state.heirlooms);
+  });
+
   test('Hardcore: opens once New Game+ is beaten, and the first knockout ends the road', () {
     final e = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight), random: Random(5));
     final s = e.state;
     expect(e.hardcoreOpen, isFalse);
     s.bossesDown.addAll({for (var c = 0; c < mainLands; c++) c});
     expect(e.hardcoreOpen, isFalse, reason: 'the first time through opens New Game+, not Hardcore');
+    // The Ember King beaten risen opens it.
+    s.risenDown.add(throneLand);
+    expect(e.hardcoreOpen, isTrue);
+    s.risenDown.remove(throneLand);
+    expect(e.hardcoreOpen, isFalse);
+    // So does beating him in New Game+.
     s.ng = 1;
     expect(e.hardcoreOpen, isTrue);
     // Going round New Game+ again keeps it open.
@@ -1319,7 +1422,8 @@ void main() {
     s.bossesDown.add(1);
     expect(e.whyNotTravel(2), isNull);
     expect(e.whyNotTravel(3), isNotNull);
-    expect(e.whyNotTravel(6), contains('Scorchmaw'));
+    expect(e.whyNotTravel(6), 'Sealed');
+    expect(e.throneSteps!.first.$1, contains('Scorchmaw'));
     // A land already set foot in stays open (saves from when the road forked).
     s.wins[4] = 2;
     expect(e.whyNotTravel(4), isNull);
@@ -1436,6 +1540,42 @@ void main() {
         ..inBattle = false
         ..rare = null;
     }
+  });
+
+  test('a class suit you could finish forging is announced once, with what it would take', () {
+    final e = GameEngine(GameEngine.newGame(), random: Random(3));
+    final s = e.state;
+    s.knight
+      ..coins = 100000
+      ..level = 20;
+    expect(e.suitsToFinish, isEmpty);
+    // Four of the five blueprints, and stuff enough for all five: not yet.
+    for (final slot in setPieceSlots.take(4)) {
+      s.addMat(blueprintKey('nightblood', slot), 1);
+    }
+    s..addMat(trophyKey(Trophy.fang), 5 * pieceTrophies)..addMat(barKey(Metal.iron), 5 * pieceBars);
+    expect(e.suitsToFinish, isEmpty);
+    // Forge two, then the last blueprint turns up: the three left are covered.
+    e.forgePiece('nightblood', setPieceSlots[0]);
+    e.forgePiece('nightblood', setPieceSlots[1]);
+    s.addMat(blueprintKey('nightblood', setPieceSlots[4]), 1);
+    expect(e.suitPiecesMissing('nightblood'), setPieceSlots.skip(2).toList());
+    expect(e.suitsToFinish, ['nightblood']);
+    expect(e.suitToAnnounce, 'nightblood');
+    // Short of bars for all three (though not for one): not ready.
+    s.addMat(barKey(Metal.iron), -s.mat(barKey(Metal.iron)) + 3 * pieceBars - 1);
+    expect(e.suitsToFinish, isEmpty);
+    s.addMat(barKey(Metal.iron), 1);
+    // Told once; still ready (the forge's badge), but not told again.
+    e.mark('suitready:nightblood');
+    expect(e.suitsToFinish, ['nightblood']);
+    expect(e.suitToAnnounce, isNull);
+    // A suit that isn't a class (the Ashen Order's) isn't announced.
+    for (final slot in setPieceSlots) {
+      s.addMat(blueprintKey('ashen', slot), 1);
+    }
+    s..addMat(trophyKey(Trophy.ashenSteel), 50)..addMat(barKey(Metal.gold), 50);
+    expect(e.suitsToFinish, ['nightblood']);
   });
 
   test('Dunstan forges set pieces from blueprints, trophies, bars and gold', () {
@@ -2464,6 +2604,18 @@ void main() {
       expect(e.state.wild, 0, reason: 'still out in the wilds');
     });
 
+    test('the deep waystone gives the area\'s dye, once; an old save gets it on loading', () {
+      final e = ready()..state.bossesDown.add(0);
+      e.enterWild(0);
+      e.state.wildDepth = wildDeepStep - 1;
+      expect(e.stepWild(), WildEvent.waystone);
+      expect(e.state.knight.ownedDyes, contains(wildDye(0)));
+      expect(dyeEarnedBy(wildDye(0)), isNotNull, reason: 'never sold');
+      final old = GameState.fromJson(jsonDecode(jsonEncode(e.state.toJson())) as Map<String, dynamic>);
+      old.knight.ownedDyes.remove(wildDye(0));
+      expect(GameEngine(old).state.knight.ownedDyes, contains(wildDye(0)));
+    });
+
     test('home from a waystone keeps everything; running loses part of it', () {
       final e = ready()..state.bossesDown.add(0);
       e.enterWild(0);
@@ -2787,6 +2939,114 @@ void main() {
     expect(charged / plain, greaterThan(2.5));
   });
 
+  test('with the Ember Throne open, the road goes to it, not back to a side land part done', () {
+    final e = GameEngine(GameEngine.newGame(), random: Random(1));
+    final s = e.state, k = s.knight;
+    while (k.level < 40) {
+      e.grantXp(xpToNext(k));
+    }
+    s.innRepaired = true;
+    for (var c = 0; c < throneLand; c++) {
+      s.bossesDown.add(c);
+    }
+    // Partway through a side land, the throne still sealed: finish it (a seal).
+    final side = [for (var i = mainLands; i < continents.length; i++) if (i != throneKeyLand && e.whyNotTravel(i) == null) i].first;
+    s.continent = side;
+    s.wins[side] = 2;
+    expect(e.roadStep()?.land, side);
+    // Every seal broken: the throne, though that side land's still part done.
+    s.bossesDown.addAll([throneKeyLand, for (var i = mainLands; i < continents.length; i++) if (i != side) i]);
+    expect(e.throneSealed, isFalse);
+    expect(e.roadStep()?.land, throneLand);
+  });
+
+  test('the Ember King risen is Unbowed (never held two turns running), and leaves the Kingslayer dye', () {
+    final e = GameEngine(GameEngine.newGame(), random: Random(3));
+    final s = e.state, k = s.knight;
+    while (k.level < 45) {
+      e.grantXp(xpToNext(k));
+    }
+    s.innRepaired = true;
+    s.bossesDown.addAll([for (var c = 0; c < continents.length; c++) c]);
+    e.travel(throneLand);
+    expect(e.risenReady(throneLand), isTrue);
+    e.exploreHeroic();
+    expect(foeIn(s).look, 'emberKing');
+    s.foeHp = s.foeMax = 999999;
+    k.hp = maxHp(k);
+    // Frozen: he loses the turn. Frozen again straight after: he shakes it off.
+    s.foeFrozen = true;
+    expect(e.takeTurn(BattleAction.attack).guard, Guard.frozen);
+    s.foeFrozen = true;
+    k.hp = maxHp(k);
+    // (An arcane ward takes his blow, so a fresh hero lives through it.)
+    s.wards = 3;
+    expect(e.takeTurn(BattleAction.attack).guard, Guard.warded);
+    expect(s.foeFrozen, isFalse);
+    // Beaten: the dye, worn.
+    s.foeHp = 1;
+    k.hp = maxHp(k);
+    for (var i = 0; i < 20 && s.inBattle; i++) {
+      s.foeHp = 1;
+      k.hp = maxHp(k);
+      s.wards = 3;
+      e.takeTurn(BattleAction.attack);
+    }
+    expect(s.inBattle, isFalse, reason: s.journal.reversed.take(6).map((j) => j.text).join(' | '));
+    expect(s.risenDown, contains(throneLand), reason: s.journal.reversed.take(6).map((j) => j.text).join(' | '));
+    expect(k.ownedDyes, contains(kingslayerDye));
+  });
+
+  test('at the Ember King\'s door, his generals can be hunted down, one fight each', () {
+    final e = GameEngine(GameEngine.newGame(), random: Random(3));
+    final s = e.state, k = s.knight;
+    while (k.level < 40) {
+      e.grantXp(xpToNext(k));
+    }
+    s.innRepaired = true;
+    s.bossesDown.addAll([for (var c = 0; c < continents.length; c++) if (c != throneLand) c]);
+    expect(e.canHuntGeneral, isFalse, reason: 'not at the Throne');
+    e.travel(throneLand);
+    expect(e.canHuntGeneral, isTrue);
+    final f = e.huntGeneral()!;
+    expect(emberGenerals, contains(s.rare?.name));
+    expect(f.boss, isFalse);
+    expect(s.inBattle, isTrue);
+    // All three down: nothing left to hunt.
+    s.generalsDown.addAll(emberGenerals);
+    expect(e.canHuntGeneral, isFalse);
+  });
+
+  test('the throne\'s seals are shown when Scorchmaw falls, and again as each one breaks', () {
+    final e = GameEngine(GameEngine.newGame(), random: Random(1));
+    final s = e.state;
+    // Not met yet: nothing to show.
+    s.bossesDown.add(mainLands + 1);
+    expect(e.sealNews, isFalse);
+    // Scorchmaw down: the seals (one already broken by a lord beaten before).
+    s.bossesDown.addAll(openers(throneLand));
+    expect(e.sealNews, isTrue);
+    expect(e.sealsNow, (false, 1));
+    e.markSealsShown();
+    expect(e.sealNews, isFalse);
+    expect(e.sealsShown, (false, 1));
+    // Deepforge's lord: its seal.
+    s.bossesDown.add(throneKeyLand);
+    expect(e.sealNews, isTrue);
+    expect(e.sealsNow, (true, 1));
+    e.markSealsShown();
+    // Five more lords: the other five seals (a seventh doesn't count past them).
+    for (var i = 2; i < 8; i++) {
+      if (mainLands + i != throneKeyLand) s.bossesDown.add(mainLands + i);
+    }
+    expect(e.sealsNow, (true, throneSeals - 1));
+    expect(e.throneSealed, isFalse);
+    expect(e.sealNews, isTrue);
+    e.markSealsShown();
+    expect(e.sealNews, isFalse);
+    expect(s.did.where((d) => d.startsWith('sealsshown:')).length, 1);
+  });
+
   test('the Ember Throne is sealed till half the side lands\' lords are down, and the road says so', () {
     final e = GameEngine(GameEngine.newGame(), random: Random(1), clock: () => DateTime(2026, 6, 1));
     final s = e.state, k = s.knight;
@@ -2801,14 +3061,18 @@ void main() {
     expect(e.roadStep()?.title, startsWith('Break a seal'));
     expect(isSideLand(e.roadStep()!.land), isTrue);
     s.bossesDown.addAll([for (var i = 0; i < throneSeals - 1; i++) mainLands + i]);
-    expect(e.whyNotTravel(throneLand), contains('1 more side land'));
+    expect(e.whyNotTravel(throneLand), 'Sealed');
+    // The map lists what opens it, ticked off as it goes: one seal still to break.
+    expect(e.throneSteps!.last, ('Beat $throneSeals side-land lords · ${throneSeals - 1} of $throneSeals', false));
+    expect(e.throneSteps!.first.$2, isTrue);
     s.bossesDown.add(mainLands + throneSeals - 1);
     expect(e.whyNotTravel(throneLand), isNull);
     // Six seals without Deepforge Hold's don't do: its lord holds the one that must break.
     s.bossesDown
       ..remove(throneKeyLand)
       ..add(mainLands + throneSeals);
-    expect(e.whyNotTravel(throneLand), contains('holds the last seal'));
+    expect(e.whyNotTravel(throneLand), 'Sealed');
+    expect(e.throneSteps!.where((st) => !st.$2).single.$1, 'Beat Thane Grimnar in Deepforge Hold');
     expect(e.roadStep()?.land, throneKeyLand);
     s.bossesDown.add(throneKeyLand);
     expect(e.whyNotTravel(throneLand), isNull);

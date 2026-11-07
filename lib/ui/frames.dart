@@ -9,6 +9,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
 import '../game/catalog.dart';
+import '../game/knight_classes.dart';
 import '../art/looks.dart';
 import 'hud.dart' show LookPortrait, TypePortrait;
 
@@ -77,10 +78,13 @@ const _gem = {
 
 /// A face in a frame [size] across; the face itself fills the middle ~70%.
 class OrnateFrame extends StatelessWidget {
-  const OrnateFrame({super.key, required this.kind, required this.size, required this.child});
+  const OrnateFrame({super.key, required this.kind, required this.size, required this.child, this.crest});
   final FrameKind kind;
   final double size;
   final Widget child;
+
+  /// A mastered order's crest, set at the frame's foot (your own frames only).
+  final KnightClass? crest;
 
   static const face = .6;
 
@@ -93,18 +97,31 @@ class OrnateFrame extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          Positioned.fill(child: RepaintBoundary(child: CustomPaint(painter: _FramePainter(kind, front: false)))),
+          Positioned.fill(child: RepaintBoundary(child: CustomPaint(painter: _FramePainter(kind, front: false, crest: crest)))),
           ClipOval(child: SizedBox(width: f, height: f, child: child)),
-          Positioned.fill(child: IgnorePointer(child: RepaintBoundary(child: CustomPaint(painter: _FramePainter(kind, front: true))))),
+          Positioned.fill(child: IgnorePointer(child: RepaintBoundary(child: CustomPaint(painter: _FramePainter(kind, front: true, crest: crest))))),
         ],
       ),
     );
   }
 }
 
+/// An order's crest on its own, [size] tall (as it's set in a frame's foot).
+class CrestBadge extends StatelessWidget {
+  const CrestBadge(this.cls, {super.key, this.size = 22});
+  final KnightClass cls;
+  final double size;
+  @override
+  Widget build(BuildContext context) => SizedBox(width: size, height: size, child: CustomPaint(painter: _FramePainter(FrameKind.knight, front: true, crest: cls, crestOnly: true)));
+}
+
 class _FramePainter extends CustomPainter {
-  _FramePainter(this.kind, {required this.front});
+  _FramePainter(this.kind, {required this.front, this.crest, this.crestOnly = false});
   final FrameKind kind;
+  final KnightClass? crest;
+
+  /// Just the crest, filling the canvas (see [CrestBadge]).
+  final bool crestOnly;
 
   /// The ring and whatever crosses over it; or (false) everything behind the face.
   final bool front;
@@ -136,6 +153,14 @@ class _FramePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (crestOnly) {
+      // The crest is about 22 units tall: fill the box with it.
+      canvas.save();
+      canvas.scale(size.width / 22, size.height / 22);
+      _crest(canvas, crest!, const Offset(11, 11.3));
+      canvas.restore();
+      return;
+    }
     canvas.save();
     canvas.scale(size.width / 100, size.height / 100);
     canvas.translate(50, 50);
@@ -143,7 +168,9 @@ class _FramePainter extends CustomPainter {
     if (front) {
       _ringOf(canvas);
       s.front?.call(canvas);
+      if (crest != null) _crest(canvas, crest!, const Offset(0, _ring + 3));
     } else {
+      if (crest != null) _crestGlow(canvas, Color(crest!.argb));
       s.back(canvas);
     }
     canvas.restore();
@@ -877,6 +904,74 @@ class _FramePainter extends CustomPainter {
   }
 
   /// A skull, its sockets lit red.
+  /// A soft glow of the order's colour behind the whole frame.
+  void _crestGlow(Canvas canvas, Color col) {
+    final r = Rect.fromCircle(center: Offset.zero, radius: 50);
+    canvas.drawCircle(Offset.zero, 50, Paint()
+      ..shader = RadialGradient(colors: [col.withValues(alpha: 0), col.withValues(alpha: .38), col.withValues(alpha: 0)], stops: const [.55, .72, 1]).createShader(r));
+  }
+
+  /// A mastered order's crest: a small shield in its colour, its sign on it, over the frame's foot.
+  void _crest(Canvas canvas, KnightClass cls, Offset at) {
+    final col = Color(cls.argb);
+    const w = 8.0, top = -8.5, waist = 2.5, tip = 10.0;
+    final shield = Path()
+      ..moveTo(at.dx - w, at.dy + top)
+      ..quadraticBezierTo(at.dx, at.dy + top + 2.2, at.dx + w, at.dy + top)
+      ..lineTo(at.dx + w, at.dy + waist)
+      ..quadraticBezierTo(at.dx + w * .9, at.dy + tip - 3, at.dx, at.dy + tip)
+      ..quadraticBezierTo(at.dx - w * .9, at.dy + tip - 3, at.dx - w, at.dy + waist)
+      ..close();
+    // A dark backing a little larger: the shield's rim, in the frame's own metal.
+    canvas.save();
+    canvas.translate(at.dx, at.dy);
+    canvas.scale(1.18);
+    canvas.translate(-at.dx, -at.dy);
+    _solid(canvas, shield);
+    canvas.restore();
+    final b = shield.getBounds();
+    canvas.drawPath(shield, Paint()..shader = LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color.lerp(col, Colors.white, .35)!, col, Color.lerp(col, Colors.black, .6)!], stops: const [0, .4, 1]).createShader(b));
+    canvas.drawPath(shield, Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = .8
+      ..color = Color.lerp(col, Colors.black, .7)!);
+    // Its sign, in cream with a dark edge so it reads small.
+    final sign = Paint()..color = const Color(0xFFFFF2D8);
+    final rim = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = .7
+      ..strokeJoin = StrokeJoin.round
+      ..color = Color.lerp(col, Colors.black, .75)!;
+    final c = at + const Offset(0, .3);
+    final Path p;
+    switch (cls.id) {
+      case 'drakesworn': // a flame
+        p = Path()
+          ..moveTo(c.dx, c.dy - 6.5)
+          ..cubicTo(c.dx + 1.5, c.dy - 3.5, c.dx + 4.6, c.dy - 1.5, c.dx + 4, c.dy + 2.2)
+          ..cubicTo(c.dx + 3.6, c.dy + 5, c.dx + 1.5, c.dy + 6, c.dx, c.dy + 6)
+          ..cubicTo(c.dx - 1.5, c.dy + 6, c.dx - 3.8, c.dy + 5, c.dx - 4, c.dy + 2.2)
+          ..cubicTo(c.dx - 4.2, c.dy - .5, c.dx - 2.4, c.dy - 1.2, c.dx - 2.2, c.dy - 3.4)
+          ..cubicTo(c.dx - 1, c.dy - 2, c.dx - .6, c.dy - 1, c.dx - .3, c.dy - .2)
+          ..cubicTo(c.dx + .6, c.dy - 2.4, c.dx + .4, c.dy - 4.5, c.dx, c.dy - 6.5)
+          ..close();
+      case 'nightblood': // a drop of blood
+        p = Path()
+          ..moveTo(c.dx, c.dy - 6.2)
+          ..cubicTo(c.dx + 1.2, c.dy - 3.2, c.dx + 4, c.dy - .6, c.dx + 4, c.dy + 2.2)
+          ..arcToPoint(Offset(c.dx - 4, c.dy + 2.2), radius: const Radius.circular(4))
+          ..cubicTo(c.dx - 4, c.dy - .6, c.dx - 1.2, c.dy - 3.2, c.dx, c.dy - 6.2)
+          ..close();
+      default: // the forge: a hammer
+        p = Path()
+          ..addRRect(RRect.fromRectAndRadius(Rect.fromCenter(center: c + const Offset(0, -3.4), width: 9, height: 4), const Radius.circular(.8)))
+          ..addRect(Rect.fromCenter(center: c + const Offset(0, 1.8), width: 2, height: 8.6));
+    }
+    canvas.drawPath(p, sign);
+    canvas.drawPath(p, rim);
+    if (cls.id == 'nightblood') canvas.drawCircle(c + const Offset(-1.4, 1.6), .9, Paint()..color = Colors.white.withValues(alpha: .8));
+  }
+
   void _skull(Canvas canvas, Offset at) {
     const bone = [Color(0xFFFBF3E0), Color(0xFFD8C8A8), Color(0xFF6E5E44)];
     final head = Path()
@@ -920,7 +1015,7 @@ class _FramePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_FramePainter old) => old.kind != kind || old.front != front;
+  bool shouldRepaint(_FramePainter old) => old.kind != kind || old.front != front || old.crest != crest;
 }
 
 /// `?frames`: every land's frame round its boss, and yours, side by side (a dev check).

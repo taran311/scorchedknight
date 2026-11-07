@@ -66,7 +66,7 @@ class HeroCard extends StatelessWidget {
           Stack(
             clipBehavior: Clip.none,
             children: [
-              HeroPortrait(look: heroLook(k), size: compact ? 62 : 84, signature: portraitSignature(k), framed: true, frame: heroFrame(s)),
+              HeroPortrait(look: heroLook(k), size: compact ? 62 : 84, signature: portraitSignature(k), framed: true, frame: heroFrame(s), crest: heroCrest(k)),
               Positioned(right: -6, bottom: -6, child: _LevelBadge(level: k.level, size: 28)),
             ],
           ),
@@ -165,11 +165,17 @@ class Bar extends StatelessWidget {
 
 /// Your portrait's frame: the road's scorched bronze and crossed swords, New Game+'s gold sunburst,
 /// or Hardcore's spiked black iron with a skull at its crown.
+/// The order's crest set in your frame, if you've earned one and chosen it.
+KnightClass? heroCrest(Knight k) => k.crest == null || !k.crests.contains(k.crest) ? null : knightClassById(k.crest);
+
 FrameKind heroFrame(GameState s) => s.hardcore ? FrameKind.hardcore : (s.ng > 0 ? FrameKind.ascendant : FrameKind.knight);
 
 /// A head-and-shoulders portrait of any figure, in a round frame lit like the fire behind them.
 class HeroPortrait extends StatelessWidget {
-  const HeroPortrait({super.key, required this.look, this.size = 64, this.signature, this.framed = false, this.frame = FrameKind.knight});
+  const HeroPortrait({super.key, required this.look, this.size = 64, this.signature, this.framed = false, this.frame = FrameKind.knight, this.crest});
+
+  /// A mastered order's crest in the frame (see [heroCrest]).
+  final KnightClass? crest;
 
   /// Which of your frames (the road's, New Game+'s or Hardcore's): see [heroFrame].
   final FrameKind frame;
@@ -187,6 +193,7 @@ class HeroPortrait extends StatelessWidget {
       ? OrnateFrame(
           kind: frame,
           size: size,
+          crest: crest,
           child: DecoratedBox(
             decoration: const BoxDecoration(gradient: RadialGradient(center: Alignment(.3, -.2), colors: [Color(0xFF8A4A22), Color(0xFF2A160C)])),
             child: RepaintBoundary(child: CustomPaint(painter: _PortraitPainter(look, signature))),
@@ -271,7 +278,16 @@ class FoeCard extends StatelessWidget {
           _withFace(Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
           Row(
             children: [
-              Expanded(child: Text(name, overflow: TextOverflow.ellipsis, style: Txt.label(size: fill ? 13.5 : 15, color: colour, weight: FontWeight.w800))),
+              // (Up to two lines, a little smaller when it's long: "Gorbo the One-Eyed, Risen" was
+              // "GORBO THE …" on a phone. Not FitText: this card is sized by IntrinsicHeight.)
+              Expanded(
+                child: Text(
+                  name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Txt.label(size: (fill ? 13.5 : 15) - (name.length > 18 ? 1.5 : 0), color: colour, weight: FontWeight.w800).copyWith(height: 1.1),
+                ),
+              ),
               // (With a face, the level sits on the face instead, so the name gets the room.)
               if (face == null) Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
@@ -390,7 +406,7 @@ class ClassTag extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(5, 1, 6, 1),
         decoration: BoxDecoration(color: col.withValues(alpha: .16), borderRadius: BorderRadius.circular(3), border: Border.all(color: col.withValues(alpha: .75))),
         // (Shrinks to fit a narrow card rather than lose the end of the name.)
-        child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text('${cls.name.toUpperCase()} · R$rank', maxLines: 1, style: Txt.label(size: 10.5, color: Color.lerp(col, const Color(0xFFFFFFFF), .3)!, weight: FontWeight.w800))),
+        child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text('${cls.name.toUpperCase()} · ${rank >= maxRank ? 'MASTER' : 'R$rank'}', maxLines: 1, style: Txt.label(size: 10.5, color: Color.lerp(col, const Color(0xFFFFFFFF), .3)!, weight: FontWeight.w800))),
       ),
     );
   }
@@ -450,7 +466,7 @@ class HeroStrip extends StatelessWidget {
           Stack(
             clipBehavior: Clip.none,
             children: [
-              HeroPortrait(look: heroLook(k), size: 64, signature: portraitSignature(k), framed: true, frame: heroFrame(s)),
+              HeroPortrait(look: heroLook(k), size: 64, signature: portraitSignature(k), framed: true, frame: heroFrame(s), crest: heroCrest(k)),
               Positioned(
                 left: -2,
                 bottom: -2,

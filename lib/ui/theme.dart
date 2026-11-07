@@ -403,20 +403,23 @@ double fitWidth(BuildContext context, {required double aspect, required double b
   return w < 860 ? 860 : (w > 1040 ? 1040 : w);
 }
 
-/// One line of text that shrinks to fit (down to [minScale] of its size) before it truncates: a
-/// long land or lair name on a phone ("The Kennels of Flame ahead") reads whole, a little smaller,
-/// rather than as "The Kennels of F…".
+/// One line of text that shrinks to fit (down to [minScale] of its size): a long land or lair name
+/// on a phone ("The Kennels of Flame ahead") reads whole, a little smaller, rather than as "The
+/// Kennels of F…". Too long even then, it goes onto a second line (a little smaller) rather than
+/// being cut short; [wrap] false (a label in a tight spot that can't take two) truncates instead.
 class FitText extends StatelessWidget {
-  const FitText(this.text, {super.key, required this.style, this.textAlign, this.minScale = .7});
+  const FitText(this.text, {super.key, required this.style, this.textAlign, this.minScale = .7, this.wrap = true});
   final String text;
   final TextStyle style;
   final TextAlign? textAlign;
   final double minScale;
+  final bool wrap;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(builder: (context, box) {
       var scale = 1.0;
+      int? lines = 1;
       if (box.hasBoundedWidth) {
         final tp = TextPainter(
           text: TextSpan(text: text, style: style),
@@ -424,10 +427,61 @@ class FitText extends StatelessWidget {
           textDirection: TextDirection.ltr,
           textScaler: MediaQuery.textScalerOf(context),
         )..layout();
-        if (tp.width > box.maxWidth) scale = (box.maxWidth / tp.width).clamp(minScale, 1.0);
+        // (A little slack: measured to the pixel, a line that just fitted could still lose its
+        // last letters to an ellipsis once drawn.)
+        final room = box.maxWidth * .96;
+        if (tp.width > room) {
+          scale = room / tp.width;
+          if (scale < minScale && wrap) {
+            // Two lines, at most a little smaller (words don't break evenly, hence the slack).
+            // Longer still: as many lines as it takes. Never cut a name short.
+            final two = room * 2 * .82 / tp.width;
+            lines = two < minScale ? null : 2;
+            scale = two.clamp(minScale, .9);
+          } else {
+            // One line it must be: shrink as far as it takes, rather than lose letters.
+            scale = scale.clamp(wrap ? minScale : .4, 1.0);
+          }
+        }
       }
       final size = style.fontSize ?? 14;
-      return Text(text, maxLines: 1, softWrap: false, overflow: TextOverflow.ellipsis, textAlign: textAlign, style: style.copyWith(fontSize: size * scale - (scale < 1 ? .1 : 0)));
+      return Text(
+        text,
+        maxLines: lines,
+        softWrap: lines != 1,
+        overflow: lines == null ? null : TextOverflow.ellipsis,
+        textAlign: textAlign,
+        style: style.copyWith(fontSize: size * scale - (scale < 1 ? .1 : 0), height: lines != 1 ? 1.1 : null),
+      );
     });
   }
+}
+
+/// Text kept to [maxLines] by shrinking it (down to [minScale]) rather than cutting it short.
+/// Only past that does it fall back to an ellipsis.
+class ShrinkLines extends StatelessWidget {
+  const ShrinkLines(this.text, {super.key, required this.style, this.maxLines = 2, this.minScale = .72});
+  final String text;
+  final TextStyle style;
+  final int maxLines;
+  final double minScale;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(builder: (context, box) {
+    final base = style.fontSize ?? 14;
+    var size = base;
+    if (box.hasBoundedWidth) {
+      final scaler = MediaQuery.textScalerOf(context);
+      bool fits(double s) => !(TextPainter(
+        text: TextSpan(text: text, style: style.copyWith(fontSize: s, height: maxLines > 1 ? 1.1 : null)),
+        maxLines: maxLines,
+        textDirection: TextDirection.ltr,
+        textScaler: scaler,
+      )..layout(maxWidth: box.maxWidth - 1)).didExceedMaxLines;
+      while (size > base * minScale && !fits(size)) {
+        size -= .5;
+      }
+    }
+    return Text(text, maxLines: maxLines, overflow: TextOverflow.ellipsis, style: style.copyWith(fontSize: size, height: maxLines > 1 ? 1.1 : null));
+  });
 }

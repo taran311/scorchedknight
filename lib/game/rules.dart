@@ -304,10 +304,23 @@ int foeMenace(GameState s) {
 /// with, and at their full share he was a wall. At a quarter, though, he was easier the second
 /// time than the first: 45% puts him at about twice the first road's knockouts.)
 const ngHp = 1.4, ngHit = 1.25, ngBossShare = .5, ngKingShare = .45;
+
+/// Heirlooms carried into New Game+ add this to its foes' HP and hit for each unit of their
+/// weight ([heirloomWeight]; on top of [ngHp] and [ngHit], weighted the same way). Your best three
+/// (the weapon you fight with and the two strongest other pieces) took New Game+ from about three
+/// times the first road's knockouts to barely more than it; with these, tool/ngplus.dart puts it
+/// back at a little over twice (median 37 against 17), and carrying none (50) or only a weapon
+/// (45) is harder still: what you bring always helps.
+const heirloomHp = .24, heirloomHit = .12;
+
+/// How much an heirloom weighs on New Game+: a weapon is most of what one changes (a heirloom
+/// weapon alone did nearly all three's work), the rest far less, so carrying more is never the
+/// harder road.
+double heirloomWeight(GearSlot slot) => slot == GearSlot.weapon ? 1 : .15;
 double _ngRamp(int? land) => land == null ? 1 : (.15 + .85 * landTier(land) / 3).clamp(0.0, 1.0);
 double _ngShare(int? land, bool boss) => !boss ? 1 : (land == mainLands - 1 ? ngKingShare : ngBossShare);
-double ngFoeHp(int ng, [int? land, bool boss = false]) => ng > 0 ? 1 + (ngHp - 1) * _ngRamp(land) * _ngShare(land, boss) : 1;
-double ngFoeHit(int ng, [int? land, bool boss = false]) => ng > 0 ? 1 + (ngHit - 1) * _ngRamp(land) * _ngShare(land, boss) : 1;
+double ngFoeHp(int ng, [int? land, bool boss = false, double heirlooms = 0]) => ng > 0 ? 1 + (ngHp - 1 + heirlooms * heirloomHp) * _ngRamp(land) * _ngShare(land, boss) : 1;
+double ngFoeHit(int ng, [int? land, bool boss = false, double heirlooms = 0]) => ng > 0 ? 1 + (ngHit - 1 + heirlooms * heirloomHit) * _ngRamp(land) * _ngShare(land, boss) : 1;
 
 /// A foe's HP, fixed when the fight starts.
 int spawnHp(int foeIndex, int level, [Rare? rare]) {
@@ -612,7 +625,7 @@ int counterDamage(GameState s) {
   // (see doggedFor): a hero who can't win yet still gets there, rather than losing for ever.
   final c = realmAt(s.foe);
   final dogged = s.rare == null && foeIn(s).boss && !s.bossesDown.contains(c) && !s.wildFight && !s.dungeonFight ? 1 - math.min(doggedHitMax, doggedHitStep * (c == throneLand ? math.max(0, (s.bossLosses[c] ?? 0) - kingMercyAfter) : (s.bossLosses[c] ?? 0))) : 1.0;
-  return math.max(1, (foeAttack(s.foe, s.rare, s.foeLevel) * (1 - damageReduction(k)) * weakened * bones * bark * hide * scale * dogged * manaShield(s) * outmatched(s.foeLevel, k.level) * ngFoeHit(s.ng, realmAt(s.rare?.base ?? s.foe), foeIn(s).boss)).round());
+  return math.max(1, (foeAttack(s.foe, s.rare, s.foeLevel) * (1 - damageReduction(k)) * weakened * bones * bark * hide * scale * dogged * manaShield(s) * outmatched(s.foeLevel, k.level) * ngFoeHit(s.ng, realmAt(s.rare?.base ?? s.foe), foeIn(s).boss, s.heirlooms)).round());
 }
 
 /// The Bloodmoon Pelt: when a blow leaves you under [wolfAt] of your HP, the wolf comes out (once a

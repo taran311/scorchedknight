@@ -78,7 +78,11 @@ bool guardianSworn(List<String> found) => vaultPieces.every((p) => found.contain
 /// a set piece Dunstan forged from a blueprint (each is forged once), and the one-per-hero weapons
 /// (the elemental arms, Thornbloom, Duskwing and Rimeforged). It
 /// can't be sold (and always fits in your chest), so a slip of the thumb never loses it for good.
+/// How many pieces you can carry into New Game+ as heirlooms.
+const heirloomMax = 3;
+
 bool isKeepsake(GearItem g) =>
+    g.heirloom ||
     g.gearSet == 'vault' ||
     g.gearSet == 'arena' ||
     forgedSets.any((f) => f.id == g.gearSet) ||

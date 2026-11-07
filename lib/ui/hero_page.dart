@@ -25,6 +25,8 @@ import '../game/nemesis.dart' show nemesisTitle;
 import 'errands_view.dart';
 import 'fill_column.dart';
 import 'hero_view.dart';
+import 'frames.dart' show CrestBadge;
+import 'hud.dart' show heroCrest;
 import 'item_icons.dart';
 import 'journal_panel.dart' show fmt;
 import 'loot_window.dart';
@@ -273,9 +275,11 @@ class _PaperDoll extends StatelessWidget {
                 child: Column(
                   children: [
                     Text(s.settings.name, style: Txt.label(size: 20, color: Palette.cream, weight: FontWeight.w800)),
-                    Text(classOf(k) == null ? 'Level ${k.level} knight' : 'Level ${k.level} ${classOf(k)!.name} · Rank ${classRank(k, classOf(k)!.id)}', style: Txt.label(size: 13, color: classOf(k) == null ? Palette.amber : Color(classOf(k)!.argb))),
+                    Text(classOf(k) == null ? 'Level ${k.level} knight' : 'Level ${k.level} ${classOf(k)!.name} · ${classRank(k, classOf(k)!.id) >= maxRank ? 'Master' : 'Rank ${classRank(k, classOf(k)!.id)}'}', style: Txt.label(size: 13, color: classOf(k) == null ? Palette.amber : Color(classOf(k)!.argb))),
                     // Which road you're on (the first, New Game+ or Hardcore): tap for all three.
                     RoadLabel(controller: c),
+                    // The crests of the orders you've mastered: which one your frame wears.
+                    _CrestPick(controller: c),
                     if (fill) Expanded(child: figure) else SizedBox(height: phone ? 200 : 300, child: figure),
                     // The other class suits you hold, a tap to change into (see GameEngine.wearSuit).
                     _SuitSwap(controller: c),
@@ -331,7 +335,7 @@ class _PaperDoll extends StatelessWidget {
                         if (!phone) const SizedBox(height: 2),
                         Text(value, style: Txt.label(size: phone ? 13 : 15, color: Palette.cream)),
                         // A word under each number, so nobody has to hover to know what it is.
-                        FitText(_statWord(tip), style: Txt.label(size: phone ? 9.5 : 10.5, color: Palette.parch2)),
+                        FitText(_statWord(tip), wrap: false, style: Txt.label(size: phone ? 9.5 : 10.5, color: Palette.parch2)),
                       ],
                     ),
                   ),
@@ -558,6 +562,54 @@ class _SlotSheetState extends State<_SlotSheet> {
   );
 }
 
+/// The orders' crests you've earned, to set in your portrait's frame (or none). Nothing until
+/// you've mastered an order.
+class _CrestPick extends StatelessWidget {
+  const _CrestPick({required this.controller});
+  final GameController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = controller, k = c.state.knight, worn = heroCrest(k);
+    final owned = [for (final id in k.crests) if (knightClassById(id) case final kc?) kc];
+    if (owned.isEmpty) return const SizedBox.shrink();
+    Widget pick(KnightClass? cls) {
+      final on = worn?.id == cls?.id, col = cls == null ? Palette.parch2 : Color(cls.argb);
+      return Tooltip(
+        message: cls == null ? 'A bare frame' : 'The ${cls.name}\'s crest, set in your portrait\'s frame',
+        child: GestureDetector(
+          onTap: on ? null : () => c.wearCrest(cls?.id ?? ''),
+          child: MouseRegion(
+            cursor: on ? MouseCursor.defer : SystemMouseCursors.click,
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: on ? Color.lerp(col, Colors.black, .7) : const Color(0x55000000),
+                border: Border.all(color: on ? Palette.amber : Palette.stone3, width: on ? 1.5 : 1),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: cls == null ? Icon(Icons.block, size: 18, color: col) : Opacity(opacity: on ? 1 : .75, child: CrestBadge(cls, size: 18)),
+            ),
+          ),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('Crest', style: Txt.label(size: 12.5, color: Palette.parch2)),
+          const SizedBox(width: 6),
+          for (final cls in owned) pick(cls),
+          pick(null),
+        ],
+      ),
+    );
+  }
+}
+
 class _Satchel extends StatelessWidget {
   const _Satchel({required this.controller});
   final GameController controller;
@@ -766,6 +818,17 @@ class _Spellbook extends StatelessWidget {
                       ),
                     ),
                   ),
+                  // Just learned and not cast yet.
+                  if (known && k.newRites.contains(sp.id))
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(color: const Color(0xFF9BE27A), borderRadius: BorderRadius.circular(3)),
+                        child: Text('NEW', style: Txt.label(size: 10.5, color: const Color(0xFF14200C), weight: FontWeight.w900)),
+                      ),
+                    ),
                   if (slotAt >= 0)
                     Positioned(
                       left: 0,
@@ -828,7 +891,7 @@ class _Spellbook extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(sp.name, style: Txt.label(size: 14.5, color: Palette.cream, weight: FontWeight.w800)),
-                            Text(sp.desc, maxLines: 2, overflow: TextOverflow.ellipsis, style: Txt.onStone(size: 12.5)),
+                            Text(sp.desc, style: Txt.onStone(size: 12.5)),
                           ],
                         ),
                 ),
@@ -1152,8 +1215,10 @@ Color petColour(Pet p) => switch (p) {
   Pet.fairy => const Color(0xFFE6B8FF),
 };
 
-/// The way up as one row (where the full ladder won't fit): each home, lit once it's built.
+/// The way up as one row (where the full ladder won't fit): each home, lit once it's built, its
+/// name under it (so all four fit a phone's width without being cut short).
 Widget _ladderStrip(int built, List<IconData> icons) => Stone(
+  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
   child: Row(
     children: [
       for (final (i, h) in homes.indexed) ...[
@@ -1161,13 +1226,18 @@ Widget _ladderStrip(int built, List<IconData> icons) => Stone(
         Expanded(
           child: Opacity(
             opacity: i <= built ? 1 : .55,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icons[i], size: 22, color: i <= built ? Palette.amber : Palette.parch2),
-                const SizedBox(width: 4),
-                Flexible(child: Text(h.name, overflow: TextOverflow.ellipsis, style: Txt.label(size: 13, color: Palette.cream))),
-                if (i <= built) const Padding(padding: EdgeInsets.only(left: 3), child: Icon(Icons.check_circle, size: 14, color: Color(0xFF9BE27A))),
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Icon(icons[i], size: 26, color: i <= built ? Palette.amber : Palette.parch2),
+                    if (i <= built) const Positioned(right: -8, bottom: -2, child: Icon(Icons.check_circle, size: 14, color: Color(0xFF9BE27A))),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                FittedBox(fit: BoxFit.scaleDown, child: Text(h.name, maxLines: 1, style: Txt.label(size: 13, color: Palette.cream))),
               ],
             ),
           ),
@@ -1294,7 +1364,8 @@ class _Home extends StatelessWidget {
                     size: 12.5,
                     text: 'Timber from foes in ${[for (final l in timberLands) continents[l].name].join(' and ')} · iron in ${[for (final l in ironLands) continents[l].name].join(' and ')}${s.home >= 1 ? ' · $retainerName finds some too' : ''}',
                   ),
-                if (next.after >= 0) ...[
+                // (Not yet beaten: the button below says so; only the tick once it is.)
+                if (next.after >= 0 && s.bossesDown.contains(next.after)) ...[
                   const SizedBox(height: 4),
                   Text(
                     s.bossesDown.contains(next.after) ? '✓ ${continents[next.after].boss.name} is beaten' : 'First, beat ${continents[next.after].boss.name}',
@@ -1348,7 +1419,7 @@ class _Home extends StatelessWidget {
         // (On a phone with the armoury and errands above it, the full ladder doesn't fit: then it's
         // one row, tent to keep, rather than cropped.)
         if (box.hasBoundedHeight)
-          Expanded(child: LayoutBuilder(builder: (context, room) => room.maxHeight >= 70.0 * homes.length + 40 ? ladder : _ladderStrip(s.home, icons)))
+          Expanded(child: LayoutBuilder(builder: (context, room) => room.maxHeight >= 70.0 * homes.length + 40 ? ladder : Align(alignment: Alignment.topCenter, child: _ladderStrip(s.home, icons))))
         else
           ladder,
       ],

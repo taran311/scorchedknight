@@ -32,11 +32,13 @@ import 'gear_glance.dart';
 import 'item_icons.dart';
 import 'stat_icons.dart';
 import 'merchant.dart' show promptRelicForge;
+import 'king_intro.dart';
+import 'throne_seals.dart';
 import 'theme.dart';
 import 'trail_data.dart';
 
 /// What the battle screen should start with, once the stage is listening.
-enum BattleStart { explore, boss, resume, raid, heroic, wild, dungeon }
+enum BattleStart { explore, boss, resume, raid, heroic, wild, dungeon, general }
 
 /// What the screen hands back when it closes: back to the map, or (knocked out) to the Inn.
 /// How the fight screen was left: back to the trail or map, home to the inn, or on to the land a
@@ -136,6 +138,8 @@ class _BattleScreenState extends State<BattleScreen> {
         if (!c.startRaid()) c.resumeFight();
       case BattleStart.heroic:
         c.exploreHeroic();
+      case BattleStart.general:
+        c.huntGeneral();
       case BattleStart.wild || BattleStart.dungeon:
         c.arriveWild();
     }
@@ -257,7 +261,12 @@ class _BattleScreenState extends State<BattleScreen> {
     _begin(trailStep(c.state, c.state.continent) == TrailStep.lair ? BattleStart.boss : BattleStart.explore);
   }
 
-  void _close(BattleExit to) => Navigator.of(context).pop(to);
+  Future<void> _close(BattleExit to) async {
+    // A seal on the Ember Throne broke (or Scorchmaw fell and the seals were met): shown on the
+    // way out of the fight.
+    if (c.sealNews) await showThroneSeals(context, c);
+    if (mounted) Navigator.of(context).pop(to);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -488,7 +497,7 @@ class _BattleScreenState extends State<BattleScreen> {
     // A whole questline suit: the attack and the bash are the order's own.
     final art = suitArtFor(k);
     var key = 0;
-    Widget slot(BattleAction a, Widget icon, String name, _SlotInfo info, {String? badge, Color badgeColour = Palette.amber, Widget? badgeArt, String? figure, int wait = 0, bool glow = false, Color tint = const Color(0xFF3B3327), String? rite}) {
+    Widget slot(BattleAction a, Widget icon, String name, _SlotInfo info, {String? badge, Color badgeColour = Palette.amber, Widget? badgeArt, String? figure, int wait = 0, bool glow = false, Color tint = const Color(0xFF3B3327), String? rite, bool fresh = false}) {
       final why = rite != null ? c.whyNotRite(rite) : c.whyNot(a);
       key++;
       final mine = key, phone = isPhone(context);
@@ -514,6 +523,7 @@ class _BattleScreenState extends State<BattleScreen> {
             wait: wait,
             glow: glow && why == null && ready,
             tint: tint,
+            fresh: fresh,
             onTap: phone && use != null
                 ? () {
                     setState(() {
@@ -530,6 +540,8 @@ class _BattleScreenState extends State<BattleScreen> {
                     _peek = true;
                   })
                 : null,
+            // Let go of a held tile: its card goes (it only shows while held).
+            onRelease: phone ? () => setState(() => _peek = false) : null,
           ),
         ),
       );
@@ -650,6 +662,8 @@ class _BattleScreenState extends State<BattleScreen> {
               glow: riteEdge > 1,
               tint: const Color(0xFF1E2A44),
               rite: sp.id,
+              // Just learned (a new class rank) and not cast yet: marked NEW till you try it.
+              fresh: c.state.knight.newRites.contains(sp.id),
             );
           })(),
         slot(
@@ -695,9 +709,14 @@ class _BattleScreenState extends State<BattleScreen> {
           petName,
           _SlotInfo(petName, const Color(0xFFE8B070), [
             if (pet == null && ds == null) ('🐾', 'No companion yet', soft) else ('🐾', ds != null && pet == null ? 'Your dragon breathes fire' : 'Your companion strikes', plain),
-            if (s.petWait > 0) ('⏳', 'Ready in ${turns(s.petWait)}', soft),
+            // Its real use: send it in as the foe rears back, and it takes the heavy blow for you.
+            ('🛡', s.foeWindup ? 'Takes the heavy blow for you!' : 'When a foe rears back: takes the heavy blow for you', s.foeWindup ? good : soft),
+            if (s.petWait > 0) ('⏳', 'Ready in ${turns(s.petWait)}', soft) else ('⏳', 'Cooldown ${turns(petCooldown)}', soft),
           ]),
+          figure: s.foeWindup ? 'Shield' : null,
           wait: s.petWait,
+          // Lit while a heavy blow is coming: the moment to send it in.
+          glow: s.foeWindup,
           // Your companion's earthy amber, like its paw.
           tint: const Color(0xFF4A3218),
         ),
@@ -742,7 +761,7 @@ class _BattleScreenState extends State<BattleScreen> {
       padding: const EdgeInsets.only(top: 8),
       child: Row(
         children: [
-          Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: Txt.label(size: 12.5, color: Palette.parch2))),
+          Flexible(child: Text(label, style: Txt.label(size: 12.5, color: Palette.parch2))),
           const SizedBox(width: 8),
           for (var i = 0; i < of; i++) pip(i < done),
           Icon(Icons.castle, size: 15, color: next ? col : Palette.stone3),
@@ -819,7 +838,7 @@ class _BattleScreenState extends State<BattleScreen> {
           flex: 3,
           child: StoneButton(
             title: isPhone(context) ? 'Onward' : 'Onward to ${continents[to].name}',
-            caption: c.whyNotTravel(to) != null ? 'Opens at level ${continents[to].minLevel}' : (isPhone(context) ? continents[to].name : 'A new land'),
+            caption: c.whyNotTravel(to) == 'Sealed' ? 'Sealed' : c.whyNotTravel(to) != null ? 'Opens at level ${continents[to].minLevel}' : (isPhone(context) ? continents[to].name : 'A new land'),
             tone: ButtonTone.blood,
             onPressed: () {
               nextLand = to;
@@ -1060,7 +1079,13 @@ class _FoeCard extends StatelessWidget {
 
 /// One slot on the hotbar.
 class _SkillSlot extends StatefulWidget {
-  const _SkillSlot({required this.hotkey, required this.icon, required this.name, required this.info, this.badge, this.badgeColour = Palette.amber, this.badgeArt, this.figure, this.wait = 0, this.glow = false, this.tint = const Color(0xFF3B3327), this.onTap, this.picked = false, this.onPick});
+  const _SkillSlot({required this.hotkey, required this.icon, required this.name, required this.info, this.badge, this.badgeColour = Palette.amber, this.badgeArt, this.figure, this.wait = 0, this.glow = false, this.tint = const Color(0xFF3B3327), this.onTap, this.picked = false, this.onPick, this.onRelease, this.fresh = false});
+
+  /// On a phone: the held tile was let go.
+  final VoidCallback? onRelease;
+
+  /// A rite just learned and never cast: a NEW tag and a bright edge in its own colour.
+  final bool fresh;
   final int hotkey;
 
   /// On a phone: this move is picked (its card shows above the moves; another tap uses it), and
@@ -1089,6 +1114,13 @@ class _SkillSlot extends StatefulWidget {
 
 class _SkillSlotState extends State<_SkillSlot> {
   bool _hover = false, _down = false;
+
+  /// Bumped by a tap on a move that can't be used: the tile gives a quick shake.
+  int _nopes = 0;
+  void _nope() {
+    HapticFeedback.selectionClick();
+    setState(() => _nopes++);
+  }
   final _card = OverlayPortalController();
   final _link = LayerLink();
 
@@ -1116,7 +1148,7 @@ class _SkillSlotState extends State<_SkillSlot> {
     // to greyscale, so a live move's colour is what the eye finds. (Only fading the symbol left
     // the tile's own colour lit, and a dead rite looked nearly as ready as Attack.)
     final tint = on ? w.tint : Color.lerp(w.tint, const Color(0xFF16130F), .82)!;
-    final slot = AnimatedScale(
+    final still = AnimatedScale(
       scale: _down && on ? .92 : (_hover && on ? 1.05 : 1),
       duration: const Duration(milliseconds: 90),
       child: AspectRatio(
@@ -1126,7 +1158,7 @@ class _SkillSlotState extends State<_SkillSlot> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(6),
             gradient: RadialGradient(center: const Alignment(0, -.3), radius: 1, colors: [Color.lerp(tint, Colors.white, _hover && on ? .16 : (on ? .08 : .03))!, Color.lerp(tint, Colors.black, .55)!]),
-            border: Border.all(color: w.picked ? const Color(0xFFFFF0C8) : (w.glow ? Palette.amber : (on ? const Color(0xFF8A6A3A) : const Color(0xFF2A241C))), width: w.picked ? 3 : (w.glow ? 2 : 1.5)),
+            border: Border.all(color: w.picked ? const Color(0xFFFFF0C8) : (w.fresh ? const Color(0xFF9BE27A) : (w.glow ? Palette.amber : (on ? const Color(0xFF8A6A3A) : const Color(0xFF2A241C)))), width: w.picked ? 3 : (w.glow || w.fresh ? 2 : 1.5)),
             boxShadow: [
               const BoxShadow(color: Colors.black, offset: Offset(0, 2), blurRadius: 3),
               if (w.glow) BoxShadow(color: Palette.amber.withValues(alpha: .45), blurRadius: 10),
@@ -1161,8 +1193,18 @@ class _SkillSlotState extends State<_SkillSlot> {
                   ),
                 ),
               ),
-              // The number key (not on a phone: no keys there).
-              if (!isPhone(context)) Positioned(left: 4, top: 3, child: Text('${w.hotkey}', style: Txt.label(size: 11, color: Palette.parch2))),
+              // The number key (not on a phone: no keys there); a just-learned rite's NEW tag there instead.
+              if (w.fresh)
+                Positioned(
+                  left: 3,
+                  top: 3,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(color: const Color(0xFF9BE27A), borderRadius: BorderRadius.circular(3)),
+                    child: Text('NEW', style: Txt.label(size: 10.5, color: const Color(0xFF14200C), weight: FontWeight.w900)),
+                  ),
+                )
+              else if (!isPhone(context)) Positioned(left: 4, top: 3, child: Text('${w.hotkey}', style: Txt.label(size: 11, color: Palette.parch2))),
               // One key figure.
               if (w.badge != null || w.badgeArt != null)
                 Positioned(
@@ -1187,6 +1229,16 @@ class _SkillSlotState extends State<_SkillSlot> {
         ),
       ),
     );
+    // A quick side-to-side shake after a tap it can't take.
+    final slot = _nopes == 0
+        ? still
+        : TweenAnimationBuilder<double>(
+            key: ValueKey(_nopes),
+            tween: Tween(begin: 0, end: 1),
+            duration: const Duration(milliseconds: 260),
+            builder: (context, v, child) => Transform.translate(offset: Offset(math.sin(v * math.pi * 4) * 5 * (1 - v), 0), child: child),
+            child: still,
+          );
     // The card floats above the slot, centred on it, while the pointer is over it (or while it's
     // held down on a touch screen).
     return OverlayPortal(
@@ -1213,9 +1265,14 @@ class _SkillSlotState extends State<_SkillSlot> {
             onTapUp: (_) => setState(() => _down = false),
             onTapCancel: () => setState(() => _down = false),
             onLongPressStart: (_) => w.onPick == null ? _card.show() : w.onPick!(),
-            onLongPressEnd: (_) => _card.hide(),
-            // On a phone a tap uses the move at once; a move that can't be used shows why instead.
-            onTap: w.onTap ?? w.onPick,
+            onLongPressEnd: (_) {
+              _card.hide();
+              w.onRelease?.call();
+            },
+            // A tap uses the move at once. One that can't be used now (cooling down, short of
+            // mana) just gives a little shake: its card, and why, is a press-and-hold away, so it
+            // doesn't cover the fight while you line up your next move.
+            onTap: w.onTap ?? _nope,
             // On a phone the moves are square tiles (no taller than 120); elsewhere a row of slots.
             child: isPhone(context)
                 ? LayoutBuilder(builder: (context, box) => SizedBox(height: math.min(box.maxWidth * (MediaQuery.sizeOf(context).height >= 820 ? 1.12 : 1), 120), child: slot))
@@ -1392,9 +1449,9 @@ class _CommandDeck extends StatelessWidget {
           }
         : 'Turn ${c.state.turn + 1} · your move';
     // The log is a line or two at most; tap it for the whole fight.
-    // (A tall phone shows two, a shorter one just the newest.)
+    // (The slim phone strip shows just the newest, shrunk to fit rather than cut short.)
     final roomy = fill && MediaQuery.sizeOf(context).height >= 820;
-    final keep = fill && !roomy ? 1 : 2;
+    final keep = fill ? 1 : 2;
     final recent = lines.length <= keep ? lines : lines.sublist(lines.length - keep);
     Color tone(EntryKind k) => switch (k) {
       EntryKind.damage => const Color(0xFFE88A70),
@@ -1450,7 +1507,7 @@ class _CommandDeck extends StatelessWidget {
                     for (final (i, e) in recent.indexed)
                       Opacity(
                         opacity: fill ? (.45 + .55 * (i + 1) / recent.length) : 1,
-                        child: Text(e.text, maxLines: phone && !roomy ? 2 : 1, overflow: TextOverflow.ellipsis, style: Txt.onStone(size: phone ? 13.5 : 14.5, color: tone(e.kind))),
+                        child: ShrinkLines(e.text, maxLines: phone ? 2 : 1, style: Txt.onStone(size: phone ? 13.5 : 14.5, color: tone(e.kind))),
                       ),
                   ],
                 );
@@ -1578,11 +1635,15 @@ class _Result extends StatelessWidget {
         title = k?.won == true ? 'The Ember King is no more!' : (k?.boss == true ? 'Boss defeated!' : (k?.foe?.boss == true ? 'Risen boss defeated!' : 'Victory!'));
         if (k != null) {
           final chest = k.chest;
-          newRites = k.levelUps == 0 ? const [] : spells.where((sp) => sp.order == null && sp.earned == null && sp.level > s.knight.level - k.levelUps && sp.level <= s.knight.level).toList();
+          newRites = [
+            if (k.levelUps > 0) ...spells.where((sp) => sp.order == null && sp.earned == null && sp.level > s.knight.level - k.levelUps && sp.level <= s.knight.level),
+            // A new class rank's rite: the same big card, so it can't be missed.
+            if (c.engine.rankUpRite case final sp?) sp,
+          ];
           spoils.addAll([
             if (k.levelUps > 0) _Spoil(const Icon(Icons.arrow_upward, size: 18, color: _green), 'Level ${s.knight.level}!', _green, big: true),
             // Any rite the new level brings, by name, in its own colour.
-            if (k.levelUps > 0 && part != _ResultPart.spoils)
+            if (part != _ResultPart.spoils)
               for (final sp in newRites)
                 _Spoil(Icon(riteIcon(sp), size: 18, color: Color(sp.argb)), 'New rite: ${sp.name}', Color(sp.argb), big: true, tip: s.knight.rites.contains(sp.id) ? 'On your hotbar' : 'Swap it onto your hotbar in your ${homes[s.home].name.toLowerCase()}'),
             if (c.engine.rankUp case final up?) _Spoil(const Icon(Icons.military_tech, size: 18, color: Color(0xFFFFB04A)), up, const Color(0xFFFFB04A), big: true),
@@ -1625,7 +1686,7 @@ class _Result extends StatelessWidget {
             if (k.trophy != null) _Spoil(const Icon(Icons.emoji_events, size: 17, color: Palette.cream), k.trophy!, Palette.cream, tip: 'For $smithName\'s forge'),
             if (k.blueprint != null) _Spoil(const Icon(Icons.description, size: 17, color: Color(0xFF8AB8F0)), k.blueprint!, const Color(0xFF8AB8F0), big: true, tip: 'A blueprint. Take it to $smithName'),
           ]);
-          if (k.won) lines = ['The Great Burning is over. Your eyebrows can start growing back.', 'New Game+ is open: start the road again, harder, from the roads in Your Tent (tap the label under your name) whenever you like.'];
+          if (k.won) lines = ['The Great Burning is over. Your eyebrows can start growing back.', 'New Game+ is open, and Vharrax will rise again, harder. Back in town, you\'ll see what\'s next.'];
         }
       case Outcome.fled when r?.packLoss != null:
         title = 'You got away!';
@@ -1682,7 +1743,7 @@ class _Result extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('New rite: ${sp.name}', style: Txt.label(size: 14.5, color: Color(sp.argb), weight: FontWeight.w800)),
+                        Text('${sp.order != null ? 'Rite unlocked' : 'New rite'}: ${sp.name}', style: Txt.label(size: 14.5, color: Color(sp.argb), weight: FontWeight.w800)),
                         Text(sp.desc, style: Txt.onStone(size: 13, color: Palette.cream)),
                         Text('${sp.cost} mana · ${s.knight.rites.contains(sp.id) ? 'on your hotbar' : 'add it to your hotbar in your ${homes[s.home].name.toLowerCase()}'}', style: Txt.onStone(size: 12, color: Palette.parch2)),
                       ],
@@ -1771,6 +1832,11 @@ class _Spoil extends StatelessWidget {
 /// (A relic's last part won in it: the way to the forge is offered as you come out, and taking it
 /// counts as heading back to town.)
 Future<BattleExit?> openBattle(BuildContext context, GameController c, BattleStart start) async {
+  // The first time at the Ember King's door: his intro, then the fight.
+  if (start == BattleStart.boss) {
+    await maybeShowKingIntro(context, c);
+    if (!context.mounted) return null;
+  }
   final exit = await Navigator.of(context).push<BattleExit>(MaterialPageRoute(builder: (_) => BattleScreen(controller: c, start: start)));
   if (context.mounted && await promptRelicForge(context, c)) return BattleExit.inn;
   return exit;

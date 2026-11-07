@@ -234,6 +234,11 @@ class GearDetails extends StatelessWidget {
             padding: const EdgeInsets.only(top: 6),
             child: Text('⚡ ${g.specialMove!.name}: ${g.specialMove!.desc}. Fires about one attack in ${specialEvery.round()}.', style: note.copyWith(color: Color(g.specialMove!.argb), fontWeight: FontWeight.w700)),
           ),
+        if (g.heirloom)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text('✦ Heirloom: carried into New Game+. It grows with you, and can\'t be sold.', style: note.copyWith(color: const Color(0xFFF2C14E), fontWeight: FontWeight.w700)),
+          ),
         if (g.lore != null && !dense)
           Padding(
             padding: const EdgeInsets.only(top: 6),

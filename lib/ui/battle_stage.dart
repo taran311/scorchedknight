@@ -674,6 +674,16 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
   double get _foeHeightPlain => _isBeast ? beastHeight(_foe.look) * (_foe.aura != null ? 1.06 : 1) : _isKraken ? seaHeight(_foe.look) * _krakenScale * .9 : _isHound ? 92 * _houndScale * .95 : _isDragon ? dragonHeight * _dragonScale * _dragonLook.scale * .8 : builds[_foeLook.build]!.height * _foeScale * .95;
   Offset get _foeChest => Offset(_foeX, _groundY - _foeHeight * .62) + _foeLift;
 
+  /// Where a fire-breathing foe's fire comes out: a hound's jaws (drawn mirrored at its feet, 30
+  /// behind, at [_houndScale], then grown by the menace scale); others' fire comes off the chest.
+  Offset get _foeFireFrom {
+    if (!_isHound) return _foeChest + const Offset(-50, -20);
+    final feet = Offset(_foeX + fx['enter']! * 440 - fx['lunge']! * 90, _groundY) + _foeLift;
+    // The muzzle's tip in the hound's own drawing ((46, 3) in its head, turned and placed), at its scale.
+    const jaws = Offset(30 - 87.6 * _houndScale, -94.2 * _houndScale);
+    return feet + jaws * _menaceScale;
+  }
+
   /// Foes that are aloft hover above the ground (bobbing gently), and dive at you to strike.
   Offset get _foeLift {
     if (!_foe.aloft) return Offset.zero;
@@ -1869,9 +1879,12 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
             _spark('curse', _foeChest + const Offset(-30, -30), 8, speed: 2, life: 400, radius: 3, gravity: 0);
             _at(strikeMs - 170, () => _shots.add(_Projectile('bolt', _foeChest + const Offset(-30, -30), to, now, 170, const Color(0xFFB07AFF))));
           case Strike.fire:
-            // Fire pours across the field at you.
+            // Fire pours across the field at you, out of its jaws.
             for (var j = 0; j < 5; j++) {
-              _at(strikeMs - 200 + j * 30.0, () => _spark('fire', _foeChest + const Offset(-50, -20), 4, dir: math.atan2(to.dy - _foeChest.dy, to.dx - _foeChest.dx), spread: .3, speed: 10, life: 420, radius: 10, lift: 0, gravity: 0));
+              _at(strikeMs - 200 + j * 30.0, () {
+                final from = _foeFireFrom;
+                _spark('fire', from, 4, dir: math.atan2(to.dy - from.dy, to.dx - from.dx), spread: .3, speed: 10, life: 420, radius: 10, lift: 0, gravity: 0);
+              });
             }
         }
       });
@@ -1935,7 +1948,13 @@ class _BattleStageState extends State<BattleStage> with SingleTickerProviderStat
               _tween('kflash', 0, 300, delay: 80);
             }
           case Guard.guarded:
-            _mark('Guarded!', _orange, at);
+            // (Sent in against a heavy blow: it took the lot.)
+            _mark(r.covered ? 'Covered!' : 'Guarded!', _orange, at, icon: r.covered ? Icons.pets : null);
+            if (r.covered) {
+              Audio.play(Sfx.block);
+              _spark('spark', clash, 16, speed: 5, life: 450, radius: 3.5);
+              _punch(.4);
+            }
             c.revealCounter();
             return;
           case Guard.roared:

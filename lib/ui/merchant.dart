@@ -22,13 +22,14 @@ import '../game/classes.dart';
 import '../game/crafting.dart';
 import '../game/loot.dart';
 import '../game/controller.dart';
-import '../game/knight_classes.dart' show knightClassById;
+import '../game/knight_classes.dart' show knightClassById, classRank, maxRank;
 import '../game/rules.dart' show potionHeal;
 import 'item_icons.dart';
 import 'loot_window.dart' show resolvePendingLoot;
 import 'material_icons.dart';
 import 'journal_panel.dart' show fmt;
 import 'hero_view.dart' show GearIcon, SetChips, UpgradeBadge, upgradeVerdict;
+import 'frames.dart' show CrestBadge;
 import 'hud.dart' show brewIcon;
 import 'stat_icons.dart' show InfoChip, StatChip;
 import 'quest_dialog.dart' show NpcPortrait, magsLook;
@@ -383,11 +384,12 @@ class MerchantWares extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: [
-            for (final d in dyes.where((d) => !seasonalDyes.containsKey(d.id) || k.ownedDyes.contains(d.id) || c.season.name == seasonalDyes[d.id]))
+            // (An order's dye only once you've earned it: it's never sold.)
+            for (final d in dyes.where((d) => dyeEarnedBy(d.id) != null ? k.ownedDyes.contains(d.id) : (!seasonalDyes.containsKey(d.id) || k.ownedDyes.contains(d.id) || c.season.name == seasonalDyes[d.id])))
               _DyeSwatch(
                 colour: Color(d.argb),
-                rare: d.price != null,
-                name: seasonalDyes.containsKey(d.id) ? '${d.name} (this season only)' : d.name,
+                rare: d.price != null || dyeEarnedBy(d.id) != null,
+                name: seasonalDyes.containsKey(d.id) ? '${d.name} (this season only)' : (dyeEarnedBy(d.id) != null ? '${d.name} (${dyeEarnedBy(d.id)})' : d.name),
                 owned: k.ownedDyes.contains(d.id),
                 wearing: k.dye == d.id,
                 price: e.priceOf('dye:${d.id}'),
@@ -544,116 +546,7 @@ class ForgeWares extends StatelessWidget {
           ),
         if (c.honeables.isEmpty) Text('Rare or finer gear you wear (your vault pieces are beyond Dunstan\'s hammer)', style: Txt.onStone(size: 12.5)),
         ],
-        if (on('suits')) ...[
-        if (!forgedSets.any((f) => s.mat(trophyKey(f.trophy)) > 0 || setPieceSlots.any((slot) => s.mat(blueprintKey(f.id, slot)) > 0)))
-          Padding(padding: const EdgeInsets.only(top: 8), child: Text('Faction suits: their foes drop trophies and blueprints, and $smithName forges the pieces', style: Txt.onStone(size: 12.5))),
-        // Set pieces, from the blueprints the Ashen Order, the vampires and the werewolves carry.
-        // A suit you hold all of, with nothing to reforge: one quiet line (at the bottom), not the
-        // whole list of pieces you've already got.
-        for (final f in forgedSets)
-          if (c.engine.holdsSuit(f.id) && !setPieceSlots.any((slot) => c.canReforge(f.id, slot))) ...[]
-          else if (s.mat(trophyKey(f.trophy)) > 0 || setPieceSlots.any((slot) => s.mat(blueprintKey(f.id, slot)) > 0)) ...[
-            x.heading('${gearSetById(f.id)!.name} set'),
-            SetChips(set: gearSetById(f.id)!, dense: true, named: false),
-            // An order's suit is a class: say so, and what kind of knight it makes you.
-            if (knightClassById(f.id) case final cls?)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text('All five: you become the ${cls.name} · ${cls.focus.toLowerCase()}', style: Txt.label(size: 12.5, color: Color(cls.argb))),
-              ),
-            // Where its blueprints and trophies come from, and its metal: one line each.
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: WhereLine(controller: c, size: 12.5, text: '${f.trophy.label} and blueprints: ${f.from}${trophyLands(f.trophy).isEmpty ? '' : ' (${trophyLands(f.trophy).join(', ')})'}'),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: WhereLine(controller: c, size: 12.5, text: '${f.metal.bar}s: smelt ${f.metal.golemName.toLowerCase()} ore (${metalLands(f.metal).join(', ')})'),
-            ),
-            const SizedBox(height: 4),
-            for (final slot in setPieceSlots)
-              if (s.mat(blueprintKey(f.id, slot)) > 0)
-                x.ware(
-                  MatIcon.blueprint(size: 28),
-                  slot == GearSlot.armour ? armourTierById(setArmourId(f.id)).name : '${gearSetById(f.id)!.name} ${pieceNoun(slot)}',
-                  switch (c.heldSetPiece(f.id, slot)) {
-                    final g? when c.canReforge(f.id, slot) => 'Yours, level ${g.level}: reforge to your level',
-                    final g? => 'Forged, level ${g.level}: yours to keep',
-                    _ when c.hasSetPiece(f.id, slot) => 'Forged: yours to keep',
-                    _ => slot == GearSlot.armour ? '−${(armourTierById(setArmourId(f.id)).reduction * 100).round()}% damage taken' : 'Legendary, at your level',
-                  },
-                  CostButton(
-                    label: c.canReforge(f.id, slot) ? 'Reforge' : (c.hasSetPiece(f.id, slot) ? 'Forged' : 'Forge'),
-                    onTap: c.whyNotForgePiece(f.id, slot) == null
-                        ? () {
-                            if (c.forgePiece(f.id, slot) != null) {
-                              Audio.play(Sfx.clang);
-                              resolvePendingLoot(context, c);
-                            }
-                          }
-                        : null,
-                  ),
-                  extra: Wrap(
-                    spacing: 10,
-                    children: [
-                      x.have(MatIcon.trophy(f.trophy, size: 16), s.mat(trophyKey(f.trophy)), pieceTrophies),
-                      x.have(MatIcon.bar(f.metal, size: 16), s.mat(barKey(f.metal)), pieceBars),
-                      x.have(const ItemIcon(Item.coins, size: 14), k.coins, pieceFee(k.level)),
-                    ],
-                  ),
-                )
-              else
-                x.ware(
-                  Opacity(opacity: .35, child: MatIcon.blueprint(size: 28)),
-                  '${gearSetById(f.id)!.name} ${pieceNoun(slot)}',
-                  'No blueprint yet',
-                  const SizedBox(),
-                ),
-          ],
-        for (final f in forgedSets)
-          if (c.engine.holdsSuit(f.id) && !setPieceSlots.any((slot) => c.canReforge(f.id, slot)))
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Row(
-                children: [
-                  const Icon(Icons.check_circle, size: 16, color: Color(0xFF9BE27A)),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text.rich(TextSpan(children: [
-                      TextSpan(text: '${gearSetById(f.id)!.name} set', style: Txt.label(size: 13, color: Palette.cream)),
-                      if (knightClassById(f.id) case final cls?) TextSpan(text: '  ${cls.name}', style: Txt.label(size: 12, color: Color(cls.argb))),
-                      TextSpan(text: '  · every piece forged', style: Txt.onStone(size: 12)),
-                    ])),
-                  ),
-                ],
-              ),
-            ),
-        // The suits not begun yet: what there is to find, and who carries it.
-        if (forgedSets.any((f) => !(s.mat(trophyKey(f.trophy)) > 0 || setPieceSlots.any((slot) => s.mat(blueprintKey(f.id, slot)) > 0)))) ...[
-          x.heading('Still to find'),
-          for (final f in forgedSets)
-            if (!(s.mat(trophyKey(f.trophy)) > 0 || setPieceSlots.any((slot) => s.mat(blueprintKey(f.id, slot)) > 0)))
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Opacity(opacity: .45, child: MatIcon.trophy(f.trophy, size: 20)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text.rich(
-                        TextSpan(children: [
-                          TextSpan(text: gearSetById(f.id)!.name, style: Txt.label(size: 13.5, color: Palette.cream)),
-                          if (knightClassById(f.id) case final cls?) TextSpan(text: '  ${cls.name}', style: Txt.label(size: 12, color: Color(cls.argb))),
-                          TextSpan(text: '\n${f.from}${trophyLands(f.trophy).isEmpty ? '' : ' · ${trophyLands(f.trophy).join(', ')}'}', style: Txt.onStone(size: 12)),
-                        ]),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-        ],
-        ], // (End of the Suits tab: the relics below sat inside it once, on no tab at all.)
+        if (on('suits')) _SuitsTab(controller: c, x: x, focus: focus),
         // Relics: a blueprint and its parts, forged into a legend.
         // (On the Forge tab only: they used to repeat under every tab.)
         if (on('forge') && relics.keys.any((l) => c.heroicOpen(l) && !s.forged.contains(l))) x.heading('Relics'),
@@ -664,7 +557,7 @@ class ForgeWares extends StatelessWidget {
               child: x.ware(
               const Icon(Icons.hardware, color: Color(0xFFFFB04A), size: 26),
               'Forge ${e.key == 2 && k.heroClass == HeroClass.ranger ? 'Briarsong' : e.value.name}',
-              '${[for (var i = 0; i < e.value.parts.length; i++) '${hasRelicPart(s.relicParts, e.key, i) ? '✓' : '·'} ${e.value.parts[i].name}'].join('  ')} · Lv ${e.value.minLevel}+',
+              '${[for (var i = 0; i < e.value.parts.length; i++) '${hasRelicPart(s.relicParts, e.key, i) ? '✓' : '○'} ${e.value.parts[i].name}'].join('  ')} · Lv ${e.value.minLevel}+',
               CostButton(
                 label: '${e.value.gold} gold',
                 onTap: c.whyNotForge(e.key) == null
@@ -1323,6 +1216,228 @@ class _SpotlitState extends State<Spotlit> with SingleTickerProviderStateMixin {
         );
       },
       child: widget.child,
+    );
+  }
+}
+
+
+/// The forge's Suits tab: the three orders first, each a card of its own in its colour (wear the
+/// whole suit and you fight as that knight), then the other faction suits. Each card folds away to
+/// one line: what it is, five pips for its pieces, and whether something's ready to forge. Open
+/// it for the set bonus, where its blueprints come from, and the pieces themselves.
+class _SuitsTab extends StatelessWidget {
+  const _SuitsTab({required this.controller, required this.x, this.focus});
+  final GameController controller;
+  final _Shop x;
+  final String? focus;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = controller, s = c.state;
+    bool begun(ForgedSet f) => s.mat(trophyKey(f.trophy)) > 0 || setPieceSlots.any((slot) => s.mat(blueprintKey(f.id, slot)) > 0 || c.hasSetPiece(f.id, slot));
+    final orders = [for (final f in forgedSets) if (knightClassById(f.id) != null) f];
+    // The rest: what you're working on first, then the finished, then those not found yet.
+    int rank(ForgedSet f) => !begun(f) ? 2 : (c.engine.holdsSuit(f.id) && !setPieceSlots.any((slot) => c.canReforge(f.id, slot)) ? 1 : 0);
+    final others = [for (final f in forgedSets) if (knightClassById(f.id) == null) f]..sort((a, b) => rank(a).compareTo(rank(b)));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 6),
+        Text('Their foes drop trophies and blueprints, and $smithName forges the pieces. Tap a suit to see it.', style: Txt.onStone(size: 12.5)),
+        x.heading('The orders'),
+        Text('Wear an order\'s whole suit and you fight as its knight, with rites of its own.', style: Txt.onStone(size: 12.5, color: Palette.parch2)),
+        const SizedBox(height: 6),
+        for (final f in orders) ...[_SuitCard(controller: c, x: x, set: f, begun: begun(f), focus: focus), const SizedBox(height: 8)],
+        x.heading('Faction suits'),
+        const SizedBox(height: 4),
+        for (final f in others) ...[_SuitCard(controller: c, x: x, set: f, begun: begun(f), focus: focus), const SizedBox(height: 6)],
+      ],
+    );
+  }
+}
+
+class _SuitCard extends StatefulWidget {
+  const _SuitCard({required this.controller, required this.x, required this.set, required this.begun, this.focus});
+  final GameController controller;
+  final _Shop x;
+  final ForgedSet set;
+  final bool begun;
+  final String? focus;
+
+  @override
+  State<_SuitCard> createState() => _SuitCardState();
+}
+
+class _SuitCardState extends State<_SuitCard> {
+  // Folded away unless you were sent here for it: the "Ready to forge" mark says where to look,
+  // and a page of every suit's pieces at once is what made this tab hard to read.
+  late bool open = widget.focus == 'suit:${widget.set.id}';
+
+  GameController get c => widget.controller;
+  ForgedSet get f => widget.set;
+
+  /// A piece you could forge (or reforge) right now.
+  bool get _ready => setPieceSlots.any((slot) => c.whyNotForgePiece(f.id, slot) == null);
+
+  @override
+  Widget build(BuildContext context) {
+    final s = c.state, k = s.knight, x = widget.x, gs = gearSetById(f.id)!, cls = knightClassById(f.id);
+    final col = cls == null ? Palette.amber : Color(cls.argb);
+    final held = setPieceSlots.where((slot) => c.hasSetPiece(f.id, slot)).length;
+    final done = held == setPieceSlots.length;
+    final ready = _ready;
+    final r = cls == null || (k.classWins[cls.id] ?? 0) == 0 ? 0 : classRank(k, cls.id);
+
+    // Five pips: forged (filled), a blueprint waiting (ringed), or nothing yet (dim).
+    Widget pip(GearSlot slot) {
+      final has = c.hasSetPiece(f.id, slot), bp = s.mat(blueprintKey(f.id, slot)) > 0;
+      return Container(
+        width: 10,
+        height: 10,
+        margin: const EdgeInsets.only(left: 3),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: has ? col : Colors.transparent,
+          border: Border.all(color: has ? col : (bp ? Palette.amber : Palette.stone3), width: bp && !has ? 1.6 : 1.2),
+        ),
+      );
+    }
+
+    final status = !widget.begun
+        ? 'Not found yet'
+        : done
+        ? (setPieceSlots.any((slot) => c.canReforge(f.id, slot)) ? 'Complete · can reforge' : 'Complete')
+        : '$held of ${setPieceSlots.length} forged';
+
+    final header = Row(
+      children: [
+        SizedBox(
+          width: 34,
+          height: 34,
+          child: Center(
+            child: cls != null
+                ? Opacity(opacity: widget.begun ? 1 : .55, child: CrestBadge(cls, size: 32))
+                : Opacity(opacity: widget.begun ? 1 : .4, child: MatIcon.trophy(f.trophy, size: 26)),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(cls?.name ?? '${gs.name} suit', style: Txt.label(size: cls == null ? 14.5 : 16, color: cls == null ? (widget.begun ? Palette.cream : Palette.parch2) : col, weight: FontWeight.w800)),
+              Text(
+                cls == null ? status : '${gs.name} suit · ${cls.focus.toLowerCase()}${r > 0 ? ' · ${r >= maxRank ? 'mastered' : 'rank $r'}' : ''}',
+                style: Txt.onStone(size: 12, color: Palette.parch2),
+              ),
+              if (cls != null) Text(status, style: Txt.onStone(size: 12, color: Palette.parch2)),
+            ],
+          ),
+        ),
+        const SizedBox(width: 6),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Row(mainAxisSize: MainAxisSize.min, children: [for (final slot in setPieceSlots) pip(slot)]),
+            if (ready) ...[
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(color: Palette.bloodDeep, borderRadius: BorderRadius.circular(3), border: Border.all(color: Palette.amber)),
+                child: Text('Ready to forge', style: Txt.label(size: 11, color: Palette.amber)),
+              ),
+            ] else if (done) ...[
+              const SizedBox(height: 4),
+              const Icon(Icons.check_circle, size: 16, color: Color(0xFF9BE27A)),
+            ],
+          ],
+        ),
+        Icon(open ? Icons.expand_less : Icons.expand_more, size: 22, color: Palette.parch2),
+      ],
+    );
+
+    final body = <Widget>[
+      const SizedBox(height: 8),
+      SetChips(set: gs, dense: true, named: false),
+      Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: WhereLine(controller: c, size: 12.5, text: '${f.trophy.label} and blueprints: ${f.from}${trophyLands(f.trophy).isEmpty ? '' : ' (${trophyLands(f.trophy).join(', ')})'}'),
+      ),
+      Padding(
+        padding: const EdgeInsets.only(top: 2),
+        child: WhereLine(controller: c, size: 12.5, text: '${f.metal.bar}s: smelt ${f.metal.golemName.toLowerCase()} ore (${metalLands(f.metal).join(', ')})'),
+      ),
+      if (widget.begun) ...[
+        const SizedBox(height: 4),
+        for (final slot in setPieceSlots)
+          if (s.mat(blueprintKey(f.id, slot)) > 0 || c.hasSetPiece(f.id, slot))
+            x.ware(
+              MatIcon.blueprint(size: 28),
+              slot == GearSlot.armour ? armourTierById(setArmourId(f.id)).name : '${gs.name} ${pieceNoun(slot)}',
+              switch (c.heldSetPiece(f.id, slot)) {
+                final g? when c.canReforge(f.id, slot) => 'Yours, level ${g.level}: reforge to your level',
+                final g? => 'Forged, level ${g.level}: yours to keep',
+                _ when c.hasSetPiece(f.id, slot) => 'Forged: yours to keep',
+                _ => slot == GearSlot.armour ? '−${(armourTierById(setArmourId(f.id)).reduction * 100).round()}% damage taken' : 'Legendary, at your level',
+              },
+              CostButton(
+                label: c.canReforge(f.id, slot) ? 'Reforge' : (c.hasSetPiece(f.id, slot) ? 'Forged' : 'Forge'),
+                onTap: c.whyNotForgePiece(f.id, slot) == null
+                    ? () {
+                        if (c.forgePiece(f.id, slot) != null) {
+                          Audio.play(Sfx.clang);
+                          resolvePendingLoot(context, c);
+                        }
+                      }
+                    : null,
+              ),
+              extra: Wrap(
+                spacing: 10,
+                children: [
+                  x.have(MatIcon.trophy(f.trophy, size: 16), s.mat(trophyKey(f.trophy)), pieceTrophies),
+                  x.have(MatIcon.bar(f.metal, size: 16), s.mat(barKey(f.metal)), pieceBars),
+                  x.have(const ItemIcon(Item.coins, size: 14), k.coins, pieceFee(k.level)),
+                ],
+              ),
+            ),
+        // The pieces with no blueprint yet: one line, not a row each.
+        if (setPieceSlots.where((slot) => s.mat(blueprintKey(f.id, slot)) == 0 && !c.hasSetPiece(f.id, slot)).toList() case final missing when missing.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Opacity(opacity: .4, child: MatIcon.blueprint(size: 18)),
+              const SizedBox(width: 6),
+              Expanded(child: Text('No blueprint yet: ${[for (final slot in missing) slot == GearSlot.armour ? 'armour' : pieceNoun(slot)].join(', ')}', style: Txt.onStone(size: 12.5, color: Palette.parch2))),
+            ]),
+          ),
+      ],
+    ];
+
+    return Spotlit(
+      on: widget.focus == 'suit:${f.id}',
+      child: Container(
+        decoration: BoxDecoration(
+          color: cls == null ? const Color(0x33000000) : Color.lerp(col, Colors.black, .82),
+          border: Border(
+            left: BorderSide(color: cls == null ? (ready ? Palette.amber : Palette.stone3) : col, width: cls == null ? 2 : 4),
+            top: BorderSide(color: cls == null ? Palette.stone3 : col.withValues(alpha: .5)),
+            right: BorderSide(color: cls == null ? Palette.stone3 : col.withValues(alpha: .5)),
+            bottom: BorderSide(color: cls == null ? Palette.stone3 : col.withValues(alpha: .5)),
+          ),
+        ),
+        padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => setState(() => open = !open),
+              child: MouseRegion(cursor: SystemMouseCursors.click, child: header),
+            ),
+            if (open) ...body,
+          ],
+        ),
+      ),
     );
   }
 }

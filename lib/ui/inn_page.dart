@@ -52,6 +52,9 @@ import 'merchant.dart';
 import 'quest_dialog.dart';
 import '../services/cloud.dart';
 import '../services/desktop.dart';
+import 'suit_ready.dart';
+import 'journey.dart';
+import 'throne_seals.dart';
 import 'theme.dart';
 import 'wilds_page.dart';
 import 'trail_data.dart' show trailAt;
@@ -83,15 +86,23 @@ class _InnPageState extends State<InnPage> with RouteAware {
     if (route != null) townRoutes.subscribe(this, route);
   }
 
+  /// The place pointed at, in the scene or on its button under it: both light up together.
+  final _hover = ValueNotifier<TownSpot?>(null);
+
   @override
   void dispose() {
     townRoutes.unsubscribe(this);
+    _hover.dispose();
     super.dispose();
   }
 
   /// Back in town from somewhere else.
   @override
-  void didPopNext() => _checkRaid();
+  void didPopNext() => _checkRaid().then((_) async {
+        if (mounted && c.sealNews && !c.state.inBattle && (ModalRoute.of(context)?.isCurrent ?? false)) await showThroneSeals(context, c);
+        if (mounted && (ModalRoute.of(context)?.isCurrent ?? false)) await maybeShowJourney(context, c);
+        await _checkSuits();
+      });
 
   /// Bandits hit the town while you were out: whoever was robbed runs up to tell you, once.
   Future<void> _checkRaid() async {
@@ -100,6 +111,21 @@ class _InnPageState extends State<InnPage> with RouteAware {
     if (!mounted || !(ModalRoute.of(context)?.isCurrent ?? false) || c.state.raidSeen) return;
     c.raidSeen();
     if (await raidAlarm(context, c) && mounted) await _chase();
+  }
+
+  /// A class suit Dunstan could finish now: he says so, once per suit (in town, forge open).
+  bool _suitAsking = false;
+  Future<void> _checkSuits() async {
+    if (_suitAsking || _away || c.state.inBattle || c.jobOffered || c.whyShut('forge') != null || c.suitToAnnounce == null) return;
+    _suitAsking = true;
+    try {
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+      if (!mounted || !(ModalRoute.of(context)?.isCurrent ?? false) || c.suitToAnnounce == null) return;
+      final id = c.suitToAnnounce!;
+      if (await announceSuitReady(context, c) && mounted) await showForgeWindow(context, c, tab: 'suits', focus: 'suit:$id');
+    } finally {
+      _suitAsking = false;
+    }
   }
 
   /// After the bandits.
@@ -125,6 +151,9 @@ class _InnPageState extends State<InnPage> with RouteAware {
         if (mounted) await talkToHob(context, c, onHunt: _hunt, first: true);
       }
       if (mounted) await _checkRaid();
+      if (mounted && c.sealNews && !c.state.inBattle) await showThroneSeals(context, c);
+      if (mounted) await maybeShowJourney(context, c);
+      if (mounted) await _checkSuits();
       // A seasonal event: welcomed once a year.
       final season = mounted ? c.greetSeason() : null;
       if (season != null && mounted) showQuestToast(context, season.label, 'A seasonal event is on in Cindervale');
@@ -257,6 +286,8 @@ class _InnPageState extends State<InnPage> with RouteAware {
           TownSpot.enchanter: 'A rune to bind',
         if (c.whyShut('forge') == null && c.engine.relicToForge != null)
           TownSpot.forge: '${relics[c.engine.relicToForge]!.name} to forge'
+        else if (c.whyShut('forge') == null && c.suitsToFinish.isNotEmpty)
+          TownSpot.forge: '${gearSetById(c.suitsToFinish.first)!.name} suit to forge'
         else if (c.whyShut('forge') == null && c.engine.upgradesReady > 0)
           TownSpot.forge: '${c.engine.upgradesReady} upgrade${c.engine.upgradesReady == 1 ? '' : 's'} ready',
       };
@@ -282,79 +313,8 @@ class _InnPageState extends State<InnPage> with RouteAware {
                             // (Opened where its note points: bolts to make opens on the bolts.)
                             TownSpot.enchanter: s.inBattle ? () => _shut('Finish your fight first') : () => c.whyShut('tower') == null ? showEnchanterWindow(context, c, tab: notes[TownSpot.enchanter] == 'Bolts to make' ? 'bolts' : null) : _shut(c.whyShut('tower')!),
                           };
-      return Scaffold(
-        body: Column(
-          children: [
-            SizedBox(height: MediaQuery.paddingOf(context).top),
-            Expanded(
-              child: LayoutBuilder(builder: (context, viewport) {
-                final pad = EdgeInsets.fromLTRB(12, 12, 12, (phone ? 12 : 20) + MediaQuery.paddingOf(context).bottom);
-                return SingleChildScrollView(
-                padding: pad,
-                child: RepaintBoundary(child: Center(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: fitWidth(context, aspect: 2, below: 230, chrome: 130)),
-                    // On a phone the square fills the screen: the place buttons and the log grow
-                    // into whatever room the cards leave.
-                    child: fillOnPhone(phone, viewport.maxHeight - pad.vertical, [
-                        if (phone) ...[
-                          Row(
-                            children: [
-                              Expanded(child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Tooltip(message: 'Your gear', child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => showGearGlance(context, c), child: AbsorbPointer(child: HeroCard(controller: c)))))),
-                              IconButton(
-                                tooltip: 'Settings',
-                                onPressed: () => showDialog<void>(context: context, builder: (_) => _SettingsWindow(controller: c)),
-                                icon: const Icon(Icons.settings, color: Palette.parch, size: 26),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                        ],
-                        _TownSquare(
-                          compact: phone,
-                          hud: Tooltip(message: 'Your gear', child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => showGearGlance(context, c), child: AbsorbPointer(child: HeroCard(controller: c)))),
-                          onSettings: () => showDialog<void>(context: context, builder: (_) => _SettingsWindow(controller: c)),
-                          look: heroLook(k),
-                          repaired: s.innRepaired,
-                          quest: offered ? 1 : (ready ? 2 : (job ? 3 : 0)),
-                          raid: s.raid,
-                          // (Plus 100 with a hardcore road won: its standard by your door, see paintHome.)
-                          home: s.home + (s.hcBest?['won'] == true ? 100 : 0),
-                          hallowash: c.season == Season.hallowash,
-                          time: !s.day ? InnSky.night : (s.won ? InnSky.clearDay : InnSky.ashDay),
-                          subtitle: c.season == Season.hallowash ? 'Hallowash in the square' : s.won ? 'The Ember King is gone. The ash is settling.' : (s.innRepaired ? 'The square, by the Soot & Kettle' : 'The square, still smoking'),
-                          labels: labels,
-                          onTap: taps,
-                        ),
-                        if (phone) ...[
-                          const SizedBox(height: 8),
-                          // The six places as big buttons under the scene, where thumbs reach.
-                          // The six places, two to a row, taller when there's room.
-                          Grow(
-                            min: 3 * 50 + 16,
-                            max: 3 * 82 + 16,
-                            weight: 2,
-                            child: Column(
-                              children: [
-                                for (final (i, row) in const [[TownSpot.gate, TownSpot.inn], [TownSpot.stall, TownSpot.forge], [TownSpot.enchanter, TownSpot.tent]].indexed) ...[
-                                  if (i > 0) const SizedBox(height: 8),
-                                  Expanded(
-                                    child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                                      children: [
-                                        for (final (j, spot) in row.indexed) ...[
-                                          if (j > 0) const SizedBox(width: 8),
-                                          Expanded(child: _PlaceButton(icon: _TownSquareState._icons[spot]!, label: notes[spot] == null ? labels[spot]! : _plainLabel(spot, s.home), note: notes[spot], onTap: taps[spot], hot: spot == TownSpot.gate, accent: _placeAccent[spot], locked: _shutSpot(spot), ready: !_shutSpot(spot) && ((spot == TownSpot.forge && c.engine.forgeReady) || (spot == TownSpot.enchanter && c.engine.gemsWaiting)))),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 10),
+      // What's waiting in town, a card each: the fight left open, the road, the board, a task...
+      final cards = <Widget>[
                         if (s.inBattle) ...[
                           _ResumeBanner(controller: c, onTap: _resume),
                           const SizedBox(height: 10),
@@ -449,8 +409,177 @@ class _InnPageState extends State<InnPage> with RouteAware {
                           _Banner(icon: Icons.inventory_2, text: c.nextLoot!.name, button: 'Open', onTap: () => resolvePendingLoot(context, c)),
                           const SizedBox(height: 10),
                         ],
+      ];
+      final scene = _TownSquare(
+        compact: phone,
+        hover: _hover,
+        hud: Tooltip(message: 'Your gear', child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => showGearGlance(context, c), child: AbsorbPointer(child: HeroCard(controller: c)))),
+        onSettings: () => showDialog<void>(context: context, builder: (_) => _SettingsWindow(controller: c)),
+        look: heroLook(k),
+        repaired: s.innRepaired,
+        quest: offered ? 1 : (ready ? 2 : (job ? 3 : 0)),
+        raid: s.raid,
+        // (Plus 100 with a hardcore road won: its standard by your door, see paintHome.)
+        home: s.home + (s.hcBest?['won'] == true ? 100 : 0),
+        hallowash: c.season == Season.hallowash,
+        time: !s.day ? InnSky.night : (s.won ? InnSky.clearDay : InnSky.ashDay),
+        subtitle: c.season == Season.hallowash ? 'Hallowash in the square' : s.won ? 'The Ember King is gone. The ash is settling.' : (s.innRepaired ? 'The square, by the Soot & Kettle' : 'The square, still smoking'),
+        labels: labels,
+        onTap: taps,
+      );
+      Widget place(TownSpot spot, {String? note}) => _PlaceButton(
+        icon: _TownSquareState._icons[spot]!,
+        label: notes[spot] == null && note == null ? labels[spot]! : (spot == TownSpot.gate ? labels[spot]! : _plainLabel(spot, s.home)),
+        note: notes[spot] ?? note,
+        onTap: taps[spot],
+        hot: spot == TownSpot.gate,
+        accent: _placeAccent[spot],
+        locked: _shutSpot(spot),
+        ready: !_shutSpot(spot) && ((spot == TownSpot.forge && c.engine.forgeReady) || (spot == TownSpot.enchanter && c.engine.gemsWaiting)),
+        hover: phone ? null : _hover,
+        spot: spot,
+      );
+      // On a big screen: the six places in a row under the scene, in the scene's own order (left to
+      // right), the way out first and widest. Point at one and its place in the scene lights up.
+      final bar = SizedBox(
+        height: 64,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final (i, spot) in const [TownSpot.gate, TownSpot.forge, TownSpot.stall, TownSpot.enchanter, TownSpot.inn, TownSpot.tent].indexed) ...[
+              if (i > 0) const SizedBox(width: 8),
+              Expanded(
+                flex: spot == TownSpot.gate ? 7 : 5,
+                child: place(
+                  spot,
+                  note: spot != TownSpot.gate
+                      ? null
+                      : s.inBattle
+                      ? 'Your fight is waiting'
+                      : offered
+                      ? 'Hob has a job for you'
+                      : s.wild != null
+                      ? 'Step ${math.max(1, s.wildDepth)}'
+                      : s.dungeon != null
+                      ? 'The run is still open'
+                      : 'Out to the map',
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+      final log = _LogPanel(entries: s.journal, onStory: _showStory, fill: phone);
+      final size = MediaQuery.sizeOf(context);
+      // A wide screen: the square and the log on the left, what's waiting on the right, all of it
+      // in view at once rather than down a long page.
+      final wide = !phone && size.width >= 1240 && size.height >= 620;
+      return Scaffold(
+        body: Column(
+          children: [
+            SizedBox(height: MediaQuery.paddingOf(context).top),
+            Expanded(
+              child: LayoutBuilder(builder: (context, viewport) {
+                final pad = EdgeInsets.fromLTRB(12, 12, 12, (phone ? 12 : 20) + MediaQuery.paddingOf(context).bottom);
+                if (wide) {
+                  const side = 420.0, gap = 16.0;
+                  final h = viewport.maxHeight - pad.vertical;
+                  // The scene as wide as the room allows, leaving the bar and a few lines of log.
+                  final left = math.min(math.min(viewport.maxWidth - pad.horizontal - side - gap, (h - 64 - 10 - 150) * 2), 1240.0);
+                  return Padding(
+                    padding: pad,
+                    child: Center(
+                      child: SizedBox(
+                        width: left + gap + side,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            SizedBox(
+                              width: left,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  RepaintBoundary(child: scene),
+                                  const SizedBox(height: 10),
+                                  bar,
+                                  const SizedBox(height: 10),
+                                  Expanded(child: _LogPanel(entries: s.journal, onStory: _showStory, fill: true)),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: gap),
+                            SizedBox(
+                              width: side,
+                              child: SingleChildScrollView(
+                                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                                  ...cards,
+                                  if (cards.isEmpty) Text('Nothing waiting in town. The road is out there.', style: Txt.onStone(size: 13)),
+                                ]),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }
+                return SingleChildScrollView(
+                padding: pad,
+                child: RepaintBoundary(child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: phone ? double.infinity : fitWidth(context, aspect: 2, below: 310, chrome: 130)),
+                    // On a phone the square fills the screen: the place buttons and the log grow
+                    // into whatever room the cards leave.
+                    child: fillOnPhone(phone, viewport.maxHeight - pad.vertical, [
+                        if (phone) ...[
+                          Row(
+                            children: [
+                              Expanded(child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Tooltip(message: 'Your gear', child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => showGearGlance(context, c), child: AbsorbPointer(child: HeroCard(controller: c)))))),
+                              IconButton(
+                                tooltip: 'Settings',
+                                onPressed: () => showDialog<void>(context: context, builder: (_) => _SettingsWindow(controller: c)),
+                                icon: const Icon(Icons.settings, color: Palette.parch, size: 26),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+                        scene,
+                        if (phone) ...[
+                          const SizedBox(height: 8),
+                          // The six places as big buttons under the scene, where thumbs reach.
+                          // The six places, two to a row, taller when there's room.
+                          Grow(
+                            min: 3 * 50 + 16,
+                            max: 3 * 82 + 16,
+                            weight: 2,
+                            child: Column(
+                              children: [
+                                for (final (i, row) in const [[TownSpot.gate, TownSpot.inn], [TownSpot.stall, TownSpot.forge], [TownSpot.enchanter, TownSpot.tent]].indexed) ...[
+                                  if (i > 0) const SizedBox(height: 8),
+                                  Expanded(
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                                      children: [
+                                        for (final (j, spot) in row.indexed) ...[
+                                          if (j > 0) const SizedBox(width: 8),
+                                          Expanded(child: place(spot)),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ] else ...[
+                          const SizedBox(height: 10),
+                          bar,
+                        ],
+                        const SizedBox(height: 10),
+                        ...cards,
                         const SizedBox(height: 12),
-                        Grow(min: 56, weight: 3, child: _LogPanel(entries: s.journal, onStory: _showStory, fill: phone)),
+                        Grow(min: 56, weight: 3, child: log),
                     ]),
                   ),
                 )),
@@ -949,7 +1078,10 @@ class _LogPanelState extends State<_LogPanel> {
 /// the Soot & Kettle with Hob out front, and your tent. Point at a place and it lights up with its
 /// sign; tap it to go there.
 class _TownSquare extends StatefulWidget {
-  const _TownSquare({required this.hud, required this.onSettings, required this.look, required this.repaired, required this.quest, required this.subtitle, required this.labels, required this.onTap, this.raid, this.time = InnSky.night, this.home = 0, this.hallowash = false, this.compact = false});
+  const _TownSquare({required this.hud, required this.onSettings, required this.look, required this.repaired, required this.quest, required this.subtitle, required this.labels, required this.onTap, required this.hover, this.raid, this.time = InnSky.night, this.home = 0, this.hallowash = false, this.compact = false});
+
+  /// The place pointed at (here or on the buttons under the scene).
+  final ValueNotifier<TownSpot?> hover;
 
   /// On a phone: just the scene (still tappable), with no card, signs or cog laid over it; the
   /// page shows those around it instead.
@@ -982,7 +1114,19 @@ class _TownSquare extends StatefulWidget {
 }
 
 class _TownSquareState extends State<_TownSquare> {
-  TownSpot? _hover;
+  ValueNotifier<TownSpot?> get _hover => widget.hover;
+
+  /// The place under a point in the scene: where places overlap (the forge up the lane behind the
+  /// stall and the signpost), the smaller, nearer one wins, so each has a fair patch to point at.
+  TownSpot? _at(Offset p, Rect Function(Rect) place) {
+    TownSpot? best;
+    var area = double.infinity;
+    for (final e in townSpots.entries) {
+      final r = place(e.value);
+      if (r.contains(p) && r.width * r.height < area) (best, area) = (e.key, r.width * r.height);
+    }
+    return best;
+  }
 
   static const _icons = {TownSpot.gate: Icons.signpost, TownSpot.stall: Icons.storefront, TownSpot.inn: Icons.sports_bar, TownSpot.tent: Icons.shield, TownSpot.forge: Icons.hardware, TownSpot.enchanter: Icons.auto_fix_high};
 
@@ -1000,34 +1144,56 @@ class _TownSquareState extends State<_TownSquare> {
             Rect place(Rect r) => Rect.fromLTRB(r.left * k, (r.top - dy) * k, r.right * k, (r.bottom - dy) * k);
             return Stack(
               children: [
-                Positioned.fill(child: _InnScene(look: widget.look, repaired: widget.repaired, quest: widget.quest, hover: _hover, raid: widget.raid, time: widget.time, home: widget.home, hallowash: widget.hallowash)),
-                for (final e in townSpots.entries)
-                  Positioned.fromRect(
-                    rect: place(e.value),
-                    child: MouseRegion(
-                      cursor: widget.onTap[e.key] != null ? SystemMouseCursors.click : MouseCursor.defer,
-                      onEnter: (_) => setState(() => _hover = e.key),
-                      onExit: (_) => setState(() => _hover = _hover == e.key ? null : _hover),
-                      child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: widget.onTap[e.key]),
+                Positioned.fill(
+                  child: ValueListenableBuilder<TownSpot?>(
+                    valueListenable: _hover,
+                    builder: (context, on, _) => _InnScene(look: widget.look, repaired: widget.repaired, quest: widget.quest, hover: on, raid: widget.raid, time: widget.time, home: widget.home, hallowash: widget.hallowash),
+                  ),
+                ),
+                // One region over the whole scene: what's under the pointer is worked out in one
+                // place (see _at), so neighbours never fight over it.
+                Positioned.fill(
+                  child: ValueListenableBuilder<TownSpot?>(
+                    valueListenable: _hover,
+                    builder: (context, on, child) => MouseRegion(
+                      cursor: on != null && widget.onTap[on] != null ? SystemMouseCursors.click : MouseCursor.defer,
+                      onHover: (e) {
+                        final at = _at(e.localPosition, place);
+                        if (at != _hover.value) _hover.value = at;
+                      },
+                      onExit: (_) => _hover.value = null,
+                      child: child,
+                    ),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTapUp: (e) {
+                        final at = _at(e.localPosition, place);
+                        if (at != null) widget.onTap[at]?.call();
+                      },
                     ),
                   ),
-                // A sign over each place, always showing, lit when pointed at.
+                ),
+                // The sign of the place pointed at, over it (the buttons under the scene name them all).
                 if (!widget.compact)
-                  for (final e in townSpots.entries)
-                  Positioned(
-                    left: (place(e.value).center.dx - 110).clamp(-50.0, box.maxWidth - 170),
-                    width: 220,
-                    top: math.max(4, place(e.value).top - 30),
-                    // The sign is a way in too: point at it and its place lights up; click it to go.
-                    child: Center(
-                      child: MouseRegion(
-                        cursor: widget.onTap[e.key] != null ? SystemMouseCursors.click : MouseCursor.defer,
-                        onEnter: (_) => setState(() => _hover = e.key),
-                        onExit: (_) => setState(() => _hover = _hover == e.key ? null : _hover),
-                        child: GestureDetector(
-                          onTap: widget.onTap[e.key],
-                          child: _Sign(icon: _icons[e.key]!, text: widget.labels[e.key] ?? '', lit: _hover == e.key, off: widget.onTap[e.key] == null),
-                        ),
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: ValueListenableBuilder<TownSpot?>(
+                        valueListenable: _hover,
+                        builder: (context, on, _) {
+                          if (on == null) return const SizedBox.shrink();
+                          final r = place(townSpots[on]!);
+                          // Centred over the place; near an edge, held against it rather than pushed
+                          // over its neighbour. Clear of your hero card in the top corner.
+                          final edge = r.center.dx < 110 ? -1.0 : (r.center.dx > box.maxWidth - 110 ? 1.0 : 0.0);
+                          return Stack(children: [
+                            Positioned(
+                              left: (r.center.dx - 110).clamp(4.0, math.max(4.0, box.maxWidth - 224)),
+                              width: 220,
+                              top: (r.top - 30).clamp(r.center.dx < 330 ? 96.0 : 8.0, math.max(96.0, box.maxHeight - 40)),
+                              child: Align(alignment: Alignment(edge, 0), child: _Sign(icon: _icons[on]!, text: widget.labels[on] ?? '', lit: true, off: widget.onTap[on] == null)),
+                            ),
+                          ]);
+                        },
                       ),
                     ),
                   ),
@@ -1456,7 +1622,7 @@ class _SettingsWindowState extends State<_SettingsWindow> {
               _toggle('Mute all', Icons.volume_off_rounded, _s.muted, (v) => _set((s) => s.muted = v)),
               // (Two graphs at the top of the screen: the upper one is drawing to the screen, the
               // lower one is the game working out each frame. Red bars are frames that ran late.)
-              if (!kIsWeb && kDebugMode) _toggle('Show frame timings', Icons.speed_rounded, _s.frameTimes, (v) => _set((s) => s.frameTimes = v)),
+              if (!kIsWeb && (kDebugMode || isDesktopApp)) _toggle('Show frame timings', Icons.speed_rounded, _s.frameTimes, (v) => _set((s) => s.frameTimes = v)),
               _slider(Icons.music_note_rounded, _s.music, (v) => _set((s) => s.music = v)),
               _slider(Icons.volume_up_rounded, _s.sound, (v) => _set((s) => s.sound = v), onEnd: () => Audio.play(Sfx.hit)),
               const SizedBox(height: 6),
@@ -1523,7 +1689,12 @@ String _plainLabel(TownSpot spot, int home) => switch (spot) {
 };
 
 class _PlaceButton extends StatelessWidget {
-  const _PlaceButton({required this.icon, required this.label, this.note, this.onTap, this.hot = false, this.ready = false, this.accent, this.locked = false});
+  const _PlaceButton({required this.icon, required this.label, this.note, this.onTap, this.hot = false, this.ready = false, this.accent, this.locked = false, this.hover, this.spot});
+
+  /// With a pointer (a big screen): the place pointed at, shared with the scene so the two light
+  /// up together; [spot] is this button's.
+  final ValueNotifier<TownSpot?>? hover;
+  final TownSpot? spot;
 
   /// A line under the name: what's waiting there (points to train, a rest).
   final String? note;
@@ -1545,7 +1716,26 @@ class _PlaceButton extends StatelessWidget {
   final bool ready;
 
   @override
-  Widget build(BuildContext context) => Opacity(
+  Widget build(BuildContext context) {
+    final h = hover;
+    if (h == null) return _button(false);
+    return MouseRegion(
+      onEnter: (_) => h.value = spot,
+      onExit: (_) {
+        if (h.value == spot) h.value = null;
+      },
+      child: ValueListenableBuilder<TownSpot?>(valueListenable: h, builder: (context, on, _) => _button(on == spot)),
+    );
+  }
+
+  Widget _button(bool lit) => AnimatedContainer(
+    duration: const Duration(milliseconds: 120),
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(4),
+      boxShadow: lit ? [BoxShadow(color: (hot ? Palette.amber : (accent ?? Palette.amber)).withValues(alpha: .55), blurRadius: 14, spreadRadius: 1)] : const [],
+    ),
+    transform: lit ? (Matrix4.identity()..translateByDouble(0, -2, 0, 1)) : Matrix4.identity(),
+    child: Opacity(
     opacity: onTap == null || locked ? .5 : 1,
     child: Material(
       color: Colors.transparent,
@@ -1598,6 +1788,7 @@ class _PlaceButton extends StatelessWidget {
           }),
         ),
       ),
+    ),
     ),
   );
 }

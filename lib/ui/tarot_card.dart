@@ -534,12 +534,14 @@ void _star(Canvas canvas, Offset at, double r, int points, Paint paint) {
 }
 
 void _label(Canvas canvas, String text, Offset centre, double size, Color colour, {double? maxWidth}) {
-  final tp = TextPainter(
-    text: TextSpan(text: text, style: Txt.label(size: size, color: colour, weight: FontWeight.w800)),
+  TextPainter paint(double s) => TextPainter(
+    text: TextSpan(text: text, style: Txt.label(size: s, color: colour, weight: FontWeight.w800)),
     textDirection: TextDirection.ltr,
     maxLines: 1,
-    ellipsis: '…',
-  )..layout(maxWidth: maxWidth ?? double.infinity);
+  )..layout();
+  // Too wide: shrink the words to fit rather than cut them off.
+  var tp = paint(size);
+  if (maxWidth != null && tp.width > maxWidth) tp = paint(size * maxWidth / tp.width);
   tp.paint(canvas, centre - Offset(tp.width / 2, tp.height / 2));
 }
 

@@ -265,6 +265,11 @@ class GameController extends ChangeNotifier {
     // time you become each knight; changing back into a suit you've worn before is just a change.)
     final cls = classOf(state.knight)?.id;
     if (loaded && cls != null && cls != _lastClass && firstTime) classAwakened.value = cls;
+    // An order mastered: its ceremony, once the killing blow and the victory have had their moment.
+    if (engine.mastered case final id?) {
+      engine.mastered = null;
+      Future<void>.delayed(const Duration(milliseconds: 3200), () => classAwakened.value = 'master:$id');
+    }
     _lastClass = cls;
     // Gear changed out of a fight (a piece swapped, armour reforged): never more HP than the new
     // most.
@@ -297,6 +302,12 @@ class GameController extends ChangeNotifier {
   void explore() {
     if (busy || state.inBattle) return;
     engine.explore();
+    _arrive();
+  }
+
+  /// One of the Ember King's generals, hunted down (call with the battle screen open).
+  void huntGeneral() {
+    if (busy || state.inBattle || engine.huntGeneral() == null) return;
     _arrive();
   }
 
@@ -466,6 +477,29 @@ class GameController extends ChangeNotifier {
   }
 
   /// You've been told about the raid (so the town doesn't tell you again).
+  /// Marks a one-off notice as seen (a "what's next" window: see journey.dart).
+  void seen(String key) {
+    engine.mark(key);
+    _changed();
+  }
+
+  /// The seal screen has seals to show (see GameEngine.sealNews); and it has shown them.
+  bool get sealNews => engine.sealNews;
+  void sealsSeen() {
+    engine.markSealsShown();
+    _changed();
+  }
+
+  /// A class suit you could finish forging now and haven't been told about (see GameEngine).
+  String? get suitToAnnounce => engine.suitToAnnounce;
+  List<String> get suitsToFinish => engine.suitsToFinish;
+
+  /// Told about suit [id]: not again.
+  void suitAnnounced(String id) {
+    engine.mark('suitready:$id');
+    _changed();
+  }
+
   void raidSeen() {
     if (state.raid == null || state.raidSeen) return;
     state.raidSeen = true;
@@ -1034,7 +1068,9 @@ class GameController extends ChangeNotifier {
   /// Casts the rite [id] from the hotbar.
   void castRite(String id) {
     if (busy || !state.inBattle || engine.whyNotRite(id) != null) return;
-    state.knight.preparedSpell = id;
+    state.knight
+      ..preparedSpell = id
+      ..newRites.remove(id);
     act(BattleAction.cast);
   }
 
@@ -1051,6 +1087,11 @@ class GameController extends ChangeNotifier {
 
   void wearDye(String id) {
     engine.wearDye(id);
+    _changed();
+  }
+
+  void wearCrest(String id) {
+    engine.wearCrest(id);
     _changed();
   }
 
@@ -1088,8 +1129,10 @@ class GameController extends ChangeNotifier {
   /// New Game+: why not yet (null: ready), and going round again (see GameEngine.newGamePlus).
   String? get whyNotNewGamePlus => engine.whyNotNewGamePlus();
 
-  Future<void> newGamePlus() async {
-    if (busy || !engine.newGamePlus()) return;
+  List<GearItem> get heirloomChoices => engine.heirloomChoices;
+
+  Future<void> newGamePlus({List<String> heirlooms = const []}) async {
+    if (busy || !engine.newGamePlus(heirlooms: heirlooms)) return;
     _emit(ResetEvent());
     outcome = null;
     _syncShown();

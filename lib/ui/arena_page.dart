@@ -164,7 +164,8 @@ class _BoutRow extends StatelessWidget {
                   TextSpan(text: bout.name, style: Txt.label(size: 14, color: won || next ? Palette.cream : Palette.parch2, weight: FontWeight.w700)),
                   TextSpan(text: '  ${bout.school}', style: Txt.label(size: 12, color: Palette.parch2)),
                 ]),
-                maxLines: 1,
+                // (Two lines: a gladiator's name and school on one line were cut short on a phone.)
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
             ),

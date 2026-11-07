@@ -135,40 +135,45 @@ class _WildsPageState extends State<WildsPage> {
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-    listenable: c,
-    builder: (context, _) {
-      final s = c.state, a = s.wild;
-      return MusicZone(
-        track: 'travel',
-        child: Scaffold(
-          body: Column(
-            children: [
-              SizedBox(height: MediaQuery.paddingOf(context).top),
-              Expanded(
-                child: LayoutBuilder(builder: (context, viewport) {
-                  final pad = EdgeInsets.fromLTRB(12, 12, 12, 20 + MediaQuery.paddingOf(context).bottom);
-                  return SingleChildScrollView(
-                  padding: pad,
-                  child: RepaintBoundary(child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 760),
-                      // Out on a trip on a phone, the trail grows to fill the screen.
-                      child: fillOnPhone(isPhone(context) && a != null, viewport.maxHeight - pad.vertical, [
-                          Align(alignment: Alignment.centerLeft, child: (widget.fromTown ? InnBackButton(label: 'Town', onPressed: () => Navigator.of(context).pop()) : InnBackButton(label: 'Map', icon: Icons.public, onPressed: () => Navigator.of(context).pop()))),
-                          const SizedBox(height: 10),
-                          if (a == null) _picker() else ..._trip(a),
-                      ]),
-                    ),
-                  )),
-                );
-                }),
+        listenable: c,
+        builder: (context, _) {
+          final s = c.state, a = s.wild;
+          return MusicZone(
+            track: 'travel',
+            child: Scaffold(
+              body: Column(
+                children: [
+                  SizedBox(height: MediaQuery.paddingOf(context).top),
+                  Expanded(
+                    child: LayoutBuilder(builder: (context, viewport) {
+                      final pad = EdgeInsets.fromLTRB(12, 12, 12, 20 + MediaQuery.paddingOf(context).bottom);
+                      return SingleChildScrollView(
+                        padding: pad,
+                        child: RepaintBoundary(
+                            child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 760),
+                            // Out on a trip on a phone, the trail grows to fill the screen.
+                            child: fillOnPhone(isPhone(context) && a != null, viewport.maxHeight - pad.vertical, [
+                              Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: (widget.fromTown
+                                      ? InnBackButton(label: 'Town', onPressed: () => Navigator.of(context).pop())
+                                      : InnBackButton(label: 'Map', icon: Icons.public, onPressed: () => Navigator.of(context).pop()))),
+                              const SizedBox(height: 10),
+                              if (a == null) _picker() else ..._trip(a),
+                            ]),
+                          ),
+                        )),
+                      );
+                    }),
+                  ),
+                ],
               ),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       );
-    },
-  );
 
   // ---------------- choosing where to go ----------------
 
@@ -189,6 +194,7 @@ class _WildsPageState extends State<WildsPage> {
             locked: c.wildOpen(i) ? null : c.whyNotWild(i),
             best: s.wildBest[i] ?? 0,
             suggested: c.wildHint(s.continent) == i,
+            deep: s.knight.ownedDyes.contains(wildDye(i)),
             onEnter: c.whyNotWild(i) == null ? () => _enter(i) : null,
           ),
           const SizedBox(height: 10),
@@ -205,154 +211,161 @@ class _WildsPageState extends State<WildsPage> {
     final log = s.journal.length > _logFrom ? s.journal.sublist(_logFrom) : const <JournalEntry>[];
     final phone = isPhone(context);
     return [
-        // Where you are: the path behind you, the waystones ahead, fog over the rest (on a phone,
-        // taller when there's room).
-        Grow(min: 170, max: 340, child: Stone(
-          padding: const EdgeInsets.all(3),
-          child: SizedBox(
-            height: phone ? null : 170,
-            child: Stack(
-              children: [
-                Positioned.fill(child: CustomPaint(painter: _PathPainter(depth: d, colour: col, best: s.wildBest[a] ?? 0, alert: s.wildAlert))),
-                Positioned(
-                  left: 10,
-                  top: 8,
-                  right: 10,
-                  child: Row(
-                    children: [
-                      Expanded(child: FitText(area.name, style: Txt.label(size: 20, color: col, weight: FontWeight.w800))),
-                      Text(d == 0 ? 'At the edge' : 'Step $d', style: Txt.label(size: 18, color: Palette.cream)),
-                    ],
+      // Where you are: the path behind you, the waystones ahead, fog over the rest (on a phone,
+      // taller when there's room).
+      Grow(
+          min: 170,
+          max: 340,
+          child: Stone(
+            padding: const EdgeInsets.all(3),
+            child: SizedBox(
+              height: phone ? null : 170,
+              child: Stack(
+                children: [
+                  Positioned.fill(child: CustomPaint(painter: _PathPainter(depth: d, colour: col, best: s.wildBest[a] ?? 0, alert: s.wildAlert))),
+                  Positioned(
+                    left: 10,
+                    top: 8,
+                    right: 10,
+                    child: Row(
+                      children: [
+                        Expanded(child: FitText(area.name, style: Txt.label(size: 20, color: col, weight: FontWeight.w800))),
+                        Text(d == 0 ? 'At the edge' : 'Step $d', style: Txt.label(size: 18, color: Palette.cream)),
+                      ],
+                    ),
                   ),
-                ),
-                Positioned(
-                  left: 10,
-                  bottom: 8,
-                  right: 10,
-                  child: Row(
-                    children: [
-                      Icon(at && e == null ? Icons.shield : Icons.signpost, size: 18, color: at && e == null ? const Color(0xFF9FE07A) : Palette.parch2),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Tooltip(
-                          message: at && e == null ? 'At a waystone: head home now and keep everything' : 'Next waystone at step $next',
-                          child: Text(
-                            at && e == null ? 'Safe' : 'Waystone in ${next - d}',
-                            overflow: TextOverflow.ellipsis,
-                            style: Txt.label(size: 14, color: at && e == null ? const Color(0xFFBFF0A0) : Palette.parch),
+                  Positioned(
+                    left: 10,
+                    bottom: 8,
+                    right: 10,
+                    child: Row(
+                      children: [
+                        Icon(at && e == null ? Icons.shield : Icons.signpost, size: 18, color: at && e == null ? const Color(0xFF9FE07A) : Palette.parch2),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Tooltip(
+                            message: at && e == null ? 'At a waystone: head home now and keep everything' : 'Next waystone at step $next',
+                            child: Text(
+                              at && e == null ? 'Safe' : 'Waystone in ${next - d}',
+                              overflow: TextOverflow.ellipsis,
+                              style: Txt.label(size: 14, color: at && e == null ? const Color(0xFFBFF0A0) : Palette.parch),
+                            ),
                           ),
                         ),
-                      ),
-                      // How much harder the foes are here, and how much more gold they carry.
-                      Tooltip(
-                        message: 'Foes here are ${wildLevels(d, a)} levels above you',
-                        child: Row(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.trending_up, size: 16, color: Color(0xFFE88A70)), Text(' +${wildLevels(d, a)}', style: Txt.label(size: 14, color: const Color(0xFFE88A70)))]),
-                      ),
-                      const SizedBox(width: 10),
-                      Tooltip(
-                        message: 'Gold from foes here',
-                        child: Row(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.monetization_on, size: 16, color: Color(0xFFFFD45A)), Text(' ×${wildGold(d).toStringAsFixed(2)}', style: Txt.label(size: 14, color: Palette.amber))]),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        )),
-        const SizedBox(height: 10),
-        // What to do next, right under the trail: press on, or head for home.
-        _actions(),
-        const SizedBox(height: 10),
-        // You and your pack.
-        Stone(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.favorite, color: Color(0xFFE05A4A), size: 20),
-                  const SizedBox(width: 6),
-                  Expanded(child: Bar(value: k.hp, max: maxHp(k), height: 18, label: '${k.hp} / ${maxHp(k)}', colours: const [Color(0xFFE0604A), Color(0xFF8A1E14)])),
-                  const SizedBox(width: 10),
-                  Tooltip(
-                    message: 'Drink a potion: +${potionHeal(k)} HP',
-                    child: SizedBox(
-                      width: 128,
-                      child: StoneButton(
-                        title: 'Potion · ${k.potions}',
-                        compact: true,
-                        onPressed: k.potions > 0 && k.hp < maxHp(k) && !s.inBattle
-                            ? () {
-                                if (c.drinkPotion() > 0) Audio.play(Sfx.potion);
-                              }
-                            : null,
-                      ),
+                        // How much harder the foes are here, and how much more gold they carry.
+                        Tooltip(
+                          message: 'Foes here are ${wildLevels(d, a)} levels above you',
+                          child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [const Icon(Icons.trending_up, size: 16, color: Color(0xFFE88A70)), Text(' +${wildLevels(d, a)}', style: Txt.label(size: 14, color: const Color(0xFFE88A70)))]),
+                        ),
+                        const SizedBox(width: 10),
+                        Tooltip(
+                          message: 'Gold from foes here',
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            const Icon(Icons.monetization_on, size: 16, color: Color(0xFFFFD45A)),
+                            Text(' ×${wildGold(d).toStringAsFixed(2)}', style: Txt.label(size: 14, color: Palette.amber))
+                          ]),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
-              Row(
+            ),
+          )),
+      const SizedBox(height: 10),
+      // What to do next, right under the trail: press on, or head for home.
+      _actions(),
+      const SizedBox(height: 10),
+      // You and your pack.
+      Stone(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.favorite, color: Color(0xFFE05A4A), size: 20),
+                const SizedBox(width: 6),
+                Expanded(child: Bar(value: k.hp, max: maxHp(k), height: 18, label: '${k.hp} / ${maxHp(k)}', colours: const [Color(0xFFE0604A), Color(0xFF8A1E14)])),
+                const SizedBox(width: 10),
+                Tooltip(
+                  message: 'Drink a potion: +${potionHeal(k)} HP',
+                  child: SizedBox(
+                    width: 128,
+                    child: StoneButton(
+                      title: 'Potion · ${k.potions}',
+                      compact: true,
+                      onPressed: k.potions > 0 && k.hp < maxHp(k) && !s.inBattle
+                          ? () {
+                              if (c.drinkPotion() > 0) Audio.play(Sfx.potion);
+                            }
+                          : null,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                const Icon(Icons.backpack, color: Palette.amber, size: 22),
+                const SizedBox(width: 6),
+                Text('Your pack', style: Txt.label(size: 16)),
+                const SizedBox(width: 10),
+                const Icon(Icons.monetization_on, color: Color(0xFFFFD45A), size: 18),
+                const SizedBox(width: 3),
+                Text(fmt(s.packGold), style: Txt.label(size: 18, color: const Color(0xFFFFD45A))),
+                const Spacer(),
+                const Tooltip(message: 'Not yours until you get it home', child: Icon(Icons.lock_clock, size: 18, color: Palette.parch2)),
+              ],
+            ),
+            const SizedBox(height: 6),
+            if (s.pack.isEmpty)
+              Text('Empty', style: Txt.onStone(size: 14))
+            else
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
                 children: [
-                  const Icon(Icons.backpack, color: Palette.amber, size: 22),
-                  const SizedBox(width: 6),
-                  Text('Your pack', style: Txt.label(size: 16)),
-                  const SizedBox(width: 10),
-                  const Icon(Icons.monetization_on, color: Color(0xFFFFD45A), size: 18),
-                  const SizedBox(width: 3),
-                  Text(fmt(s.packGold), style: Txt.label(size: 18, color: const Color(0xFFFFD45A))),
-                  const Spacer(),
-                  const Tooltip(message: 'Not yours until you get it home', child: Icon(Icons.lock_clock, size: 18, color: Palette.parch2)),
+                  for (final g in s.pack)
+                    Tooltip(
+                      message: '${g.name} · ${g.rarity.label} · level ${g.level}',
+                      child: GearIcon(item: g, size: 46, heroClass: k.heroClass, dye: k.dye),
+                    ),
                 ],
               ),
-              const SizedBox(height: 6),
-              if (s.pack.isEmpty)
-                Text('Empty', style: Txt.onStone(size: 14))
-              else
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    for (final g in s.pack)
-                      Tooltip(
-                        message: '${g.name} · ${g.rarity.label} · level ${g.level}',
-                        child: GearIcon(item: g, size: 46, heroClass: k.heroClass, dye: k.dye),
-                      ),
-                  ],
-                ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 10),
+      // What's in front of you.
+      if (e != null && e != WildEvent.waystone)
+        _EventCard(event: e, controller: c, onChoose: _choose)
+      else if (_outcome != null)
+        _Note(icon: at ? Icons.signpost : Icons.check_circle_outline, text: _outcome!)
+      else if (s.inBattle)
+        const _Note(icon: Icons.sports_martial_arts, text: 'A fight is waiting for you. Step back in to finish it.')
+      else if (d == 0) ...[
+        _Note(icon: Icons.forest, text: area.blurb),
+        const SizedBox(height: 10),
+        // The rules, open on your first trip; after that, folded away under its heading.
+        _Rules(open: c.state.wildBest.values.every((b) => b == 0)),
+      ] else
+        const _Note(icon: Icons.help_outline, text: 'The path winds on into the ash. You can\'t see what\'s next.'),
+      if (log.isNotEmpty) ...[
+        const SizedBox(height: 10),
+        Stone(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('On this trip', style: Txt.label(size: 14, color: Palette.amber)),
+              const SizedBox(height: 4),
+              for (final l in log.reversed.take(6)) Padding(padding: const EdgeInsets.only(bottom: 3), child: Text(l.text, style: Txt.onStone(size: 13.5))),
             ],
           ),
         ),
-        const SizedBox(height: 10),
-        // What's in front of you.
-        if (e != null && e != WildEvent.waystone)
-          _EventCard(event: e, controller: c, onChoose: _choose)
-        else if (_outcome != null)
-          _Note(icon: at ? Icons.signpost : Icons.check_circle_outline, text: _outcome!)
-        else if (s.inBattle)
-          const _Note(icon: Icons.sports_martial_arts, text: 'A fight is waiting for you. Step back in to finish it.')
-        else if (d == 0) ...[
-          _Note(icon: Icons.forest, text: area.blurb),
-          const SizedBox(height: 10),
-          // The rules, open on your first trip; after that, folded away under its heading.
-          _Rules(open: c.state.wildBest.values.every((b) => b == 0)),
-        ]
-        else
-          const _Note(icon: Icons.help_outline, text: 'The path winds on into the ash. You can\'t see what\'s next.'),
-        if (log.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          Stone(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('On this trip', style: Txt.label(size: 14, color: Palette.amber)),
-                const SizedBox(height: 4),
-                for (final l in log.reversed.take(6)) Padding(padding: const EdgeInsets.only(bottom: 3), child: Text(l.text, style: Txt.onStone(size: 13.5))),
-              ],
-            ),
-          ),
-        ],
+      ],
     ];
   }
 
@@ -403,16 +416,16 @@ class _RulesState extends State<_Rules> {
   @override
   Widget build(BuildContext context) {
     Widget line(IconData icon, String text) => Padding(
-      padding: const EdgeInsets.only(bottom: 5),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 18, color: Palette.inkSoft),
-          const SizedBox(width: 8),
-          Expanded(child: Text(text, style: Txt.body(size: 15))),
-        ],
-      ),
-    );
+          padding: const EdgeInsets.only(bottom: 5),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, size: 18, color: Palette.inkSoft),
+              const SizedBox(width: 8),
+              Expanded(child: Text(text, style: Txt.body(size: 15))),
+            ],
+          ),
+        );
     return Parchment(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -428,11 +441,11 @@ class _RulesState extends State<_Rules> {
             ),
           ),
           if (_open) ...[
-          const SizedBox(height: 6),
-          line(Icons.help_outline, 'Every step is a surprise. No healing on the way.'),
-          line(Icons.backpack, 'Loot goes in your pack. Deeper: tougher, richer.'),
-          line(Icons.signpost, 'Waystone every $waystoneEvery steps: leave there, keep it all.'),
-          line(Icons.directions_run, 'Leave early −${(fleeLoss * 100).round()}% · flee a fight −${(fightFleeLoss * 100).round()}% · knocked out −${(koLoss * 100).round()}%'),
+            const SizedBox(height: 6),
+            line(Icons.help_outline, 'Every step is a surprise. No healing on the way.'),
+            line(Icons.backpack, 'Loot goes in your pack. Deeper: tougher, richer.'),
+            line(Icons.signpost, 'Waystone every $waystoneEvery steps: leave there, keep it all.'),
+            line(Icons.directions_run, 'Leave early −${(fleeLoss * 100).round()}% · flee a fight −${(fightFleeLoss * 100).round()}% · knocked out −${(koLoss * 100).round()}%'),
           ],
         ],
       ),
@@ -441,7 +454,10 @@ class _RulesState extends State<_Rules> {
 }
 
 class _AreaCard extends StatelessWidget {
-  const _AreaCard({required this.area, required this.locked, required this.best, required this.suggested, required this.onEnter});
+  const _AreaCard({required this.area, required this.locked, required this.best, required this.suggested, required this.onEnter, required this.deep});
+
+  /// Its deep waystone reached (and its dye earned).
+  final bool deep;
   final WildArea area;
   final String? locked;
   final int best;
@@ -454,51 +470,74 @@ class _AreaCard extends StatelessWidget {
     return Opacity(
       opacity: locked == null ? 1 : .6,
       child: Stone(
-        child: Row(
-          children: [
-            Container(
-              width: 70,
-              height: 70,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(3),
-                border: Border.all(color: Palette.stone0, width: 2),
-                gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color.lerp(col, Colors.black, .35)!, Color.lerp(col, Colors.black, .75)!]),
+        child: LayoutBuilder(builder: (context, box) {
+          final narrow = box.maxWidth < 460;
+          final info = Row(
+            children: [
+              Container(
+                width: narrow ? 56 : 70,
+                height: narrow ? 56 : 70,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(3),
+                  border: Border.all(color: Palette.stone0, width: 2),
+                  gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color.lerp(col, Colors.black, .35)!, Color.lerp(col, Colors.black, .75)!]),
+                ),
+                child: Icon(locked == null ? Icons.forest : Icons.lock, color: Palette.cream, size: 34),
               ),
-              child: Icon(locked == null ? Icons.forest : Icons.lock, color: Palette.cream, size: 34),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(child: FitText(area.name, style: Txt.label(size: 20, color: col, weight: FontWeight.w800))),
-                      if (suggested) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                          decoration: BoxDecoration(color: Palette.bloodDeep, borderRadius: BorderRadius.circular(3), border: Border.all(color: Palette.amber)),
-                          child: Text('Gear up here', style: Txt.label(size: 12, color: Palette.amber)),
-                        ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(child: FitText(area.name, style: Txt.label(size: 20, color: col, weight: FontWeight.w800))),
+                        if (suggested) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                            decoration: BoxDecoration(color: Palette.bloodDeep, borderRadius: BorderRadius.circular(3), border: Border.all(color: Palette.amber)),
+                            child: Text('Gear up here', style: Txt.label(size: 12, color: Palette.amber)),
+                          ),
+                        ],
                       ],
-                    ],
-                  ),
-                  Text(locked ?? area.blurb, style: Txt.onStone(size: 14.5, color: locked == null ? Palette.parch2 : Palette.cream)),
-                  if (locked == null) ...[
-                    const SizedBox(height: 3),
-                    Text(
-                      '${[for (final l in area.lands) continents[l].name].join(' & ')} foes · ruled by ${area.warlord.$1}${best > 0 ? ' · deepest: step $best' : ''}',
-                      style: Txt.label(size: 13, color: Palette.parch),
                     ),
+                    Text(locked ?? area.blurb, style: Txt.onStone(size: 14.5, color: locked == null ? Palette.parch2 : Palette.cream)),
+                    if (locked == null) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        '${[for (final l in area.lands) continents[l].name].join(' & ')} foes · ruled by ${area.warlord.$1}${best > 0 ? ' · deepest: step $best' : ''}',
+                        style: Txt.label(size: 13, color: Palette.parch),
+                      ),
+                      // Its prize for going all the way out: a dye of its own.
+                      const SizedBox(height: 3),
+                      Row(children: [
+                        Icon(deep ? Icons.check_circle : Icons.palette, size: 14, color: deep ? const Color(0xFF9BE27A) : Color.lerp(Color(dyeById(wildDye(wildAreas.indexOf(area))).argb), Colors.white, .25)),
+                        const SizedBox(width: 5),
+                        Flexible(
+                          child: Text(
+                            deep ? '${dyeById(wildDye(wildAreas.indexOf(area))).name} dye: yours' : 'Reach step $wildDeepStep: the ${dyeById(wildDye(wildAreas.indexOf(area))).name} dye',
+                            style: Txt.onStone(size: 12.5, color: deep ? Palette.parch2 : Palette.cream),
+                          ),
+                        ),
+                      ]),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
-            const SizedBox(width: 10),
-            SizedBox(width: 110, child: StoneButton(title: 'Head in', tone: ButtonTone.blood, compact: true, onPressed: onEnter)),
-          ],
-        ),
+              if (!narrow) ...[
+                const SizedBox(width: 10),
+                SizedBox(width: 110, child: StoneButton(title: 'Head in', tone: ButtonTone.blood, compact: true, onPressed: onEnter)),
+              ],
+            ],
+          );
+          if (!narrow) return info;
+          return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            info,
+            const SizedBox(height: 10),
+            StoneButton(title: 'Head in', tone: ButtonTone.blood, compact: true, onPressed: onEnter),
+          ]);
+        }),
       ),
     );
   }
@@ -587,15 +626,15 @@ class _Note extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Parchment(
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, color: Palette.inkSoft, size: 22),
-        const SizedBox(width: 10),
-        Expanded(child: Text(text, style: Txt.body(size: 16))),
-      ],
-    ),
-  );
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: Palette.inkSoft, size: 22),
+            const SizedBox(width: 10),
+            Expanded(child: Text(text, style: Txt.body(size: 16))),
+          ],
+        ),
+      );
 }
 
 class _Confirm extends StatelessWidget {
@@ -604,32 +643,32 @@ class _Confirm extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Dialog(
-    backgroundColor: Colors.transparent,
-    insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
-    child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 520),
-      child: Stone(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(title, style: Txt.label(size: 20, color: Palette.amber, weight: FontWeight.w800)),
-            const SizedBox(height: 8),
-            Container(padding: const EdgeInsets.all(12), decoration: parchmentDecoration(), child: Text(text, style: Txt.body(size: 16))),
-            const SizedBox(height: 12),
-            Row(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: Stone(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(child: StoneButton(title: yes, tone: ButtonTone.blood, onPressed: () => Navigator.of(context).pop(true))),
-                const SizedBox(width: 10),
-                Expanded(child: StoneButton(title: no, onPressed: () => Navigator.of(context).pop(false))),
+                Text(title, style: Txt.label(size: 20, color: Palette.amber, weight: FontWeight.w800)),
+                const SizedBox(height: 8),
+                Container(padding: const EdgeInsets.all(12), decoration: parchmentDecoration(), child: Text(text, style: Txt.body(size: 16))),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(child: StoneButton(title: yes, tone: ButtonTone.blood, onPressed: () => Navigator.of(context).pop(true))),
+                    const SizedBox(width: 10),
+                    Expanded(child: StoneButton(title: no, onPressed: () => Navigator.of(context).pop(false))),
+                  ],
+                ),
               ],
             ),
-          ],
+          ),
         ),
-      ),
-    ),
-  );
+      );
 }
 
 /// What you brought home.
@@ -662,7 +701,9 @@ class _Haul extends StatelessWidget {
                     Text('${x.depth} step${x.depth == 1 ? '' : 's'} into the wilds.', style: Txt.body(size: 16)),
                     const SizedBox(height: 4),
                     Text(
-                      x.gold == 0 && x.items == 0 ? 'You came back empty-handed.' : 'You brought home ${fmt(x.gold)} gold${x.items > 0 ? ' and ${x.items} piece${x.items == 1 ? '' : 's'} of gear' : ''}.',
+                      x.gold == 0 && x.items == 0
+                          ? 'You came back empty-handed.'
+                          : 'You brought home ${fmt(x.gold)} gold${x.items > 0 ? ' and ${x.items} piece${x.items == 1 ? '' : 's'} of gear' : ''}.',
                       style: Txt.body(size: 16, weight: FontWeight.w700),
                     ),
                     if (!x.lost.none) ...[
@@ -699,7 +740,8 @@ class _PathPainter extends CustomPainter {
     // Sky and ground.
     c.drawRect(
       Offset.zero & size,
-      Paint()..shader = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color.lerp(colour, Colors.black, .78)!, const Color(0xFF15110C)]).createShader(Offset.zero & size),
+      Paint()
+        ..shader = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color.lerp(colour, Colors.black, .78)!, const Color(0xFF15110C)]).createShader(Offset.zero & size),
     );
     final hills = Path()..moveTo(0, h * .62);
     for (var x = 0.0; x <= w; x += 24) {
@@ -734,11 +776,13 @@ class _PathPainter extends CustomPainter {
     for (var i = from + 1; i <= to; i++) {
       path.lineTo(at(i).dx, at(i).dy);
     }
-    c.drawPath(path, Paint()
-      ..color = const Color(0xFF5A4A36)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 5
-      ..strokeCap = StrokeCap.round);
+    c.drawPath(
+        path,
+        Paint()
+          ..color = const Color(0xFF5A4A36)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 5
+          ..strokeCap = StrokeCap.round);
     // Fog over what's ahead.
     final fogFrom = at(depth).dx + 14;
     c.drawRect(
@@ -751,9 +795,12 @@ class _PathPainter extends CustomPainter {
       if (stone) {
         // A carved standing stone, glowing faintly.
         final lit = i == depth;
-        c.drawCircle(p + const Offset(0, -14), lit ? 22 : 14, Paint()
-          ..color = (lit ? const Color(0xFF9FE07A) : const Color(0xFF6FA0C0)).withValues(alpha: lit ? .35 : .18)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8));
+        c.drawCircle(
+            p + const Offset(0, -14),
+            lit ? 22 : 14,
+            Paint()
+              ..color = (lit ? const Color(0xFF9FE07A) : const Color(0xFF6FA0C0)).withValues(alpha: lit ? .35 : .18)
+              ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8));
         final s = Path()
           ..moveTo(p.dx - 7, p.dy + 4)
           ..lineTo(p.dx - 6, p.dy - 22)
@@ -761,25 +808,36 @@ class _PathPainter extends CustomPainter {
           ..lineTo(p.dx + 7, p.dy + 4)
           ..close();
         c.drawPath(s, Paint()..color = const Color(0xFF8A8A84));
-        c.drawPath(s, Paint()
-          ..color = Colors.black
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.6);
-        c.drawLine(p + const Offset(-2, -18), p + const Offset(2, -10), Paint()
-          ..color = lit ? const Color(0xFFBFF0A0) : const Color(0xFF9AC8E0)
-          ..strokeWidth = 1.6);
+        c.drawPath(
+            s,
+            Paint()
+              ..color = Colors.black
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 1.6);
+        c.drawLine(
+            p + const Offset(-2, -18),
+            p + const Offset(2, -10),
+            Paint()
+              ..color = lit ? const Color(0xFFBFF0A0) : const Color(0xFF9AC8E0)
+              ..strokeWidth = 1.6);
       } else if (i < depth) {
         c.drawCircle(p, 5, Paint()..color = Palette.parch2);
-        c.drawCircle(p, 5, Paint()
-          ..color = Colors.black
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.2);
+        c.drawCircle(
+            p,
+            5,
+            Paint()
+              ..color = Colors.black
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 1.2);
       } else if (i > depth) {
         c.drawCircle(p, 8, Paint()..color = const Color(0xFF231C14));
-        c.drawCircle(p, 8, Paint()
-          ..color = const Color(0xFF6E604C)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.2);
+        c.drawCircle(
+            p,
+            8,
+            Paint()
+              ..color = const Color(0xFF6E604C)
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 1.2);
         _text(c, '?', p, 11, const Color(0xFFBFB09A));
       }
       if (i == best && i > depth) _text(c, 'deepest', p + const Offset(0, 20), 9.5, Palette.amber);
@@ -787,18 +845,27 @@ class _PathPainter extends CustomPainter {
     }
     // You.
     final me = at(depth);
-    c.drawCircle(me, 16, Paint()
-      ..color = (alert ? const Color(0xFFFF5A3A) : Palette.amber).withValues(alpha: .45)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7));
+    c.drawCircle(
+        me,
+        16,
+        Paint()
+          ..color = (alert ? const Color(0xFFFF5A3A) : Palette.amber).withValues(alpha: .45)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7));
     c.drawCircle(me, 9, Paint()..color = alert ? const Color(0xFFFF7A5A) : Palette.amber);
-    c.drawCircle(me, 9, Paint()
-      ..color = Colors.black
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2);
+    c.drawCircle(
+        me,
+        9,
+        Paint()
+          ..color = Colors.black
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2);
     // A little banner on a pole.
-    c.drawLine(me + const Offset(0, -8), me + const Offset(0, -34), Paint()
-      ..color = const Color(0xFF2A2018)
-      ..strokeWidth = 2.4);
+    c.drawLine(
+        me + const Offset(0, -8),
+        me + const Offset(0, -34),
+        Paint()
+          ..color = const Color(0xFF2A2018)
+          ..strokeWidth = 2.4);
     c.drawPath(
       Path()
         ..moveTo(me.dx, me.dy - 34)

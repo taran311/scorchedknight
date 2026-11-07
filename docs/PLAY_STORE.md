@@ -79,7 +79,7 @@ the Shattered Sea and the Hollowdeep. One purchase unlocks the rest for good.
 > fight, and rack your favourite outfits in the armoury.
 >
 > **When you've won**
-> New Game+ brings tougher foes and better spoils. Hardcore gives you one life.
+> New Game+ sends you round again against tougher foes, with three heirlooms of your choosing. Beat the Ember King risen and Hardcore opens: one life.
 >
 > Free to start: play the first four lands, Ravenmoor and more, then unlock the full game once.
 > No subscription, no adverts, no energy timers. Sign in (optional) to carry your hero between your

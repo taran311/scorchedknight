@@ -156,6 +156,8 @@ class Knight {
     this.gloves = false,
     this.dye = 'crimson',
     List<String>? ownedDyes,
+    List<String>? crests,
+    this.crest,
     this.potions = 0,
     this.poisonFights = 0,
     this.chariotFights = 0,
@@ -171,6 +173,7 @@ class Knight {
     this.activePet,
     List<String>? mounts,
     List<String>? earnedRites,
+    List<String>? newRites,
     this.mount,
     this.scrolls = 0,
     this.female = false,
@@ -184,9 +187,11 @@ class Knight {
        brews = brews ?? {},
        mounts = mounts ?? [],
        earnedRites = earnedRites ?? [],
+       newRites = newRites ?? [],
        pets = pets ?? {},
        loadouts = loadouts ?? {for (final c in HeroClass.values) c: Loadout.starter(c)},
-       ownedDyes = ownedDyes ?? ['crimson'];
+       ownedDyes = ownedDyes ?? ['crimson'],
+       crests = crests ?? [];
 
   int level, xp, hp, coins;
   HeroClass heroClass;
@@ -206,6 +211,11 @@ class Knight {
   bool gloves;
   String dye;
   List<String> ownedDyes;
+
+  /// The orders' crests you've earned (by mastering the order: they stay yours, into New Game+),
+  /// and the one set in your portrait's frame ('' for none chosen; null, never chosen).
+  List<String> crests;
+  String? crest;
   int potions;
 
   /// Fights left with weapon poison on the blade.
@@ -243,6 +253,9 @@ class Knight {
 
   /// Rites won rather than learned (the Hall of the Slain's War Cry), by id.
   final List<String> earnedRites;
+
+  /// Class rites just learned and not yet cast: marked NEW on the hotbar and in the Tent.
+  final List<String> newRites;
   String? mount;
 
   /// Scrolls of enchanting: each pays for one rune at the enchanter instead of gold.
@@ -286,6 +299,8 @@ class Knight {
     'gloves': gloves,
     'dye': dye,
     'ownedDyes': ownedDyes,
+    if (crests.isNotEmpty) 'crests': crests,
+    if (crest != null) 'crest': crest,
     'potions': potions,
     if (poisonFights > 0) 'poison': poisonFights,
     if (chariotFights > 0) 'chariot': chariotFights,
@@ -301,6 +316,7 @@ class Knight {
     'activePet': activePet,
     if (mounts.isNotEmpty) 'mounts': mounts,
     if (earnedRites.isNotEmpty) 'earned': earnedRites,
+    if (newRites.isNotEmpty) 'newRites': newRites,
     if (mount != null) 'mount': mount,
     if (scrolls > 0) 'scrolls': scrolls,
     if (female) 'female': true,
@@ -329,6 +345,8 @@ class Knight {
       gloves: j['gloves'] as bool? ?? false,
       dye: j['dye'] as String? ?? 'crimson',
       ownedDyes: (j['ownedDyes'] as List?)?.cast<String>(),
+      crests: (j['crests'] as List?)?.cast<String>().toList(),
+      crest: j['crest'] as String?,
       potions: pots - extra,
       poisonFights: (j['poison'] as num?)?.toInt() ?? 0,
       chariotFights: (j['chariot'] as num?)?.toInt() ?? 0,
@@ -349,6 +367,7 @@ class Knight {
       activePet: j['activePet'] as String?,
       mounts: (j['mounts'] as List?)?.cast<String>().toList(),
       earnedRites: (j['earned'] as List?)?.cast<String>().toList(),
+      newRites: (j['newRites'] as List?)?.cast<String>().toList(),
       mount: j['mount'] as String?,
       scrolls: (j['scrolls'] as num?)?.toInt() ?? 0,
       female: j['female'] == true,
@@ -499,6 +518,7 @@ class GameState {
     this.doorUsed = false,
     this.bloodEdge = false,
     this.hcUnlocked = false,
+    this.heirlooms = 0,
     this.hcRun,
     this.hcBest,
     this.errand,
@@ -794,6 +814,10 @@ class GameState {
   /// (Your main hero's save.) Hardcore is open (New Game+ beaten); the hardcore hero you have on
   /// the go, as you last left them (name, level, lands); and the best run that ever fell or won.
   bool hcUnlocked;
+
+  /// The weight of the heirlooms carried into this New Game+ (see [heirloomWeight]): it makes its
+  /// foes a little tougher (see ngFoeHp), so what you bring helps without undoing what New Game+ is.
+  double heirlooms;
   Map<String, dynamic>? hcRun, hcBest;
 
   /// Wren's errand under way (null: she's home), and how many foes you'd felled when she set out.
@@ -948,6 +972,7 @@ class GameState {
     if (doorUsed) 'door': true,
     if (bloodEdge) 'edge': true,
     if (hcUnlocked) 'hcOpen': true,
+    if (heirlooms > 0) 'heirlooms': heirlooms,
     if (hcRun != null) 'hcRun': hcRun,
     if (hcBest != null) 'hcBest': hcBest,
     if (errand != null) 'errand': errand,
@@ -1106,6 +1131,7 @@ class GameState {
       doorUsed: j['door'] == true,
       bloodEdge: j['edge'] == true,
       hcUnlocked: j['hcOpen'] == true,
+      heirlooms: (j['heirlooms'] as num?)?.toDouble() ?? 0,
       hcRun: (j['hcRun'] as Map?)?.cast<String, dynamic>(),
       hcBest: (j['hcBest'] as Map?)?.cast<String, dynamic>(),
       errand: j['errand'] as String?,

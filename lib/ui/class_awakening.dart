@@ -10,6 +10,7 @@ import 'package:flutter/scheduler.dart';
 
 import '../art/looks.dart';
 import '../audio/audio.dart';
+import '../game/catalog.dart' show dyeById, orderDye;
 import '../game/controller.dart';
 import '../game/knight_classes.dart';
 import 'hero_view.dart';
@@ -75,7 +76,9 @@ class _ClassAwakeningState extends State<ClassAwakening> with SingleTickerProvid
 
   @override
   Widget build(BuildContext context) {
-    final cls = knightClassById(_id);
+    // 'master:<id>': the order mastered (rank 10), in gold; otherwise becoming its knight.
+    final master = _id?.startsWith('master:') ?? false;
+    final cls = knightClassById(master ? _id!.substring(7) : _id);
     if (cls == null) return const SizedBox.shrink();
     final k = widget.controller.state.knight, col = Color(cls.argb);
     // In, hold, and out over the last half second.
@@ -95,7 +98,7 @@ class _ClassAwakeningState extends State<ClassAwakening> with SingleTickerProvid
           children: [
             // The world goes dark, and the class's colour wells up behind you.
             Positioned.fill(child: ColoredBox(color: Colors.black.withValues(alpha: .9 * dim))),
-            Positioned.fill(child: CustomPaint(painter: _Burst(_t, col, out))),
+            Positioned.fill(child: CustomPaint(painter: _Burst(_t, master ? const Color(0xFFFFC85A) : col, out))),
             Center(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -127,16 +130,16 @@ class _ClassAwakeningState extends State<ClassAwakening> with SingleTickerProvid
                         offset: Offset(0, 12 * (1 - name)),
                         child: Column(
                           children: [
-                            Text('YOU ARE NOW', style: Txt.label(size: 13, color: Palette.parch2, weight: FontWeight.w800).copyWith(letterSpacing: 3)),
+                            Text(master ? 'MASTER OF THE ORDER' : 'YOU ARE NOW', style: Txt.label(size: 13, color: Palette.parch2, weight: FontWeight.w800).copyWith(letterSpacing: 3)),
                             const SizedBox(height: 4),
                             FittedBox(
                               fit: BoxFit.scaleDown,
                               child: Text(
-                                withArticleOf(cls.name).toUpperCase(),
+                                master ? cls.name.toUpperCase() : withArticleOf(cls.name).toUpperCase(),
                                 style: Txt.logo().copyWith(fontSize: 34, color: col, letterSpacing: 2, shadows: [Shadow(color: col.withValues(alpha: .8), blurRadius: 18), const Shadow(color: Colors.black, blurRadius: 4)]),
                               ),
                             ),
-                            Text(cls.focus, style: Txt.label(size: 15, color: Palette.cream)),
+                            Text(master ? 'Rank $maxRank' : cls.focus, style: Txt.label(size: 15, color: master ? const Color(0xFFFFD27A) : Palette.cream)),
                           ],
                         ),
                       ),
@@ -148,11 +151,19 @@ class _ClassAwakeningState extends State<ClassAwakening> with SingleTickerProvid
                         constraints: const BoxConstraints(maxWidth: 380),
                         child: Column(
                           children: [
-                            Text(cls.blurb, textAlign: TextAlign.center, style: Txt.onStone(size: 14, color: Palette.cream)),
-                            const SizedBox(height: 10),
-                            if (first != null) _line(Icons.auto_awesome, col, 'Rank 1 rite: ${first.name}'),
-                            _line(Icons.military_tech, col, 'At rank $maxRank: ${cls.passive}. ${cls.passiveText}'),
-                            _line(Icons.gps_fixed, col, '${cls.bolts}: ${cls.boltsText.toLowerCase()}'),
+                            if (master) ...[
+                              Text('The order has nothing left to teach you.', textAlign: TextAlign.center, style: Txt.onStone(size: 14, color: Palette.cream)),
+                              const SizedBox(height: 10),
+                              _line(Icons.military_tech, col, '${cls.passive}: ${cls.passiveText}'),
+                              _line(Icons.palette, Color(dyeById(orderDye(cls.id)).argb), 'The order\'s own colour: ${dyeById(orderDye(cls.id)).name} dye, never sold. You\'re wearing it'),
+                              _line(Icons.shield, col, 'The ${cls.name}\'s crest, set in your portrait\'s frame. It stays yours, into New Game+'),
+                            ] else ...[
+                              Text(cls.blurb, textAlign: TextAlign.center, style: Txt.onStone(size: 14, color: Palette.cream)),
+                              const SizedBox(height: 10),
+                              if (first != null) _line(Icons.auto_awesome, col, 'Rank 1 rite: ${first.name}'),
+                              _line(Icons.military_tech, col, 'At rank $maxRank: ${cls.passive}. ${cls.passiveText}'),
+                              _line(Icons.gps_fixed, col, '${cls.bolts}: ${cls.boltsText.toLowerCase()}'),
+                            ],
                             const SizedBox(height: 12),
                             Text('Tap to carry on', style: Txt.label(size: 12, color: Palette.parch2)),
                           ],

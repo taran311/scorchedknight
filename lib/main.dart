@@ -17,6 +17,13 @@ import 'services/full_game.dart';
 import 'game/controller.dart';
 import 'ui/moves_preview.dart';
 import 'ui/effects_preview.dart';
+import 'ui/map_page.dart' show MapPanelsAudit;
+import 'ui/trail_page.dart' show TrailPage;
+import 'ui/wilds_page.dart' show WildsPage;
+import 'ui/arena_page.dart' show ArenaPage;
+import 'ui/hall_page.dart' show HallPage;
+import 'ui/dungeon_page.dart' show DungeonPage;
+import 'ui/throne_seals.dart';
 import 'ui/armoury.dart';
 import 'ui/bestiary.dart';
 import 'ui/frames.dart';
@@ -197,8 +204,30 @@ class _ScorchedKnightAppState extends State<ScorchedKnightApp> {
         if (Uri.base.queryParameters.containsKey('tarot')) return const TarotPreview();
         if (Uri.base.queryParameters.containsKey('moves')) return const MovesPreview();
         if (Uri.base.queryParameters.containsKey('effects')) return const EffectsPreview();
+        // ?seals=0:0-1:2 : the seal screen from (Deepforge's broken 0/1, others) to the same; a tap replays it.
+        if (Uri.base.queryParameters['seals'] case final q?) {
+          (bool, int) read(String x) => (x.split(':').first == '1', int.tryParse(x.split(':').last) ?? 0);
+          final parts = q.split('-');
+          return ThroneSealsView(steps: const [('Beat Thane Grimnar in Deepforge Hold', false), ('Beat 6 side-land lords · 2 of 6', false)], before: read(parts.first), now: read(parts.last));
+        }
         final cloud = CloudSave.instance;
         if (!_game.loaded || (cloud.available && !cloud.authKnown)) return const Scaffold(body: Center(child: CircularProgressIndicator(color: Palette.amber)));
+        // ?audit=map : every map panel stacked, from this save (see MapPanelsAudit).
+        if (Uri.base.queryParameters['audit'] == 'map') return MapPanelsAudit(controller: _game);
+        // ?audit=trail&land=N : that land's trail page, straight in.
+        if (Uri.base.queryParameters['audit'] == 'trail') return TrailPage(controller: _game, land: int.tryParse(Uri.base.queryParameters['land'] ?? '') ?? 0);
+        // ?audit=wilds[&area=N], ?audit=arena, ?audit=hall, ?audit=dungeon&id=X : those pages, straight in.
+        if (Uri.base.queryParameters['audit'] == 'wilds') {
+          final a = int.tryParse(Uri.base.queryParameters['area'] ?? '');
+          if (a != null && _game.state.wild == null) _game.enterWild(a);
+          return WildsPage(controller: _game, area: a, fromTown: true);
+        }
+        if (Uri.base.queryParameters['audit'] == 'arena') return ArenaPage(controller: _game);
+        if (Uri.base.queryParameters['audit'] == 'hall') return HallPage(controller: _game);
+        if (Uri.base.queryParameters['audit'] == 'dungeon') {
+          _game.state.dungeon ??= Uri.base.queryParameters['id'];
+          return DungeonPage(controller: _game);
+        }
         // Cloud saves on: sign in (or choose to play without an account) first.
         if (widget.controller == null && cloud.available && !cloud.signedIn && !_game.state.settings.guest) {
           return MusicZone(key: const ValueKey('signin'), track: 'title', child: SignInScreen(controller: _game));

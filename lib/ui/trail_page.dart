@@ -114,6 +114,19 @@ class _TrailPageState extends State<TrailPage> {
     Navigator.of(context).pushReplacement(MaterialPageRoute<void>(builder: (_) => TrailPage(controller: c, land: to)));
   }
 
+  /// After one of the Ember King's generals.
+  Future<void> _hunt() async {
+    if (!c.state.inBattle && !c.engine.canHuntGeneral) {
+      c.travel(land);
+      if (!c.engine.canHuntGeneral) return;
+    }
+    if (!await _readyToFight() || !mounted) return;
+    c.travel(land);
+    final exit = await openBattle(context, c, c.state.inBattle ? BattleStart.resume : BattleStart.general);
+    if (!mounted) return;
+    if (exit == BattleExit.inn) Navigator.of(context).popUntil((r) => r.isFirst);
+  }
+
   /// Against the land's boss, risen.
   Future<void> _goHeroic() async {
     if (!c.state.inBattle && c.engine.whyNotRisen(land) != null) return;
@@ -155,14 +168,17 @@ class _TrailPageState extends State<TrailPage> {
                             ],
                           ),
                           const SizedBox(height: 8),
+                          // The land's name on a line of its own (beside the day and progress pills it
+                          // was squeezed till "Ravenmoor" broke mid-word), the pills under it.
+                          FitText(l.name, wrap: false, minScale: .7, style: Txt.logo().copyWith(fontSize: 22)),
+                          const SizedBox(height: 2),
                           Row(
                             children: [
-                              Expanded(child: Text(l.name, style: Txt.logo().copyWith(fontSize: 22))),
+                              Expanded(child: Text('Foes level $level', style: Txt.label(size: 13, color: Palette.parch))),
                               if (_nightPill(s, l) case final p?) ...[p, const SizedBox(width: 6)],
                               _landPill(c, land, step, at),
                             ],
                           ),
-                          Text('Foes level $level', style: Txt.label(size: 13, color: Palette.parch)),
                           const SizedBox(height: 6),
                         ],
                         // The land, with its trail drawn over it.
@@ -293,7 +309,7 @@ class _TrailPageState extends State<TrailPage> {
                           ],
                         // The Throne: the Ember King's generals, and how much weaker each one leaves him.
                         if (land == mainLands - 1 && !s.bossesDown.contains(land)) ...[
-                          _Generals(state: s),
+                          _Generals(state: s, onHunt: c.engine.canHuntGeneral || c.whyNotTravel(land) == null ? _hunt : null),
                           const SizedBox(height: 10),
                         ],
                         Grow(child: _Lurking(controller: c, land: land)),
@@ -587,6 +603,12 @@ class _Heroic extends StatelessWidget {
                     Text('${boss.name}, Risen', style: Txt.label(size: 19, color: Palette.cream, weight: FontWeight.w800)),
                     const SizedBox(height: 2),
                     Text(ready ? 'One fight, tougher than before' : why, style: Txt.label(size: 13, color: ready ? Palette.parch2 : gold)),
+                    // The Ember King, risen: what's different, and his prize (it goes on into New Game+).
+                    if (land == throneLand) ...[
+                      const SizedBox(height: 4),
+                      Text('Unbowed: stun, freeze or lull him and he loses that turn, but never two running', style: Txt.onStone(size: 12.5, color: Palette.cream)),
+                      Text(s.knight.ownedDyes.contains(kingslayerDye) ? '✓ Kingslayer gold dye, yours' : 'Prize: the Kingslayer gold dye, which comes with you into New Game+', style: Txt.onStone(size: 12.5, color: gold)),
+                    ],
                     for (final r in shown) ...[
                       const SizedBox(height: 10),
                       _RelicReward(
@@ -767,9 +789,12 @@ class _RelicReward extends StatelessWidget {
                                     children: [
                                       Icon(has[i] ? Icons.check : (local || elsewhere ? Icons.place : Icons.lock_outline), size: 14, color: col),
                                       const SizedBox(width: 4),
-                                      Text(
-                                        has[i] ? parts[i].name : (local ? '${parts[i].name} · HERE' : '${parts[i].name} · ${elsewhere ? keeper : continents[parts[i].land].name}'),
-                                        style: Txt.label(size: 12.5, color: col, weight: local ? FontWeight.w800 : FontWeight.w700),
+                                      // (Free to wrap: a long part and place ran out past the box on a phone.)
+                                      Flexible(
+                                        child: Text(
+                                          has[i] ? parts[i].name : (local ? '${parts[i].name} · HERE' : '${parts[i].name} · ${elsewhere ? keeper : continents[parts[i].land].name}'),
+                                          style: Txt.label(size: 12.5, color: col, weight: local ? FontWeight.w800 : FontWeight.w700),
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -1162,7 +1187,9 @@ class _TrailPainter extends CustomPainter {
         _text(canvas, '${i + 1}', p, here ? 20 : 16, here ? const Color(0xFF15110C) : const Color(0xFFBFB09A));
       }
       // The stop's name under it.
-      _text(canvas, trailStops[land][i], p + const Offset(0, 40), 15, here ? const Color(0xFFFFE6A0) : const Color(0xCCDDD0B1));
+      // (Not the first stop's name while the way-on marker stands over the lair: it sits right on
+      // top of it, and the name showed half-hidden, like one cut short.)
+      if (!(i == 0 && step != TrailStep.stop)) _text(canvas, trailStops[land][i], p + const Offset(0, 40), 15, here ? const Color(0xFFFFE6A0) : const Color(0xCCDDD0B1));
     }
 
     // The lair: a dark ring with a crown, glowing once it's open.
@@ -1248,8 +1275,11 @@ class _TrailPainter extends CustomPainter {
 /// The Ember King's generals, on the Throne's trail: who's down, who still stands, and what it's
 /// worth against him.
 class _Generals extends StatelessWidget {
-  const _Generals({required this.state});
+  const _Generals({required this.state, this.onHunt});
   final GameState state;
+
+  /// Go after one still standing (null: all down).
+  final VoidCallback? onHunt;
 
   @override
   Widget build(BuildContext context) {
@@ -1267,7 +1297,12 @@ class _Generals extends StatelessWidget {
         children: [
           Text(down == 0 ? 'THE EMBER KING\'S GENERALS' : 'GENERALS DOWN: $down OF ${emberGenerals.length} · VHARRAX ${(generalCut * down * 100).round()}% WEAKER', style: Txt.label(size: 12, color: ember)),
           const SizedBox(height: 4),
-          Text('Each one you fell on the road before you face him leaves him weaker.', style: Txt.onStone(size: 13.5)),
+          Text(
+            down >= emberGenerals.length
+                ? 'All three are down. He\'s as weak as he\'ll ever be.'
+                : 'Not needed to face him, but each one you fell first leaves him ${(generalCut * 100).round()}% weaker. They turn up now and then on the road here, or go after them.',
+            style: Txt.onStone(size: 13.5),
+          ),
           const SizedBox(height: 6),
           Wrap(
             spacing: 6,
@@ -1281,6 +1316,10 @@ class _Generals extends StatelessWidget {
                 ),
             ],
           ),
+          if (down < emberGenerals.length && onHunt != null) ...[
+            const SizedBox(height: 8),
+            StoneButton(title: 'Hunt a general', caption: '${emberGenerals.length - down} still standing', compact: true, onPressed: onHunt),
+          ],
         ],
       ),
     );

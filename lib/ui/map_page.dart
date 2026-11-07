@@ -19,12 +19,14 @@ import 'hud.dart';
 import 'stat_icons.dart' show InfoChip;
 import 'loot_window.dart' show resolvePendingLoot;
 import 'material_icons.dart';
+import 'throne_seals.dart';
 import 'theme.dart';
 import 'trail_data.dart';
 import 'trail_page.dart';
 import 'wilds_page.dart';
 import '../game/wilds.dart';
 import '../game/dungeons.dart';
+import '../game/crafting.dart';
 import '../game/contracts.dart';
 import '../game/models.dart' show GameState;
 import 'arena_page.dart';
@@ -51,8 +53,11 @@ const _wildSpots = <Offset>[Offset(560, 524), Offset(480, 120), Offset(690, 110)
 /// On a phone the map gets a tall window of its own, drawn big enough to read, opening on the land
 /// you're in: drag to look around, pinch to zoom.
 class _PhoneMap extends StatefulWidget {
-  const _PhoneMap({required this.focus, required this.builder});
+  const _PhoneMap({required this.focus, required this.builder, this.jump = 0});
   final Offset focus;
+
+  /// Changed: swing round to [focus] (a pick from the list), keeping the zoom.
+  final int jump;
 
   /// The map at [width]; [close] once you've pinched in far enough to read every name.
   final Widget Function(double width, bool close) builder;
@@ -78,6 +83,19 @@ class _PhoneMapState extends State<_PhoneMap> {
   void _zoomed() {
     final close = _view.value.getMaxScaleOnAxis() >= _closeAt;
     if (close != _close) setState(() => _close = close);
+  }
+
+  @override
+  void didUpdateWidget(_PhoneMap old) {
+    super.didUpdateWidget(old);
+    final size = _placed;
+    if (old.jump == widget.jump || size == null) return;
+    final w = size.height * 1000 / _mapH, k = w / 1000, zoom = _view.value.getMaxScaleOnAxis();
+    final dx = (size.width / 2 - widget.focus.dx * k * zoom).clamp(math.min(0.0, size.width - w * zoom), 0.0).toDouble();
+    final dy = (size.height / 2 - widget.focus.dy * k * zoom).clamp(math.min(0.0, size.height - size.height * zoom), 0.0).toDouble();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _view.value = Matrix4.identity()
+      ..translateByDouble(dx, dy, 0, 1)
+      ..scaleByDouble(zoom, zoom, 1, 1));
   }
 
   @override
@@ -320,6 +338,128 @@ class _MapPageState extends State<MapPage> {
 
   void _home() => Navigator.of(context).pop();
 
+  /// Bumped when a pick comes from the list, so a phone's map swings round to show it.
+  int _jump = 0;
+
+  /// Where the picked thing is on the map (for a phone's map to swing round to).
+  Offset get _focus {
+    if (placeById(_placePick) case final p?) return Offset(p.x, p.y);
+    if (dungeonById(_dungeonPick) case final d?) return Offset(d.x, d.y);
+    if (_wildPick case final a?) return _wildSpots[a];
+    if (_arenaPick) return const Offset(arenaX, arenaY);
+    if (_hallPick) return const Offset(hallX, hallY);
+    return _spots[_pick];
+  }
+
+  /// The list of everywhere: a row picks it, as its marker would.
+  Future<void> _openList() async {
+    final pick = await showModalBottomSheet<_Pick>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      constraints: BoxConstraints(maxWidth: 560, maxHeight: MediaQuery.sizeOf(context).height * .82),
+      builder: (_) => SizedBox(height: MediaQuery.sizeOf(context).height * .82, child: _LandsSheet(controller: c)),
+    );
+    if (pick == null || !mounted) return;
+    setState(() {
+      _arenaPick = pick.kind == 'arena';
+      _hallPick = pick.kind == 'hall';
+      _placePick = pick.kind == 'place' ? pick.id : null;
+      _dungeonPick = pick.kind == 'dungeon' ? pick.id : null;
+      _wildPick = pick.kind == 'wild' ? int.parse(pick.id) : null;
+      if (pick.kind == 'land') _pick = int.parse(pick.id);
+      _jump++;
+    });
+  }
+
+  /// The button that opens the list.
+  Widget _listButton() => Tooltip(
+    message: 'Everywhere, as a list',
+    child: Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _openList,
+        borderRadius: BorderRadius.circular(3),
+        child: Ink(
+          decoration: stoneDecoration(fill: Palette.stone3),
+          padding: const EdgeInsets.fromLTRB(10, 6, 12, 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.format_list_bulleted, color: Palette.amber, size: 20),
+              const SizedBox(width: 6),
+              Text('Lands', style: Txt.label(size: 15, color: Palette.cream, weight: FontWeight.w800)),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+
+  /// What's picked on the map, and the way into it.
+  Widget _panel() {
+    if (_arenaPick) return _ArenaPanel(controller: c, onGo: _arena);
+    if (_hallPick) return _HallPanel(controller: c, onGo: _hall);
+    if (dungeonById(_dungeonPick) case final d?) return _DungeonPanel(controller: c, dungeon: d, onGo: () => _delve(d));
+    if (placeById(_placePick) case final p?) return _PlacePanel(controller: c, place: p, onGo: () => _explore(p));
+    if (_wildPick case final a?) return _WildPanel(controller: c, area: a, onGo: () => _wilds(a));
+    return _ContinentPanel(controller: c, index: _pick, onEnter: () => _enter(_pick));
+  }
+
+  /// A wide screen: the map on the left, as big as the height allows; your card, the way home and
+  /// what's picked on the right.
+  Widget _wide(BuildContext context, Widget map) {
+    const side = 400.0, gap = 16.0;
+    return MusicZone(
+      track: 'travel',
+      child: Scaffold(
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: LayoutBuilder(builder: (context, box) {
+              final w = math.min(box.maxWidth - side - gap, (box.maxHeight - 6) * 1000 / _mapH);
+              return Center(
+                child: SizedBox(
+                  width: w + gap + side,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      SizedBox(width: w, child: RepaintBoundary(child: map)),
+                      const SizedBox(width: gap),
+                      SizedBox(
+                        width: side,
+                        // As tall as the map (so the two line up), unless that's too short for the panel.
+                        height: math.min(box.maxHeight, math.max(w * _mapH / 1000, 560)),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Tooltip(message: 'Your gear', child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => showGearGlance(context, c), child: AbsorbPointer(child: HeroCard(controller: c)))))),
+                                const SizedBox(width: 8),
+                                InnBackButton(label: 'Town', onPressed: _home),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Align(alignment: Alignment.centerLeft, child: _listButton()),
+                            const SizedBox(height: 10),
+                            // (Laid out as on a phone: the panels already know how to stack for a
+                            // column this narrow.)
+                            Expanded(child: MediaQuery(data: MediaQuery.of(context).copyWith(size: Size(side, box.maxHeight)), child: SingleChildScrollView(child: _panel()))),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+      ),
+    );
+  }
+
   /// The page's frame: on a phone it fits the screen exactly, above the system bar; elsewhere it
   /// scrolls if it must.
   Widget _frame(BuildContext context, bool phone, Widget child) => phone
@@ -356,37 +496,7 @@ class _MapPageState extends State<MapPage> {
         listenable: c,
         builder: (context, _) {
           final s = c.state, phone = isPhone(context);
-          return MusicZone(
-              track: 'travel',
-              child: Scaffold(
-                body: Column(
-                  children: [
-                    SizedBox(height: MediaQuery.paddingOf(context).top),
-                    Expanded(
-                      // On a phone the whole page fits the screen (no scrolling to reach the button):
-                      // the map takes whatever room the panel leaves it.
-                      child: _frame(
-                        context,
-                        phone,
-                        RepaintBoundary(child: Center(
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(maxWidth: fitWidth(context, aspect: 1000 / _mapH, below: 200)),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                // Your card and the way home sit above the map, not on it (they used to
-                                // cover the lands in the corners).
-                                ...[
-                                  Row(
-                                    children: [
-                                      Expanded(child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Tooltip(message: 'Your gear', child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => showGearGlance(context, c), child: AbsorbPointer(child: HeroCard(controller: c)))))),
-                                      const SizedBox(width: 8),
-                                      InnBackButton(label: 'Town', onPressed: _home),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 8),
-                                ],
-                                _grow(phone, Stone(
+          final map = Stone(
                                   padding: const EdgeInsets.all(3),
                                   child: Builder(
                                     builder: (context) {
@@ -410,6 +520,7 @@ class _MapPageState extends State<MapPage> {
                                                   pins: [for (final p in places) if (c.placeShown(p) || (!p.hidden && p.relic == null)) (p, s.explored.contains(p.id), c.whyNotExplore(p.id) == null)],
                                                   pinPicked: _placePick,
                                                   lockedLands: {for (var i = 0; i < continents.length; i++) if (c.whyNotTravel(i) != null) i},
+                                                  sealed: {if (c.whyNotTravel(throneLand) == 'Sealed') throneLand},
                                                   levelGates: {for (var i = 0; i < continents.length; i++) if (c.whyNotTravel(i)?.startsWith('Reach level') ?? false) i: continents[i].minLevel},
                                                   relicSpots: {
                                                     for (final p in places) if (relicPartsAt(p.id).any((e) => c.engine.relicPartWanted(e.$1, e.$2))) p.id,
@@ -474,26 +585,54 @@ class _MapPageState extends State<MapPage> {
                                         );
                                       }
 
-                                      if (phone) return _PhoneMap(focus: _spots[_pick], builder: mapAt);
+                                      if (phone) return _PhoneMap(focus: _focus, jump: _jump, builder: mapAt);
                                       return AspectRatio(aspectRatio: 1000 / _mapH, child: LayoutBuilder(builder: (context, box) => mapAt(box.maxWidth)));
                                     },
                                   ),
-                                )),
+                                );
+          final size = MediaQuery.sizeOf(context);
+          // A wide screen: the map as big as the height allows, and what's picked beside it (not
+          // under it, down a scroll).
+          if (!phone && size.width >= 1240 && size.height >= 600) return _wide(context, map);
+          return MusicZone(
+              track: 'travel',
+              child: Scaffold(
+                body: Column(
+                  children: [
+                    SizedBox(height: MediaQuery.paddingOf(context).top),
+                    Expanded(
+                      // On a phone the whole page fits the screen (no scrolling to reach the button):
+                      // the map takes whatever room the panel leaves it.
+                      child: _frame(
+                        context,
+                        phone,
+                        RepaintBoundary(child: Center(
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(maxWidth: fitWidth(context, aspect: 1000 / _mapH, below: 200)),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                // Your card and the way home sit above the map, not on it (they used to
+                                // cover the lands in the corners).
+                                ...[
+                                  Row(
+                                    children: [
+                                      Expanded(child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Tooltip(message: 'Your gear', child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => showGearGlance(context, c), child: AbsorbPointer(child: HeroCard(controller: c)))))),
+                                      const SizedBox(width: 8),
+                                      InnBackButton(label: 'Town', onPressed: _home),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                ],
+                                // The list of everywhere, from the map's corner.
+                                _grow(phone, Stack(fit: StackFit.passthrough, children: [map, Positioned(right: 8, top: 8, child: _listButton())])),
                                 if (phone && s.knight.level < 3)
                                   Padding(
                                     padding: const EdgeInsets.only(top: 4),
                                     child: Text('Drag to look around · zoom in to see every name', textAlign: TextAlign.center, style: Txt.label(size: 12, color: Palette.parch2)),
                                   ),
                                 SizedBox(height: phone ? 6 : 10),
-                                if (_arenaPick)
-                                  _ArenaPanel(controller: c, onGo: _arena)
-                                else if (_hallPick)
-                                  _HallPanel(controller: c, onGo: _hall)
-                                else if (dungeonById(_dungeonPick) case final d?)
-                                  _DungeonPanel(controller: c, dungeon: d, onGo: () => _delve(d))
-                                else if (placeById(_placePick) case final p?)
-                                  _PlacePanel(controller: c, place: p, onGo: () => _explore(p))
-                                else if (_wildPick case final a?) _WildPanel(controller: c, area: a, onGo: () => _wilds(a)) else _ContinentPanel(controller: c, index: _pick, onEnter: () => _enter(_pick)),
+                                _panel(),
                               ],
                             ),
                           ),
@@ -536,10 +675,28 @@ class _ContinentPanel extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(land.name, style: Txt.label(size: 22, color: col, weight: FontWeight.w800)),
-            if (blocked != null)
+            // The Ember Throne: what opens it, as a checklist ticked off as you go.
+            if (c.engine.throneSteps case final steps? when index == throneLand)
+              for (final (text, done) in steps)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Row(
+                    children: [
+                      Icon(done ? Icons.check_circle : Icons.radio_button_unchecked, size: 18, color: done ? const Color(0xFF9BE27A) : Palette.stone3),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          text,
+                          style: Txt.onStone(size: 15, color: done ? Palette.parch2 : Palette.cream).copyWith(decoration: done ? TextDecoration.lineThrough : null),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+            else if (blocked != null)
               Text(blocked, style: Txt.onStone(size: 16, color: Palette.cream))
             else ...[
-              Text(land.blurb, maxLines: 4, overflow: TextOverflow.ellipsis, style: Txt.onStone(size: 15)),
+              Text(land.blurb, style: Txt.onStone(size: 15)),
               const SizedBox(height: 6),
               Row(
                 children: [
@@ -555,14 +712,15 @@ class _ContinentPanel extends StatelessWidget {
                       ),
                     ),
                   Icon(step == TrailStep.patrol ? Icons.flag : Icons.workspace_premium, size: 20, color: step == TrailStep.stop ? Palette.stone3 : Palette.amber),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: FitText(
-                      step == TrailStep.patrol ? '${land.boss.name} beaten' : (step == TrailStep.lair ? 'The lair is open!' : '${trailLairs[index]} ahead'),
-                      style: Txt.label(size: 14, color: Palette.parch),
-                    ),
-                  ),
                 ],
+              ),
+              // (On a line of its own: beside the stops a boss's name had no room and was cut short.)
+              Padding(
+                padding: const EdgeInsets.only(top: 3),
+                child: Text(
+                  step == TrailStep.patrol ? '${land.boss.name} beaten' : (step == TrailStep.lair ? 'The lair is open!' : '${trailLairs[index]} ahead'),
+                  style: Txt.label(size: 14, color: Palette.parch),
+                ),
               ),
               // What's left worth having here: places, dungeons and relic parts, found/all.
               Builder(
@@ -606,6 +764,9 @@ class _ContinentPanel extends StatelessWidget {
         // Past the free lands: the way to the full game, rather than a dead "Locked".
         c.engine.lockedByFullGame(index)
             ? StoneButton(title: 'Full game', caption: 'Unlock', tone: ButtonTone.amber, onPressed: () => showFullGame(context, c))
+            // The sealed throne, once you've met its seals: a look at them.
+            : blocked == 'Sealed' && c.engine.sealsShown != null
+            ? StoneButton(title: 'The seals', caption: '${(c.engine.sealsNow.$1 ? 1 : 0) + c.engine.sealsNow.$2} of $throneSeals broken', tone: ButtonTone.amber, onPressed: () => showThroneSeals(context, c))
             : StoneButton(
                 title: blocked == null ? 'Enter' : 'Locked',
                 caption: blocked == null ? land.name : null,
@@ -664,7 +825,7 @@ class _PlacePanel extends StatelessWidget {
             if (contractFor(p.id) case final job? when !done)
               Text('Contract: ${job.client} pays ${contractBounty(c.state.knight.level)} gold', style: Txt.label(size: 12.5, color: const Color(0xFFE0B070))),
             const SizedBox(height: 2),
-            Text(done ? p.after : p.blurb, maxLines: 3, overflow: TextOverflow.ellipsis, style: Txt.onStone(size: 15)),
+            Text(done ? p.after : p.blurb, style: Txt.onStone(size: 15)),
           ],
         ),
         StoneButton(
@@ -734,7 +895,7 @@ class _HallPanel extends StatelessWidget {
             Text(hallName, style: Txt.label(size: 22, color: Palette.cream, weight: FontWeight.w800)),
             Text('${continents[hallLand].name} · ${done ? 'the hall has drunk to you' : 'wave ${s.hallWaves + 1} of ${hallWaves.length}'}', style: Txt.label(size: 13, color: Palette.amber)),
             const SizedBox(height: 2),
-            Text(why ?? (done ? 'The Thane will fight you again, for the glory of it.' : 'Three waves of the honoured dead, no rest between. They teach a War Cry, and the Thane carries the Allfather\'s spear.'), maxLines: 3, overflow: TextOverflow.ellipsis, style: Txt.onStone(size: 15)),
+            Text(why ?? (done ? 'The Thane will fight you again, for the glory of it.' : 'Three waves of the honoured dead, no rest between. They teach a War Cry, and the Thane carries the Allfather\'s spear.'), style: Txt.onStone(size: 15)),
           ],
         ),
         StoneButton(title: why == null ? 'Enter' : 'Locked', tone: ButtonTone.blood, onPressed: why == null ? onGo : null),
@@ -771,7 +932,7 @@ class _ArenaPanel extends StatelessWidget {
             Text(arenaName, style: Txt.label(size: 22, color: Palette.cream, weight: FontWeight.w800)),
             Text('${continents[arenaLand].name} · ${done ? 'you are its Champion' : 'bout ${s.arenaWins + 1} of ${arenaBouts.length}'}', style: Txt.label(size: 13, color: Palette.amber)),
             const SizedBox(height: 2),
-            Text(why ?? (done ? 'The Champion of the Ash will fight you again, for the crowd.' : 'Seven gladiators, one after another. Beat them all for the Champion\'s set.'), maxLines: 3, overflow: TextOverflow.ellipsis, style: Txt.onStone(size: 15)),
+            Text(why ?? (done ? 'The Champion of the Ash will fight you again, for the crowd.' : 'Seven gladiators, one after another. Beat them all for the Champion\'s set.'), style: Txt.onStone(size: 15)),
           ],
         ),
         StoneButton(
@@ -818,7 +979,7 @@ class _DungeonPanel extends StatelessWidget {
             ),
             ...?_relicNote(s, d.id),
             const SizedBox(height: 2),
-            Text(why ?? d.blurb, maxLines: 3, overflow: TextOverflow.ellipsis, style: Txt.onStone(size: 15, color: why == null ? Palette.parch2 : Palette.cream)),
+            Text(why ?? d.blurb, style: Txt.onStone(size: 15, color: why == null ? Palette.parch2 : Palette.cream)),
           ],
         ),
         StoneButton(
@@ -899,7 +1060,7 @@ class _WildPanel extends StatelessWidget {
           children: [
             Text(w.name, style: Txt.label(size: 22, color: col, weight: FontWeight.w800)),
             Text(open ? w.blurb : 'Opens when ${continents[w.opensAfter].boss.name} falls.',
-                maxLines: 2, overflow: TextOverflow.ellipsis, style: Txt.onStone(size: 15, color: open ? Palette.parch2 : Palette.cream)),
+                style: Txt.onStone(size: 15, color: open ? Palette.parch2 : Palette.cream)),
           ],
         ),
         StoneButton(title: open ? (here ? 'Back in' : 'Head in') : 'Locked', caption: here ? 'Step ${c.state.wildDepth}' : null, tone: ButtonTone.blood, onPressed: open ? onGo : null),
@@ -914,7 +1075,10 @@ class _WildPanel extends StatelessWidget {
 const _done = Color(0xFF9BE27A);
 
 class _MapPainter extends CustomPainter {
-  _MapPainter({required this.open, required this.selected, required this.beaten, this.cleared = const {}, required this.wildsOpen, this.wildPicked, this.trip, this.pins = const [], this.pinPicked, this.delves = const [], this.delvePicked, this.lockedLands = const {}, this.levelGates = const {}, this.relicSpots = const {}, this.nameLand, this.allNames = true, this.arena = (false, 0), this.arenaPicked = false, this.hall = (false, 0), this.hallPicked = false, this.hideRoadTo});
+  _MapPainter({required this.open, required this.selected, required this.beaten, this.cleared = const {}, required this.wildsOpen, this.wildPicked, this.trip, this.pins = const [], this.pinPicked, this.delves = const [], this.delvePicked, this.lockedLands = const {}, this.levelGates = const {}, this.relicSpots = const {}, this.nameLand, this.allNames = true, this.arena = (false, 0), this.arenaPicked = false, this.hall = (false, 0), this.hallPicked = false, this.hideRoadTo, this.sealed = const {}});
+
+  /// Lands with no road drawn to them yet: the Ember Throne, while its seals hold.
+  final Set<int> sealed;
 
   /// The road into this land is left off: it's being walked onto the map right now
   /// (showRoadOpens), and drawn there twice the two lines didn't match.
@@ -1038,7 +1202,7 @@ class _MapPainter extends CustomPainter {
     dashed(bend(_innSpot, _spots[0]), 3.2, 22, 1);
     for (final (from, to) in roads) {
       final side = isSideLand(to);
-      if (!beaten.contains(from) || to == hideRoadTo) continue;
+      if (!beaten.contains(from) || to == hideRoadTo || sealed.contains(to)) continue;
       dashed(bend(_spots[from], _spots[to]), side ? 2 : 3.2, side ? 14 : 22, side ? .8 : 1);
     }
     for (var i = 0; i < continents.length; i++) {
@@ -1749,9 +1913,11 @@ class _PulsePainter extends CustomPainter {
 /// to the new one inked in and your marker walking it, before the new land's trail. A couple of
 /// seconds at most, and a tap skips it. (So the move to a new land is something you see happen,
 /// not a screen that changed under a hurried thumb.)
-Future<void> showRoadOpens(BuildContext context, GameController c, {required int from, required int to}) {
+Future<void> showRoadOpens(BuildContext context, GameController c, {required int from, required int to}) async {
+  // The Ember Throne while it's sealed: no road (the seal screen said so on the way out of the fight).
+  if (c.whyNotTravel(to) == 'Sealed') return;
   Audio.play(Sfx.quest);
-  return Navigator.of(context).push(
+  await Navigator.of(context).push(
     PageRouteBuilder<void>(
       opaque: true,
       transitionDuration: const Duration(milliseconds: 250),
@@ -1844,6 +2010,7 @@ class _RoadOpensState extends State<_RoadOpens> with SingleTickerProviderStateMi
                                       beaten: s.bossesDown,
                                       wildsOpen: [for (var w = 0; w < wildAreas.length; w++) c.wildOpen(w)],
                                       lockedLands: {for (var i = 0; i < continents.length; i++) if (c.whyNotTravel(i) != null) i},
+                                                  sealed: {if (c.whyNotTravel(throneLand) == 'Sealed') throneLand},
                                                   levelGates: {for (var i = 0; i < continents.length; i++) if (c.whyNotTravel(i)?.startsWith('Reach level') ?? false) i: continents[i].minLevel},
                                       nameLand: widget.to,
                                       allNames: false,
@@ -1885,7 +2052,7 @@ class _RoadOpensState extends State<_RoadOpens> with SingleTickerProviderStateMi
                             if (widget.gate case final lv?)
                               Text('Opens at level $lv. Grow stronger here first.', textAlign: TextAlign.center, style: Txt.onStone(size: 14.5, color: Palette.amber))
                             else
-                              Text(l.blurb, textAlign: TextAlign.center, maxLines: 3, overflow: TextOverflow.ellipsis, style: Txt.onStone(size: 14.5)),
+                              Text(l.blurb, textAlign: TextAlign.center, style: Txt.onStone(size: 14.5)),
                           ],
                         ),
                       ),
@@ -2025,6 +2192,234 @@ class WhereLine extends StatelessWidget {
             TextSpan(text: '  Find on map ›', style: Txt.label(size: size, color: Palette.amber)),
           ]),
         ),
+      ),
+    );
+  }
+}
+
+/// ?audit=map : every map panel (each land, place, dungeon and wild, the Colosseum and the Hall)
+/// one under another at the window's width, from the save as it stands: for checking every name
+/// and line by eye (nothing cut short, nothing spilling), without hunting for each marker.
+class MapPanelsAudit extends StatelessWidget {
+  const MapPanelsAudit({super.key, required this.controller});
+  final GameController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = controller;
+    Widget tag(String t) => Padding(padding: const EdgeInsets.only(top: 14, bottom: 4), child: Text(t, style: Txt.label(size: 11, color: Palette.parch2)));
+    return Scaffold(
+      backgroundColor: Palette.ground,
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(8),
+          children: [
+            for (var i = 0; i < continents.length; i++) ...[tag('LAND $i'), _ContinentPanel(controller: c, index: i, onEnter: () {})],
+            for (final p in places) ...[tag('PLACE ${p.id}'), _PlacePanel(controller: c, place: p, onGo: () {})],
+            for (final d in dungeons) ...[tag('DUNGEON ${d.id}'), _DungeonPanel(controller: c, dungeon: d, onGo: () {})],
+            for (var a = 0; a < wildAreas.length; a++) ...[tag('WILD $a'), _WildPanel(controller: c, area: a, onGo: () {})],
+            tag('ARENA'),
+            _ArenaPanel(controller: c, onGo: () {}),
+            tag('HALL'),
+            _HallPanel(controller: c, onGo: () {}),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+/// What's picked from the list of places (see [_LandsSheet]): a land, a place, a dungeon, a wild
+/// area, the Colosseum or the Hall.
+typedef _Pick = ({String kind, String id});
+
+/// Everywhere on the map as a list, to find a place fast (the map is small on a phone): each with
+/// its level, how it stands, and a mark for what's waiting there. A row picks it, just as its
+/// marker on the map does.
+class _LandsSheet extends StatelessWidget {
+  const _LandsSheet({required this.controller});
+  final GameController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = controller, s = c.state, e = c.engine;
+    // The suits under way (some of it, not all): their trophies' lands get a mark.
+    final farming = <String>{
+      for (final f in forgedSets)
+        if (s.mat(trophyKey(f.trophy)) > 0 || setPieceSlots.any((slot) => s.mat(blueprintKey(f.id, slot)) > 0 || c.hasSetPiece(f.id, slot)))
+          if (!e.holdsSuit(f.id)) ...trophyLands(f.trophy),
+    };
+    bool wanted(List<(int, int)> parts) => parts.any((p) => e.relicPartWanted(p.$1, p.$2));
+    bool relicIn(int land) =>
+        wanted([for (final p in relicPartsOn(land)) if (relics[p.$1]!.parts[p.$2].risen) p]) ||
+        places.any((p) => p.land == land && c.placeShown(p) && wanted(relicPartsAt(p.id))) ||
+        dungeons.any((d) => d.land == land && wanted(relicPartsAt(d.id)));
+    final lands = [for (var i = 0; i < continents.length; i++) i]..sort((a, b) => continents[a].minLevel.compareTo(continents[b].minLevel));
+
+    Widget row({required _Pick pick, required Widget lead, required String name, required String line, Color? lineColour, bool dim = false, bool here = false, List<Widget> marks = const []}) => InkWell(
+      onTap: () => Navigator.of(context).pop(pick),
+      child: Opacity(
+        opacity: dim ? .55 : 1,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(
+            color: here ? const Color(0x33FFB04A) : null,
+            border: const Border(bottom: BorderSide(color: Color(0x33AE9A72))),
+          ),
+          child: Row(
+            children: [
+              SizedBox(width: 26, child: Center(child: lead)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(name, style: Txt.label(size: 14.5, color: Palette.cream, weight: FontWeight.w800)),
+                    Text(line, style: Txt.onStone(size: 12, color: lineColour ?? Palette.parch2)),
+                  ],
+                ),
+              ),
+              for (final m in marks) Padding(padding: const EdgeInsets.only(left: 6), child: m),
+              const SizedBox(width: 4),
+              const Icon(Icons.chevron_right, size: 18, color: Palette.parch2),
+            ],
+          ),
+        ),
+      ),
+    );
+    Widget mark(IconData icon, Color col, String why) => Tooltip(message: why, child: Icon(icon, size: 17, color: col));
+    final relicMark = mark(Icons.extension, const Color(0xFFFFD98A), 'A relic part you need is here');
+    const green = Color(0xFF9BE27A), amberish = Color(0xFFFFB04A);
+    Widget heading(String t) => Padding(padding: const EdgeInsets.fromLTRB(10, 14, 10, 4), child: Text(t.toUpperCase(), style: Txt.label(size: 12, color: Palette.amber)));
+
+    final shownPlaces = [for (final p in places) if (c.placeShown(p) || (!p.hidden && p.relic == null)) p]
+      ..sort((a, b) {
+        int rank(Place p) => s.explored.contains(p.id) ? 2 : (c.whyNotExplore(p.id) == null ? 0 : 1);
+        final r = rank(a).compareTo(rank(b));
+        return r != 0 ? r : (continents[a.land].minLevel + a.above).compareTo(continents[b.land].minLevel + b.above);
+      });
+
+    return Container(
+      decoration: BoxDecoration(color: const Color(0xFF1E1812), border: Border.all(color: Palette.amberLo, width: 1.5), borderRadius: const BorderRadius.vertical(top: Radius.circular(8))),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 10, 6, 4),
+            child: Row(
+              children: [
+                const Icon(Icons.format_list_bulleted, color: Palette.amber, size: 20),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Where to?', style: Txt.label(size: 18, color: Palette.cream, weight: FontWeight.w800))),
+                IconButton(tooltip: 'Close', onPressed: () => Navigator.of(context).pop(), icon: const Icon(Icons.close, color: Palette.parch2)),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Wrap(spacing: 12, runSpacing: 2, children: [
+              for (final (i, t) in [(Icons.extension, 'relic part'), (Icons.shield, 'suit you\'re forging'), (Icons.castle, 'lair ready'), (Icons.check_circle, 'all done')])
+                Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(i, size: 13, color: Palette.parch2),
+                  const SizedBox(width: 3),
+                  Text(t, style: Txt.onStone(size: 11.5, color: Palette.parch2)),
+                ]),
+            ]),
+          ),
+          const SizedBox(height: 4),
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.only(bottom: 12 + MediaQuery.paddingOf(context).bottom),
+              children: [
+                heading('Lands'),
+                for (final i in lands)
+                  () {
+                    final l = continents[i], why = c.whyNotTravel(i), down = s.bossesDown.contains(i);
+                    final lair = !down && why == null && trailAt(s, i) >= winsForBoss;
+                    final line = why != null
+                        ? (why == 'Sealed' ? 'Sealed: break its seals · Lv ${l.minLevel}+' : why.startsWith('Reach level') ? why : '$why · Lv ${l.minLevel}+')
+                        : !down
+                        ? '${lair ? 'The lair is open' : 'Boss: ${l.boss.name}'} · Lv ${l.minLevel}+'
+                        : e.risenReady(i)
+                        ? '${l.boss.name}, risen, is waiting'
+                        : e.landCleared(i)
+                        ? 'All done · Lv ${l.minLevel}+'
+                        : '${l.boss.name} beaten · Lv ${l.minLevel}+';
+                    return row(
+                      pick: (kind: 'land', id: '$i'),
+                      lead: why != null ? const Icon(Icons.lock, size: 18, color: Palette.parch2) : Container(width: 14, height: 14, decoration: BoxDecoration(shape: BoxShape.circle, color: Color(l.argb), border: Border.all(color: Colors.black54))),
+                      name: l.name,
+                      line: line,
+                      lineColour: lair || (down && e.risenReady(i)) ? amberish : null,
+                      dim: why != null,
+                      here: s.continent == i,
+                      marks: [
+                        if (relicIn(i)) relicMark,
+                        if (farming.contains(l.name)) mark(Icons.shield, const Color(0xFF9FC8E8), 'Its foes drop a suit you\'re forging'),
+                        if (lair || (down && e.risenReady(i))) mark(Icons.castle, amberish, lair ? 'The lair is open' : 'The boss, risen, is waiting'),
+                        if (e.landCleared(i)) mark(Icons.check_circle, green, 'All done'),
+                      ],
+                    );
+                  }(),
+                heading('Off the road'),
+                for (var a = 0; a < wildAreas.length; a++)
+                  row(
+                    pick: (kind: 'wild', id: '$a'),
+                    lead: Icon(Icons.forest, size: 20, color: c.wildOpen(a) ? Color(wildAreas[a].argb) : Palette.parch2),
+                    name: wildAreas[a].name,
+                    line: !c.wildOpen(a) ? (c.whyNotWild(a) ?? 'Not open yet') : (s.wild == a ? 'You\'re out there: step ${s.wildDepth}' : 'Deepest: step ${s.wildBest[a] ?? 0}'),
+                    dim: !c.wildOpen(a),
+                    here: s.wild == a,
+                  ),
+                row(
+                  pick: (kind: 'arena', id: ''),
+                  lead: const Icon(Icons.stadium, size: 20, color: Palette.amber),
+                  name: arenaName,
+                  line: c.whyNotTravel(arenaLand) ?? 'Bouts won: ${s.arenaWins}',
+                  dim: c.whyNotTravel(arenaLand) != null,
+                ),
+                row(
+                  pick: (kind: 'hall', id: ''),
+                  lead: const Icon(Icons.shield_moon, size: 20, color: Palette.amber),
+                  name: hallName,
+                  line: c.whyNotTravel(hallLand) ?? 'Waves won: ${s.hallWaves}',
+                  dim: c.whyNotTravel(hallLand) != null,
+                ),
+                heading('Dungeons'),
+                for (final d in [...dungeons]..sort((a, b) => a.minLevel.compareTo(b.minLevel)))
+                  () {
+                    final open = c.whyNotTravel(d.land) == null && c.dungeonOpen(d), done = s.dungeonsDone.contains(d.id);
+                    return row(
+                      pick: (kind: 'dungeon', id: d.id),
+                      lead: Icon(Icons.door_back_door, size: 20, color: open ? const Color(0xFFC8B088) : Palette.parch2),
+                      name: d.name,
+                      line: s.dungeon == d.id ? 'Your run is still open' : '${continents[d.land].name} · Lv ${d.minLevel}+${done ? ' · cleared' : ''}',
+                      lineColour: s.dungeon == d.id ? amberish : null,
+                      dim: !open,
+                      here: s.dungeon == d.id,
+                      marks: [
+                        if (wanted(relicPartsAt(d.id))) relicMark,
+                        if (done) mark(Icons.check_circle, green, 'Cleared'),
+                      ],
+                    );
+                  }(),
+                heading('Places'),
+                for (final p in shownPlaces)
+                  () {
+                    final done = s.explored.contains(p.id), why = c.whyNotExplore(p.id);
+                    return row(
+                      pick: (kind: 'place', id: p.id),
+                      lead: Icon(done ? Icons.check_circle : Icons.location_on, size: 19, color: done ? green : (why == null ? const Color(0xFFE05A4A) : Palette.parch2)),
+                      name: p.name,
+                      line: '${continents[p.land].name} · Lv ${continents[p.land].minLevel + p.above}+${done ? ' · explored' : ''}',
+                      dim: done || (why != null && c.whyNotTravel(p.land) != null),
+                      marks: [if (!done && wanted(relicPartsAt(p.id))) relicMark],
+                    );
+                  }(),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

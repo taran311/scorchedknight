@@ -261,6 +261,9 @@ class SwingResult {
   bool heavy = false, windup = false;
 
 
+  /// Your companion took the foe's heavy blow for you.
+  bool covered = false;
+
   /// The Guardian's Oath caught the heavy blow.
   bool oath = false;
 
@@ -284,6 +287,19 @@ class GameEngine {
     loot.ng = state.ng;
     sellSpareSetPieces();
     _raiseOldPieces();
+    // The deep waystone reached before its dye existed.
+    for (final e in state.wildBest.entries) {
+      if (e.value >= wildDeepStep && !state.knight.ownedDyes.contains(wildDye(e.key))) state.knight.ownedDyes.add(wildDye(e.key));
+    }
+    // Orders mastered before their dyes existed.
+    for (final kc in knightClasses) {
+      if (classRank(state.knight, kc.id) >= maxRank && !state.knight.ownedDyes.contains(orderDye(kc.id))) state.knight.ownedDyes.add(orderDye(kc.id));
+      // ...and before their crests did: earned, and set in the frame if none ever was.
+      if (classRank(state.knight, kc.id) >= maxRank && !state.knight.crests.contains(kc.id)) {
+        state.knight.crests.add(kc.id);
+        state.knight.crest ??= kc.id;
+      }
+    }
   }
 
   /// Saves from before: a class suit's pieces become legendary, and a relic already forged gets
@@ -321,8 +337,19 @@ class GameEngine {
   /// The Blood Knight's Undying, spent this fight.
   bool _undyingUsed = false;
 
+  /// The risen Ember King was held last turn (stunned, frozen or asleep): he won't be again this
+  /// turn (see _foeTurn).
+  bool _heldLast = false;
+
   /// The last win took you up a rank in your class, as 'Dragon Knight rank 4' (for the spoils).
   String? rankUp;
+
+  /// The class rite the last win's new rank brought (shown big on the victory screen).
+  Spell? rankUpRite;
+
+  /// The order just mastered (rank 10) by the last win: its ceremony plays (the controller
+  /// takes it).
+  String? mastered;
   AmmoType? _cleanBolt;
   final LootTable loot;
 
@@ -391,12 +418,16 @@ class GameEngine {
   /// your level whenever you gain one (no other gear does; the rest wants replacing or the forge).
   void _growVault() {
     final k = state.knight, lvl = k.level;
-    GearItem? grow(GearItem? g) => g != null && g.gearSet == 'vault' && g.level < lvl ? tempered(g, lvl) : g;
+    // (The vault's pieces, and the heirlooms you carried into New Game+.)
+    GearItem? grow(GearItem? g) => g != null && (g.gearSet == 'vault' || g.heirloom) && g.level < lvl ? tempered(g, lvl) : g;
     for (final l in k.loadouts.values) {
       l
+        ..weapon = grow(l.weapon)
+        ..offhand = grow(l.offhand)
         ..helm = grow(l.helm)
         ..gloves = grow(l.gloves)
-        ..boots = grow(l.boots);
+        ..boots = grow(l.boots)
+        ..cape = grow(l.cape);
     }
     k
       ..trinket = grow(k.trinket)
@@ -463,7 +494,16 @@ class GameEngine {
     // places, dungeons), so the square doesn't send you to roam the wilds with lands unbeaten.
     // With nothing left standing either, the gold that piles up after the war has a use: the
     // forge's whetstone, your best worn piece first, as soon as you can pay for its next step.
-    if (next == null) return _meanwhile('After the war', 0, train: false) ?? gauntletStep() ?? _honeStep();
+    if (next == null) {
+      // The next part of the journey: the Ember King risen (beating him opens Hardcore), as soon
+      // as he's back; till then, what's left standing, towards his level.
+      if (!state.hardcore && !state.risenDown.contains(throneLand) && (state.bossLosses[risenLossKey(throneLand)] ?? 0) < giveUpLosses) {
+        if (risenReady(throneLand)) return const RoadStep(RoadKind.heroic, 'Beat Vharrax, risen', 'The hardest fight there is · it opens Hardcore', throneLand);
+        final at = risenLevel(throneLand);
+        return _meanwhile('Vharrax rises again at level $at', at);
+      }
+      return _meanwhile('After the war', 0, train: false) ?? gauntletStep() ?? _honeStep();
+    }
     // The road's boss has beaten you again and again: a few levels first, then back to it.
     final grow = state.setbacks['grow:$next'];
     if (grow != null && k.level < grow && whyNotTravel(next) == null) {
@@ -472,8 +512,9 @@ class GameEngine {
     // Partway through a side land's trail: finish it, its lord too, before the road calls you on
     // (it used to send you straight back to the main road from a lair door). Its lord is a seal
     // on the Ember Throne, too. Not when it's beaten you again and again: then the road goes on.
+    // And not once the throne's open: then the Ember King is the road, and the side land can wait.
     final here = state.continent;
-    if (isSideLand(here) && !state.bossesDown.contains(here) && here < state.wins.length && state.wins[here] > 0 && (state.bossLosses[here] ?? 0) < giveUpLosses && whyNotTravel(here) == null) {
+    if (!(next == throneLand && !throneSealed) && isSideLand(here) && !state.bossesDown.contains(here) && here < state.wins.length && state.wins[here] > 0 && (state.bossLosses[here] ?? 0) < giveUpLosses && whyNotTravel(here) == null) {
       return RoadStep(RoadKind.side, 'Finish ${continents[here].name.replaceFirst('The ', 'the ')}: beat ${continents[here].boss.name.split(',').first}', 'You\'re partway there · then back to the road', here);
     }
     // The Ember Throne sealed: the road runs through the side lands, a seal a lord.
@@ -674,26 +715,58 @@ class GameEngine {
   /// Deepforge's lord, as the seals' notes name him.
   String get _keyLord => '${continents[throneKeyLand].boss.name.split(',').first.replaceFirst(' Deepforge', '')} of ${continents[throneKeyLand].name}';
 
+  /// The throne's seals as they stand: Deepforge Hold's (the one that must break) and how many of
+  /// the other five.
+  (bool, int) get sealsNow {
+    final key = state.bossesDown.contains(throneKeyLand);
+    return (key, math.min(throneSeals - 1, sealsBroken - (key ? 1 : 0)));
+  }
+
+  /// The seals as the seal screen last showed them.
+  (bool, int)? get sealsShown {
+    for (final d in state.did) {
+      if (d.startsWith('sealsshown:')) {
+        final p = d.split(':');
+        return (p[1] == '1', int.tryParse(p[2]) ?? 0);
+      }
+    }
+    return null;
+  }
+
+  /// The seal screen has something to show: Scorchmaw's down (so you've met the seals), the throne
+  /// not yet entered, and the seals not shown as they now stand (or never shown at all).
+  bool get sealNews => !_beenTo(throneLand) && openers(throneLand).any(state.bossesDown.contains) && sealsShown != sealsNow;
+
+  void markSealsShown() {
+    state.did.removeWhere((d) => d.startsWith('sealsshown:'));
+    final (key, others) = sealsNow;
+    state.did.add('sealsshown:${key ? 1 : 0}:$others');
+  }
+
+  /// What opens the Ember Throne, each with whether it's done (null once it's open): the road's
+  /// boss, Deepforge's lord, and the six side-land lords who hold its seals.
+  List<(String, bool)>? get throneSteps {
+    if (whyNotTravel(throneLand) != 'Sealed') return null;
+    String short(int land) => continents[land].boss.name.split(',').first.replaceFirst(' Deepforge', '');
+    String place(int land) => continents[land].name.replaceFirst('The ', 'the ');
+    return [
+      for (final f in openers(throneLand)) ('Beat ${short(f)} in ${place(f)}', state.bossesDown.contains(f)),
+      ('Beat ${short(throneKeyLand)} in ${place(throneKeyLand)}', state.bossesDown.contains(throneKeyLand)),
+      ('Beat $throneSeals side-land lords · ${math.min(sealsBroken, throneSeals)} of $throneSeals', sealsBroken >= throneSeals),
+    ];
+  }
+
   /// Why you can't go to continent [c] yet (null: you can).
   String? whyNotTravel(int c) {
     if (c < 0 || c >= continents.length) return 'No such land';
     if (lockedByFullGame(c)) return '${continents[c].name} is in the full game';
     final from = openers(c);
     // (A land you've already been into stays open: saves from when the road forked.)
-    // The Ember Throne's seals, said together with the road's own lock when both still stand (it
-    // used to name only Scorchmaw, and the seals came as a surprise after).
-    String? seals;
-    if (c == throneLand && throneSealed) {
-      final left = sealsLeft, key = !state.bossesDown.contains(throneKeyLand);
-      seals = key && left == 1
-          ? '$_keyLord holds the last seal'
-          : 'beat the lords of $left more side land${left == 1 ? '' : 's'}${key ? ', $_keyLord among them' : ''} ($sealsBroken of $throneSeals)';
-    }
+    // The Ember Throne: the steps to open it are listed on the map (see [throneSteps]).
+    if (c == throneLand && !_beenTo(c) && (throneSealed || (from.isNotEmpty && !from.any(state.bossesDown.contains)))) return 'Sealed';
     if (from.isNotEmpty && !from.any(state.bossesDown.contains) && !_beenTo(c)) {
-      final road = 'Beat ${from.map((f) => '${continents[f].boss.name} (${continents[f].name})').join(' or ')}';
-      return seals == null ? '$road to find the way' : '$road, and break its seals: $seals';
+      return 'Beat ${from.map((f) => '${continents[f].boss.name} (${continents[f].name})').join(' or ')} to find the way';
     }
-    if (seals != null) return 'Sealed: $seals';
     final need = continents[c].minLevel;
     if (state.knight.level < need) return 'Reach level $need to enter';
     return null;
@@ -755,6 +828,24 @@ class GameEngine {
 
   /// Sets out into the current continent: a foe from its list steps up, or now and then a rare
   /// foe or a whole pack. Returns the foe you face.
+  /// One of the Ember King's generals still standing can be hunted down: you're at the Throne,
+  /// he's still to beat, and the way's open. (On the trail they only turned up now and then; at
+  /// his door there was no way to go after the rest.)
+  bool get canHuntGeneral =>
+      state.continent == throneLand && !state.bossesDown.contains(throneLand) && whyNotTravel(throneLand) == null && emberGenerals.any((g) => !state.generalsDown.contains(g));
+
+  /// Into a fight with one of the generals still standing (call with the battle screen open).
+  FoeType? huntGeneral() {
+    if (!canHuntGeneral || state.inBattle) return null;
+    final named = continents[throneLand].named;
+    final left = [for (final n in named) if (!state.generalsDown.contains(n.name)) n];
+    final n = left[_rng.nextInt(left.length)];
+    final at = lookIndex(n.base, throneLand), rare = Rare(at, n.aura, name: n.name, look: n.look);
+    _begin(at, rare);
+    _note('You go looking for the Ember King\'s generals, and ${n.name} comes out of the smoke to meet you. Fell it, and Vharrax will be the weaker for it.', EntryKind.gold);
+    return encounterType(at, rare);
+  }
+
   FoeType explore() {
     final c = state.continent, land = continents[c], all = foeIndexes(c);
     // Some foes only come out at night (and by night, they're most of what's out there).
@@ -1269,6 +1360,18 @@ class GameEngine {
     if (!risen) return null;
     state.risenDown.add(c);
     state.bossLosses.remove(risenLossKey(c));
+    // The Ember King, risen and beaten: the Kingslayer dye, a prize that goes on with you into
+    // New Game+ (dyes carry over; gear doesn't).
+    if (c == throneLand && !state.hardcore && !state.hcUnlocked) {
+      state.hcUnlocked = true;
+      _note('Hardcore is open: a new hero with one life, from the roads in your tent.', EntryKind.gold);
+    }
+    if (c == throneLand && !state.knight.ownedDyes.contains(kingslayerDye)) {
+      state.knight
+        ..ownedDyes.add(kingslayerDye)
+        ..dye = kingslayerDye;
+      _note('Vharrax falls a second time, and this time the fire goes out of him for good. His last coal leaves a stain on your cape that will never wash out: Kingslayer gold. It\'s yours, here and in any world after.', EntryKind.gold);
+    }
     // A risen boss always carries the relic part it's keeping (if you hold that relic's blueprint).
     for (final (r, i) in relicPartsOn(c)) {
       if (relics[r]!.parts[i].risen && _grantPart(r, i)) return relics[r]!.parts[i].name;
@@ -1380,6 +1483,10 @@ class GameEngine {
     final s = state, a = wildArea!;
     s.wildDepth++;
     if (s.wildDepth > (s.wildBest[s.wild!] ?? 0)) s.wildBest[s.wild!] = s.wildDepth;
+    if (s.wildDepth == wildDeepStep && !s.knight.ownedDyes.contains(wildDye(s.wild!))) {
+      s.knight.ownedDyes.add(wildDye(s.wild!));
+      _note('Step $wildDeepStep: the deep waystone of ${a.name}. Few come this far. Its colour is yours: the ${dyeById(wildDye(s.wild!)).name} dye (wear it from your tent).', EntryKind.gold);
+    }
     if (isWaystone(s.wildDepth)) {
       _note('Step ${s.wildDepth}: a waystone. From here you can head home with everything in your pack.', EntryKind.good);
       return WildEvent.waystone;
@@ -2027,7 +2134,9 @@ class GameEngine {
     if (rare == null && foeAt(foe).boss) level = math.min(level, bossLevelFor(realmAt(foe), k.level));
     _fightHits = 0;
     _undyingUsed = false;
+    _heldLast = false;
     rankUp = null;
+    rankUpRite = null;
     _fightPotions = 0;
     _fightRites = 0;
     _fightSlumbers = 0;
@@ -2038,7 +2147,7 @@ class GameEngine {
       ..foe = foe
       ..rare = rare
       ..foeLevel = level
-      ..foeMax = (spawnHp(foe, level, rare) * ngFoeHp(state.ng, realmAt(rare?.base ?? foe), encounterType(foe, rare).boss) * (rare == null && foe == bossIndex(mainLands - 1) ? kingStrength : 1) * (rare == null ? doggedFor(foe) : 1)).round()
+      ..foeMax = (spawnHp(foe, level, rare) * ngFoeHp(state.ng, realmAt(rare?.base ?? foe), encounterType(foe, rare).boss, state.heirlooms) * (rare == null && foe == bossIndex(mainLands - 1) ? kingStrength : 1) * (rare == null ? doggedFor(foe) : 1)).round()
       ..turn = 0
       ..fleeTries = 0
       ..doorUsed = false
@@ -2947,8 +3056,13 @@ class GameEngine {
 
   /// The companion's command: hounds pounce (and may stagger the foe), a fairy casts a charm at
   /// once, a dragon breathes a great gout of fire.
+  /// Commanded while the foe reared back: the companion takes this turn's heavy blow for you.
+  bool _cover = false;
+
   void _command(SwingResult r) {
     final k = state.knight, pet = petStage(k), ds = dragonStage(k), foe = foeIn(state);
+    // A heavy blow coming: your companion goes in, and takes it for you.
+    _cover = state.foeWindup;
     // A command is worth a turn: it scales with your own blow, and companions fly, so it reaches
     // foes that are aloft too.
     final bite = swingDamage(state, 1).chip, blow = fullSwing(k) * outmatchedHits(state.foeLevel, k.level);
@@ -2992,10 +3106,31 @@ class GameEngine {
       _note(text);
     }
 
+    // Your companion, sent in as the foe reared back, takes the heavy blow for you.
+    if (heavy && _cover) {
+      _cover = false;
+      final ds = dragonStage(k), who = pet != null ? 'your ${pet.$2.name.toLowerCase()}' : 'your ${ds?.name.toLowerCase() ?? 'companion'}';
+      r.covered = true;
+      spared(Guard.guarded, '$foeName brings its heavy blow down, but ${pet?.$1 == Pet.fairy ? '$who throws a shield of light over you' : (pet == null ? '$who spreads its wings over you' : '$who leaps in and takes it')}.');
+      return;
+    }
+    _cover = false;
+    // The Ember King, risen: Unbowed. Stun, freeze or lull him and he loses that turn, as ever, but
+    // he can't be held two turns running: he shakes it off and comes on.
+    final unbowed = foe.look == 'emberKing' && (state.rare?.name?.endsWith(', Risen') ?? false);
+    if (unbowed && _heldLast && (bashed || state.foeFrozen || state.foeAsleep > 0)) {
+      bashed = false;
+      state
+        ..foeFrozen = false
+        ..foeAsleep = 0;
+      _note('$foeName shakes it off. He will not be held twice running.', EntryKind.damage);
+    }
+    _heldLast = false;
     // (The Forge Knight stuns any boss, every time; but not the Ember King, too vast to stagger
     // every time: with it he was a punching bag for a Forge Knight with a good blade.)
     if (bashed && (!foe.boss || (suitWorn(k) == 'deepforge' && foe.look != 'emberKing') || _rng.nextBool())) {
       r.stunned = true;
+      _heldLast = unbowed;
       spared(Guard.stunned, '$foeName is seeing stars and can\'t hit back.');
       return;
     }
@@ -3016,9 +3151,11 @@ class GameEngine {
       spared(Guard.slowed, '$foeName swings far too slowly. It misses.');
     } else if (state.foeAsleep > 0) {
       state.foeAsleep--;
+      _heldLast = unbowed;
       spared(Guard.asleep, state.foeAsleep > 0 ? '$foeName snores through its turn.' : '$foeName stirs and wakes.');
     } else if (state.foeFrozen) {
       state.foeFrozen = false;
+      _heldLast = unbowed;
       spared(Guard.frozen, '$foeName can\'t move and can\'t hit back.');
     } else if (state.wards > 0) {
       state.wards--;
@@ -4683,6 +4820,27 @@ class GameEngine {
       // A set piece you could forge and aren't wearing yet.
       forgedSets.any((f) => setPieceSlots.any((slot) => whyNotForgePiece(f.id, slot) == null && !hasSetPiece(f.id, slot)));
 
+  /// The pieces of class suit [id] you're still missing (none if it isn't a class suit).
+  List<GearSlot> suitPiecesMissing(String id) =>
+      knightClassById(id) == null ? const [] : [for (final slot in setPieceSlots) if (!hasSetPiece(id, slot)) slot];
+
+  /// Class suits Dunstan could finish for you right now: a blueprint for every piece you lack, and
+  /// the trophies, bars and gold for all of them together.
+  List<String> get suitsToFinish => [
+        for (final kc in knightClasses)
+          if (_canFinishSuit(kc.id)) kc.id,
+      ];
+
+  bool _canFinishSuit(String id) {
+    final f = forgedSetById(id), missing = suitPiecesMissing(id), n = missing.length;
+    if (f == null || n == 0 || state.inBattle) return false;
+    if (missing.any((slot) => state.mat(blueprintKey(id, slot)) == 0)) return false;
+    return state.mat(trophyKey(f.trophy)) >= n * pieceTrophies && state.mat(barKey(f.metal)) >= n * pieceBars && state.knight.coins >= n * pieceFee(state.knight.level);
+  }
+
+  /// A class suit you could finish now and haven't been told about yet (each one once).
+  String? get suitToAnnounce => suitsToFinish.where((id) => !state.did.contains('suitready:$id')).firstOrNull;
+
   /// Gems you could have ground into bolts.
   bool get gemsWaiting => Gem.values.any((g) => whyNotFletch(g) == null) || Elemental.values.any((el) => whyNotBind(el) == null);
 
@@ -4945,13 +5103,24 @@ class GameEngine {
     final now = classRank(k, cls.id);
     if (now == before) return;
     final rite = cls.rites.where((sp) => sp.rank == now).firstOrNull;
-    rankUp = '${cls.name} rank $now${rite != null ? ' · ${rite.name}' : ''}';
+    rankUp = now >= maxRank ? '${cls.name} mastered' : '${cls.name} rank $now';
+    rankUpRite = rite;
+    if (now >= maxRank) {
+      // Mastered: the order's dye (worn at once, so the ceremony shows you in it).
+      if (!k.ownedDyes.contains(orderDye(cls.id))) k.ownedDyes.add(orderDye(cls.id));
+      k.dye = orderDye(cls.id);
+      // ...and its crest, set in your portrait's frame.
+      if (!k.crests.contains(cls.id)) k.crests.add(cls.id);
+      k.crest = cls.id;
+      mastered = cls.id;
+    }
     if (rite != null) {
+      if (!k.newRites.contains(rite.id)) k.newRites.add(rite.id);
       final active = k.rites.where((r) => spellById(r) != null && riteKnown(k, spellById(r)!)).length;
       if (!k.rites.contains(rite.id) && active < riteSlots) k.rites.add(rite.id);
       _note('${cls.name}, rank $now! You learn ${rite.name}${k.rites.contains(rite.id) ? ': it\'s on your hotbar' : '. Swap it onto your hotbar in your ${homes[state.home].name.toLowerCase()}'}.', EntryKind.gold);
     } else if (now == maxRank) {
-      _note('${cls.name}, rank $now: a master of the order! ${cls.passive}: ${cls.passiveText.toLowerCase()}.', EntryKind.gold);
+      _note('${cls.name}, rank $now: a master of the order! ${cls.passive}: ${cls.passiveText.toLowerCase()}. And the order\'s own colour is yours: ${dyeById(orderDye(cls.id)).name} dye.', EntryKind.gold);
     } else {
       _note('${cls.name}, rank $now!', EntryKind.gold);
     }
@@ -5035,7 +5204,9 @@ class GameEngine {
 
   /// Hardcore is open: New Game+ has been beaten (on your main hero's save).
   bool get hardcoreOpen => hardcoreOpenFor(state);
-  bool hardcoreOpenFor(GameState s) => s.hcUnlocked || (s.won && s.ng >= 1);
+  /// Hardcore opens once you've beaten the Ember King risen (the hardest fight the road has), or
+  /// beaten him in New Game+; and stays open.
+  bool hardcoreOpenFor(GameState s) => s.hcUnlocked || s.risenDown.contains(throneLand) || (s.won && s.ng >= 1);
 
   /// A hardcore hero's line for the main save's card: who, how far, and how it ended.
   static Map<String, dynamic> hardcoreSummary(GameState s) => {
@@ -5067,15 +5238,34 @@ class GameEngine {
   /// (back to level 1, growing with you as ever: worn where they were worn). Everything else
   /// starts over, and every foe is tougher for it ([ngFoeHp], [ngFoeHit]) while legendaries
   /// drop more often.
-  bool newGamePlus() {
+  /// Gear you could carry into New Game+ as an heirloom (up to [heirloomMax]): every piece you own
+  /// but the vault's (they come anyway), best first.
+  List<GearItem> get heirloomChoices {
+    final k = state.knight, seen = <String>{};
+    return [
+      for (final g in [
+        for (final l in k.loadouts.values) for (final s in GearSlot.values) l.inSlot(s),
+        k.ring,
+        k.trinket,
+        ...k.stash,
+        ...state.pendingLoot,
+      ])
+        if (g != null && g.gearSet != 'vault' && seen.add(g.id)) g,
+    ]..sort((a, b) => b.score.compareTo(a.score));
+  }
+
+  bool newGamePlus({List<String> heirlooms = const []}) {
     if (whyNotNewGamePlus() != null) return false;
     final old = state, k = old.knight;
+    final choices = heirloomChoices;
     final fresh = newGame(heroClass: k.heroClass);
     final n = fresh.knight;
     n
       ..female = k.female
       ..dye = k.dye
-      ..ownedDyes = [...k.ownedDyes];
+      ..ownedDyes = [...k.ownedDyes]
+      ..crests = [...k.crests]
+      ..crest = k.crest;
     // The vault's pieces: each one you own comes along once, worn if it was worn.
     final seen = <String>{};
     GearItem? carry(GearItem? g) {
@@ -5100,12 +5290,41 @@ class GameEngine {
       final c = carry(g);
       if (c != null) n.stash.add(c);
     }
+    // Heirlooms: up to three pieces you chose, back to level 1 (they grow with you, as the vault's
+    // do), worn where they'd go if the slot's free, else in the chest.
+    for (final id in heirlooms.take(heirloomMax)) {
+      final g = choices.where((c) => c.id == id).firstOrNull;
+      if (g == null) continue;
+      final h = relevelled(g, 1)..heirloom = true;
+      final nl2 = n.loadout;
+      switch (h.slot) {
+        case GearSlot.weapon:
+          nl2.weapon = h;
+        case GearSlot.offhand when nl2.offhand == null:
+          nl2.offhand = h;
+        case GearSlot.helm when nl2.helm?.gearSet != 'vault':
+          nl2.helm = h;
+        case GearSlot.gloves when nl2.gloves?.gearSet != 'vault':
+          nl2.gloves = h;
+        case GearSlot.boots when nl2.boots?.gearSet != 'vault':
+          nl2.boots = h;
+        case GearSlot.cape when nl2.cape == null:
+          nl2.cape = h;
+        case GearSlot.ring when n.ring == null:
+          n.ring = h;
+        case GearSlot.trinket when n.trinket == null:
+          n.trinket = h;
+        default:
+          n.stash.add(h);
+      }
+    }
     n.hp = maxHp(n);
     fresh
       ..settings = old.settings
       ..ng = old.ng + 1
-      // (Hardcore opens once New Game+ is beaten, and stays open whatever road you're on.)
-      ..hcUnlocked = old.hcUnlocked || (old.won && old.ng >= 1)
+      ..heirlooms = [for (final sl in GearSlot.values) n.loadout.inSlot(sl), n.ring, n.trinket, ...n.stash].fold(0.0, (w, g) => w + (g != null && g.heirloom ? heirloomWeight(g.slot) : 0))
+      // (Hardcore, once open, stays open whatever road you're on.)
+      ..hcUnlocked = hardcoreOpenFor(old)
       ..hcRun = old.hcRun
       ..hcBest = old.hcBest
       ..keys = old.keys
@@ -5119,7 +5338,7 @@ class GameEngine {
     fresh.vaultFound.addAll(old.vaultFound);
     fresh.journal
       ..clear()
-      ..add(JournalEntry('New Game+ ${'★' * math.min(fresh.ng, 5)}: the ash comes back thicker, and so do the things in it. You start again in Cindervale, the vault\'s pieces still on you.', EntryKind.gold));
+      ..add(JournalEntry('New Game+ ${'★' * math.min(fresh.ng, 5)}: the ash comes back thicker, and so do the things in it. You start again in Cindervale${heirlooms.isEmpty ? '' : ', your heirlooms back to level 1 but still yours'}, the vault\'s pieces still on you.', EntryKind.gold));
     state = fresh;
     loot.ng = fresh.ng;
     return true;
@@ -5284,6 +5503,12 @@ class GameEngine {
   void wearDye(String id) {
     final k = state.knight;
     if (k.ownedDyes.contains(id)) k.dye = id;
+  }
+
+  /// Sets an earned order's crest in your portrait's frame ('' for a bare frame).
+  void wearCrest(String id) {
+    final k = state.knight;
+    if (id.isEmpty || k.crests.contains(id)) k.crest = id;
   }
 
   // ---------------- classes ----------------

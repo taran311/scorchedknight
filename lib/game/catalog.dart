@@ -1455,7 +1455,36 @@ const dyes = <Dye>[
   Dye('ashen', 'Ashen white', 0xFFB8B2A8, 4000),
   Dye('dragonblood', 'Dragonblood', 0xFF5E0A10, 7000),
   Dye('obsidian', 'Obsidian', 0xFF151116, 12000),
+  // The orders' own colours: never sold, only earned by mastering the order (rank 10).
+  Dye('order-drakesworn', 'Wyrmfire', 0xFFD8581C),
+  Dye('order-nightblood', 'Nightblood', 0xFF6A0C24),
+  Dye('order-deepforge', 'Forge gold', 0xFFC8A040),
+  // The wilds' own: for reaching the deep waystone (see wildDye), never sold.
+  Dye('wild-0', 'Ashdrift grey', 0xFF7E776C),
+  Dye('wild-1', 'Briarthorn', 0xFF3E5A22),
+  Dye('wild-2', 'Smoulder', 0xFF7A2410),
+  // The risen Ember King's: never sold either.
+  Dye(kingslayerDye, 'Kingslayer gold', 0xFFF0C860),
 ];
+
+/// The dye for beating the Ember King risen (see [dyes]).
+const kingslayerDye = 'kingslayer';
+
+/// The dye an order gives its masters (see [dyes]).
+String orderDye(String classId) => 'order-$classId';
+bool isOrderDye(String id) => id.startsWith('order-');
+
+/// A dye that's earned, never sold: what it was earned by (null: Mags sells it).
+String? dyeEarnedBy(String id) => isOrderDye(id)
+    ? 'an order\'s master'
+    : id == kingslayerDye
+    ? 'the risen Ember King slain'
+    : id.startsWith('wild-')
+    ? 'the deep waystone of the wilds'
+    : null;
+
+/// The dye for reaching wilds area [area]'s deep waystone (see wildDeepStep in wilds.dart).
+String wildDye(int area) => 'wild-$area';
 
 /// Dyes Mags only stocks during their seasonal event (yours to keep once bought).
 const seasonalDyes = {'pumpkin': 'hallowash'};

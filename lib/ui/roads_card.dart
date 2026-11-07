@@ -1,5 +1,5 @@
 // The three roads, kept in your tent: the first time through, New Game+ (open once the Ember King
-// falls) and Hardcore (open once New Game+ is beaten): one life, in a save of its own. Locked ones say
+// falls) and Hardcore (open once he's beaten risen, or in New Game+): one life, in a save of its own. Locked ones say
 // what opens them, so there's always a next road in sight. Under your name in the tent, a label says
 // which road you're on; tap it for the card.
 
@@ -8,6 +8,9 @@ import 'package:flutter/material.dart';
 import '../audio/audio.dart';
 import '../game/controller.dart';
 import '../game/models.dart';
+import '../game/loot.dart';
+import '../game/vault.dart' show heirloomMax;
+import 'hero_view.dart' show GearIcon, rarityColour;
 import 'theme.dart';
 
 const _gold = Color(0xFFF2C14E), _blood = Color(0xFFE0503A), _ash = Color(0xFFE8B070), _dim = Color(0xFF8A8070);
@@ -114,7 +117,7 @@ class RoadsCard extends StatelessWidget {
                   child: _tile(
                     Icons.auto_awesome,
                     'New Game+',
-                    hc ? 'Done' : (ngOpen ? 'Tougher foes, legendaries ×2' : (onNg ? (s.won ? 'Done' : 'You\'re here') : 'Beat the Ember King')),
+                    hc ? 'Done' : (ngOpen ? 'Tougher foes · bring 3 heirlooms' : (onNg ? (s.won ? 'Done' : 'You\'re here') : 'Beat the Ember King')),
                     _gold,
                     locked: !hc && !ngOpen && !onNg,
                     here: onNg && !s.won,
@@ -131,7 +134,7 @@ class RoadsCard extends StatelessWidget {
                         ? (s.won ? 'The King is dead' : 'You\'re here')
                         : c.hardcoreOpen
                         ? (run != null ? '${run['name']} · Lv ${run['level']}' : (best != null ? 'Best: ${best['won'] == true ? 'beat the King' : 'Lv ${best['level']}'}' : 'One life. Own save'))
-                        : 'Beat New Game+',
+                        : 'Beat Vharrax, risen',
                     _blood,
                     locked: !hc && !c.hardcoreOpen,
                     here: hc,
@@ -173,7 +176,7 @@ class RoadsCard extends StatelessWidget {
           const SizedBox(height: 3),
           FittedBox(fit: BoxFit.scaleDown, child: Text(title, style: Txt.label(size: 13, color: col, weight: FontWeight.w800))),
           const SizedBox(height: 3),
-          Text(line, textAlign: TextAlign.center, maxLines: 2, style: Txt.onStone(size: 11.5, color: locked ? _dim : Palette.parch2)),
+          Text(line, textAlign: TextAlign.center, style: Txt.onStone(size: 11.5, color: locked ? _dim : Palette.parch2)),
           if (action != null) ...[
             const Spacer(),
             const SizedBox(height: 5),
@@ -218,24 +221,117 @@ class RoadsCard extends StatelessWidget {
 
   Future<void> _beginNg(BuildContext context) async {
     final c = controller;
-    final sure = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Palette.stone2,
-        title: Text('Start the road again?', style: Txt.label(size: 18, color: _gold)),
-        content: Text(
-          'You start again at level 1 in Cindervale, against tougher foes, with legendaries twice as likely. Your Cinder keys and the vault\'s pieces come with you (back to level 1, growing as you do). Gold, other gear, companions and the map start over.',
-          style: Txt.onStone(size: 14, color: Palette.cream),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text('Not yet', style: Txt.label(size: 14))),
-          TextButton(onPressed: () => Navigator.of(context).pop(true), child: Text('Begin', style: Txt.label(size: 14, color: _gold))),
-        ],
-      ),
-    );
-    if (sure != true) return;
+    final picks = await showDialog<List<String>>(context: context, builder: (context) => _HeirloomPicker(controller: c));
+    if (picks == null) return;
     Audio.play(Sfx.levelUp);
     onDone?.call();
-    await c.newGamePlus();
+    await c.newGamePlus(heirlooms: picks);
+  }
+}
+
+/// New Game+'s start: what it is, and up to three pieces of gear to carry into it as heirlooms.
+class _HeirloomPicker extends StatefulWidget {
+  const _HeirloomPicker({required this.controller});
+  final GameController controller;
+
+  @override
+  State<_HeirloomPicker> createState() => _HeirloomPickerState();
+}
+
+class _HeirloomPickerState extends State<_HeirloomPicker> {
+  final _picked = <String>[];
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.controller, k = c.state.knight, choices = c.heirloomChoices;
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: Stone(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Start the road again?', style: Txt.label(size: 19, color: _gold, weight: FontWeight.w800)),
+              const SizedBox(height: 6),
+              Text(
+                'You start again at level 1 in Cindervale, against tougher foes, with legendaries twice as likely. '
+                'Your Cinder keys, dyes and the vault\'s pieces come with you. Gold, the rest of your gear, companions and the map start over.',
+                style: Txt.onStone(size: 13.5, color: Palette.cream),
+              ),
+              const SizedBox(height: 10),
+              Text('HEIRLOOMS · PICK UP TO $heirloomMax  (${_picked.length}/$heirloomMax)', style: Txt.label(size: 12.5, color: _gold, weight: FontWeight.w800)),
+              const SizedBox(height: 3),
+              Text(
+                'They go back to level 1 and grow with you, as the vault\'s pieces do. The ash remembers what you carried: each one makes the foes a little tougher, a weapon most of all.',
+                style: Txt.onStone(size: 12.5),
+              ),
+              const SizedBox(height: 8),
+              Flexible(
+                child: choices.isEmpty
+                    ? Text('No gear to carry.', style: Txt.onStone(size: 13))
+                    : ListView(
+                        shrinkWrap: true,
+                        children: [
+                          for (final g in choices)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 6),
+                              child: InkWell(
+                                onTap: _picked.contains(g.id) || _picked.length < heirloomMax
+                                    ? () => setState(() => _picked.contains(g.id) ? _picked.remove(g.id) : _picked.add(g.id))
+                                    : null,
+                                child: Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: _picked.contains(g.id) ? _gold.withValues(alpha: .14) : Colors.black.withValues(alpha: .22),
+                                    border: Border.all(color: _picked.contains(g.id) ? _gold : Palette.stone3, width: _picked.contains(g.id) ? 2 : 1),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      GearIcon(item: g, size: 40, heroClass: k.heroClass, dye: k.dye),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(g.name, style: Txt.label(size: 14.5, color: rarityColour(g.rarity))),
+                                            Text('${g.rarity.label} · ${g.slot.label.toLowerCase()}${g.specialMove != null ? ' · ${g.specialMove!.name}' : ''}', style: Txt.onStone(size: 12)),
+                                          ],
+                                        ),
+                                      ),
+                                      Icon(_picked.contains(g.id) ? Icons.check_circle : Icons.radio_button_unchecked, color: _picked.contains(g.id) ? _gold : Palette.stone3, size: 22),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(child: StoneButton(title: 'Not yet', compact: true, onPressed: () => Navigator.of(context).pop())),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: StoneButton(
+                      title: 'Begin',
+                      caption: _picked.isEmpty ? 'No heirlooms' : '${_picked.length} heirloom${_picked.length == 1 ? '' : 's'}',
+                      compact: true,
+                      tone: ButtonTone.amber,
+                      onPressed: () => Navigator.of(context).pop(List<String>.of(_picked)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

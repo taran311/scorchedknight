@@ -565,6 +565,10 @@ class GearItem {
   /// Times Dunstan has honed it (each one +[honeStep] to every stat, up to [honeMax]).
   int hone = 0;
 
+  /// Carried into New Game+ (see GameEngine.newGamePlus): back to level 1, it grows with you as the
+  /// vault's pieces do, and can't be sold.
+  bool heirloom = false;
+
   /// A quest weapon's special attack (an id in [specials]).
   final String? special;
   Special? get specialMove => special == null ? null : specials[special];
@@ -617,6 +621,7 @@ class GearItem {
     if (gearSet != null) 'set': gearSet,
     if (enchant != null) 'en': enchant!.toJson(),
     if (hone > 0) 'hn': hone,
+    if (heirloom) 'hl': true,
     'stats': {for (final e in stats.entries) e.key.name: e.value},
     'sv': gearStatsVersion,
   };
@@ -641,7 +646,9 @@ class GearItem {
         if (Stat.values.any((s) => s.name == e.key))
           Stat.values.byName(e.key as String): _restat(Stat.values.byName(e.key as String), (e.value as num).toInt(), (j['level'] as num).toInt(), (j['sv'] as num?)?.toInt() ?? 0),
     },
-  )..hone = (j['hn'] as num?)?.toInt() ?? 0;
+  )
+    ..hone = (j['hn'] as num?)?.toInt() ?? 0
+    ..heirloom = j['hl'] == true;
 }
 
 /// Which balance of stats a saved piece was rolled under. 1: regeneration, lifesteal and bloodleech
@@ -1126,7 +1133,30 @@ GearItem tempered(GearItem g, int level) => GearItem(
   gearSet: g.gearSet,
   value: (g.value * (3 + level * 1.2) / (3 + g.level * 1.2)).round(),
   stats: {for (final e in g.stats.entries) e.key: math.max(e.value, (e.value * _base(e.key, level) / _base(e.key, g.level)).round())},
-)..hone = g.hone;
+)
+  ..hone = g.hone
+  ..heirloom = g.heirloom;
+
+/// [g] brought to [level] either way (an heirloom back to level 1 for New Game+): every stat
+/// scaled to what it would be at that level, at least 1. ([tempered] only ever raises.)
+GearItem relevelled(GearItem g, int level) => GearItem(
+  id: g.id,
+  name: g.name,
+  slot: g.slot,
+  art: g.art,
+  rarity: g.rarity,
+  level: level,
+  heroClass: g.heroClass,
+  lore: g.lore,
+  tint: g.tint,
+  special: g.special,
+  enchant: g.enchant,
+  gearSet: g.gearSet,
+  value: math.max(1, (g.value * (3 + level * 1.2) / (3 + g.level * 1.2)).round()),
+  stats: {for (final e in g.stats.entries) e.key: math.max(1, (e.value * _base(e.key, level) / _base(e.key, g.level)).round())},
+)
+  ..hone = g.hone
+  ..heirloom = g.heirloom;
 
 /// Honing at the forge: each step adds this share of every stat, up to [honeMax] steps.
 const honeStep = .05, honeMax = 5;

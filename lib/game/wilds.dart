@@ -72,6 +72,10 @@ const wildAreas = <WildArea>[
 /// your whole pack.
 const waystoneEvery = 5;
 
+/// The deep waystone: reach it in an area and its own dye is yours (once). Past the point the
+/// foes and the gear stop climbing, so it's the mark of having gone all the way out.
+const wildDeepStep = 30;
+
 /// Share of the pack you lose: running home between waystones, running from a single fight (you
 /// stay in the wilds), and being knocked out.
 const fleeLoss = .4, fightFleeLoss = .15, koLoss = .75;
