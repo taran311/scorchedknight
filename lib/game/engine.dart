@@ -5367,6 +5367,12 @@ class GameEngine {
     // What you've already been told about the roads on (Hardcore's opening above all): it's not
     // news again in the new run.
     fresh.did.addAll(old.did.where((d) => d == 'journey:hc' || d.startsWith('roads:')));
+    // Tasks already met by what carries over (the dyes you own, the vault's pieces, your lifetime
+    // tally of foes and rares): done last time, not done again, so no reward for nothing. The
+    // rest start over, to be earned again in the new run.
+    for (final t in allTasks) {
+      if (t.done(fresh)) fresh.tasksClaimed.add(t.id);
+    }
     fresh.journal
       ..clear()
       ..add(JournalEntry('New Game+ ${'★' * math.min(fresh.ng, 5)}: the ash comes back thicker, and so do the things in it. You start again in Cindervale${heirlooms.isEmpty ? '' : ', your heirlooms back to level 1 but still yours'}, the vault\'s pieces still on you.', EntryKind.gold));

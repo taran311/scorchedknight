@@ -37,6 +37,9 @@ import 'fill_column.dart';
 import 'battle_screen.dart';
 import 'class_picker.dart' show HeroOrHeroine;
 import 'frames.dart';
+import 'hero_view.dart' show GearIcon;
+import '../game/classes.dart' show armourTierById;
+import '../game/knight_classes.dart' show knightClasses, classRank, classOf, maxRank, rankWins;
 import 'gear_glance.dart';
 import 'hud.dart';
 import 'errands_view.dart';
@@ -543,6 +546,9 @@ class _InnPageState extends State<InnPage> with RouteAware {
                                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                                   ...cards,
                                   if (cards.isEmpty) Text('Nothing waiting in town. The road is out there.', style: Txt.onStone(size: 13)),
+                                  // Under what's waiting, with the room a wide screen has: you at
+                                  // a glance (what you wear, your orders, how far you've come).
+                                  if (!_away) _KnightGlance(controller: c, onGear: () => showGearGlance(context, c), onTent: () => openTent(context, c)),
                                 ]),
                               ),
                             ),
@@ -620,6 +626,113 @@ class _InnPageState extends State<InnPage> with RouteAware {
       );
     },
   );
+}
+
+/// You at a glance, for a wide screen's town: what you wear (tap for your gear), the three orders
+/// and how far up each you are, and how much of the world you've won back.
+class _KnightGlance extends StatelessWidget {
+  const _KnightGlance({required this.controller, required this.onGear, required this.onTent});
+  final GameController controller;
+  final VoidCallback onGear, onTent;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = controller, s = c.state, k = s.knight, l = k.loadout, e = c.engine;
+    final worn = classOf(k);
+    final lands = continents.length, freed = [for (var i = 0; i < lands; i++) if (s.bossesDown.contains(i)) i].length;
+    final cleared = [for (var i = 0; i < lands; i++) if (e.landCleared(i)) i].length;
+    Widget heading(String t) => Padding(padding: const EdgeInsets.only(top: 10, bottom: 5), child: Text(t.toUpperCase(), style: Txt.label(size: 11.5, color: Palette.amber)));
+    Widget bar(double f, Color col) => ClipRRect(
+      borderRadius: BorderRadius.circular(2),
+      child: SizedBox(height: 5, child: LinearProgressIndicator(value: f.clamp(0.0, 1.0), backgroundColor: const Color(0x33000000), valueColor: AlwaysStoppedAnimation(col))),
+    );
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Stone(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            heading('What you wear'),
+            Tooltip(
+              message: 'Your gear',
+              child: GestureDetector(
+                onTap: onGear,
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: Wrap(
+                    spacing: 5,
+                    runSpacing: 5,
+                    children: [
+                      for (final (g, label) in [(l.weapon, 'Weapon'), (l.activeOffhand ?? l.offhand, 'Off hand'), (l.helm, 'Head'), (l.cape, 'Cape'), (l.gloves, 'Hands'), (l.boots, 'Feet'), (k.ring, 'Ring'), (k.trinket, 'Trinket')])
+                        GearIcon(item: g, size: 40, heroClass: k.heroClass, dye: k.dye, empty: label),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text('${armourTierById(k.armour).name} · −${(damageReduction(k) * 100).round()}% damage taken', style: Txt.onStone(size: 12, color: Palette.parch2)),
+            heading('The orders'),
+            for (final o in knightClasses)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: InkWell(
+                  onTap: onTent,
+                  child: Row(
+                    children: [
+                      Opacity(opacity: k.crests.contains(o.id) || worn?.id == o.id ? 1 : .45, child: CrestBadge(o, size: 22)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Flexible(child: Text(o.name, style: Txt.label(size: 13, color: Color(o.argb), weight: FontWeight.w800))),
+                                if (worn?.id == o.id) ...[
+                                  const SizedBox(width: 6),
+                                  Text('WEARING', style: Txt.label(size: 10, color: Palette.cream)),
+                                ],
+                                const Spacer(),
+                                Text(
+                                  (k.classWins[o.id] ?? 0) == 0 ? 'not begun' : (classRank(k, o.id) >= maxRank ? 'mastered' : 'rank ${classRank(k, o.id)}'),
+                                  style: Txt.onStone(size: 11.5, color: Palette.parch2),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 3),
+                            bar((k.classWins[o.id] ?? 0) / rankWins.last, Color(o.argb)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            heading('The world'),
+            Row(
+              children: [
+                Expanded(child: Text('Lands freed', style: Txt.onStone(size: 12.5))),
+                Text('$freed of $lands', style: Txt.label(size: 12.5, color: Palette.cream)),
+              ],
+            ),
+            const SizedBox(height: 3),
+            bar(freed / lands, Palette.amber),
+            const SizedBox(height: 7),
+            Row(
+              children: [
+                Expanded(child: Text('Lands cleared, risen lords and all', style: Txt.onStone(size: 12.5))),
+                Text('$cleared of $lands', style: Txt.label(size: 12.5, color: Palette.cream)),
+              ],
+            ),
+            const SizedBox(height: 3),
+            bar(cleared / lands, const Color(0xFF9BE27A)),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _Banner extends StatelessWidget {

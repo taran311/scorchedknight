@@ -1331,10 +1331,16 @@ void main() {
     // Going round New Game+ again keeps it open, and having been told of it, it isn't news again.
     e.mark('journey:hc');
     e.mark('roads:hc');
+    e.state.foesFelled = 50;
     expect(e.newGamePlus(), isTrue);
     expect(e.state.hcUnlocked, isTrue);
     expect(e.hardcoreOpen, isTrue);
     expect(e.state.did, containsAll(['journey:hc', 'roads:hc']));
+    // Tasks the carried-over tallies already meet aren't handed out again for nothing.
+    expect(e.state.tasksClaimed, contains('win'), reason: 'a lifetime of wins carries over');
+    for (final t in allTasks) {
+      if (t.done(e.state)) expect(e.state.tasksClaimed, contains(t.id), reason: '${t.id} met at the start of New Game+');
+    }
     // A hardcore road: one life.
     final h = GameEngine(GameEngine.newGame(heroClass: HeroClass.knight)..hardcore = true, random: Random(6));
     expect(h.whyNotNewGamePlus(), isNotNull);

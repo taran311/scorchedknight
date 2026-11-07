@@ -361,16 +361,32 @@ class _MapPageState extends State<MapPage> {
       builder: (_) => SizedBox(height: MediaQuery.sizeOf(context).height * .82, child: _LandsSheet(controller: c)),
     );
     if (pick == null || !mounted) return;
-    setState(() {
-      _arenaPick = pick.kind == 'arena';
-      _hallPick = pick.kind == 'hall';
-      _placePick = pick.kind == 'place' ? pick.id : null;
-      _dungeonPick = pick.kind == 'dungeon' ? pick.id : null;
-      _wildPick = pick.kind == 'wild' ? int.parse(pick.id) : null;
-      if (pick.kind == 'land') _pick = int.parse(pick.id);
-      _jump++;
-    });
+    _apply(pick);
   }
+
+  /// A pick from the list: what it is, picked as its marker would be.
+  void _apply(_Pick pick) => setState(() {
+    _arenaPick = pick.kind == 'arena';
+    _hallPick = pick.kind == 'hall';
+    _placePick = pick.kind == 'place' ? pick.id : null;
+    _dungeonPick = pick.kind == 'dungeon' ? pick.id : null;
+    _wildPick = pick.kind == 'wild' ? int.parse(pick.id) : null;
+    if (pick.kind == 'land') _pick = int.parse(pick.id);
+    _jump++;
+  });
+
+  /// What's picked now, as a list row would name it.
+  _Pick get _current => _arenaPick
+      ? (kind: 'arena', id: '')
+      : _hallPick
+      ? (kind: 'hall', id: '')
+      : _placePick != null
+      ? (kind: 'place', id: _placePick!)
+      : _dungeonPick != null
+      ? (kind: 'dungeon', id: _dungeonPick!)
+      : _wildPick != null
+      ? (kind: 'wild', id: '$_wildPick')
+      : (kind: 'land', id: '$_pick');
 
   /// The button that opens the list.
   Widget _listButton() => Tooltip(
@@ -428,8 +444,8 @@ class _MapPageState extends State<MapPage> {
                       const SizedBox(width: gap),
                       SizedBox(
                         width: side,
-                        // As tall as the map (so the two line up), unless that's too short for the panel.
-                        height: math.min(box.maxHeight, math.max(w * _mapH / 1000, 560)),
+                        // The full height: the list of everywhere fills what the panel leaves.
+                        height: box.maxHeight,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
@@ -440,12 +456,16 @@ class _MapPageState extends State<MapPage> {
                                 InnBackButton(label: 'Town', onPressed: _home),
                               ],
                             ),
-                            const SizedBox(height: 8),
-                            Align(alignment: Alignment.centerLeft, child: _listButton()),
                             const SizedBox(height: 10),
-                            // (Laid out as on a phone: the panels already know how to stack for a
-                            // column this narrow.)
-                            Expanded(child: MediaQuery(data: MediaQuery.of(context).copyWith(size: Size(side, box.maxHeight)), child: SingleChildScrollView(child: _panel()))),
+                            // What's picked, then everywhere as a list under it (the room a wide
+                            // screen has to spare): a row picks it, as its marker does. (Laid out
+                            // as on a phone: the panels already know how to stack this narrow.)
+                            ConstrainedBox(
+                              constraints: BoxConstraints(maxHeight: box.maxHeight * .5),
+                              child: MediaQuery(data: MediaQuery.of(context).copyWith(size: Size(side, box.maxHeight)), child: SingleChildScrollView(child: _panel())),
+                            ),
+                            const SizedBox(height: 10),
+                            Expanded(child: _LandsSheet(controller: c, onPick: _apply, picked: _current)),
                           ],
                         ),
                       ),
@@ -2238,8 +2258,13 @@ typedef _Pick = ({String kind, String id});
 /// its level, how it stands, and a mark for what's waiting there. A row picks it, just as its
 /// marker on the map does.
 class _LandsSheet extends StatelessWidget {
-  const _LandsSheet({required this.controller});
+  const _LandsSheet({required this.controller, this.onPick, this.picked});
   final GameController controller;
+
+  /// Laid in beside the map (a wide screen) rather than a sheet: a row picks straight away, and
+  /// [picked] is lit.
+  final void Function(_Pick)? onPick;
+  final _Pick? picked;
 
   @override
   Widget build(BuildContext context) {
@@ -2258,13 +2283,13 @@ class _LandsSheet extends StatelessWidget {
     final lands = [for (var i = 0; i < continents.length; i++) i]..sort((a, b) => continents[a].minLevel.compareTo(continents[b].minLevel));
 
     Widget row({required _Pick pick, required Widget lead, required String name, required String line, Color? lineColour, bool dim = false, bool here = false, List<Widget> marks = const []}) => InkWell(
-      onTap: () => Navigator.of(context).pop(pick),
+      onTap: () => onPick != null ? onPick!(pick) : Navigator.of(context).pop(pick),
       child: Opacity(
         opacity: dim ? .55 : 1,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
           decoration: BoxDecoration(
-            color: here ? const Color(0x33FFB04A) : null,
+            color: picked == pick ? const Color(0x55FFB04A) : (here ? const Color(0x33FFB04A) : null),
             border: const Border(bottom: BorderSide(color: Color(0x33AE9A72))),
           ),
           child: Row(
@@ -2301,7 +2326,7 @@ class _LandsSheet extends StatelessWidget {
       });
 
     return Container(
-      decoration: BoxDecoration(color: const Color(0xFF1E1812), border: Border.all(color: Palette.amberLo, width: 1.5), borderRadius: const BorderRadius.vertical(top: Radius.circular(8))),
+      decoration: BoxDecoration(color: const Color(0xFF1E1812), border: Border.all(color: Palette.amberLo, width: 1.5), borderRadius: onPick == null ? const BorderRadius.vertical(top: Radius.circular(8)) : BorderRadius.circular(4)),
       child: Column(
         children: [
           Padding(
@@ -2311,7 +2336,7 @@ class _LandsSheet extends StatelessWidget {
                 const Icon(Icons.format_list_bulleted, color: Palette.amber, size: 20),
                 const SizedBox(width: 8),
                 Expanded(child: Text('Where to?', style: Txt.label(size: 18, color: Palette.cream, weight: FontWeight.w800))),
-                IconButton(tooltip: 'Close', onPressed: () => Navigator.of(context).pop(), icon: const Icon(Icons.close, color: Palette.parch2)),
+                if (onPick == null) IconButton(tooltip: 'Close', onPressed: () => Navigator.of(context).pop(), icon: const Icon(Icons.close, color: Palette.parch2)),
               ],
             ),
           ),
